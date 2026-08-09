@@ -196,6 +196,7 @@ val SAMPLE_D = """
 ## Kotlin（泛型 + 高阶函数）
 
 ```kotlin
+// 泛型 + lambda 高阶函数示例
 inline fun <T : Any> Result<T>.foldOrNull(
     onSuccess: (T) -> Unit,
     onError: (Throwable) -> Unit,
@@ -208,6 +209,7 @@ inline fun <T : Any> Result<T>.foldOrNull(
 ## Python
 
 ```python
+# 装饰器缓存
 def cached(fn: Callable) -> Callable:
     store = {}
     def wrap(*args):

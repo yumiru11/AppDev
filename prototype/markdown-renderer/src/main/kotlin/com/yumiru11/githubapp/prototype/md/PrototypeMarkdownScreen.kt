@@ -31,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -60,7 +61,28 @@ import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.mikepenz.markdown.utils.getUnescapedTextInNode
 import dev.snipme.highlights.Highlights
+import dev.snipme.highlights.model.SyntaxTheme
 import dev.snipme.highlights.model.SyntaxThemes
+import androidx.compose.material3.ColorScheme
+
+/** M3 语义色派生代码高亮主题：关键字=primary、字符串=tertiary、注释=outline、标点=onSurface（与正文同对比） */
+private val m3CodeTheme: SyntaxTheme
+    @Composable
+    get() {
+        val c = MaterialTheme.colorScheme
+        return SyntaxTheme(
+            key = "m3",
+            code = c.onSurface.toArgb(),
+            keyword = c.primary.toArgb(),
+            string = c.tertiary.toArgb(),
+            literal = c.tertiary.toArgb(),
+            comment = c.outline.toArgb(),
+            metadata = c.secondary.toArgb(),
+            multilineComment = c.outline.toArgb(),
+            punctuation = c.onSurface.toArgb(),
+            mark = c.secondaryContainer.toArgb(),
+        )
+    }
 
 @Composable
 fun PrototypeMarkdownScreen(variant: MdVariant, darkTheme: Boolean) {
@@ -92,12 +114,13 @@ fun PrototypeMarkdownScreen(variant: MdVariant, darkTheme: Boolean) {
                     ),
                     components = markdownComponents(
                         codeFence = { model ->
+                            val theme = m3CodeTheme
                             MarkdownHighlightedCodeFence(
                                 content = model.content,
                                 node = model.node,
                                 style = model.typography.code,
-                                highlightsBuilder = remember(darkTheme) {
-                                    Highlights.Builder().theme(SyntaxThemes.default(darkMode = darkTheme))
+                                highlightsBuilder = remember(darkTheme, colorScheme) {
+                                    Highlights.Builder().theme(theme)
                                 },
                             )
                         },
