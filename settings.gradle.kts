@@ -56,3 +56,5 @@ include(":feature:editor")
 include(":feature:settings")
 include(":feature:notifications")
 include(":feature:profile")
+
+include(":prototype:markdown-renderer")

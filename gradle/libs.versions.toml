@@ -17,7 +17,7 @@ core-ktx = "1.13.1"
 security-crypto = "1.1.0-alpha06"
 kotlinx-serialization = "1.7.3"
 kotlinx-coroutines = "1.9.0"
-markdown = "0.43.0"
+markdown = "0.38.1"
 icons = "2.2.1"
 sora = "0.23.6"
 appauth = "0.11.1"
@@ -51,6 +51,9 @@ icons-material-symbols-sharp = { group = "com.composables", name = "icons-materi
 icons-material-symbols-outlined-filled = { group = "com.composables", name = "icons-material-symbols-outlined-filled-android", version.ref = "icons" }
 icons-material-symbols-rounded-filled = { group = "com.composables", name = "icons-material-symbols-rounded-filled-android", version.ref = "icons" }
 icons-material-symbols-sharp-filled = { group = "com.composables", name = "icons-material-symbols-sharp-filled-android", version.ref = "icons" }
+icons-material-symbols-outlined-cmp = { group = "com.composables", name = "icons-material-symbols-outlined-cmp", version.ref = "icons" }
+icons-material-symbols-rounded-cmp = { group = "com.composables", name = "icons-material-symbols-rounded-cmp", version.ref = "icons" }
+icons-material-symbols-base-cmp = { group = "com.composables", name = "icons-material-symbols-cmp", version.ref = "icons" }
 
 # Activity + Lifecycle
 activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activity-compose" }
@@ -136,3 +139,4 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 apollo = { id = "com.apollographql.apollo", version.ref = "apollo" }
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
