@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -53,12 +54,13 @@ import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.compose.elements.MarkdownBlockQuote
-import com.mikepenz.markdown.compose.elements.highlightedCodeBlock
-import com.mikepenz.markdown.compose.elements.highlightedCodeFence
+import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeFence
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.mikepenz.markdown.utils.getUnescapedTextInNode
+import dev.snipme.highlights.Highlights
+import dev.snipme.highlights.model.SyntaxThemes
 
 @Composable
 fun PrototypeMarkdownScreen(variant: MdVariant, darkTheme: Boolean) {
@@ -89,9 +91,24 @@ fun PrototypeMarkdownScreen(variant: MdVariant, darkTheme: Boolean) {
                         inlineCodeBackground = if (darkTheme) Color(0xFF2E2E34) else Color(0xFFE8E8EC),
                     ),
                     components = markdownComponents(
-                        codeFence = highlightedCodeFence,
-                        codeBlock = highlightedCodeBlock,
+                        codeFence = { model ->
+                            MarkdownHighlightedCodeFence(
+                                content = model.content,
+                                node = model.node,
+                                style = model.typography.code,
+                                highlightsBuilder = remember(darkTheme) {
+                                    Highlights.Builder().theme(SyntaxThemes.default(darkMode = darkTheme))
+                                },
+                            )
+                        },
                         blockQuote = { model -> GitHubAlertOrQuote(model) },
+                        checkbox = { model ->
+                            com.mikepenz.markdown.m3.elements.MarkdownCheckBox(
+                                content = model.content,
+                                node = model.node,
+                                style = model.typography.text,
+                            )
+                        },
                     ),
                     modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                 )
@@ -101,12 +118,53 @@ fun PrototypeMarkdownScreen(variant: MdVariant, darkTheme: Boolean) {
 }
 
 /** GitHub Alert 检测 + 彩色卡片；非 Alert 复用官方 MarkdownBlockQuote（子节点解析、嵌套递归） */
+private data class AlertSpec(
+    val label: String,
+    val container: Color,
+    val onContainer: Color,
+    val accent: Color,
+    val icon: ImageVector,
+)
+
+/** 主题感知：用 M3 语义容器色（primaryContainer 等自动适配明暗），生产接 ExtendedColors */
+@Composable
+private fun alertSpecs(): Map<String, AlertSpec> {
+    val c = MaterialTheme.colorScheme
+    return mapOf(
+        "NOTE" to AlertSpec(
+            label = "Note",
+            container = c.primaryContainer, onContainer = c.onPrimaryContainer,
+            accent = c.primary, icon = MaterialSymbols.Rounded.Info,
+        ),
+        "TIP" to AlertSpec(
+            label = "Tip",
+            container = c.tertiaryContainer, onContainer = c.onTertiaryContainer,
+            accent = c.tertiary, icon = MaterialSymbols.Rounded.Lightbulb,
+        ),
+        "IMPORTANT" to AlertSpec(
+            label = "Important",
+            container = c.secondaryContainer, onContainer = c.onSecondaryContainer,
+            accent = c.secondary, icon = MaterialSymbols.Rounded.Priority_high,
+        ),
+        "WARNING" to AlertSpec(
+            label = "Warning",
+            container = c.surfaceContainerHighest, onContainer = c.onSurface,
+            accent = Color(0xFFB26A00), icon = MaterialSymbols.Rounded.Warning,
+        ),
+        "CAUTION" to AlertSpec(
+            label = "Caution",
+            container = c.errorContainer, onContainer = c.onErrorContainer,
+            accent = c.error, icon = MaterialSymbols.Rounded.Error,
+        ),
+    )
+}
+
 @Composable
 private fun GitHubAlertOrQuote(model: MarkdownComponentModel) {
     val doc = model.content
     val nodeText = model.node.getUnescapedTextInNode(doc)
     val type = Regex("""(?m)^>?[ \t]*\[!([A-Z]+)\]""").find(nodeText)?.groupValues?.get(1)?.uppercase()
-    val spec = ALERT_SPECS[type]
+    val spec = alertSpecs()[type]
     if (spec != null) {
         val body = nodeText.lineSequence()
             .drop(1)
@@ -117,42 +175,6 @@ private fun GitHubAlertOrQuote(model: MarkdownComponentModel) {
         MarkdownBlockQuote(content = doc, node = model.node)
     }
 }
-
-private data class AlertSpec(
-    val label: String,
-    val container: Color,
-    val onContainer: Color,
-    val accent: Color,
-    val icon: ImageVector,
-)
-
-private val ALERT_SPECS: Map<String, AlertSpec> = mapOf(
-    "NOTE" to AlertSpec(
-        label = "Note",
-        container = Color(0xFFDDE1FF), onContainer = Color(0xFF001B3C),
-        accent = Color(0xFF005AC8), icon = MaterialSymbols.Rounded.Info,
-    ),
-    "TIP" to AlertSpec(
-        label = "Tip",
-        container = Color(0xFFCDEDCF), onContainer = Color(0xFF00210F),
-        accent = Color(0xFF006E2B), icon = MaterialSymbols.Rounded.Lightbulb,
-    ),
-    "IMPORTANT" to AlertSpec(
-        label = "Important",
-        container = Color(0xFFEBDCFF), onContainer = Color(0xFF25004F),
-        accent = Color(0xFF6E3AB0), icon = MaterialSymbols.Rounded.Priority_high,
-    ),
-    "WARNING" to AlertSpec(
-        label = "Warning",
-        container = Color(0xFFFFE5B4), onContainer = Color(0xFF281900),
-        accent = Color(0xFF9A5B00), icon = MaterialSymbols.Rounded.Warning,
-    ),
-    "CAUTION" to AlertSpec(
-        label = "Caution",
-        container = Color(0xFFFFDAD7), onContainer = Color(0xFF410001),
-        accent = Color(0xFFBA1A1A), icon = MaterialSymbols.Rounded.Error,
-    ),
-)
 
 @Composable
 private fun AlertCard(spec: AlertSpec, body: String) {
