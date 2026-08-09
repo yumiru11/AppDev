@@ -1,0 +1,4 @@
+我正在规划一个功能全面丰富，用起来感觉轻量化、流畅，且美观的安卓github应用的开发，目前已知要求有使用kotlin,jetpack compose,ui全material you设计,简洁流畅，github使用graphql+rest api，markdown渲染需要完美融入material you，并且能点击链接跳转对应的仓库/issue/pr/...，需要搜索相关信息后考虑使用适合的三方库还是webview还是自建方案，必须融入material you风格。搜索相关信息，并规划具体技术栈，尤其是md渲染，以及material you风格ui设计。
+补充要求：readme必须正确渲染，能做到与网页端一致的正常渲染部分写法，issue和pr的ui结构基本与github网页端保持一致的同时适配material you设计，有准确的语法高亮，支持md编辑、代码编辑、仓库管理、审查、评论等写功能；ui有精美且舒适且符合material you审美的预设主题与自定义主题，支持动态配色，动效流畅，支持ui自定义，图标使用material you风格图标库；项目有完整测试工作流和ci/cd，并且活用github actions来加快开发效率，项目架构清晰，支持i18n，减少硬编码
+针对测试方面，我需要构建能快捷预览并进行详细功能测试的流程，最好能直接在linux环境里不依赖虚拟机/waydroid就直接能进行预览与测试（我不打算走kotlin多平台，专注于安卓端）
+我需要你详细搜索网络信息，仔细斟酌，再给出答复，选出最佳方案
