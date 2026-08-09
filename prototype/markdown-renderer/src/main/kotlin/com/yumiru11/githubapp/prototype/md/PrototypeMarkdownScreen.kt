@@ -1,15 +1,13 @@
 // ===== PROTOTYPE（可抛弃，验证用）=====
 // 组装浏览器：变体（Issue 正文 / 重型 GFM / README 式）× 亮/暗主题 × Material Symbols 图标条。
-// 本轮验证（用户第二轮反馈）：
-// 1) 语法高亮：markdownComponents(codeFence/codeBlock = highlightedCodeFence/Block) 接入 -code 模块
-// 2) GitHub Alert：0.38.1 无 alert 槽位 → 自定义 blockQuote 检测 `[!TYPE]` 渲染告警卡；非 Alert
-//    引用块 → 普通 Material You 引用卡（容器色 + 左侧 3dp primary 条，plan §2.8）
-// 3) 图标细观感：rounded（粗）vs outlined（细）分组标注对比
+// 第二轮修复（用户反馈）：
+// 1) blockQuote：alert 检测用 node.getUnescapedTextInNode() 切片；非 alert 复用官方 MarkdownBlockQuote
+//    （逐子节点 MarkdownElement 解析 → 引用不再吞全文、checkbox/标注正常）
+// 2) 行内代码：inlineCodeBackground 换不透明柔和表面色（0.38 为 annotator span，无法圆角——限制记录）
+// 3) 样本扩容（多语言代码高亮矩阵）见 PrototypeSamples.kt
 package com.yumiru11.githubapp.prototype.md
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,11 +34,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
-import com.composables.icons.materialsymbols.outlined.Home as OutlinedHome
-import com.composables.icons.materialsymbols.outlined.Notifications as OutlinedNotifications
-import com.composables.icons.materialsymbols.outlined.Search as OutlinedSearch
-import com.composables.icons.materialsymbols.outlined.Settings as OutlinedSettings
-import com.composables.icons.materialsymbols.outlined.Star as OutlinedStar
 import com.composables.icons.materialsymbols.rounded.Error
 import com.composables.icons.materialsymbols.rounded.Home
 import com.composables.icons.materialsymbols.rounded.Info
@@ -51,13 +44,21 @@ import com.composables.icons.materialsymbols.rounded.Search
 import com.composables.icons.materialsymbols.rounded.Settings
 import com.composables.icons.materialsymbols.rounded.Star
 import com.composables.icons.materialsymbols.rounded.Warning
+import com.composables.icons.materialsymbols.outlined.Home as OutlinedHome
+import com.composables.icons.materialsymbols.outlined.Notifications as OutlinedNotifications
+import com.composables.icons.materialsymbols.outlined.Search as OutlinedSearch
+import com.composables.icons.materialsymbols.outlined.Settings as OutlinedSettings
+import com.composables.icons.materialsymbols.outlined.Star as OutlinedStar
 import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
 import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.MarkdownBlockQuote
 import com.mikepenz.markdown.compose.elements.highlightedCodeBlock
 import com.mikepenz.markdown.compose.elements.highlightedCodeFence
 import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.model.rememberMarkdownState
+import com.mikepenz.markdown.utils.getUnescapedTextInNode
 
 @Composable
 fun PrototypeMarkdownScreen(variant: MdVariant, darkTheme: Boolean) {
@@ -66,7 +67,7 @@ fun PrototypeMarkdownScreen(variant: MdVariant, darkTheme: Boolean) {
         Surface(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                 Text(
-                    text = "PROTOTYPE - ${variant.label} - ${if (darkTheme) "dark" else "light"}",
+                    text = "PROTOTYPE · ${variant.label} · ${if (darkTheme) "dark" else "light"}",
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -77,11 +78,16 @@ fun PrototypeMarkdownScreen(variant: MdVariant, darkTheme: Boolean) {
                         MdVariant.A -> SAMPLE_A
                         MdVariant.B -> SAMPLE_B
                         MdVariant.C -> SAMPLE_C
+                        MdVariant.D -> SAMPLE_D
+                        MdVariant.E -> SAMPLE_E
                     },
                 )
                 Markdown(
                     state,
                     imageTransformer = Coil3ImageTransformerImpl,
+                    colors = markdownColor(
+                        inlineCodeBackground = if (darkTheme) Color(0xFF2E2E34) else Color(0xFFE8E8EC),
+                    ),
                     components = markdownComponents(
                         codeFence = highlightedCodeFence,
                         codeBlock = highlightedCodeBlock,
@@ -94,95 +100,97 @@ fun PrototypeMarkdownScreen(variant: MdVariant, darkTheme: Boolean) {
     }
 }
 
-/** GitHub Alert 检测 + 渲染；非 Alert 引用块用 Material You 引用卡 */
+/** GitHub Alert 检测 + 彩色卡片；非 Alert 复用官方 MarkdownBlockQuote（子节点解析、嵌套递归） */
 @Composable
 private fun GitHubAlertOrQuote(model: MarkdownComponentModel) {
-    val raw = model.content.trimStart()
-    val match = Regex("""\[!([A-Z]+)\]""").find(raw)
-    val type = match?.groupValues?.get(1)?.uppercase()
-    if (type != null) {
-        val body = raw.removePrefix("[!$type]").trimStart().removePrefix("]").trimStart()
-        AlertCard(type, body)
-        return
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(8.dp))
-            .padding(12.dp),
-    ) {
-        Box(modifier = Modifier.width(3.dp).height(28.dp).background(MaterialTheme.colorScheme.primary))
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = raw,
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyMedium,
-        )
+    val doc = model.content
+    val nodeText = model.node.getUnescapedTextInNode(doc)
+    val type = Regex("""(?m)^>?[ \t]*\[!([A-Z]+)\]""").find(nodeText)?.groupValues?.get(1)?.uppercase()
+    val spec = ALERT_SPECS[type]
+    if (spec != null) {
+        val body = nodeText.lineSequence()
+            .drop(1)
+            .joinToString("\n") { line: String -> line.removePrefix(">").trimStart() }
+            .trim()
+        AlertCard(spec, body)
+    } else {
+        MarkdownBlockQuote(content = doc, node = model.node)
     }
 }
 
-private data class AlertStyles(
-    val accent: Color,
+private data class AlertSpec(
+    val label: String,
     val container: Color,
     val onContainer: Color,
+    val accent: Color,
     val icon: ImageVector,
 )
 
-@Composable
-private fun alertStyles(type: String): AlertStyles {
-    val c = MaterialTheme.colorScheme
-    return when (type) {
-        "NOTE" -> AlertStyles(c.primary, c.primaryContainer, c.onPrimaryContainer, MaterialSymbols.Rounded.Info)
-        "TIP" -> AlertStyles(c.tertiary, c.tertiaryContainer, c.onTertiaryContainer, MaterialSymbols.Rounded.Lightbulb)
-        "IMPORTANT" -> AlertStyles(c.secondary, c.secondaryContainer, c.onSecondaryContainer, MaterialSymbols.Rounded.Priority_high)
-        "WARNING" -> AlertStyles(Color(0xFF9A5B00), c.surfaceContainerHighest, c.onSurface, MaterialSymbols.Rounded.Warning)
-        else -> AlertStyles(c.error, c.errorContainer, c.onErrorContainer, MaterialSymbols.Rounded.Error)
-    }
-}
+private val ALERT_SPECS: Map<String, AlertSpec> = mapOf(
+    "NOTE" to AlertSpec(
+        label = "Note",
+        container = Color(0xFFDDE1FF), onContainer = Color(0xFF001B3C),
+        accent = Color(0xFF005AC8), icon = MaterialSymbols.Rounded.Info,
+    ),
+    "TIP" to AlertSpec(
+        label = "Tip",
+        container = Color(0xFFCDEDCF), onContainer = Color(0xFF00210F),
+        accent = Color(0xFF006E2B), icon = MaterialSymbols.Rounded.Lightbulb,
+    ),
+    "IMPORTANT" to AlertSpec(
+        label = "Important",
+        container = Color(0xFFEBDCFF), onContainer = Color(0xFF25004F),
+        accent = Color(0xFF6E3AB0), icon = MaterialSymbols.Rounded.Priority_high,
+    ),
+    "WARNING" to AlertSpec(
+        label = "Warning",
+        container = Color(0xFFFFE5B4), onContainer = Color(0xFF281900),
+        accent = Color(0xFF9A5B00), icon = MaterialSymbols.Rounded.Warning,
+    ),
+    "CAUTION" to AlertSpec(
+        label = "Caution",
+        container = Color(0xFFFFDAD7), onContainer = Color(0xFF410001),
+        accent = Color(0xFFBA1A1A), icon = MaterialSymbols.Rounded.Error,
+    ),
+)
 
 @Composable
-private fun AlertCard(type: String, body: String) {
-    val s = alertStyles(type)
+private fun AlertCard(spec: AlertSpec, body: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
-            .background(s.container, RoundedCornerShape(10.dp))
+            .background(spec.container, RoundedCornerShape(10.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
-        Icon(s.icon, contentDescription = null, tint = s.accent, modifier = Modifier.size(22.dp))
+        Icon(spec.icon, contentDescription = null, tint = spec.accent, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(10.dp))
         Column {
             Text(
-                text = type,
-                color = s.accent,
+                text = spec.label,
+                color = spec.accent,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(2.dp))
-            Text(text = body, color = s.onContainer, style = MaterialTheme.typography.bodyMedium)
+            // 递归解析告警正文（保留 **加粗**、`行内码` 等行内格式）
+            Markdown(body)
         }
     }
 }
 
-/** 图标条：rounded（粗）与 outlined（细）分组对比 */
+/** 图标条：rounded（实心粗） vs outlined（细描边）两组对比，供用户选「圆角+细」偏好 */
 @Composable
 private fun IconStrip() {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        IconGroup("Rounded (thick)", listOf(
-            MaterialSymbols.Rounded.Star,
-            MaterialSymbols.Rounded.Home,
-            MaterialSymbols.Rounded.Search,
-            MaterialSymbols.Rounded.Notifications,
-            MaterialSymbols.Rounded.Settings,
+    Column {
+        IconGroup("Rounded（常规粗）", listOf(
+            MaterialSymbols.Rounded.Star, MaterialSymbols.Rounded.Home,
+            MaterialSymbols.Rounded.Search, MaterialSymbols.Rounded.Notifications, MaterialSymbols.Rounded.Settings,
         ))
-        IconGroup("Outlined (finer)", listOf(
-            MaterialSymbols.Outlined.OutlinedStar,
-            MaterialSymbols.Outlined.OutlinedHome,
-            MaterialSymbols.Outlined.OutlinedSearch,
-            MaterialSymbols.Outlined.OutlinedNotifications,
-            MaterialSymbols.Outlined.OutlinedSettings,
+        Spacer(Modifier.height(4.dp))
+        IconGroup("Outlined（细描边，更轻）", listOf(
+            MaterialSymbols.Outlined.OutlinedStar, MaterialSymbols.Outlined.OutlinedHome,
+            MaterialSymbols.Outlined.OutlinedSearch, MaterialSymbols.Outlined.OutlinedNotifications, MaterialSymbols.Outlined.OutlinedSettings,
         ))
     }
 }
@@ -190,11 +198,7 @@ private fun IconStrip() {
 @Composable
 private fun IconGroup(label: String, icons: List<ImageVector>) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.width(130.dp),
-        )
+        Text(text = label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(140.dp))
         icons.forEach { Icon(it, contentDescription = null, modifier = Modifier.size(30.dp)) }
     }
 }

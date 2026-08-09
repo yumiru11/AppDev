@@ -36,4 +36,10 @@ class MarkdownRendererPrototypeTest {
     @Test fun md_c_readme_light_renders() = snapshot("md_c_readme_light", MdVariant.C, dark = false)
 
     @Test fun md_c_readme_dark_renders() = snapshot("md_c_readme_dark", MdVariant.C, dark = true)
+
+    @Test fun md_d_codeMatrix_light_renders() = snapshot("md_d_code_light", MdVariant.D, dark = false)
+
+    @Test fun md_d_codeMatrix_dark_renders() = snapshot("md_d_code_dark", MdVariant.D, dark = true)
+
+    @Test fun md_e_codeMatrix2_light_renders() = snapshot("md_e_code2_light", MdVariant.E, dark = false)
 }

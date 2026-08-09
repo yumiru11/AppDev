@@ -10,6 +10,8 @@ enum class MdVariant(val label: String) {
     A("Issue 正文"),
     B("重型 GFM"),
     C("README 式"),
+    D("代码矩阵"),
+    E("代码矩阵二"),
 }
 
 /** 典型 Issue 正文：标题、引用、有序/无序/任务列表、@提及、#引用、行内代码 */
@@ -57,6 +59,17 @@ suspend fun fetchRepo(owner: String, name: String): Repo {
 }
 ```
 
+```kotlin
+// 泛型 + lambda + 高阶函数
+inline fun <T : Any> Result<T>.foldOrNull(
+    onSuccess: (T) -> Unit,
+    onError: (Throwable) -> Unit,
+): T? = fold(
+    onSuccess = { onSuccess(it); it },
+    onFailure = { onError(it); null },
+)
+```
+
 ```python
 # 装饰器
 def cached(fn: Callable) -> Callable:
@@ -66,6 +79,62 @@ def cached(fn: Callable) -> Callable:
             store[args] = fn(*args)
         return store[args]
     return wrap
+```
+
+```go
+// Go 并发示例
+func fetchAll(urls []string) []string {
+	ch := make(chan string)
+	for _, u := range urls {
+		go func(u string) { ch <- fetch(u) }(u)
+	}
+	results := make([]string, 0, len(urls))
+	for range urls {
+		results = append(results, <-ch)
+	}
+	return results
+}
+```
+
+```json
+{
+  "name": "AppDev",
+  "version": "0.1.0",
+  "tags": ["android", "compose", "material-you"],
+  "ci": { "enabled": true, "runs_on": "ubuntu-latest" }
+}
+```
+
+```yaml
+name: Build
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./gradlew assembleDebug
+```
+
+```bash
+# Shell 脚本
+for file in src/**/*.kt; do
+  if grep -q "TODO" "${'$'}file"; then
+    echo "⚠️  ${'$'}file 有 TODO"
+  fi
+done
+```
+
+```java
+// Java 8 流式 API
+public List<String> filterStarts(List<String> items, String prefix) {
+    return items.stream()
+        .filter(s -> s.startsWith(prefix))
+        .map(String::toUpperCase)
+        .collect(Collectors.toList());
+}
 ```
 
 ## 其他内联
@@ -118,4 +187,136 @@ type Repo = { owner: string; name: string };
 ![GitHub 标志](https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png)
 
 **加粗** 结尾 :rocket:
+""".trimIndent()
+
+/** 代码矩阵：全部语言高亮在一屏内验证 */
+val SAMPLE_D = """
+# 代码矩阵
+
+## Kotlin（泛型 + 高阶函数）
+
+```kotlin
+inline fun <T : Any> Result<T>.foldOrNull(
+    onSuccess: (T) -> Unit,
+    onError: (Throwable) -> Unit,
+): T? = fold(
+    onSuccess = { onSuccess(it); it },
+    onFailure = { onError(it); null },
+)
+```
+
+## Python
+
+```python
+def cached(fn: Callable) -> Callable:
+    store = {}
+    def wrap(*args):
+        if args not in store:
+            store[args] = fn(*args)
+        return store[args]
+    return wrap
+```
+
+## Go
+
+```go
+func fetchAll(urls []string) []string {
+	ch := make(chan string)
+	for _, u := range urls {
+		go func(u string) { ch <- fetch(u) }(u)
+	}
+	return results
+}
+```
+
+## JSON
+
+```json
+{
+  "name": "AppDev",
+  "version": "0.1.0",
+  "tags": ["android", "compose"],
+  "ci": { "enabled": true, "runs_on": "ubuntu-latest" }
+}
+```
+
+## YAML
+
+```yaml
+name: Build
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+```
+
+## Bash
+
+```bash
+for file in src/**/*.kt; do
+  if grep -q "TODO" "${'$'}file"; then
+    echo "TODO found"
+  fi
+done
+```
+
+## Java
+
+```java
+public List<String> filterStarts(List<String> items, String prefix) {
+    return items.stream()
+        .filter(s -> s.startsWith(prefix))
+        .map(String::toUpperCase)
+        .collect(Collectors.toList());
+}
+```
+""".trimIndent()
+
+/** 代码矩阵二：YAML/Bash/Java（JSON 已在 D 首屏确认） */
+val SAMPLE_E = """
+# 代码矩阵（二）
+
+
+## YAML
+
+```yaml
+name: Build
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+```
+
+## Bash
+
+```bash
+for file in src/**/*.kt; do
+  if grep -q "TODO" "${'$'}file"; then
+    echo "TODO found in ${'$'}file"
+  fi
+done
+```
+
+## Java
+
+```java
+public class RepoService {
+    private final HttpClient client;
+
+    public RepoService(HttpClient client) {
+        this.client = client;
+    }
+
+    public List<String> filterStarts(List<String> items, String prefix) {
+        return items.stream()
+            .filter(s -> s.startsWith(prefix))
+            .map(String::toUpperCase)
+            .collect(Collectors.toList());
+    }
+}
+```
 """.trimIndent()
