@@ -1,0 +1,85 @@
+# T1 发布流水线：tag v* 触发签名发布。
+#
+# 需在仓库 Settings → Secrets and variables → Actions 配置以下 Secrets：
+#   - KEYSTORE_BASE64  ：签名 keystore 文件的 base64 编码（`base64 -w0 release.keystore`）
+#   - KEYSTORE_PASSWORD：keystore 密码
+#   - KEY_ALIAS        ：签名 key 别名
+#   - KEY_PASSWORD     ：key 密码
+# app/build.gradle.kts 仅在 KEYSTORE_FILE 指向的文件存在时启用 signingConfig，
+# 本地无 Secrets 时 debug 构建不受影响。
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # gradle.properties 中的 org.gradle.java.home 是开发机私有路径（本机红线配置，不入库改），
+      # GitHub runner 上不存在会导致首个 Gradle 步骤硬失败；删除后回退到 setup-java 的 JAVA_HOME
+      - name: Override local JDK path for CI
+        run: sed -i '/org.gradle.java.home/d' gradle.properties
+
+      # 与 ci.yml 同源：注入开发机同款镜像 init 脚本，避免插件/依赖解析失败
+      - name: Install Gradle mirror init script (dev-machine parity)
+        run: |
+          mkdir -p "$HOME/.gradle/init.d"
+          cp .github/gradle/init-mirror.gradle "$HOME/.gradle/init.d/mirror.gradle"
+
+      # 与 ci.yml 同源：预置插件构件到 mavenLocal（runner 插件解析兜底）
+      - name: Seed plugin artifacts into mavenLocal
+        run: bash .github/gradle/seed-plugins.sh
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode keystore from Secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          test -s "$RUNNER_TEMP/release.keystore" || { echo "::error::KEYSTORE_BASE64 secret missing or invalid"; exit 1; }
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+
+      - name: Build signed AAB + APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon
+
+      - name: Upload mapping (R8/混淆映射)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-mapping
+          path: app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: ignore
+
+      - name: Create Release draft
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: ${{ github.ref_name }}
+          files: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/mapping/release/mapping.txt

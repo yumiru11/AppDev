@@ -1,5 +1,6 @@
 plugins {
     id("appdev.android.application")
+    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -9,6 +10,60 @@ android {
         applicationId = "com.yumiru11.githubapp"
         versionCode = 1
         versionName = "0.1.0"
+    }
+
+    testOptions {
+        unitTests {
+            // Robolectric/Roborazzi 需要 Android 资源
+            isIncludeAndroidResources = true
+        }
+    }
+
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = false
+        // AGP 8.7.3 的 lint-api 与新版 Compose 1.11 / Lifecycle AAR 内置 lint 检查器二进制不兼容
+        // （IncompatibleClassChangeError），整体禁用这批库内检测器；AGP/lint 升级后移除本段
+        disable += "AutoboxingStateCreation"
+        disable += "AutoboxingStateValueProperty"
+        disable += "ComposableLambdaParameterNaming"
+        disable += "ComposableNaming"
+        disable += "CompositionLocalNaming"
+        disable += "FlowOperatorInvokedInComposition"
+        disable += "FrequentlyChangingValue"
+        disable += "MutableCollectionMutableState"
+        disable += "OpaqueUnitKey"
+        disable += "ProduceStateDoesNotAssignValue"
+        disable += "RememberInComposition"
+        disable += "UnrememberedAnimatable"
+        disable += "UnrememberedMutableState"
+        disable += "UnrememberedState"
+        disable += "NullSafeMutableLiveData"
+    }
+
+    // 签名：仅当环境变量/Gradle 属性提供 keystore 时启用（CI release 流程），
+    // 本地无 keystore 不影响 debug 构建
+    signingConfigs {
+        val keystoreFile =
+            System.getenv("KEYSTORE_FILE")?.let(::file)
+                ?: project.findProperty("KEYSTORE_FILE")?.toString()?.let(::file)
+        if (keystoreFile != null && keystoreFile.exists()) {
+            create("release") {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                    ?: project.findProperty("KEYSTORE_PASSWORD")?.toString()
+                keyAlias = System.getenv("KEY_ALIAS")
+                    ?: project.findProperty("KEY_ALIAS")?.toString()
+                keyPassword = System.getenv("KEY_PASSWORD")
+                    ?: project.findProperty("KEY_PASSWORD")?.toString()
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+        }
     }
 }
 
@@ -28,4 +83,34 @@ dependencies {
 
     // Core
     implementation(libs.core.ktx)
+
+    // Testing（JUnit4 + Robolectric + Roborazzi + Konsist）
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.roborazzi.junit.rule)
+    testImplementation(libs.konsist)
+}
+
+// Konsist 无原生任务：以过滤后的单测任务充当 konsistCheck（只跑 konsist 包下的架构测试）。
+// 无匹配测试类时 isFailOnNoMatchingTests = false 保证空跑通过（T2 接入规则前的过渡态）
+tasks.register<Test>("konsistCheck") {
+    description = "Runs Konsist architecture tests (filtered from :app unit tests)."
+    group = "verification"
+    testClassesDirs =
+        project.tasks
+            .named<Test>("testDebugUnitTest")
+            .get()
+            .testClassesDirs
+    classpath =
+        project.tasks
+            .named<Test>("testDebugUnitTest")
+            .get()
+            .classpath
+    useJUnit()
+    filter {
+        includeTestsMatching("com.yumiru11.githubapp.konsist.*")
+        isFailOnNoMatchingTests = false
+    }
 }

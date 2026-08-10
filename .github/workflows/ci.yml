@@ -1,0 +1,104 @@
+# T1 质量门禁：PR / main push 必跑的检查流水线。
+#
+# 作为 required check 使用时（交付阶段配置 branch protection）：
+#   - 纯文档 PR（仅 docs/**/*.md、*.md、LICENSE 等）会被 paths-ignore 过滤掉，
+#     工作流不触发、required check 自动跳过，不会卡住 docs-only 合并。
+#   - 取舍：若未来出现「代码 + docs」混合变更，仍会触发全部检查（路径过滤是
+#     排除语义，不是包含语义），无需额外处理。
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**/*.md'
+      - '**/*.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+  pull_request:
+    paths-ignore:
+      - 'docs/**/*.md'
+      - '**/*.md'
+      - 'LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # gradle.properties 中的 org.gradle.java.home 是开发机私有路径（本机红线配置，不入库改），
+      # GitHub runner 上不存在会导致首个 Gradle 步骤硬失败；删除后回退到 setup-java 的 JAVA_HOME
+      - name: Override local JDK path for CI
+        run: sed -i '/org.gradle.java.home/d' gradle.properties
+
+      # 开发机有全局 ~/.gradle/init.d/mirror.gradle 覆盖仓库（本机全链验证基于该配置），
+      # runner 上没有会导致 ksp 插件 marker 解析失败；注入同款镜像配置对齐本机行为
+      - name: Install Gradle mirror init script (dev-machine parity)
+        run: |
+          mkdir -p "$HOME/.gradle/init.d"
+          cp .github/gradle/init-mirror.gradle "$HOME/.gradle/init.d/mirror.gradle"
+
+      # runner 上 Gradle 插件 marker 远程解析异常（curl 直取同 URL 却 200），
+      # 用 curl 预置全部插件构件到 mavenLocal 作确定性兜底（详见脚本头注）
+      - name: Seed plugin artifacts into mavenLocal
+        run: bash .github/gradle/seed-plugins.sh
+
+      # gradle/actions/setup-gradle@v4：自带构建缓存 + 依赖缓存
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Spotless check (ktlint)
+        run: ./gradlew spotlessCheck --no-daemon
+
+      - name: Detekt
+        run: ./gradlew detekt --no-daemon
+
+      - name: Android Lint
+        run: ./gradlew :app:lintDebug --no-daemon
+
+      - name: Konsist architecture tests
+        run: ./gradlew konsistCheck --no-daemon
+
+      - name: Unit tests
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+
+      # 失败时保留截图 diff 供排查（实际截图/compare 产物）；空测试阶段直接通过
+      - name: Verify Roborazzi screenshots
+        run: ./gradlew :app:verifyRoborazziDebug --no-daemon
+
+      - name: Upload Roborazzi diffs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: roborazzi-diffs
+          path: |
+            **/build/outputs/roborazzi/**
+            **/build/roborazzi/**
+          if-no-files-found: ignore
+
+      - name: Assemble debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
