@@ -1,0 +1,5 @@
+root = true
+
+[*.{kt,kts}]
+# Compose 约定：@Composable 函数首字母大写（ktlint function-naming 豁免）
+ktlint_function_naming_ignore_when_annotated_with = Composable

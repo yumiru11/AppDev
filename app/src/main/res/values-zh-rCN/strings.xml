@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 游客模式登录引导占位页（简体中文） -->
+    <string name="guest_welcome_title">欢迎使用 AppDev</string>
+    <string name="guest_welcome_subtitle">使用 GitHub 登录，浏览仓库、Issue 与 Pull Request。</string>
+    <string name="guest_sign_in">使用 GitHub 登录</string>
+    <string name="guest_browse_as_guest">以游客身份继续</string>
+</resources>

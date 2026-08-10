@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- TODO: 产品名定稿后改名（骨架期占位） -->
-    <string name="app_name">AppDev</string>
+    <string name="app_name" translatable="false">AppDev</string>
+
+    <!-- 游客模式登录引导占位页（T2 截图基准被测画面；T3/T4 feature:auth 接管） -->
+    <string name="guest_welcome_title">Welcome to AppDev</string>
+    <string name="guest_welcome_subtitle">Sign in with GitHub to browse repositories, issues and pull requests.</string>
+    <string name="guest_sign_in">Sign in with GitHub</string>
+    <string name="guest_browse_as_guest">Continue as guest</string>
 </resources>
