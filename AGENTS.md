@@ -93,27 +93,28 @@
 ```bash
 ./gradlew spotlessCheck              # ktlint 格式检查（全模块；修正用 spotlessApply）
 ./gradlew detekt                     # 静态分析（config/detekt/detekt.yml 基线）
-./gradlew konsistCheck               # 架构测试（Konsist，过滤 :app 单测 konsist 包；T2 前为占位空跑）
+./gradlew konsistCheck               # 架构测试（Konsist，过滤 :app 单测 konsist 包；T2 起含分层依赖方向护栏，违规即失败）
 ./gradlew :app:lintDebug             # Android Lint（abortOnError）
 ./gradlew :app:testDebugUnitTest     # 单测
 ./gradlew :app:verifyRoborazziDebug  # 截图基准校验（基准图入库，recordRoborazziDebug 更新）
 ```
 
 - Spotless 未挂进 `check/assemble`（`isEnforceCheck = false`），不拖慢日常构建；CI 显式调用
-- 截图基准路径：`app/build/outputs/roborazzi/*.png`，失败时 CI 上传 diff artifact
+- 截图基准路径：`app/src/test/screenshots/*.png`（入库；不用 build/outputs，因 build/ 不进版本库），失败时 CI 上传 diff artifact
 
 ## 测试体系（plan.md §12，全部 Linux JVM 免模拟器）
 
 ```bash
 ./gradlew :app:testDebugUnitTest            # 单测 + Robolectric + Compose 行为测试
-./gradlew :app:recordRoborazziDebug         # 生成/更新截图基准（build/outputs/roborazzi/*.png）
+./gradlew :app:recordRoborazziDebug         # 生成/更新截图基准（app/src/test/screenshots/*.png，基准入库）
 ./gradlew :app:verifyRoborazziDebug         # 校验截图
 ./gradlew :app:verifyRoborazziDebug --tests "*Markdown*"   # 只跑 MD 快照
 ./gradlew :app:konsistCheck :app:detekt :app:lintDebug
 ```
 
 - 金字塔：单测（JUnit + MockK + Turbine）→ 集成（MockWebServer / Apollo MockServer，MockWebServer 模拟 GitHub API，测试不碰真实网络）→ Compose UI（Robolectric 4.10+ Native Graphics + `testOptions.unitTests { isIncludeAndroidResources = true }`）→ 截图（Roborazzi）
-- 测试命名：`methodName_scenario_expectedBehavior`
+- 测试命名：**所有新增测试一律遵守 `methodName_scenario_expectedBehavior`**（如 `guestWelcomeScreen_lightTheme_matchesBaseline`）；detekt 已豁免测试源码的 FunctionNaming 检查以容纳下划线
+- 测试基建在 `core:testing`（MainDispatcherRule / ScreenshotTest 截图基类 / GitHubFakes 工厂骨架），新增测试依赖一律 `testImplementation(project(":core:testing"))`，不重复声明 Robolectric/Roborazzi
 
 ## CI/CD（plan.md §13）
 
@@ -132,7 +133,7 @@ feature/                   auth, home, repo, issue, pullrequest, search, editor,
 
 - `core:github-*` 只依赖网络与模型，不依赖 UI；`core:markdown` 内部隔离 WebView；`core:editor` 隔离 Sora 依赖
 - feature 之间只通过 navigation 深链交互，互不引用
-- Konsist 校验分层依赖方向；`core:model` 禁止 import android 包
+- Konsist 校验分层依赖方向（T2 落地于 `app/src/test/kotlin/.../konsist/ArchitectureTest.kt`）；工单措辞「`core:model` 禁止 import android 包」的实际落地：骨架无独立 core:model 模块，规则施加于 core:data 与 core:github-* 的 model 包（package 含 `model` 段），未来建立 core:model 后平移
 - 状态管理：单 Activity + Navigation Compose、ViewModel 暴露 `StateFlow<UiState>`、写操作走事件通道（乐观更新/失败回滚/Snackbar）
 
 ## 相关文档
