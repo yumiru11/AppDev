@@ -12,6 +12,7 @@ enum class MdVariant(val label: String) {
     C("README 式"),
     D("代码矩阵"),
     E("代码矩阵二"),
+    F("尾部元素"),
 }
 
 /** 典型 Issue 正文：标题、引用、有序/无序/任务列表、@提及、#引用、行内代码 */
@@ -321,4 +322,63 @@ public class RepoService {
     }
 }
 ```
+""".trimIndent()
+
+/** 尾部元素专项：Python 代码块、嵌套引用、行内元素矩阵、任务列表、图片占位 */
+val SAMPLE_F = """
+# 尾部元素验证
+
+## Python 代码块
+
+```python
+# 装饰器
+def cached(fn: Callable) -> Callable:
+    store = {}
+    def wrap(*args):
+        if args not in store:
+            store[args] = fn(*args)
+        return store[args]
+    return wrap
+```
+
+## 嵌套引用
+
+> 一级引用文本
+>> 二级嵌套引用文本
+
+## 行内元素矩阵
+
+**加粗文本** · *斜体文本* · ~~删除线文本~~ · `行内代码` · :rocket: :tada: :bug:
+
+[链接文本](https://github.com) 与 #123 引用
+
+## 任务列表
+
+- [x] 已完成任务
+- [ ] 未完成任务
+
+## 图片占位
+
+![GitHub 标志](https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png)
+""".trimIndent()
+
+/** 任务列表 + 图片占位 + 长段落专项 */
+val SAMPLE_G = """
+# 任务与图片
+
+## 任务列表
+
+- [x] 已完成任务
+- [ ] 未完成任务
+- [x] 带 **加粗** 与 `行内码` 的任务
+
+## 图片占位（coil3 网络，测试环境应显示加载失败占位）
+
+![GitHub 标志](https://github.githubassets.com/assets/GitHub-Mark-ea2971cee799.png)
+
+![仓库图标](https://avatars.githubusercontent.com/u/9919?v=4)
+
+## 长段落
+
+这是一段用于验证 **长文本换行** 的普通段落：包含多个中文字符、英文单词 mixed content、数字 12345、特殊符号 !@#\$%^&*()_+-=、以及 `行内代码` 片段，验证文本在窄容器内的自动换行、行高与段落间距是否符合预期，避免出现文字溢出、重叠或异常断行。
 """.trimIndent()

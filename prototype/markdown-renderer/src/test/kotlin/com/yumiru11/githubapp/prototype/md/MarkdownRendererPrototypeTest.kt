@@ -14,7 +14,7 @@ import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w411dp-h891dp-420dpi")
+@Config(sdk = [35], qualifiers = "w411dp-h891dp-640dpi")
 class MarkdownRendererPrototypeTest {
 
     @get:Rule
@@ -42,4 +42,8 @@ class MarkdownRendererPrototypeTest {
     @Test fun md_d_codeMatrix_dark_renders() = snapshot("md_d_code_dark", MdVariant.D, dark = true)
 
     @Test fun md_e_codeMatrix2_light_renders() = snapshot("md_e_code2_light", MdVariant.E, dark = false)
+
+    @Test fun md_f_tailElements_light_renders() = snapshot("md_f_tail_light", MdVariant.F, dark = false)
+
+    @Test fun md_f_tailElements_dark_renders() = snapshot("md_f_tail_dark", MdVariant.F, dark = true)
 }

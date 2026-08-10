@@ -14,6 +14,10 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            all {
+                // Roborazzi 官方推荐：硬件渲染模式提升截图颜色准确性（符号不再与背景混色）
+                it.systemProperties["robolectric.pixelCopyRenderMode"] = "hardware"
+            }
         }
     }
 }
@@ -37,6 +41,12 @@ dependencies {
     implementation(libs.icons.material.symbols.base.cmp)
     implementation(libs.icons.material.symbols.outlined.cmp)
     implementation(libs.icons.material.symbols.rounded.cmp)
+
+    // KotlinTextMate：VS Code 同款语法高亮（替换 Highlights，用户选定）
+    implementation(libs.kotlin.textmate.compose)
+
+    // KotlinTextMate：VS Code 同款语法高亮（替换 Highlights，用户选定）
+    implementation(libs.kotlin.textmate.compose)
 
     // 测试：Robolectric + Roborazzi 截图（Linux 纯 JVM 免模拟器）
     testImplementation(libs.junit)

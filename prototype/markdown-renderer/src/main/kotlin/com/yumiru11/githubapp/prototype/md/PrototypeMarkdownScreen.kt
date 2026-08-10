@@ -8,6 +8,7 @@
 package com.yumiru11.githubapp.prototype.md
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -55,34 +56,11 @@ import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.compose.elements.MarkdownBlockQuote
-import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeFence
+import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.mikepenz.markdown.utils.getUnescapedTextInNode
-import dev.snipme.highlights.Highlights
-import dev.snipme.highlights.model.SyntaxTheme
-import dev.snipme.highlights.model.SyntaxThemes
-import androidx.compose.material3.ColorScheme
-
-/** M3 语义色派生代码高亮主题：关键字=primary、字符串=tertiary、注释=outline、标点=onSurface（与正文同对比） */
-private val m3CodeTheme: SyntaxTheme
-    @Composable
-    get() {
-        val c = MaterialTheme.colorScheme
-        return SyntaxTheme(
-            key = "m3",
-            code = c.onSurface.toArgb(),
-            keyword = c.primary.toArgb(),
-            string = c.tertiary.toArgb(),
-            literal = c.tertiary.toArgb(),
-            comment = c.outline.toArgb(),
-            metadata = c.secondary.toArgb(),
-            multilineComment = c.outline.toArgb(),
-            punctuation = c.onSurface.toArgb(),
-            mark = c.secondaryContainer.toArgb(),
-        )
-    }
 
 @Composable
 fun PrototypeMarkdownScreen(variant: MdVariant, darkTheme: Boolean) {
@@ -104,7 +82,9 @@ fun PrototypeMarkdownScreen(variant: MdVariant, darkTheme: Boolean) {
                         MdVariant.C -> SAMPLE_C
                         MdVariant.D -> SAMPLE_D
                         MdVariant.E -> SAMPLE_E
+                        MdVariant.F -> SAMPLE_F
                     },
+                    immediate = true,
                 )
                 Markdown(
                     state,
@@ -114,15 +94,9 @@ fun PrototypeMarkdownScreen(variant: MdVariant, darkTheme: Boolean) {
                     ),
                     components = markdownComponents(
                         codeFence = { model ->
-                            val theme = m3CodeTheme
-                            MarkdownHighlightedCodeFence(
-                                content = model.content,
-                                node = model.node,
-                                style = model.typography.code,
-                                highlightsBuilder = remember(darkTheme, colorScheme) {
-                                    Highlights.Builder().theme(theme)
-                                },
-                            )
+                            MarkdownCodeFence(model.content, model.node, model.typography.code) { code, language, _ ->
+                                TextMateCodeBlock(code, language, darkTheme)
+                            }
                         },
                         blockQuote = { model -> GitHubAlertOrQuote(model) },
                         checkbox = { model ->
