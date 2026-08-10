@@ -26,6 +26,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   quality:
     name: Quality Gate
@@ -40,6 +43,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      # gradle.properties 中的 org.gradle.java.home 是开发机私有路径（本机红线配置，不入库改），
+      # GitHub runner 上不存在会导致首个 Gradle 步骤硬失败；删除后回退到 setup-java 的 JAVA_HOME
+      - name: Override local JDK path for CI
+        run: sed -i '/org.gradle.java.home/d' gradle.properties
 
       # gradle/actions/setup-gradle@v4：自带构建缓存 + 依赖缓存
       - name: Set up Gradle

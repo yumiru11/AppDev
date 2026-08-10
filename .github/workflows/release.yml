@@ -34,6 +34,11 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # gradle.properties 中的 org.gradle.java.home 是开发机私有路径（本机红线配置，不入库改），
+      # GitHub runner 上不存在会导致首个 Gradle 步骤硬失败；删除后回退到 setup-java 的 JAVA_HOME
+      - name: Override local JDK path for CI
+        run: sed -i '/org.gradle.java.home/d' gradle.properties
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
@@ -42,6 +47,7 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          test -s "$RUNNER_TEMP/release.keystore" || { echo "::error::KEYSTORE_BASE64 secret missing or invalid"; exit 1; }
           echo "KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
 
       - name: Build signed AAB + APK

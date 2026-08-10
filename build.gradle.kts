@@ -1,6 +1,7 @@
 // 注意：AGP / kotlin-android / kotlin-compose 三个插件已由 buildSrc 类路径提供（见 buildSrc/build.gradle.kts），
 // 根 build 里不可重复声明（否则报 "already on the classpath with an unknown version"）。
-// 其余插件（serialization/ksp/hilt/apollo/spotless/detekt）不在 buildSrc，可以正常在这里 apply false。
+// 其余插件（serialization/ksp/hilt/apollo）不在 buildSrc，可以正常在这里 apply false；
+// spotless/detekt 需要作用到根项目本身（全局格式化/静态分析），因此直接 apply。
 plugins {
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.ksp) apply false
