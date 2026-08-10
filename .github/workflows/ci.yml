@@ -56,19 +56,10 @@ jobs:
           mkdir -p "$HOME/.gradle/init.d"
           cp .github/gradle/init-mirror.gradle "$HOME/.gradle/init.d/mirror.gradle"
 
-      # 诊断：从 runner 探测插件 marker 可达性（失败排查用）
-      - name: Probe plugin repositories
-        run: |
-          for base in \
-            "https://maven.aliyun.com/repository/public" \
-            "https://maven.aliyun.com/repository/central" \
-            "https://maven.aliyun.com/repository/gradle-plugin" \
-            "https://repo.maven.apache.org/maven2" \
-            "https://plugins.gradle.org/m2"; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" -m 15 \
-              "$base/com/google/devtools/ksp/com.google.devtools.ksp.gradle.plugin/2.3.11/com.google.devtools.ksp.gradle.plugin-2.3.11.pom" || echo 000)
-            echo "$base -> $code"
-          done
+      # runner 上 Gradle 插件 marker 远程解析异常（curl 直取同 URL 却 200），
+      # 用 curl 预置全部插件构件到 mavenLocal 作确定性兜底（详见脚本头注）
+      - name: Seed plugin artifacts into mavenLocal
+        run: bash .github/gradle/seed-plugins.sh
 
       # gradle/actions/setup-gradle@v4：自带构建缓存 + 依赖缓存
       - name: Set up Gradle

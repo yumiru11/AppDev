@@ -17,6 +17,9 @@ gradle.settingsEvaluated { settings ->
     settings.pluginManagement {
         repositories {
             clear()
+            // mavenLocal 优先：runner 上远程插件 marker 解析异常（curl 可取但 Gradle 报
+            // not-found），由 seed-plugins.sh 预置到 ~/.m2，不经网络、确定性命中
+            mavenLocal()
             maven { url 'https://maven.aliyun.com/repository/public' }
             maven { url 'https://maven.aliyun.com/repository/google' }
             maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }

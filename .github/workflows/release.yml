@@ -45,6 +45,10 @@ jobs:
           mkdir -p "$HOME/.gradle/init.d"
           cp .github/gradle/init-mirror.gradle "$HOME/.gradle/init.d/mirror.gradle"
 
+      # 与 ci.yml 同源：预置插件构件到 mavenLocal（runner 插件解析兜底）
+      - name: Seed plugin artifacts into mavenLocal
+        run: bash .github/gradle/seed-plugins.sh
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
