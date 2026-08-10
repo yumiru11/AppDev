@@ -88,6 +88,20 @@
 
 关键经验（GitLight 实测）：**编译 error 用 Gradle 判**（快且全模块）；**源码警告只有 LSP 通道能看**（Gradle 编译输出 0 条警告）；LSP 冷启动 3-5 分钟，daemon 保持 warm；`assembleDebug` 不跑 Lint。CLI 用 `./gradlew` 而非直接 `lint`。
 
+## 质量门禁（T1：CI 同款命令，提交前本机跑）
+
+```bash
+./gradlew spotlessCheck              # ktlint 格式检查（全模块；修正用 spotlessApply）
+./gradlew detekt                     # 静态分析（config/detekt/detekt.yml 基线）
+./gradlew konsistCheck               # 架构测试（Konsist，过滤 :app 单测 konsist 包；T2 前为占位空跑）
+./gradlew :app:lintDebug             # Android Lint（abortOnError）
+./gradlew :app:testDebugUnitTest     # 单测
+./gradlew :app:verifyRoborazziDebug  # 截图基准校验（基准图入库，recordRoborazziDebug 更新）
+```
+
+- Spotless 未挂进 `check/assemble`（`isEnforceCheck = false`），不拖慢日常构建；CI 显式调用
+- 截图基准路径：`app/build/outputs/roborazzi/*.png`，失败时 CI 上传 diff artifact
+
 ## 测试体系（plan.md §12，全部 Linux JVM 免模拟器）
 
 ```bash
