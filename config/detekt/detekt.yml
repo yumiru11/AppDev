@@ -1,0 +1,47 @@
+# Detekt 基线配置（T1 质量门禁）
+# 根 build.gradle.kts 中 buildUponDefaultConfig = true，本文件仅覆盖/补充默认规则。
+# 后续随代码增长逐步收紧；出现误报可在对应位置用 @Suppress 抑制并注明原因。
+
+build:
+  maxIssues: 0
+
+comments:
+  active: true
+  CommentOverPrivateFunction:
+    active: false
+  CommentOverPrivateProperty:
+    active: false
+  EndOfSentenceFormat:
+    active: false
+  UndocumentedPublicClass:
+    active: false
+  UndocumentedPublicFunction:
+    active: false
+
+complexity:
+  LongMethod:
+    threshold: 80
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 10
+  TooManyFunctions:
+    thresholdInFiles: 20
+    thresholdInClasses: 20
+    thresholdInInterfaces: 20
+    thresholdInObjects: 20
+
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+  MatchingDeclarationName:
+    active: true
+
+style:
+  MagicNumber:
+    active: false
+  ReturnCount:
+    max: 4
+  UnusedPrivateMember:
+    ignoreAnnotated: ['Preview']
+  MaxLineLength:
+    maxLineLength: 150
