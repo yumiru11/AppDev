@@ -84,17 +84,13 @@ dependencies {
     // Core
     implementation(libs.core.ktx)
 
-    // Testing（JUnit4 + Robolectric + Roborazzi + Konsist）
-    testImplementation(libs.junit)
-    testImplementation(libs.robolectric)
-    testImplementation(libs.roborazzi)
-    testImplementation(libs.roborazzi.compose)
-    testImplementation(libs.roborazzi.junit.rule)
+    // Testing：Konsist 架构护栏 + core:testing 基建（JUnit4/Robolectric/Roborazzi/coroutines-test 由其 api 导出）
     testImplementation(libs.konsist)
+    testImplementation(project(":core:testing"))
 }
 
 // Konsist 无原生任务：以过滤后的单测任务充当 konsistCheck（只跑 konsist 包下的架构测试）。
-// 无匹配测试类时 isFailOnNoMatchingTests = false 保证空跑通过（T2 接入规则前的过渡态）
+// isFailOnNoMatchingTests = false 保证过滤无匹配时空跑通过；T2 起该包含正式架构护栏规则
 tasks.register<Test>("konsistCheck") {
     description = "Runs Konsist architecture tests (filtered from :app unit tests)."
     group = "verification"
