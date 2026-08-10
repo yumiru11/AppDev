@@ -15,7 +15,9 @@ import org.junit.Test
  * 分层约束（plan.md §10.1）：
  * 1. core 模块不得依赖 feature 模块
  * 2. core:github-*（graphql/rest/auth/data）只依赖网络与模型，不得依赖 Compose / core UI
- * 3. feature 模块互不引用（只可通过 core:navigation 深链）
+ * 3. feature 模块互不引用（只可通过 core:navigation 深链）；其推论前提是
+ *    「模块目录名 = 包名段」，故另有显式断言：feature 内 .kt 文件 package 必须以
+ *    com.yumiru11.githubapp.feature.<模块目录名> 开头（防包名漂移导致规则 3 漏检）
  * 4. 模型层禁止 import android.* —— 工单措辞为「core:model 禁止 import android 包」，
  *    实际骨架无独立 core:model 模块，故落地为：对承载纯数据模型的
  *    core:data 与 core:github-* 中 model 包施加该规则（未来建立 core:model 后平移）
@@ -63,6 +65,26 @@ class ArchitectureTest {
             }
 
         assertNoViolations("feature modules must not depend on each other (use core:navigation deep links)", violations)
+    }
+
+    @Test
+    fun featureModules_packageNaming_mustMatchModuleDirectory() {
+        // 规则 3 依赖「目录名 = 包名段」约定，此处把约定变成显式检查：
+        // feature/<module> 内的 .kt 文件 package 必须以 com.yumiru11.githubapp.feature.<module> 开头
+        val violations =
+            kotlinFiles(featureScope()).mapNotNull { file ->
+                val moduleName = file.featureModuleName()
+                val expectedPrefix = "$FEATURE_PACKAGE_PREFIX.$moduleName"
+                val packageName = file.packagee?.name.orEmpty()
+                val matches = packageName == expectedPrefix || packageName.startsWith("$expectedPrefix.")
+                if (moduleName.isEmpty() || !matches) {
+                    "${file.path}: package '$packageName' must start with '$expectedPrefix'"
+                } else {
+                    null
+                }
+            }
+
+        assertNoViolations("feature module packages must be named com.yumiru11.githubapp.feature.<module dir>", violations)
     }
 
     @Test

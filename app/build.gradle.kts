@@ -104,6 +104,14 @@ tasks.register<Test>("konsistCheck") {
             .named<Test>("testDebugUnitTest")
             .get()
             .classpath
+    // Konsist 在测试运行期扫描全仓源码，但多数模块（feature/大部分 core）不在 :app classpath 上，
+    // 默认 inputs 感知不到它们的变更 → 新增违规文件时任务被判 UP-TO-DATE 静默跳过。
+    // 显式声明源码目录为 inputs，任一模块源码变更即触发重扫
+    inputs.files(
+        rootProject.layout.projectDirectory.dir("core"),
+        rootProject.layout.projectDirectory.dir("feature"),
+        rootProject.layout.projectDirectory.dir("app/src"),
+    )
     useJUnit()
     filter {
         includeTestsMatching("com.yumiru11.githubapp.konsist.*")
