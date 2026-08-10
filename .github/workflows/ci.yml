@@ -49,6 +49,27 @@ jobs:
       - name: Override local JDK path for CI
         run: sed -i '/org.gradle.java.home/d' gradle.properties
 
+      # 开发机有全局 ~/.gradle/init.d/mirror.gradle 覆盖仓库（本机全链验证基于该配置），
+      # runner 上没有会导致 ksp 插件 marker 解析失败；注入同款镜像配置对齐本机行为
+      - name: Install Gradle mirror init script (dev-machine parity)
+        run: |
+          mkdir -p "$HOME/.gradle/init.d"
+          cp .github/gradle/init-mirror.gradle "$HOME/.gradle/init.d/mirror.gradle"
+
+      # 诊断：从 runner 探测插件 marker 可达性（失败排查用）
+      - name: Probe plugin repositories
+        run: |
+          for base in \
+            "https://maven.aliyun.com/repository/public" \
+            "https://maven.aliyun.com/repository/central" \
+            "https://maven.aliyun.com/repository/gradle-plugin" \
+            "https://repo.maven.apache.org/maven2" \
+            "https://plugins.gradle.org/m2"; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -m 15 \
+              "$base/com/google/devtools/ksp/com.google.devtools.ksp.gradle.plugin/2.3.11/com.google.devtools.ksp.gradle.plugin-2.3.11.pom" || echo 000)
+            echo "$base -> $code"
+          done
+
       # gradle/actions/setup-gradle@v4：自带构建缓存 + 依赖缓存
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4

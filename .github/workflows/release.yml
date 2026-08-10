@@ -39,6 +39,12 @@ jobs:
       - name: Override local JDK path for CI
         run: sed -i '/org.gradle.java.home/d' gradle.properties
 
+      # 与 ci.yml 同源：注入开发机同款镜像 init 脚本，避免插件/依赖解析失败
+      - name: Install Gradle mirror init script (dev-machine parity)
+        run: |
+          mkdir -p "$HOME/.gradle/init.d"
+          cp .github/gradle/init-mirror.gradle "$HOME/.gradle/init.d/mirror.gradle"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
