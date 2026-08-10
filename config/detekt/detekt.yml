@@ -33,6 +33,8 @@ complexity:
 naming:
   FunctionNaming:
     ignoreAnnotated: ['Composable']
+    # 测试命名规范 methodName_scenario_expectedBehavior（含下划线），豁免测试源码
+    excludes: ['**/src/test/**', '**/src/androidTest/**']
   MatchingDeclarationName:
     active: true
 
