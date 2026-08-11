@@ -28,8 +28,11 @@ afterEvaluate {
 }
 
 dependencies {
-    // DataStore Preferences（主题/语言等用户偏好）
-    implementation(libs.datastore.preferences)
+    // DataStore Preferences（主题/语言等用户偏好）。必须 api：DataStore<Preferences>
+    // 是本模块公共 API 签名（DataStoreModule @Provides 返回类型 + DefaultUserPreferencesRepository
+    // 构造参数），implementation 不透传会导致 app 测试编译/Hilt KSP 解析不到类型
+    // （InjectProcessingStep could not be resolved，2026-08-12 实测）。
+    api(libs.datastore.preferences)
 
     // Hilt（DataStoreModule 装配）
     implementation(libs.hilt.android)

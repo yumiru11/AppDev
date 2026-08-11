@@ -40,8 +40,10 @@ afterEvaluate {
 }
 
 dependencies {
-    // Room（离线缓存：仓库元数据 + ETag）
-    implementation(libs.room.runtime)
+    // Room（离线缓存：仓库元数据 + ETag）。room-runtime 必须 api：AppDatabase 继承
+    // RoomDatabase（父类型在 room-runtime），app 测试编译/Hilt KSP 解析 DAO 与
+    // @Inject AppDatabase 时需要该类型可见（implementation 不透传，2026-08-12 实测）。
+    api(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 

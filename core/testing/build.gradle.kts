@@ -7,6 +7,9 @@ android {
 }
 
 dependencies {
+    // 领域模型（GitHubFakes 工厂返回 core:data 真实模型；api 导出保证测试模块可用）
+    api(project(":core:data"))
+
     // Compose（截图测试基类依赖 @Composable / MaterialTheme；BOM 统一版本）
     api(platform(libs.compose.bom))
     api(libs.compose.ui)
