@@ -44,7 +44,7 @@
 - `settings.gradle.kts` → pluginManagement + dependencyResolutionManagement（**阿里云镜像优先**：`maven.aliyun.com/repository/{google,central,gradle-plugin}`，google()/mavenCentral() 仅兜底）+ `repositoriesMode.FAIL_ON_PROJECT_REPOS`
 - `gradle/libs.versions.toml` → 版本目录单一事实来源。具体版本见下方「依赖选型」表（先进基线：AGP 8.7.3 / Kotlin 2.3.21 / Compose BOM 2026.06.01 / Hilt 2.57.2 / Apollo 5.0.1 / Retrofit 2.11.0 / OkHttp 4.12.0 / Coil 3.4.0 / Navigation 2.8.4；不要使用 GitLight 老基线）
 - 模块 `build.gradle.kts` 模式（大多数已被约定插件覆盖，仅以下需要手写）：
-  - **okhttp 版本强制**（用得到 okhttp 的模块）：`configurations.all { resolutionStrategy { force("com.squareup.okhttp3:okhttp:<version>") } }`——必须，防 Apollo KMP 传递依赖拉高版本
+  - **okhttp 版本强制**：已统一在根 `build.gradle.kts` 的 `subprojects { configurations.all { resolutionStrategy { force(...) } } }`——防 Apollo KMP 传递依赖拉高版本（勿删）
   - Apollo schema（仅 `core:github-graphql`）：`apollo { service("github") { ... introspection { headers.put("Authorization", "Bearer ${System.getenv("GITHUB_TOKEN") ?: ""}") } } }`
   - JUnit 4（非 GitLight 的 JUnit 5）；packaging 豁免已在 appdev.android.application 约定插件内置
 
@@ -66,7 +66,7 @@
 | GitHub 专属图标 | **Octicons 手挑 SVG 入库**（primer/octicons，MIT）→ core:designsystem 的 vector drawable | merge/draft PR/branch/fork/issue/discussion/workflow 等 ~15 个；无现成 Compose 库 |
 | AppAuth | `net.openid:appauth:0.11.1` | OAuth PKCE（2021 后未更，标准实现，稳定） |
 | Apollo | 5.0.1 | 5.0.0 的 patch（GitLight 验证同线）；若 Kotlin 2.3 冲突再降 5.0.0 |
-| Retrofit/OkHttp | 2.11.0 / 4.12.0 | 同 GitLight；继续保留 `resolutionStrategy force` 防 Apollo KMP 拉高版本 |
+| Retrofit/OkHttp | **3.0.0 / 5.4.0**（2026-08-11 由 dependabot 升大版本，CI 已验证；Retrofit 3 原生 suspend + 自动 HttpException；OkHttp 5 拆 JVM/Android artifact，旧 API 二进制兼容） | MockWebServer 用新 artifact `mockwebserver3`（不再旧 `mockwebserver`）；`resolutionStrategy force` 统一在根 build.gradle.kts 强制 okhttp |
 | Room / Paging | **2.8.4** / **3.5.0** | plan 新增（GitLight 无 Room） |
 | 截图/UI 测试 | **Roborazzi 1.71.0** + **Robolectric 4.15.1**（Native Graphics）+ `roborazzi-compose` + `roborazzi-junit-rule` | `@GraphicsMode(GraphicsMode.Mode.NATIVE)`；任务 `recordRoborazziDebug`/`verifyRoborazziDebug` |
 | 单测 | JUnit 4 + MockK 1.14.11 + Turbine + MockWebServer + Apollo MockServer | plan §12.1；注意与 GitLight 的 JUnit 5 不同（Robolectric 生态用 JUnit4 顺）； |

@@ -41,3 +41,23 @@ tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
         xml.required.set(false)
     }
 }
+
+// ── OkHttp 版本统一强制（防止 Apollo KMP 传递依赖拉高版本）───────────────
+// 红线：okhttp 必须在整个依赖图中保持单一版本（见 AGENTS.md「依赖选型」）
+subprojects {
+    configurations.all {
+        resolutionStrategy {
+            force("com.squareup.okhttp3:okhttp:${libs.versions.okhttp.get()}")
+        }
+    }
+}
+
+// ── OkHttp 版本统一强制（防止 Apollo KMP 传递依赖拉高版本）───────────────
+// 红线：okhttp 必须在整个依赖图中保持单一版本（见 AGENTS.md「依赖选型」）
+subprojects {
+    configurations.all {
+        resolutionStrategy {
+            force("com.squareup.okhttp3:okhttp:${libs.versions.okhttp.get()}")
+        }
+    }
+}
