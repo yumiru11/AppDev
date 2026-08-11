@@ -26,7 +26,7 @@ paging = "3.5.0"
 hilt-navigation-compose = "1.2.0"
 
 # Quality（T1 质量门禁）
-spotless = "7.2.1"
+spotless = "8.9.0"
 detekt = "1.23.8"
 ktlint = "1.8.0"
 konsist = "0.17.3"
