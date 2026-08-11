@@ -4,6 +4,11 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+// Room schema 导出：MigrationTestHelper（Robolectric）校验 v1 建库与导出 schema 一致
+ksp {
+    arg("room.schemaLocation", "$projectDir/src/test/assets/schemas")
+}
+
 // 非 UI 模块：禁用 Compose 编译器插件（同 core:navigation 的处理方式），
 // 避免无 Compose 运行时依赖时编译失败。
 composeCompiler {
@@ -16,6 +21,13 @@ android {
     // 显式关闭 compose（约定插件默认开启）
     buildFeatures {
         compose = false
+    }
+
+    // MigrationTestHelper 从 assets 读导出 schema（src/test/assets/schemas）
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
     }
 }
 
@@ -37,7 +49,9 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
-    // 测试：Robolectric + room-testing（MigrationTestHelper）
+    // 测试：Robolectric + room-testing（MigrationTestHelper）+ coroutines-test
     testImplementation(project(":core:testing"))
     testImplementation(libs.room.testing)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(kotlin("test"))
 }
