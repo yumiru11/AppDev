@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 导航 -->
+    <string name="nav_home">首页</string>
+    <string name="nav_repos">仓库</string>
+    <string name="nav_profile">我的</string>
+
+    <!-- 顶栏 -->
+    <string name="search_hint">搜索 GitHub…</string>
+
+    <!-- 首页 Tab -->
+    <string name="tab_trending">热门</string>
+    <string name="tab_news">最新</string>
+    <string name="tab_issues">Issues</string>
+    <string name="tab_prs">Pull Requests</string>
+
+    <!-- 通知面板 -->
+    <string name="notification_title">通知</string>
+    <string name="notification_close">关闭</string>
+    <string name="notification_mark_all_read">全部已读</string>
+    <string name="notification_empty">暂无通知</string>
+
+    <!-- 占位页面 -->
+    <string name="profile_title">个人主页</string>
+    <string name="search_title">搜索</string>
+    <string name="repos_title">仓库</string>
+    <string name="home_title">首页</string>
+    <string name="placeholder_item">项目 %1$d</string>
+    <string name="placeholder_content">敬请期待</string>
+    <string name="repo_owner_repo">%1$s / %2$s</string>
+</resources>

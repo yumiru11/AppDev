@@ -26,6 +26,7 @@ android {
         // （IncompatibleClassChangeError），整体禁用这批库内检测器；AGP/lint 升级后移除本段
         disable += "AutoboxingStateCreation"
         disable += "AutoboxingStateValueProperty"
+        disable += "ComposableCoroutineCreation"
         disable += "ComposableLambdaParameterNaming"
         disable += "ComposableNaming"
         disable += "CompositionLocalNaming"
@@ -81,6 +82,17 @@ dependencies {
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.compose)
 
+    // Navigation + External links (T3)
+    implementation(libs.navigation.compose)
+    implementation(libs.androidx.browser)
+
+    // 导航骨架（core:ui + core:navigation）
+    implementation(project(":core:ui"))
+    implementation(project(":core:navigation"))
+
+    // 主题（core:designsystem）
+    implementation(project(":core:designsystem"))
+
     // Core
     implementation(libs.core.ktx)
 
@@ -94,6 +106,9 @@ dependencies {
 tasks.register<Test>("konsistCheck") {
     description = "Runs Konsist architecture tests (filtered from :app unit tests)."
     group = "verification"
+    // 并行执行（org.gradle.parallel=true）下需确保编译先完成：
+    // 任务从 testDebugUnitTest 取 classpath 产物，若并行期间编译仍写入会读浆 → 显式依赖编译完成
+    dependsOn(":app:compileDebugKotlin", ":app:compileDebugUnitTestKotlin")
     testClassesDirs =
         project.tasks
             .named<Test>("testDebugUnitTest")
@@ -106,11 +121,22 @@ tasks.register<Test>("konsistCheck") {
             .classpath
     // Konsist 在测试运行期扫描全仓源码，但多数模块（feature/大部分 core）不在 :app classpath 上，
     // 默认 inputs 感知不到它们的变更 → 新增违规文件时任务被判 UP-TO-DATE 静默跳过。
-    // 显式声明源码目录为 inputs，任一模块源码变更即触发重扫
+    // 显式声明源码目录为 inputs（排除 build/）：任一模块源码变更即触发重扫。
+    // 注意：不能用整目录 inputs（会把 build 产物卷进来，Gradle 8.12 隐式依赖校验在
+    // org.gradle.parallel=true 下会报错），必须用 fileTree 排除构建产物。
     inputs.files(
-        rootProject.layout.projectDirectory.dir("core"),
-        rootProject.layout.projectDirectory.dir("feature"),
-        rootProject.layout.projectDirectory.dir("app/src"),
+        rootProject.layout.projectDirectory
+            .dir("core")
+            .asFileTree
+            .matching { exclude("**/build/**") },
+        rootProject.layout.projectDirectory
+            .dir("feature")
+            .asFileTree
+            .matching { exclude("**/build/**") },
+        rootProject.layout.projectDirectory
+            .dir("app/src")
+            .asFileTree
+            .matching { exclude("**/build/**") },
     )
     useJUnit()
     filter {
