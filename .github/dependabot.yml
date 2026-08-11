@@ -1,49 +1,33 @@
-# # Dependabot：Gradle 依赖每周巡检，按生态分组便于合并评审。
-# version: 2
-# updates:
-#   - package-ecosystem: gradle
-#     directory: '/'
-#     schedule:
-#       interval: weekly
-#     open-pull-requests-limit: 10
-#     groups:
-#       compose-bom:
-#         patterns:
-#           - 'androidx.compose*'
-#       kotlin:
-#         patterns:
-#           - 'org.jetbrains.kotlin*'
-#           - 'com.google.devtools.ksp*'
-#       agp:
-#         patterns:
-#           - 'com.android.tools.build*'
-#           - 'com.android.tools*'
-#       androidx:
-#         patterns:
-#           - 'androidx.*'
-#       squareup:
-#         patterns:
-#           - 'com.squareup.*'
-#       apollo:
-#         patterns:
-#           - 'com.apollographql*'
-#       testing:
-#         patterns:
-#           - 'io.mockk*'
-#           - 'app.cash.turbine*'
-#           - 'org.robolectric*'
-#           - 'io.github.takahirom.roborazzi*'
-#           - 'junit*'
-#       spotless-ktlint:
-#         patterns:
-#           - 'com.diffplug.spotless*'
-#           - 'com.pinterest*'
-#       detekt:
-#         patterns:
-#           - 'io.gitlab.arturbosch.detekt*'
-# 
-#   # GitHub Actions 自身版本也保持巡检
-#   - package-ecosystem: github-actions
-#     directory: '/'
-#     schedule:
-#       interval: weekly
+# Dependabot：每周合并为 1 个总 PR（Gradle）+ 1 个总 PR（GitHub Actions），
+# 避免每周十几个 chore commit 堆满 main 历史。
+# 与 AGENTS.md 锁版决策冲突的依赖走 ignore 排除（AGP/coil/hilt/wrapper/kotlin），
+# 需要升级时手动移除对应 ignore 条目再让 bot 提。
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 1
+    groups:
+      all-gradle:
+        patterns:
+          - '*'
+    ignore:
+      - dependency-name: 'com.android.tools*'       # AGP 9 大改，规划不首批升
+      - dependency-name: 'io.coil-kt*'              # coil 3.5.0 用 Kotlin 2.4 构建
+      - dependency-name: 'com.google.dagger*'       # Hilt 2.59+ 需 AGP 9
+      - dependency-name: 'gradle-wrapper'           # wrapper 锁 8.12（腾讯镜像）
+      - dependency-name: 'org.jetbrains.kotlin*'    # Kotlin 基线升级需整体评估
+      - dependency-name: 'com.google.devtools.ksp*' # 随 Kotlin 联动
+
+  # GitHub Actions 自身版本也保持巡检，同样每周 1 个总 PR
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 1
+    groups:
+      all-actions:
+        patterns:
+          - '*'
