@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AppDev 应用主题：继承系统 Material NoActionBar（浅色）。
+     深色模式经 enableEdgeToEdge() + Compose AppTheme 处理，主题仅保证 NoActionBar + edge-to-edge。 -->
+<resources>
+    <style name="Theme.AppDev" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
