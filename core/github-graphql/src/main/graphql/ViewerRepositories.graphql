@@ -1,0 +1,25 @@
+# 当前用户仓库列表（GraphQL cursor 分页，对接 Paging 3）
+query ViewerRepositories($first: Int!, $after: String) {
+  viewer {
+    repositories(first: $first, after: $after, orderBy: { field: UPDATED_AT, direction: DESC }) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        id
+        name
+        isPrivate
+        description
+        stargazerCount
+        updatedAt
+        owner {
+          login
+        }
+        primaryLanguage {
+          name
+        }
+      }
+    }
+  }
+}

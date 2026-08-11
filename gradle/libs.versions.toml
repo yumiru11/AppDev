@@ -26,7 +26,8 @@ sora = "0.23.6"
 appauth = "0.11.1"
 room = "2.8.4"
 paging = "3.5.0"
-sqldelight = "2.0.2"
+# Apollo Kotlin 5 的新版 Normalized Cache（独立仓库 apollo-kotlin-normalized-cache）
+apollo-normalized-cache = "1.0.6"
 hilt-navigation-compose = "1.2.0"
 
 # Quality（T1 质量门禁）
@@ -93,9 +94,10 @@ hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-com
 
 # Apollo Kotlin
 apollo-runtime = { group = "com.apollographql.apollo", name = "apollo-runtime", version.ref = "apollo" }
-apollo-normalized-cache = { group = "com.apollographql.apollo", name = "apollo-normalized-cache", version.ref = "apollo" }
-apollo-normalized-cache-sqlite = { group = "com.apollographql.apollo", name = "apollo-normalized-cache-sqlite-android", version.ref = "apollo" }
-sqldelight-android-driver = { group = "app.cash.sqldelight", name = "android-driver", version.ref = "sqldelight" }
+# Apollo 5 旧版 apollo-normalized-cache 已弃用且 builder 装配均为 internal，
+# 改用新版独立缓存库（需配套 apollo compiler plugin，见 core:github-graphql）
+apollo-normalized-cache = { group = "com.apollographql.cache", name = "normalized-cache", version.ref = "apollo-normalized-cache" }
+apollo-normalized-cache-sqlite = { group = "com.apollographql.cache", name = "normalized-cache-sqlite", version.ref = "apollo-normalized-cache" }
 
 # Retrofit + OkHttp
 retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }

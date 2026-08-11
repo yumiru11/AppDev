@@ -1,0 +1,10 @@
+# 当前登录用户（验收标准：viewer 走通全链）
+query Viewer {
+  viewer {
+    login
+    name
+    avatarUrl
+    bio
+    url
+  }
+}
