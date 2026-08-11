@@ -11,7 +11,7 @@ composeCompiler {
 }
 
 android {
-    namespace = "com.yumiru11.githubapp.core.github_data"
+    namespace = "com.yumiru11.githubapp.core.githubdata"
 
     // 显式关闭 compose（约定插件默认开启）
     buildFeatures {
@@ -36,6 +36,9 @@ dependencies {
     // Paging 3（GraphQL cursor PagingSource）
     implementation(libs.paging.runtime)
 
+    // FetchPolicy（GraphQL 读优先通道强制网络新鲜度）
+    implementation(libs.apollo.normalized.cache)
+
     // Hilt（RepositoryModule 装配）
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -46,4 +49,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.turbine)
     testImplementation(libs.mockwebserver3)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.kotlinx.serialization.json)
+    testImplementation(kotlin("test"))
 }
