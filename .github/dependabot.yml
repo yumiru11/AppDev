@@ -1,49 +1,49 @@
-# Dependabot：Gradle 依赖每周巡检，按生态分组便于合并评审。
-version: 2
-updates:
-  - package-ecosystem: gradle
-    directory: '/'
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 10
-    groups:
-      compose-bom:
-        patterns:
-          - 'androidx.compose*'
-      kotlin:
-        patterns:
-          - 'org.jetbrains.kotlin*'
-          - 'com.google.devtools.ksp*'
-      agp:
-        patterns:
-          - 'com.android.tools.build*'
-          - 'com.android.tools*'
-      androidx:
-        patterns:
-          - 'androidx.*'
-      squareup:
-        patterns:
-          - 'com.squareup.*'
-      apollo:
-        patterns:
-          - 'com.apollographql*'
-      testing:
-        patterns:
-          - 'io.mockk*'
-          - 'app.cash.turbine*'
-          - 'org.robolectric*'
-          - 'io.github.takahirom.roborazzi*'
-          - 'junit*'
-      spotless-ktlint:
-        patterns:
-          - 'com.diffplug.spotless*'
-          - 'com.pinterest*'
-      detekt:
-        patterns:
-          - 'io.gitlab.arturbosch.detekt*'
-
-  # GitHub Actions 自身版本也保持巡检
-  - package-ecosystem: github-actions
-    directory: '/'
-    schedule:
-      interval: weekly
+# # Dependabot：Gradle 依赖每周巡检，按生态分组便于合并评审。
+# version: 2
+# updates:
+#   - package-ecosystem: gradle
+#     directory: '/'
+#     schedule:
+#       interval: weekly
+#     open-pull-requests-limit: 10
+#     groups:
+#       compose-bom:
+#         patterns:
+#           - 'androidx.compose*'
+#       kotlin:
+#         patterns:
+#           - 'org.jetbrains.kotlin*'
+#           - 'com.google.devtools.ksp*'
+#       agp:
+#         patterns:
+#           - 'com.android.tools.build*'
+#           - 'com.android.tools*'
+#       androidx:
+#         patterns:
+#           - 'androidx.*'
+#       squareup:
+#         patterns:
+#           - 'com.squareup.*'
+#       apollo:
+#         patterns:
+#           - 'com.apollographql*'
+#       testing:
+#         patterns:
+#           - 'io.mockk*'
+#           - 'app.cash.turbine*'
+#           - 'org.robolectric*'
+#           - 'io.github.takahirom.roborazzi*'
+#           - 'junit*'
+#       spotless-ktlint:
+#         patterns:
+#           - 'com.diffplug.spotless*'
+#           - 'com.pinterest*'
+#       detekt:
+#         patterns:
+#           - 'io.gitlab.arturbosch.detekt*'
+# 
+#   # GitHub Actions 自身版本也保持巡检
+#   - package-ecosystem: github-actions
+#     directory: '/'
+#     schedule:
+#       interval: weekly
