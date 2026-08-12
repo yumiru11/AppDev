@@ -35,6 +35,7 @@ fun HomeScreen(
     onProfileClick: () -> Unit,
     onTabSelected: (String) -> Unit,
     selectedTab: String,
+    blurEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     var showNotifPanel by remember { mutableStateOf(false) }
@@ -46,12 +47,14 @@ fun HomeScreen(
                 onSearchClick = onSearchClick,
                 onNotificationClick = { showNotifPanel = true },
                 onProfileClick = onProfileClick,
+                blurEnabled = blurEnabled,
             )
         },
         bottomBar = {
             AppBottomBar(
                 selectedTab = selectedTab,
                 onTabSelected = onTabSelected,
+                blurEnabled = blurEnabled,
             )
         },
         modifier = modifier,

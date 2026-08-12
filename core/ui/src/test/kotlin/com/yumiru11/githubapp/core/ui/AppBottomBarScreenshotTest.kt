@@ -9,9 +9,12 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * AppBottomBar 截图基准测试（light / dark / 选中仓库 Tab 三态）。
+ * AppBottomBar 截图基准测试（light / dark / 选中仓库 Tab / 玻璃关闭四态）。
  *
- * 基准 PNG：core/ui/src/test/screenshots/AppBottomBar_{light,dark,repos}.png
+ * 基准 PNG：core/ui/src/test/screenshots/AppBottomBar_{light,dark,repos,blurDisabled}.png
+ *
+ * Robolectric 限制标注：同 AppTopBarScreenshotTest（模糊像素不可见，基准断言
+ * 玻璃层装配与布局，模糊代码路径由编译与渲染不崩溃保证）。
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -43,6 +46,17 @@ class AppBottomBarScreenshotTest : ScreenshotTest() {
             AppBottomBar(
                 selectedTab = TAB_REPOS,
                 onTabSelected = {},
+            )
+        }
+    }
+
+    @Test
+    fun appBottomBar_blurDisabled_matchesBaseline() {
+        captureScreenshot(name = "AppBottomBar_blurDisabled", darkTheme = false) {
+            AppBottomBar(
+                selectedTab = AppRoute.HOME,
+                onTabSelected = {},
+                blurEnabled = false,
             )
         }
     }
