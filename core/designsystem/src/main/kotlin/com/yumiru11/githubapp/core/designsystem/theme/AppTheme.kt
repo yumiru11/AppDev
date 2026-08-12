@@ -4,6 +4,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalContext
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 
 /**
@@ -39,7 +40,13 @@ fun AppTheme(
         ThemeMode.HIGH_CONTRAST -> darkTheme // follows system
     }
 
-    val themeColors = resolveThemeColors(themeMode, isDark)
+    val themeColors = when (themeMode) {
+        // Dynamic modes need a composition context (wallpaper extraction on API 31+);
+        // the pure resolver returns fixed fallbacks for the other 5 modes.
+        ThemeMode.DYNAMIC_LIGHT -> dynamicLightColors(LocalContext.current)
+        ThemeMode.DYNAMIC_DARK -> dynamicDarkColors(LocalContext.current)
+        else -> resolveThemeColors(themeMode, isDark)
+    }
 
     CompositionLocalProvider(
         ExtendedColorsProvider.Local provides themeColors.extendedColors,

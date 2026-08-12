@@ -1,8 +1,13 @@
 package com.yumiru11.githubapp.core.designsystem.theme
 
+import android.content.Context
+import android.os.Build
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 
@@ -230,14 +235,53 @@ fun oledPalette(): ThemeColors = ThemeColors(
 )
 
 // ══════════════════════════════════════════════════════════════════════════════
-// Dynamic palettes — placeholder, actual extraction on API 31+ in next task
+// Dynamic palettes — wallpaper extraction on API 31+, fixed fallback below
 // ══════════════════════════════════════════════════════════════════════════════
 
-/** Dynamic Light — falls back to [lightPalette] until API 31+ wiring. */
-fun dynamicLightPalette(): ThemeColors = lightPalette()
+/**
+ * True when the device can provide dynamic wallpaper colors (API 31+).
+ *
+ * Extracted as a pure function so the SDK gate is unit-testable without
+ * Robolectric; [dynamicLightColors] / [dynamicDarkColors] use it to decide
+ * between real extraction and the fixed fallback palettes (ADR-0004).
+ */
+internal fun supportsDynamicColors(apiLevel: Int = Build.VERSION.SDK_INT): Boolean =
+    apiLevel >= Build.VERSION_CODES.S
 
-/** Dynamic Dark — falls back to [darkPalette] until API 31+ wiring. */
-fun dynamicDarkPalette(): ThemeColors = darkPalette()
+/**
+ * Dynamic Light — wallpaper-derived Material 3 scheme on API 31+.
+ *
+ * Uses [dynamicLightColorScheme] (Material 3 dynamic color extraction from
+ * the system wallpaper) plus [rememberExtendedColors] to derive the extended
+ * semantic tokens from the dynamic scheme. Below API 31 falls back to
+ * [lightPalette] with its hand-tuned GitHub values (ADR-0004).
+ */
+@Composable
+fun dynamicLightColors(context: Context): ThemeColors {
+    if (!supportsDynamicColors()) return lightPalette()
+    val scheme = dynamicLightColorScheme(context)
+    return ThemeColors(
+        colorScheme = scheme,
+        extendedColors = rememberExtendedColors(scheme),
+    )
+}
+
+/**
+ * Dynamic Dark — wallpaper-derived Material 3 scheme on API 31+.
+ *
+ * Dark counterpart of [dynamicLightColors]: uses [dynamicDarkColorScheme]
+ * and [rememberExtendedColors] on API 31+, falls back to [darkPalette]
+ * below (ADR-0004).
+ */
+@Composable
+fun dynamicDarkColors(context: Context): ThemeColors {
+    if (!supportsDynamicColors()) return darkPalette()
+    val scheme = dynamicDarkColorScheme(context)
+    return ThemeColors(
+        colorScheme = scheme,
+        extendedColors = rememberExtendedColors(scheme),
+    )
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // High Contrast palette
@@ -388,8 +432,10 @@ fun highContrastDarkPalette(): ThemeColors = ThemeColors(
  * light vs dark. HIGH_CONTRAST also respects [isDark] to offer both light
  * and dark high-contrast variants.
  *
- * DYNAMIC_LIGHT / DYNAMIC_DARK currently return fixed palettes; the actual
- * `dynamicColor` extraction on API 31+ will be wired in the follow-up task.
+ * DYNAMIC_LIGHT / DYNAMIC_DARK return the fixed fallback palettes here so the
+ * resolver stays a pure function (unit-testable without composition) and total
+ * over all 7 modes. [AppTheme] intercepts those two modes and calls the real
+ * composable extractors [dynamicLightColors] / [dynamicDarkColors] instead.
  */
 fun resolveThemeColors(themeMode: ThemeMode, isDark: Boolean): ThemeColors =
     when (themeMode) {
@@ -397,7 +443,7 @@ fun resolveThemeColors(themeMode: ThemeMode, isDark: Boolean): ThemeColors =
         ThemeMode.LIGHT -> lightPalette()
         ThemeMode.DARK -> darkPalette()
         ThemeMode.OLED -> oledPalette()
-        ThemeMode.DYNAMIC_LIGHT -> dynamicLightPalette()
-        ThemeMode.DYNAMIC_DARK -> dynamicDarkPalette()
+        ThemeMode.DYNAMIC_LIGHT -> lightPalette()
+        ThemeMode.DYNAMIC_DARK -> darkPalette()
         ThemeMode.HIGH_CONTRAST -> if (isDark) highContrastDarkPalette() else highContrastLightPalette()
     }
