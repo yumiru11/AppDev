@@ -29,7 +29,7 @@
 | Android SDK | `/home/zhiyi/Android/Sdk`（`local.properties` 里写 `sdk.dir=`） | platforms: android-35、android-37；build-tools: 35.0.0、36.0.0 |
 | compileSdk / targetSdk / minSdk | 35 / 35 / 26 | buildToolsVersion 35.0.0 |
 | JVM target | 17（compileOptions + kotlinOptions 一致） | |
-| **Google Maven** | **不可达，必须走阿里云镜像** | `dl.google.com`/`maven.google.com` 返回 HTTP 000（2026-08-09 实测）。settings.gradle.kts 的 pluginManagement 与 dependencyResolutionManagement 已配置 `maven.aliyun.com/repository/{google,central,gradle-plugin}` 优先 + google()/mavenCentral() 兜底。**不要删掉镜像，不要调回 google() 优先** |
+| **Google Maven** | **本机不可达，走阿里云镜像（init script）** | `dl.google.com`/`maven.google.com` 在本机返回 HTTP 000（2026-08-09 实测）。镜像由本机 `~/.gradle/init.d/mirror.gradle` 注入（**不入库**），settings.gradle.kts 保持官方源（google()/mavenCentral()），CI/GitHub Actions 直连官方源（阿里云在 CI 上 502，2026-08-12 实测）。**勿在 settings.gradle.kts 写镜像，勿删 ~/.gradle/init.d/mirror.gradle** |
 
 ## Gradle 脚手架（模仿 GitLight 的配置）
 
@@ -41,7 +41,7 @@
 - `gradle/wrapper/gradle-wrapper.properties` → 上面表格的腾讯镜像 8.12-bin
 - `gradle.properties` → 必含：`org.gradle.java.home=/usr/lib/jvm/java-21-openjdk`、`org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8`、`android.useAndroidX=true`、`android.nonTransitiveRClass=true`、`org.gradle.parallel=true`、`org.gradle.caching=true`
 - `local.properties` → `sdk.dir=/home/zhiyi/Android/Sdk`（不入库）
-- `settings.gradle.kts` → pluginManagement + dependencyResolutionManagement（**阿里云镜像优先**：`maven.aliyun.com/repository/{google,central,gradle-plugin}`，google()/mavenCentral() 仅兜底）+ `repositoriesMode.FAIL_ON_PROJECT_REPOS`
+- `settings.gradle.kts` → pluginManagement + dependencyResolutionManagement（**保持官方源**：google()/mavenCentral()/gradlePluginPortal()；镜像由本机 `~/.gradle/init.d/mirror.gradle` 注入不入库）+ `repositoriesMode.FAIL_ON_PROJECT_REPOS`
 - `gradle/libs.versions.toml` → 版本目录单一事实来源。具体版本见下方「依赖选型」表（先进基线：AGP 8.7.3 / Kotlin 2.3.21 / Compose BOM 2026.06.01 / Hilt 2.57.2 / Apollo 5.0.1 / Retrofit 2.11.0 / OkHttp 4.12.0 / Coil 3.4.0 / Navigation 2.8.4；不要使用 GitLight 老基线）
 - 模块 `build.gradle.kts` 模式（大多数已被约定插件覆盖，仅以下需要手写）：
   - **okhttp 版本强制**：已统一在根 `build.gradle.kts` 的 `subprojects { configurations.all { resolutionStrategy { force(...) } } }`——防 Apollo KMP 传递依赖拉高版本（勿删）
