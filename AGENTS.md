@@ -101,6 +101,7 @@
 
 - Spotless 未挂进 `check/assemble`（`isEnforceCheck = false`），不拖慢日常构建；CI 显式调用
 - 截图基准路径：`app/src/test/screenshots/*.png`（入库；不用 build/outputs，因 build/ 不进版本库），失败时 CI 上传 diff artifact
+- **⚠️ 铁律（2026-08-12 血泪教训）：本地验证必须与 CI Quality Gate 命令级对齐——子代理/自主开发只跑 `compileDebugKotlin + testDebugUnitTest` 会漏掉 spotless/detekt，CI 必挂**。T4/T6/T7 三票 Wave 曾因派发时只给 compile/test 导致 9 个违规（包名下划线、常量命名、MatchingDeclarationName、NestedBlockDepth/ReturnCount/TooGenericExceptionCaught）全在 CI 才爆。任何实现/修复任务的验证命令必须含 `spotlessCheck + detekt`（派子代理时写进 prompt）。ktlint 常见坑：Kotlin 包名禁下划线（用 githubauth 不用 github_auth）、const val 必须 SCREAMING_SNAKE、文件名须匹配唯一顶层声明；detekt 业务合理违规用 `@file:Suppress` + 理由注释（T3 先例）。区分两类 CI 红：环境差异（镜像/网络，本地绿 CI 红，如 aliyun 502）vs 验证覆盖不足（命令没跑，本次 spotless/detekt 属此类）
 
 ## 测试体系（plan.md §12，全部 Linux JVM 免模拟器）
 
