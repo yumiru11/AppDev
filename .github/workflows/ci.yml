@@ -49,13 +49,9 @@ jobs:
       - name: Override local JDK path for CI
         run: sed -i '/org.gradle.java.home/d' gradle.properties
 
-      # 开发机有全局 ~/.gradle/init.d/mirror.gradle 覆盖仓库（本机全链验证基于该配置），
-      # runner 上没有会导致 ksp 插件 marker 解析失败；注入同款镜像配置对齐本机行为
-      - name: Install Gradle mirror init script (dev-machine parity)
-        run: |
-          mkdir -p "$HOME/.gradle/init.d"
-          cp .github/gradle/init-mirror.gradle "$HOME/.gradle/init.d/mirror.gradle"
-
+      # 开发机有全局 ~/.gradle/init.d/mirror.gradle（阿里云优先，本机 Google Maven 不可达）；
+      # GitHub runner 直连官方源即可（阿里云在 CI 上 502，2026-08-12 实测），不再注入镜像
+      # 注：seed-plugins.sh 仍保留（runner 插件 marker 解析的 curl 兜底，走官方源）
       # runner 上 Gradle 插件 marker 远程解析异常（curl 直取同 URL 却 200），
       # 用 curl 预置全部插件构件到 mavenLocal 作确定性兜底（详见脚本头注）
       - name: Seed plugin artifacts into mavenLocal
