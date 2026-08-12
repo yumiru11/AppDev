@@ -22,11 +22,11 @@ object AppBlur {
      * 半透明纯色层的 alpha（§6.1 静止态 / §6.2 API 26–30 降级层）。
      * 模糊层之上叠加该 alpha 的 surface 色以保持可读性。
      */
-    const val scrimAlpha: Float = 0.75f
+    const val SCRIM_ALPHA: Float = 0.75f
 
     /** 支持真实模糊（RenderEffect/BlurEffect）的最低 API — Android 12 */
-    const val minBlurApi: Int = Build.VERSION_CODES.S
+    const val MIN_BLUR_API: Int = Build.VERSION_CODES.S
 
     /** 当前设备是否支持真实模糊（API 31+）；否则降级为半透明纯色层 */
-    fun isBlurSupported(): Boolean = Build.VERSION.SDK_INT >= minBlurApi
+    fun isBlurSupported(): Boolean = Build.VERSION.SDK_INT >= MIN_BLUR_API
 }

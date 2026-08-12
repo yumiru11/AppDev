@@ -23,7 +23,7 @@ import com.yumiru11.githubapp.core.designsystem.token.AppBlur
  * - **API 31+**（[AppBlur.isBlurSupported]）：[Modifier.blur]（RenderEffect 真模糊）
  *   模糊背后滚动内容；[BlurredEdgeTreatment.Unbounded] 让模糊延伸到元素边界之外，
  *   保证顶栏玻璃覆盖状态栏区域时该区域同样被模糊。
- * - **API 26–30**：纯半透明 surface 层降级（[AppBlur.scrimAlpha] alpha），
+ * - **API 26–30**：纯半透明 surface 层降级（[AppBlur.SCRIM_ALPHA] alpha），
  *   不做 bitmap 模糊，性能优先（§6.2）。
  * - **[blurEnabled]=false**：完全不模糊，仅半透明 surface（设置页「毛玻璃」开关关闭时）。
  *
@@ -57,23 +57,23 @@ fun GlassSurface(
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
     // 半透明纯色层：模糊层之上叠加，保证内容可读性（§6.1 静止态 / §6.2 降级层）
-    val glassColor = surfaceColor.copy(alpha = AppBlur.scrimAlpha)
+    val glassColor = surfaceColor.copy(alpha = AppBlur.SCRIM_ALPHA)
     val useBlur = blurEnabled && AppBlur.isBlurSupported()
 
     Box(
-        modifier = modifier
-            .then(
-                if (useBlur) {
-                    Modifier.blur(
-                        radius = AppBlur.blurRadius,
-                        edgeTreatment = BlurredEdgeTreatment.Unbounded,
-                    )
-                } else {
-                    Modifier
-                },
-            )
-            .background(color = glassColor, shape = shape)
-            .clip(shape),
+        modifier =
+            modifier
+                .then(
+                    if (useBlur) {
+                        Modifier.blur(
+                            radius = AppBlur.blurRadius,
+                            edgeTreatment = BlurredEdgeTreatment.Unbounded,
+                        )
+                    } else {
+                        Modifier
+                    },
+                ).background(color = glassColor, shape = shape)
+                .clip(shape),
     ) {
         Box(modifier = Modifier.windowInsetsPadding(windowInsets)) {
             content()

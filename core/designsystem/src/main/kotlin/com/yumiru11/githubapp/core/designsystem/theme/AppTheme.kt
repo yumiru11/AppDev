@@ -30,23 +30,32 @@ fun AppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    val isDark = when (themeMode) {
-        ThemeMode.SYSTEM -> darkTheme
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK,
-        ThemeMode.OLED,
-        ThemeMode.DYNAMIC_DARK -> true
-        ThemeMode.DYNAMIC_LIGHT -> false
-        ThemeMode.HIGH_CONTRAST -> darkTheme // follows system
-    }
+    val isDark =
+        when (themeMode) {
+            ThemeMode.SYSTEM -> darkTheme
 
-    val themeColors = when (themeMode) {
-        // Dynamic modes need a composition context (wallpaper extraction on API 31+);
-        // the pure resolver returns fixed fallbacks for the other 5 modes.
-        ThemeMode.DYNAMIC_LIGHT -> dynamicLightColors(LocalContext.current)
-        ThemeMode.DYNAMIC_DARK -> dynamicDarkColors(LocalContext.current)
-        else -> resolveThemeColors(themeMode, isDark)
-    }
+            ThemeMode.LIGHT -> false
+
+            ThemeMode.DARK,
+            ThemeMode.OLED,
+            ThemeMode.DYNAMIC_DARK,
+            -> true
+
+            ThemeMode.DYNAMIC_LIGHT -> false
+
+            ThemeMode.HIGH_CONTRAST -> darkTheme // follows system
+        }
+
+    val themeColors =
+        when (themeMode) {
+            // Dynamic modes need a composition context (wallpaper extraction on API 31+);
+            // the pure resolver returns fixed fallbacks for the other 5 modes.
+            ThemeMode.DYNAMIC_LIGHT -> dynamicLightColors(LocalContext.current)
+
+            ThemeMode.DYNAMIC_DARK -> dynamicDarkColors(LocalContext.current)
+
+            else -> resolveThemeColors(themeMode, isDark)
+        }
 
     CompositionLocalProvider(
         ExtendedColorsProvider.Local provides themeColors.extendedColors,

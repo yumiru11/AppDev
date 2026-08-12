@@ -16,22 +16,22 @@ object AppMotion {
     // ── Durations (ms) ──
 
     /** 页面进入（大转场）— Emphasized decelerate */
-    const val DurationPageEnter: Int = 400
+    const val DURATION_PAGE_ENTER: Int = 400
 
     /** 页面退出（永久）— Emphasized accelerate */
-    const val DurationPageExit: Int = 200
+    const val DURATION_PAGE_EXIT: Int = 200
 
     /** 页面进出（临时，BottomSheet/Drawer）— Emphasized */
-    const val DurationTransient: Int = 500
+    const val DURATION_TRANSIENT: Int = 500
 
     /** 元素进出屏幕（列表项）— Emphasized decelerate */
-    const val DurationListItem: Int = 300
+    const val DURATION_LIST_ITEM: Int = 300
 
     /** 小型状态变化（图标填充/勾选）— Standard */
-    const val DurationSmallStateChange: Int = 200
+    const val DURATION_SMALL_STATE_CHANGE: Int = 200
 
     /** 按压反馈 — Standard accelerate */
-    const val DurationPressFeedback: Int = 150
+    const val DURATION_PRESS_FEEDBACK: Int = 150
 
     // ── Easing ──
 
@@ -55,5 +55,5 @@ object AppMotion {
     // ── List stagger（§4.2 叠加） ──
 
     /** LazyColumn 首屏进入动画的 stagger 间隔 */
-    const val ListStaggerIntervalMillis: Int = 24
+    const val LIST_STAGGER_INTERVAL_MILLIS: Int = 24
 }

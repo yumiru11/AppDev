@@ -35,16 +35,16 @@ import org.robolectric.annotation.Config
  *   视觉相同，仅验证代码路径可渲染。
  */
 class GlassSurfaceScreenshotTest : ScreenshotTest() {
-
     @Test
     fun glassSurface_blurEnabled_renders() {
         captureScreenshot("GlassSurface_blurEnabled", darkTheme = false) {
             GlassBackdrop {
                 GlassSurface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .align(Alignment.TopCenter),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .align(Alignment.TopCenter),
                     blurEnabled = true,
                 ) {
                     GlassBarContent()
@@ -58,10 +58,11 @@ class GlassSurfaceScreenshotTest : ScreenshotTest() {
         captureScreenshot("GlassSurface_blurDisabled", darkTheme = false) {
             GlassBackdrop {
                 GlassSurface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .align(Alignment.TopCenter),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .align(Alignment.TopCenter),
                     blurEnabled = false,
                 ) {
                     GlassBarContent()
@@ -76,10 +77,11 @@ class GlassSurfaceScreenshotTest : ScreenshotTest() {
         captureScreenshot("GlassSurface_api26_fallback", darkTheme = false) {
             GlassBackdrop {
                 GlassSurface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .align(Alignment.TopCenter),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .align(Alignment.TopCenter),
                     blurEnabled = true,
                 ) {
                     GlassBarContent()
@@ -93,10 +95,11 @@ class GlassSurfaceScreenshotTest : ScreenshotTest() {
         captureScreenshot("GlassSurface_statusBarInsets", darkTheme = false) {
             GlassBackdrop {
                 GlassSurface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .align(Alignment.TopCenter),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .align(Alignment.TopCenter),
                     windowInsets = WindowInsets.statusBars,
                     blurEnabled = true,
                 ) {
@@ -112,10 +115,11 @@ class GlassSurfaceScreenshotTest : ScreenshotTest() {
     @Composable
     private fun BoxScope.GlassBarContent() {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-                .background(MaterialTheme.colorScheme.secondaryContainer),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .background(MaterialTheme.colorScheme.secondaryContainer),
         )
     }
 
@@ -125,21 +129,24 @@ class GlassSurfaceScreenshotTest : ScreenshotTest() {
     @Composable
     private fun GlassBackdrop(content: @Composable BoxScope.() -> Unit) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.primaryContainer),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.primaryContainer),
         ) {
             Box(
-                modifier = Modifier
-                    .size(96.dp)
-                    .align(Alignment.TopEnd)
-                    .background(MaterialTheme.colorScheme.tertiary),
+                modifier =
+                    Modifier
+                        .size(96.dp)
+                        .align(Alignment.TopEnd)
+                        .background(MaterialTheme.colorScheme.tertiary),
             )
             Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .align(Alignment.BottomStart)
-                    .background(MaterialTheme.colorScheme.error),
+                modifier =
+                    Modifier
+                        .size(72.dp)
+                        .align(Alignment.BottomStart)
+                        .background(MaterialTheme.colorScheme.error),
             )
             content()
         }

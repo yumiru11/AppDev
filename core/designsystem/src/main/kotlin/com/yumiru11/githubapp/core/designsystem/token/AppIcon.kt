@@ -26,17 +26,17 @@ object AppIcon {
     // ── 可变字体轴（§5.2 精细方案；无新依赖时的静态变体同值） ──
 
     /** FILL 轴：选中态填充 */
-    const val fillOn: Float = 1f
+    const val FILL_ON: Float = 1f
 
     /** FILL 轴：未选中描边 */
-    const val fillOff: Float = 0f
+    const val FILL_OFF: Float = 0f
 
     /** wght 轴：「稍细」目标值（默认 400） */
-    const val weightLight: Float = 300f
+    const val WEIGHT_LIGHT: Float = 300f
 
     /** ROND 轴：圆角最强 */
-    const val roundMax: Float = 100f
+    const val ROUND_MAX: Float = 100f
 
     /** GRAD 轴：低强调场景 */
-    const val gradLow: Float = -25f
+    const val GRAD_LOW: Float = -25f
 }

@@ -23,41 +23,28 @@ import androidx.compose.ui.graphics.Color
  */
 @Immutable
 data class ExtendedColors(
-    // ── GitHub Alert: Note (info) ──────────────────────────────────────
     /** GitHub alert note container background. Material-derived (primaryContainer). */
     val noteContainer: Color,
     /** Text/icon on noteContainer. Material-derived (onPrimaryContainer). */
     val onNoteContainer: Color,
-
-    // ── GitHub Alert: Tip (hint) ───────────────────────────────────────
     /** GitHub alert tip container background. Semantic (success family). */
     val tipContainer: Color,
     /** Text/icon on tipContainer. Semantic (success family). */
     val onTipContainer: Color,
-
-    // ── GitHub Alert: Important (emphasis) ─────────────────────────────
     /** GitHub alert important container background. Material-derived (tertiaryContainer). */
     val importantContainer: Color,
     /** Text/icon on importantContainer. Material-derived (onTertiaryContainer). */
     val onImportantContainer: Color,
-
-    // ── GitHub Alert: Warning ──────────────────────────────────────────
     /** GitHub alert warning container background. Semantic (attention family). */
     val warningContainer: Color,
     /** Text/icon on warningContainer. Semantic (attention family). */
     val onWarningContainer: Color,
-
-    // ── GitHub Alert: Caution (danger) ─────────────────────────────────
     /** GitHub alert caution container background. Material-derived (errorContainer). */
     val cautionContainer: Color,
     /** Text/icon on cautionContainer. Material-derived (onErrorContainer). */
     val onCautionContainer: Color,
-
-    // ── Brand ──────────────────────────────────────────────────────────
     /** GitHub brand primary blue. Brand (primer/primitives). */
     val brand: Color,
-
-    // ── Success semantic ───────────────────────────────────────────────
     /** Success action color. Semantic. */
     val success: Color,
     /** Success container background. Semantic. */
@@ -66,8 +53,6 @@ data class ExtendedColors(
     val onSuccess: Color,
     /** Text/icon on successContainer. Semantic. */
     val onSuccessContainer: Color,
-
-    // ── Danger semantic ────────────────────────────────────────────────
     /** Danger action color. Semantic. */
     val danger: Color,
     /** Danger container background. Semantic. */
@@ -80,29 +65,28 @@ data class ExtendedColors(
 
 /** Default extended colors for preview / testing. */
 @Stable
-val DefaultExtendedColors = ExtendedColors(
-    noteContainer = Color(0xFFDDF4FF),
-    onNoteContainer = Color(0xFF0550AE),
-    tipContainer = Color(0xFFDAFBE1),
-    onTipContainer = Color(0xFF1A7F37),
-    importantContainer = Color(0xFFFBEFFF),
-    onImportantContainer = Color(0xFF8250DF),
-    warningContainer = Color(0xFFFFF8C5),
-    onWarningContainer = Color(0xFF9A6700),
-    cautionContainer = Color(0xFFFFEBE9),
-    onCautionContainer = Color(0xFFCF222E),
-    brand = Color(0xFF0969DA),
-    success = Color(0xFF1A7F37),
-    successContainer = Color(0xFFDAFBE1),
-    onSuccess = Color(0xFFFFFFFF),
-    onSuccessContainer = Color(0xFF1A7F37),
-    danger = Color(0xFFCF222E),
-    dangerContainer = Color(0xFFFFEBE9),
-    onDanger = Color(0xFFFFFFFF),
-    onDangerContainer = Color(0xFFCF222E),
-)
-
-// ── CompositionLocal ───────────────────────────────────────────────────────
+val DefaultExtendedColors =
+    ExtendedColors(
+        noteContainer = Color(0xFFDDF4FF),
+        onNoteContainer = Color(0xFF0550AE),
+        tipContainer = Color(0xFFDAFBE1),
+        onTipContainer = Color(0xFF1A7F37),
+        importantContainer = Color(0xFFFBEFFF),
+        onImportantContainer = Color(0xFF8250DF),
+        warningContainer = Color(0xFFFFF8C5),
+        onWarningContainer = Color(0xFF9A6700),
+        cautionContainer = Color(0xFFFFEBE9),
+        onCautionContainer = Color(0xFFCF222E),
+        brand = Color(0xFF0969DA),
+        success = Color(0xFF1A7F37),
+        successContainer = Color(0xFFDAFBE1),
+        onSuccess = Color(0xFFFFFFFF),
+        onSuccessContainer = Color(0xFF1A7F37),
+        danger = Color(0xFFCF222E),
+        dangerContainer = Color(0xFFFFEBE9),
+        onDanger = Color(0xFFFFFFFF),
+        onDangerContainer = Color(0xFFCF222E),
+    )
 
 private val LocalExtendedColors = staticCompositionLocalOf { DefaultExtendedColors }
 
@@ -112,8 +96,6 @@ private val LocalExtendedColors = staticCompositionLocalOf { DefaultExtendedColo
 internal object ExtendedColorsProvider {
     val Local = LocalExtendedColors
 }
-
-// ── Extension property ─────────────────────────────────────────────────────
 
 /** Access extended colors from any composable via [MaterialTheme]. */
 val MaterialTheme.extendedColors: ExtendedColors

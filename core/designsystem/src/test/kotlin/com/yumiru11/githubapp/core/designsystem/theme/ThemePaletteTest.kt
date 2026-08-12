@@ -26,7 +26,6 @@ import org.junit.Test
  *   beyond the gate + palette identity already asserted here.
  */
 class ThemePaletteTest {
-
     // ── resolveThemeColors: mode → palette mapping ─────────────────────────
 
     @Test
@@ -86,7 +85,10 @@ class ThemePaletteTest {
         assertNotEquals(lightPalette().colorScheme.background, darkPalette().colorScheme.background)
     }
 
-    private fun assertPaletteEquals(expected: ThemeColors, actual: ThemeColors) {
+    private fun assertPaletteEquals(
+        expected: ThemeColors,
+        actual: ThemeColors,
+    ) {
         assertEquals("extendedColors", expected.extendedColors, actual.extendedColors)
         val expectedScheme = expected.colorScheme
         val actualScheme = actual.colorScheme
