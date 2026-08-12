@@ -140,6 +140,9 @@ feature/                   auth, home, repo, issue, pullrequest, search, editor,
 
 - `plan.md` — 完整技术规划（Markdown 分层方案 §2、技术栈 §3、认证 §4、Material You §5、Issue/PR 页结构 §6、写功能 §7、编辑器 §8、模块 §10、i18n §11、测试 §12、CI §13、性能 §14、安全 §15）
 - `~/dev/GitLight/` — 参考实现（gradle 配置模板、AGENTS.md 的验证经验、issues.md 踩坑记录）
+- `CONTEXT.md` — 项目术语表（多模块共用术语在此登记；grill-with-docs 会话维护）
+- `docs/adr/` — 架构决策记录（编号 `NNNN-标题.md`；当前 0001-0005 覆盖认证/存储/主题/渲染分层；新决策经 grill-with-docs 会话产生）
+- `docs/ui-design.md` — UI 设计规范（导航/动效/图标/玻璃拟真；T6 消费）
 
 ## Agent skills
 
