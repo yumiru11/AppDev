@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Login screen (T4) -->
+    <string name="login_title">Welcome to AppDev</string>
+    <string name="login_subtitle">Sign in with GitHub to browse repositories, issues and pull requests.</string>
+    <string name="login_github_button">Sign in with GitHub</string>
+    <string name="login_guest_button">Continue as guest</string>
+    <string name="login_developer_mode">Developer mode</string>
+    <string name="login_pat_hint">Personal Access Token</string>
+    <string name="login_pat_save">Save</string>
+    <string name="login_pat_description">REST-only mode. Token is stored locally.</string>
+</resources>

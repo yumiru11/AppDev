@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 登录页（T4） -->
+    <string name="login_title">欢迎使用 AppDev</string>
+    <string name="login_subtitle">使用 GitHub 登录，浏览仓库、Issue 与 Pull Request。</string>
+    <string name="login_github_button">使用 GitHub 登录</string>
+    <string name="login_guest_button">以游客身份浏览</string>
+    <string name="login_developer_mode">开发者模式</string>
+    <string name="login_pat_hint">个人访问令牌</string>
+    <string name="login_pat_save">保存</string>
+    <string name="login_pat_description">仅 REST 模式。令牌存储在本地。</string>
+</resources>
