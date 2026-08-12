@@ -21,6 +21,8 @@ security-crypto = "1.1.0-alpha06"
 kotlinx-serialization = "1.7.3"
 kotlinx-coroutines = "1.9.0"
 markdown = "0.43.0"
+# KotlinTextMate（VS Code 同款语法高亮，替换 deprecated 的 markdown-code 高亮；坐标来自 prototype 分支实测）
+textmate = "0.2.0"
 icons = "2.2.1"
 sora = "0.23.6"
 appauth = "0.11.1"
@@ -63,6 +65,9 @@ icons-material-symbols-sharp = { group = "com.composables", name = "icons-materi
 icons-material-symbols-outlined-filled = { group = "com.composables", name = "icons-material-symbols-outlined-filled-android", version.ref = "icons" }
 icons-material-symbols-rounded-filled = { group = "com.composables", name = "icons-material-symbols-rounded-filled-android", version.ref = "icons" }
 icons-material-symbols-sharp-filled = { group = "com.composables", name = "icons-material-symbols-sharp-filled-android", version.ref = "icons" }
+# cmp 变体：ImageVector 对象（Compose 直接引用，如 MaterialSymbols.Rounded.Info）；base 提供 MaterialSymbols 命名空间
+icons-material-symbols-base-cmp = { group = "com.composables", name = "icons-material-symbols-cmp", version.ref = "icons" }
+icons-material-symbols-rounded-cmp = { group = "com.composables", name = "icons-material-symbols-rounded-cmp", version.ref = "icons" }
 
 # Activity + Lifecycle
 activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activity-compose" }
@@ -123,6 +128,10 @@ markdown-renderer = { group = "com.mikepenz", name = "multiplatform-markdown-ren
 markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3", version.ref = "markdown" }
 markdown-renderer-code = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-code", version.ref = "markdown" }
 markdown-renderer-coil3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-coil3", version.ref = "markdown" }
+
+# KotlinTextMate（compose 封装，io.github.ivan-magda；坐标来自 prototype 分支实测）
+# ⚠️ key 不能以 kotlin- 开头：会与 [versions] 的 kotlin 生成访问器冲突，导致 libs.versions.kotlin 不可用（Gradle 8.12 实测）
+textmate-compose = { group = "io.github.ivan-magda", name = "kotlin-textmate-compose", version.ref = "textmate" }
 
 # Auth（OAuth PKCE）
 appauth = { group = "net.openid", name = "appauth", version.ref = "appauth" }
