@@ -42,6 +42,37 @@ class UserPreferencesRepositoryTest {
         }
 
     @Test
+    fun blurEnabled_byDefault_emitsTrue() =
+        runTest {
+            val repository = createRepository()
+
+            assertEquals(true, repository.blurEnabled.first())
+        }
+
+    @Test
+    fun setBlurEnabled_false_persistsAndEmits() =
+        runTest {
+            val repository = createRepository()
+
+            repository.setBlurEnabled(false)
+
+            assertEquals(false, repository.blurEnabled.first())
+        }
+
+    @Test
+    fun setBlurEnabled_false_newInstance_readsBackPersistedValue() =
+        runTest {
+            val file = newPreferencesFile()
+            val scope = newScope()
+            createRepository(scope, file).setBlurEnabled(false)
+            scope.cancel()
+
+            val reloaded = createRepository(newScope(), file)
+
+            assertEquals(false, reloaded.blurEnabled.first())
+        }
+
+    @Test
     fun setThemeMode_darkMode_persistsAndEmits() =
         runTest {
             val repository = createRepository()

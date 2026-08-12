@@ -13,7 +13,12 @@ interface UserPreferencesRepository {
     /** 语言标签（BCP 47，null = 跟随系统语言） */
     val languageTag: Flow<String?>
 
+    /** 毛玻璃效果开关（默认开启；T6 设置页提供关闭项） */
+    val blurEnabled: Flow<Boolean>
+
     suspend fun setThemeMode(mode: ThemeMode)
+
+    suspend fun setBlurEnabled(enabled: Boolean)
 
     /** null 表示清除语言偏好（回退系统语言） */
     suspend fun setLanguageTag(tag: String?)
