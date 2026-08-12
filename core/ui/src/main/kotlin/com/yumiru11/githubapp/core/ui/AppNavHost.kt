@@ -21,19 +21,29 @@ import com.yumiru11.githubapp.core.ui.screens.SearchScreen
 /**
  * 应用导航宿主：入口 Composable，内部 Navigation Compose NavHost。
  *
- * 注册各 route 占位 destination；接收 [ParsedUrl] → [AppRoute.fromParsedUrl] 的
+ * 注册各 route destination；接收 [ParsedUrl] → [AppRoute.fromParsedUrl] 的
  * 外链导航能力（供外部消费）。
+ *
+ * - [startDestination]：起始 destination（T4 Wave2 登录态驱动首屏：Anonymous → 登录页，
+ *   由宿主按 AuthState 传入；默认 HOME 保持向后兼容）
+ * - [loginScreen]：登录页 Composable（宿主注入，避免 core:ui 依赖 feature:auth）
  */
 @Composable
 fun AppNavHost(
     navController: NavHostController = rememberNavController(),
     modifier: Modifier = Modifier,
+    startDestination: String = AppRoute.HOME,
+    loginScreen: @Composable () -> Unit = {},
 ) {
     NavHost(
         navController = navController,
-        startDestination = AppRoute.HOME,
+        startDestination = startDestination,
         modifier = modifier,
     ) {
+        composable(AppRoute.LOGIN) {
+            loginScreen()
+        }
+
         composable(AppRoute.HOME) {
             HomeScreen(
                 onSearchClick = { navController.navigate(AppRoute.SEARCH) },

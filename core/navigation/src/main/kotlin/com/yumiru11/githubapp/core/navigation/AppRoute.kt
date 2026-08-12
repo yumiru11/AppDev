@@ -13,6 +13,7 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
  */
 object AppRoute {
     const val HOME = "home"
+    const val LOGIN = "login"
     const val REPO = "repo/{owner}/{repo}"
     const val ISSUE = "issue/{owner}/{repo}/{number}"
     const val PR = "pr/{owner}/{repo}/{number}"

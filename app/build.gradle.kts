@@ -13,6 +13,10 @@ android {
         applicationId = "com.yumiru11.githubapp"
         versionCode = 1
         versionName = "0.1.0"
+
+        // AppAuth 库 manifest 的 RedirectUriReceiverActivity 用 ${appAuthRedirectScheme} 占位符
+        // （core:github-auth 声明，ADR-0001 自定义 scheme）；库 manifest 合入 app 时须由 app 提供值。
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.yumiru11.githubapp"
     }
 
     testOptions {
@@ -107,6 +111,14 @@ dependencies {
     implementation(project(":core:github-data"))
     implementation(project(":core:database"))
     implementation(project(":core:datastore"))
+
+    // 认证（T4 Wave2 接线）：OAuthSessionManager/TokenStorage 注入 MainActivity + AuthViewModel
+    implementation(project(":core:github-auth"))
+    // OkHttp（AppDiModule 桥接 @AuthHttpClient 客户端需要直接引用；core:github-auth 的 implementation 不外泄编译类路径）
+    implementation(libs.okhttp)
+
+    // 登录页（T4 Wave2 接线）：LoginScreen/AuthViewModel 装配进 app 导航
+    implementation(project(":feature:auth"))
 
     // Hilt（app 图根）
     implementation(libs.hilt.android)

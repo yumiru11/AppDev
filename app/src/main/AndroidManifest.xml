@@ -11,7 +11,8 @@
         android:theme="@style/Theme.AppDev">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -22,6 +23,14 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="github.com" />
+            </intent-filter>
+            <!-- OAuth 回调（ADR-0001）：自定义 scheme + host 约束，与 https 深链隔离；
+                 host 约束使其比 AppAuth 库 RedirectUriReceiverActivity（仅 scheme）更具体，回调直达本 Activity -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.yumiru11.githubapp" android:host="oauth-callback" />
             </intent-filter>
         </activity>
     </application>
