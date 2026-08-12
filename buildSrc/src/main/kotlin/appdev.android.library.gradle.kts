@@ -8,7 +8,9 @@ plugins {
 }
 
 android {
-    compileSdk = 35
+    // compileSdk 36：OkHttp 5.4（okhttp-android）AAR 要求 minCompileSdk 36（2026-08-12 实测）；
+    // android-36 平台已从腾讯镜像安装（本机无 dl.google.com 访问）；AGP 8.7.3 对 36 仅警告不阻塞
+    compileSdk = 36
     buildToolsVersion = "35.0.0"
 
     defaultConfig {

@@ -1,0 +1,21 @@
+# 仓库概览（plan.md §4.4 典型查询）
+query RepositoryOverview($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    id
+    name
+    description
+    stargazerCount
+    forkCount
+    primaryLanguage {
+      name
+      color
+    }
+    defaultBranchRef {
+      name
+    }
+    licenseInfo {
+      name
+    }
+    viewerHasStarred
+  }
+}

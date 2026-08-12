@@ -1,6 +1,9 @@
 plugins {
     id("appdev.android.application")
     alias(libs.plugins.roborazzi)
+    // Hilt（@HiltAndroidApp 图根 + @AndroidEntryPoint 注入）
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -66,6 +69,13 @@ android {
             signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
+
+    // OkHttp 5 / jspecify 均携带 OSGi MANIFEST，合并 Java 资源时路径冲突 → 排除
+    packaging {
+        resources {
+            excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+        }
+    }
 }
 
 dependencies {
@@ -93,12 +103,24 @@ dependencies {
     // 主题（core:designsystem）
     implementation(project(":core:designsystem"))
 
+    // 数据层（T5）：仓库层/网络通道/离线缓存/偏好存储
+    implementation(project(":core:github-data"))
+    implementation(project(":core:database"))
+    implementation(project(":core:datastore"))
+
+    // Hilt（app 图根）
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+
     // Core
     implementation(libs.core.ktx)
 
     // Testing：Konsist 架构护栏 + core:testing 基建（JUnit4/Robolectric/Roborazzi/coroutines-test 由其 api 导出）
     testImplementation(libs.konsist)
     testImplementation(project(":core:testing"))
+    // Hilt 图装配测试（@HiltAndroidTest + HiltAndroidTestRunner，Robolectric）
+    testImplementation(libs.hilt.android.testing)
+    kspTest(libs.hilt.compiler)
 }
 
 // Konsist 无原生任务：以过滤后的单测任务充当 konsistCheck（只跑 konsist 包下的架构测试）。

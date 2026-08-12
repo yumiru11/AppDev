@@ -39,12 +39,8 @@ jobs:
       - name: Override local JDK path for CI
         run: sed -i '/org.gradle.java.home/d' gradle.properties
 
-      # 与 ci.yml 同源：注入开发机同款镜像 init 脚本，避免插件/依赖解析失败
-      - name: Install Gradle mirror init script (dev-machine parity)
-        run: |
-          mkdir -p "$HOME/.gradle/init.d"
-          cp .github/gradle/init-mirror.gradle "$HOME/.gradle/init.d/mirror.gradle"
-
+      # 与 ci.yml 同源：runner 直连官方源，不注入开发机镜像（阿里云在 CI 上 502）
+      # seed-plugins.sh 保留（插件 marker curl 兜底，走官方源）
       # 与 ci.yml 同源：预置插件构件到 mavenLocal（runner 插件解析兜底）
       - name: Seed plugin artifacts into mavenLocal
         run: bash .github/gradle/seed-plugins.sh

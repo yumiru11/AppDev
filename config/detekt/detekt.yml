@@ -24,6 +24,8 @@ complexity:
   LongParameterList:
     functionThreshold: 8
     constructorThreshold: 10
+    # Fake 工厂参数全部带默认值（“只覆盖关心的字段”语义），不属于臃肿函数 → 豁免
+    ignoreDefaultParameters: true
   TooManyFunctions:
     thresholdInFiles: 20
     thresholdInClasses: 20

@@ -1,10 +1,7 @@
 pluginManagement {
     repositories {
-        // dl.google.com / maven.google.com 在本机不可达（HTTP 000，2026-08-09 实测），
-        // androidx/google 工件必须走阿里云镜像；google() 保留作兜底
-        maven("https://maven.aliyun.com/repository/google")
-        maven("https://maven.aliyun.com/repository/central")
-        maven("https://maven.aliyun.com/repository/gradle-plugin")
+        // ⚠️ 阿里云镜像不再写在这里：本机由 ~/.gradle/init.d/mirror.gradle 注入（不入库），
+        // CI/GitHub Actions 直连官方源（阿里云在 CI 上 502，2026-08-12 实测）。
         google {
             content {
                 includeGroupByRegex("com\\.android.*")
@@ -20,8 +17,8 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        maven("https://maven.aliyun.com/repository/google")
-        maven("https://maven.aliyun.com/repository/central")
+        // ⚠️ 阿里云镜像不再写在这里：本机由 ~/.gradle/init.d/mirror.gradle 注入（不入库），
+        // CI/GitHub Actions 直连官方源（阿里云在 CI 上 502，2026-08-12 实测）。
         google()
         mavenCentral()
     }
