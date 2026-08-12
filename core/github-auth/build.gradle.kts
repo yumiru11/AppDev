@@ -49,6 +49,11 @@ dependencies {
     // 协程（认证流程/TokenProvider 桥接票使用；TokenStorage 接口本身为同步设计）
     implementation(libs.kotlinx.coroutines.core)
 
-    // 测试：core:testing 已 api 导出 JUnit4/Robolectric/Roborazzi
+    // OkHttp（TokenRefresher 调 GitHub token 端点 + AuthSessionInterceptor 401 重放）
+    implementation(libs.okhttp)
+
+    // 测试：core:testing 已 api 导出 JUnit4/coroutines-test/Robolectric/Roborazzi
     testImplementation(project(":core:testing"))
+    // MockWebServer3 模拟 GitHub token 端点与 API 端点（零真实网络）
+    testImplementation(libs.mockwebserver3)
 }
