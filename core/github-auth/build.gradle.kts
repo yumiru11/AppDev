@@ -14,6 +14,13 @@ composeCompiler {
 android {
     namespace = "com.yumiru11.githubapp.core.github_auth"
 
+    defaultConfig {
+        // AppAuth 库 manifest 声明 RedirectUriReceiverActivity，其 intent-filter 的
+        // android:scheme 用 ${appAuthRedirectScheme} 占位符替换（ADR-0001 自定义 scheme）。
+        // 该 activity 会随模块合入最终 app manifest；app 侧深链 intent-filter 接线 Wave2 做。
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.yumiru11.githubapp"
+    }
+
     // 显式关闭 compose（约定插件默认开启）
     buildFeatures {
         compose = false
@@ -51,6 +58,9 @@ dependencies {
 
     // OkHttp（TokenRefresher 调 GitHub token 端点 + AuthSessionInterceptor 401 重放）
     implementation(libs.okhttp)
+
+    // AppAuth（OAuth PKCE 授权流程，ADR-0001：自定义 scheme com.yumiru11.githubapp:// 回调）
+    implementation(libs.appauth)
 
     // 测试：core:testing 已 api 导出 JUnit4/coroutines-test/Robolectric/Roborazzi
     testImplementation(project(":core:testing"))
