@@ -18,7 +18,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import com.yumiru11.githubapp.auth.authStateToDestination
 import com.yumiru11.githubapp.auth.shouldNavigateForAuthState
-import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthCallbackException
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthConfig
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
@@ -41,6 +41,8 @@ import javax.inject.Inject
  * - 登录态驱动首屏（T4 Wave2）：AuthState.Anonymous → 登录页；SignedIn/PAT → 主页。
  *   起始 destination 按 authState 传入 AppNavHost；状态变化经 LaunchedEffect 导航
  *   （仅目标页不符时 navigate，popUpTo(0) 清栈防循环）
+ * - 主题（T6 Wave2）：[AppThemeHost] 把仓库持久化的 ThemeMode 接到 AppTheme；
+ *   blurEnabled 经 AppNavHost 下传顶/底栏 GlassSurface（ADR-0004 玻璃只做两处）
  * - OAuth 回调（ADR-0001 自定义 scheme）：命中 oauth-callback 的 intent data →
  *   [OAuthSessionManager.handleCallback]（token 交换），成功后 authState 自动变
  *   SignedIn → 登录态导航接管跳主页；失败（用户取消/错误回调）留在登录页
@@ -52,6 +54,9 @@ class MainActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels()
 
     @Inject lateinit var sessionManager: OAuthSessionManager
+
+    // 主题/毛玻璃偏好仓库（T6 Wave2）：themeMode → AppThemeHost，blurEnabled → 顶/底栏玻璃
+    @Inject lateinit var userPreferencesRepository: UserPreferencesRepository
 
     // 待消费的深链 URI（冷启动 + onNewIntent 运行时）；用 mutableStateOf 以便 Compose 观察重组
     private val pendingDeepLink = mutableStateOf<Uri?>(null)
@@ -68,11 +73,14 @@ class MainActivity : ComponentActivity() {
             val navController = rememberNavController()
             val context = LocalContext.current
             val authState by authViewModel.authState.collectAsStateWithLifecycle()
+            // 毛玻璃开关（ADR-0004：默认开启，设置页 T24 提供关闭项）→ 顶栏/底栏 GlassSurface
+            val blurEnabled by userPreferencesRepository.blurEnabled.collectAsStateWithLifecycle(initialValue = true)
 
-            AppTheme {
+            AppThemeHost(repository = userPreferencesRepository) {
                 AppNavHost(
                     navController = navController,
                     startDestination = authStateToDestination(authState),
+                    blurEnabled = blurEnabled,
                     loginScreen = {
                         LoginScreen(
                             onSignIn = { authViewModel.onSignIn() },

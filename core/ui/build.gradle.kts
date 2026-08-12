@@ -31,6 +31,9 @@ dependencies {
     // 依赖 core:navigation 的 AppRoute/ParsedUrl
     implementation(project(":core:navigation"))
 
+    // 玻璃拟真容器（ADR-0004：顶栏/底栏 GlassSurface，T6 已交付）
+    implementation(project(":core:designsystem"))
+
     // 测试：core:testing 已 api 导出 JUnit4/Robolectric/Roborazzi/compose-test
     testImplementation(project(":core:testing"))
 }

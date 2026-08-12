@@ -33,6 +33,7 @@ fun AppNavHost(
     navController: NavHostController = rememberNavController(),
     modifier: Modifier = Modifier,
     startDestination: String = AppRoute.HOME,
+    blurEnabled: Boolean = true,
     loginScreen: @Composable () -> Unit = {},
 ) {
     NavHost(
@@ -57,6 +58,7 @@ fun AppNavHost(
                     }
                 },
                 selectedTab = AppRoute.HOME,
+                blurEnabled = blurEnabled,
             )
         }
 
