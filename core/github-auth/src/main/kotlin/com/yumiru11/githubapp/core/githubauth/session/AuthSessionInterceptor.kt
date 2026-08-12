@@ -1,3 +1,6 @@
+// 拦截器固有多分支（token 端点放行/重放防护/游客/注入/401 刷新重放），拆函数会牺牲可读性。
+@file:Suppress("ReturnCount")
+
 package com.yumiru11.githubapp.core.githubauth.session
 
 import com.yumiru11.githubapp.core.githubauth.token.TokenStorage

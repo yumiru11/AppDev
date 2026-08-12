@@ -31,4 +31,5 @@ data class TokenExchangeResult(
 /** 换 token 失败（授权码无效/过期、端点异常响应、网络错误）。 */
 class TokenExchangeException(
     message: String,
-) : Exception(message)
+    cause: Throwable? = null,
+) : Exception(message, cause)

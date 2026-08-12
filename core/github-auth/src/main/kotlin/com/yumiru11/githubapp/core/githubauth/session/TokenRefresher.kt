@@ -1,3 +1,7 @@
+// 网络+解析+Result 包装的标准协程结构：NestedBlockDepth 是 token 端点调用链固有深度；
+// catch (e: Exception) 前已有 CancellationException 重抛（协程取消语义正确），泛化兜底是 Result 模式的收口。
+@file:Suppress("NestedBlockDepth", "TooGenericExceptionCaught")
+
 package com.yumiru11.githubapp.core.githubauth.session
 
 import com.yumiru11.githubapp.core.githubauth.token.TokenStorage

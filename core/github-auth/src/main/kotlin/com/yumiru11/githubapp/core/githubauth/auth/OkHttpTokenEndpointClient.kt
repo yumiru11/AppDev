@@ -1,3 +1,7 @@
+// 统一包装 token 交换的所有失败为 TokenExchangeException（TokenExchangeException 先行重抛保持类型）；
+// 泛化 catch 是包装层收口设计，非缺陷。
+@file:Suppress("TooGenericExceptionCaught")
+
 package com.yumiru11.githubapp.core.githubauth.auth
 
 import kotlinx.coroutines.Dispatchers
@@ -41,8 +45,8 @@ class OkHttpTokenEndpointClient
                 } catch (e: TokenExchangeException) {
                     throw e
                 } catch (e: Exception) {
-                    // 网络/解析错误统一包装（token 内容绝不进异常消息/日志）
-                    throw TokenExchangeException("token exchange failed: ${e.javaClass.simpleName}")
+                    // 网络/解析错误统一包装（token 内容绝不进异常消息/日志）；cause 保留原始异常链
+                    throw TokenExchangeException("token exchange failed: ${e.javaClass.simpleName}", e)
                 }
             }
 
