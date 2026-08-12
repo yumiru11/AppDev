@@ -76,6 +76,38 @@ class MarkdownViewerScreenshotTest : ScreenshotTest() {
             )
         }
     }
+
+    /**
+     * 浅色主题：Markdown 表格。
+     *
+     * ADR-0005：表格不做原生横滚组件——超出容器宽度即裁剪接受；
+     * 长表格/长文档走 WebView 兜底（T8 范围）。此处只记录「渲染不崩溃」，不测横滚。
+     */
+    @Test
+    fun markdownViewer_lightTheme_withTable_matchesBaseline() {
+        captureScreenshot("MarkdownViewer_table_light", darkTheme = false) {
+            MarkdownViewer(
+                markdown = SAMPLE_TABLE,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            )
+        }
+    }
+
+    /** 深色主题：Markdown 表格（同 ADR-0005 策略，只记录渲染不崩溃） */
+    @Test
+    @Config(qualifiers = "night")
+    fun markdownViewer_darkTheme_withTable_matchesBaseline() {
+        captureScreenshot("MarkdownViewer_table_dark", darkTheme = true) {
+            MarkdownViewer(
+                markdown = SAMPLE_TABLE,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            )
+        }
+    }
 }
 
 private val SAMPLE_MARKDOWN = """
@@ -118,4 +150,20 @@ private val SAMPLE_ALERT = """
 普通引用（非告警）：
 
 > 这是一段普通引用文本，不包含 `[!TYPE]` 标记。
+""".trimIndent()
+
+private val SAMPLE_TABLE = """
+# 版本对比
+
+## 功能矩阵
+
+| 功能 | 渲染方式 | 说明 |
+|------|----------|------|
+| 标题/列表/引用 | 原生 | mikepenz 渲染 |
+| 代码块 | 原生 | TextMate 高亮 |
+| 表格 | 原生裁剪 | ADR-0005：不横滚 |
+| 长文档 | WebView | T8 兜底 |
+
+> 表格宽度超出容器时按 ADR-0005 接受裁剪，不做原生横滚组件；
+> 长表格/长文档走 WebView 兜底（T8 范围）。
 """.trimIndent()

@@ -5,7 +5,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
@@ -16,12 +23,12 @@ import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 
 /**
- * Markdown 渲染组件（骨架）。
+ * Markdown 渲染组件。
  *
  * 基于 mikepenz multiplatform-markdown-renderer 0.38.1 + KotlinTextMate 高亮。
  *
  * @param markdown Markdown 原文
- * @param onInternalLink 内部链接点击回调；Internal 类型（Repo/Issue/PR 等）由上层路由处理，
+ * @param onInternalLink 链接点击回调；Internal 类型（Repo/Issue/PR 等）由上层路由处理，
  *   External 类型默认打开 CustomTabs（上层处理）；默认空实现
  * @param modifier Modifier
  */
@@ -34,22 +41,37 @@ fun MarkdownViewer(
     val darkTheme = isSystemInDarkTheme()
     val state = rememberMarkdownState(markdown, immediate = true)
 
-    Markdown(
-        state,
-        imageTransformer = Coil3ImageTransformerImpl,
-        colors = markdownColor(
-            inlineCodeBackground = MaterialTheme.colorScheme.surfaceContainerHighest,
-        ),
-        components = markdownComponents(
-            codeFence = { model ->
-                MarkdownCodeFence(model.content, model.node, model.typography.code) { code, language, _ ->
-                    TextMateCodeBlock(code, language, darkTheme)
-                }
-            },
-            blockQuote = { model -> GitHubAlertOrQuote(model) },
-        ),
-        modifier = modifier.verticalScroll(rememberScrollState()),
-    )
+    // 链接点击接线：renderer 0.38.1 无 link 槽位，所有链接统一走 LocalUriHandler
+    // （annotatorSettings 内部唯一消费点，构建 LinkAnnotation.Url 后经 openUri 分发）。
+    // 在此覆盖 handler，把每次点击解析为 ParsedUrl 后交上层（Internal→应用内导航，
+    // External→CustomTabs）。上层可能重组替换回调，用 rememberUpdatedState 取最新值。
+    val currentOnInternalLink by rememberUpdatedState(onInternalLink)
+    val linkUriHandler = remember {
+        object : UriHandler {
+            override fun openUri(uri: String) {
+                dispatchMarkdownLink(uri, currentOnInternalLink)
+            }
+        }
+    }
+
+    CompositionLocalProvider(LocalUriHandler provides linkUriHandler) {
+        Markdown(
+            state,
+            imageTransformer = Coil3ImageTransformerImpl,
+            colors = markdownColor(
+                inlineCodeBackground = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ),
+            components = markdownComponents(
+                codeFence = { model ->
+                    MarkdownCodeFence(model.content, model.node, model.typography.code) { code, language, _ ->
+                        TextMateCodeBlock(code, language, darkTheme)
+                    }
+                },
+                blockQuote = { model -> GitHubAlertOrQuote(model) },
+            ),
+            modifier = modifier.verticalScroll(rememberScrollState()),
+        )
+    }
 }
 
 /**
@@ -63,13 +85,16 @@ fun MarkdownViewer(
  * val parsed = parseMarkdownLink("https://github.com/owner/repo/issues/42")
  * // parsed = ParsedUrl.Issue("owner", "repo", 42)
  * ```
- *
- * TODO: 接线点击处理
- * 0.38.1 的 link 组件 API 限制：[MarkdownComponentModel] 不直接暴露 URL，
- * 需要从 node AST 子节点提取。当前骨架仅实现解析器纯函数，
- * 点击接线待以下方案之一落地：
- * 1. link 组件内遍历 node.children 查找 LINK_DESTINATION 节点提取 URL
- * 2. 升级到支持 linkResolver 的版本
- * 3. 用 MarkdownState 的 linkClickHandler 机制（如有）
  */
 fun parseMarkdownLink(url: String): ParsedUrl = GitHubLinkParser.parseUrl(url)
+
+/**
+ * Markdown 链接点击分流：解析 URL 后回调 [onInternalLink]。
+ *
+ * 纯函数（无 Compose/Android 依赖，可 JVM 单测）。内部链接回调具体 [ParsedUrl]
+ * 子类型（Repo/Issue/PR/User 等，上层做应用内导航），外部链接回调
+ * [ParsedUrl.External]（上层经 ExternalLinkHost 开 CustomTabs）。
+ */
+fun dispatchMarkdownLink(url: String, onInternalLink: (ParsedUrl) -> Unit) {
+    onInternalLink(parseMarkdownLink(url))
+}
