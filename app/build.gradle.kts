@@ -47,6 +47,10 @@ android {
         disable += "UnrememberedMutableState"
         disable += "UnrememberedState"
         disable += "NullSafeMutableLiveData"
+        // T4 Wave2 新增（AuthNavigationTest/AuthViewModel 触发）：AGP 8.7.3 lint 与
+        // Compose 1.11 的 StateFlow 值检测器二进制不兼容（IncompatibleClassChangeError，
+        // lint 崩溃 "KaFunctionCall interface was expected"）；AGP/lint 升级后移除
+        disable += "StateFlowValueCalledInComposition"
     }
 
     // 签名：仅当环境变量/Gradle 属性提供 keystore 时启用（CI release 流程），
