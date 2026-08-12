@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.core.datastore.preferences
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
@@ -30,8 +31,15 @@ class DefaultUserPreferencesRepository
 
         override val languageTag: Flow<String?> = dataStore.data.map { it[KEY_LANGUAGE_TAG] }
 
+        override val blurEnabled: Flow<Boolean> =
+            dataStore.data.map { it[KEY_BLUR_ENABLED] ?: true }
+
         override suspend fun setThemeMode(mode: ThemeMode) {
             dataStore.edit { it[KEY_THEME_MODE] = mode.name }
+        }
+
+        override suspend fun setBlurEnabled(enabled: Boolean) {
+            dataStore.edit { it[KEY_BLUR_ENABLED] = enabled }
         }
 
         override suspend fun setLanguageTag(tag: String?) {
@@ -47,5 +55,6 @@ class DefaultUserPreferencesRepository
         private companion object {
             val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
             val KEY_LANGUAGE_TAG = stringPreferencesKey("language_tag")
+            val KEY_BLUR_ENABLED = booleanPreferencesKey("blur_enabled")
         }
     }
