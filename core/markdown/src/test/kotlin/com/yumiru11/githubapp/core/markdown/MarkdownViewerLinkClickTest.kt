@@ -22,7 +22,6 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35])
 class MarkdownViewerLinkClickTest {
-
     @get:Rule
     val composeRule = createComposeRule()
 

@@ -11,7 +11,6 @@ import org.junit.Test
  * 外部链接回传 [ParsedUrl.External]，由上层决定导航或 CustomTabs。
  */
 class MarkdownLinkDispatchTest {
-
     @Test
     fun dispatchMarkdownLink_githubIssueUrl_invokesOnInternalLinkWithIssue() {
         val received = mutableListOf<ParsedUrl>()

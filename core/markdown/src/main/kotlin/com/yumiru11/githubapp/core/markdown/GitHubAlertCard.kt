@@ -14,9 +14,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
@@ -44,42 +44,47 @@ private data class AlertSpec(
 private fun alertSpecs(): Map<String, AlertSpec> {
     val c = MaterialTheme.colorScheme
     return mapOf(
-        "NOTE" to AlertSpec(
-            label = stringResource(R.string.alert_note),
-            container = c.primaryContainer,
-            onContainer = c.onPrimaryContainer,
-            accent = c.primary,
-            icon = MaterialSymbols.Rounded.Info,
-        ),
-        "TIP" to AlertSpec(
-            label = stringResource(R.string.alert_tip),
-            container = c.tertiaryContainer,
-            onContainer = c.onTertiaryContainer,
-            accent = c.tertiary,
-            icon = MaterialSymbols.Rounded.Lightbulb,
-        ),
-        "IMPORTANT" to AlertSpec(
-            label = stringResource(R.string.alert_important),
-            container = c.secondaryContainer,
-            onContainer = c.onSecondaryContainer,
-            accent = c.secondary,
-            icon = MaterialSymbols.Rounded.Priority_high,
-        ),
+        "NOTE" to
+            AlertSpec(
+                label = stringResource(R.string.alert_note),
+                container = c.primaryContainer,
+                onContainer = c.onPrimaryContainer,
+                accent = c.primary,
+                icon = MaterialSymbols.Rounded.Info,
+            ),
+        "TIP" to
+            AlertSpec(
+                label = stringResource(R.string.alert_tip),
+                container = c.tertiaryContainer,
+                onContainer = c.onTertiaryContainer,
+                accent = c.tertiary,
+                icon = MaterialSymbols.Rounded.Lightbulb,
+            ),
+        "IMPORTANT" to
+            AlertSpec(
+                label = stringResource(R.string.alert_important),
+                container = c.secondaryContainer,
+                onContainer = c.onSecondaryContainer,
+                accent = c.secondary,
+                icon = MaterialSymbols.Rounded.Priority_high,
+            ),
         // 设计系统暂无 warning 语义色（T6 未落地），用 error 近似 GitHub 的橙色警示
-        "WARNING" to AlertSpec(
-            label = stringResource(R.string.alert_warning),
-            container = c.surfaceContainerHighest,
-            onContainer = c.onSurface,
-            accent = c.error,
-            icon = MaterialSymbols.Rounded.Warning,
-        ),
-        "CAUTION" to AlertSpec(
-            label = stringResource(R.string.alert_caution),
-            container = c.errorContainer,
-            onContainer = c.onErrorContainer,
-            accent = c.error,
-            icon = MaterialSymbols.Rounded.Error,
-        ),
+        "WARNING" to
+            AlertSpec(
+                label = stringResource(R.string.alert_warning),
+                container = c.surfaceContainerHighest,
+                onContainer = c.onSurface,
+                accent = c.error,
+                icon = MaterialSymbols.Rounded.Warning,
+            ),
+        "CAUTION" to
+            AlertSpec(
+                label = stringResource(R.string.alert_caution),
+                container = c.errorContainer,
+                onContainer = c.onErrorContainer,
+                accent = c.error,
+                icon = MaterialSymbols.Rounded.Error,
+            ),
     )
 }
 
@@ -93,17 +98,20 @@ private fun alertSpecs(): Map<String, AlertSpec> {
 fun GitHubAlertOrQuote(model: MarkdownComponentModel) {
     val doc = model.content
     val nodeText = model.node.getUnescapedTextInNode(doc)
-    val type = Regex("""(?m)^>?[ \t]*\[!([A-Z]+)\]""")
-        .find(nodeText)
-        ?.groupValues
-        ?.get(1)
-        ?.uppercase()
+    val type =
+        Regex("""(?m)^>?[ \t]*\[!([A-Z]+)\]""")
+            .find(nodeText)
+            ?.groupValues
+            ?.get(1)
+            ?.uppercase()
     val spec = alertSpecs()[type]
     if (spec != null) {
-        val body = nodeText.lineSequence()
-            .drop(1)
-            .joinToString("\n") { line -> line.removePrefix(">").trimStart() }
-            .trim()
+        val body =
+            nodeText
+                .lineSequence()
+                .drop(1)
+                .joinToString("\n") { line -> line.removePrefix(">").trimStart() }
+                .trim()
         AlertCard(spec, body)
     } else {
         MarkdownBlockQuote(content = doc, node = model.node)
@@ -111,13 +119,17 @@ fun GitHubAlertOrQuote(model: MarkdownComponentModel) {
 }
 
 @Composable
-private fun AlertCard(spec: AlertSpec, body: String) {
+private fun AlertCard(
+    spec: AlertSpec,
+    body: String,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp)
-            .background(spec.container, RoundedCornerShape(10.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp)
+                .background(spec.container, RoundedCornerShape(10.dp))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Icon(spec.icon, contentDescription = null, tint = spec.accent, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(10.dp))

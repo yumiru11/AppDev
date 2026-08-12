@@ -22,16 +22,16 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35])
 class MarkdownViewerScreenshotTest : ScreenshotTest() {
-
     /** 浅色主题：标题 + 代码块 + 引用 */
     @Test
     fun markdownViewer_lightTheme_withHeadingsCodeBlockQuote_matchesBaseline() {
         captureScreenshot("MarkdownViewer_light", darkTheme = false) {
             MarkdownViewer(
                 markdown = SAMPLE_MARKDOWN,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
             )
         }
     }
@@ -43,9 +43,10 @@ class MarkdownViewerScreenshotTest : ScreenshotTest() {
         captureScreenshot("MarkdownViewer_dark", darkTheme = true) {
             MarkdownViewer(
                 markdown = SAMPLE_MARKDOWN,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
             )
         }
     }
@@ -56,9 +57,10 @@ class MarkdownViewerScreenshotTest : ScreenshotTest() {
         captureScreenshot("MarkdownViewer_alert_light", darkTheme = false) {
             MarkdownViewer(
                 markdown = SAMPLE_ALERT,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
             )
         }
     }
@@ -70,9 +72,10 @@ class MarkdownViewerScreenshotTest : ScreenshotTest() {
         captureScreenshot("MarkdownViewer_alert_dark", darkTheme = true) {
             MarkdownViewer(
                 markdown = SAMPLE_ALERT,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
             )
         }
     }
@@ -88,9 +91,10 @@ class MarkdownViewerScreenshotTest : ScreenshotTest() {
         captureScreenshot("MarkdownViewer_table_light", darkTheme = false) {
             MarkdownViewer(
                 markdown = SAMPLE_TABLE,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
             )
         }
     }
@@ -102,15 +106,17 @@ class MarkdownViewerScreenshotTest : ScreenshotTest() {
         captureScreenshot("MarkdownViewer_table_dark", darkTheme = true) {
             MarkdownViewer(
                 markdown = SAMPLE_TABLE,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
             )
         }
     }
 }
 
-private val SAMPLE_MARKDOWN = """
+private val SAMPLE_MARKDOWN =
+    """
 # AppDev
 
 轻量级 **Android GitHub 客户端** · Material You 设计
@@ -135,9 +141,10 @@ suspend fun fetchRepo(owner: String, name: String): Repo {
 > 版本：v0.1.0
 
 **加粗** · *斜体* · ~~删除线~~ · `行内代码`
-""".trimIndent()
+    """.trimIndent()
 
-private val SAMPLE_ALERT = """
+private val SAMPLE_ALERT =
+    """
 > [!NOTE]
 > 这是一条 **Note** 告警，使用 M3 primaryContainer 色。
 
@@ -150,9 +157,10 @@ private val SAMPLE_ALERT = """
 普通引用（非告警）：
 
 > 这是一段普通引用文本，不包含 `[!TYPE]` 标记。
-""".trimIndent()
+    """.trimIndent()
 
-private val SAMPLE_TABLE = """
+private val SAMPLE_TABLE =
+    """
 # 版本对比
 
 ## 功能矩阵
@@ -166,4 +174,4 @@ private val SAMPLE_TABLE = """
 
 > 表格宽度超出容器时按 ADR-0005 接受裁剪，不做原生横滚组件；
 > 长表格/长文档走 WebView 兜底（T8 范围）。
-""".trimIndent()
+    """.trimIndent()

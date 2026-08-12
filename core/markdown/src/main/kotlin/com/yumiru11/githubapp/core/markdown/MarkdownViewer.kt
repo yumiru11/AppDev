@@ -46,29 +46,32 @@ fun MarkdownViewer(
     // 在此覆盖 handler，把每次点击解析为 ParsedUrl 后交上层（Internal→应用内导航，
     // External→CustomTabs）。上层可能重组替换回调，用 rememberUpdatedState 取最新值。
     val currentOnInternalLink by rememberUpdatedState(onInternalLink)
-    val linkUriHandler = remember {
-        object : UriHandler {
-            override fun openUri(uri: String) {
-                dispatchMarkdownLink(uri, currentOnInternalLink)
+    val linkUriHandler =
+        remember {
+            object : UriHandler {
+                override fun openUri(uri: String) {
+                    dispatchMarkdownLink(uri, currentOnInternalLink)
+                }
             }
         }
-    }
 
     CompositionLocalProvider(LocalUriHandler provides linkUriHandler) {
         Markdown(
             state,
             imageTransformer = Coil3ImageTransformerImpl,
-            colors = markdownColor(
-                inlineCodeBackground = MaterialTheme.colorScheme.surfaceContainerHighest,
-            ),
-            components = markdownComponents(
-                codeFence = { model ->
-                    MarkdownCodeFence(model.content, model.node, model.typography.code) { code, language, _ ->
-                        TextMateCodeBlock(code, language, darkTheme)
-                    }
-                },
-                blockQuote = { model -> GitHubAlertOrQuote(model) },
-            ),
+            colors =
+                markdownColor(
+                    inlineCodeBackground = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ),
+            components =
+                markdownComponents(
+                    codeFence = { model ->
+                        MarkdownCodeFence(model.content, model.node, model.typography.code) { code, language, _ ->
+                            TextMateCodeBlock(code, language, darkTheme)
+                        }
+                    },
+                    blockQuote = { model -> GitHubAlertOrQuote(model) },
+                ),
             modifier = modifier.verticalScroll(rememberScrollState()),
         )
     }
@@ -95,6 +98,9 @@ fun parseMarkdownLink(url: String): ParsedUrl = GitHubLinkParser.parseUrl(url)
  * 子类型（Repo/Issue/PR/User 等，上层做应用内导航），外部链接回调
  * [ParsedUrl.External]（上层经 ExternalLinkHost 开 CustomTabs）。
  */
-fun dispatchMarkdownLink(url: String, onInternalLink: (ParsedUrl) -> Unit) {
+fun dispatchMarkdownLink(
+    url: String,
+    onInternalLink: (ParsedUrl) -> Unit,
+) {
     onInternalLink(parseMarkdownLink(url))
 }

@@ -14,15 +14,16 @@ import dev.textmate.theme.Theme
 import dev.textmate.theme.ThemeReader
 
 /** fence 语言标记 → 语法文件映射（仅列 assets/grammars/ 实际存在的 7 种，其余走纯文本兜底） */
-private val GRAMMAR_FILES = mapOf(
-    "kotlin" to "grammars/kotlin.tmLanguage.json",
-    "python" to "grammars/python.tmLanguage.json",
-    "go" to "grammars/go.tmLanguage.json",
-    "java" to "grammars/java.tmLanguage.json",
-    "json" to "grammars/json.tmLanguage.json",
-    "yaml" to "grammars/yaml.tmLanguage.json",
-    "shell" to "grammars/shell.tmLanguage.json",
-)
+private val GRAMMAR_FILES =
+    mapOf(
+        "kotlin" to "grammars/kotlin.tmLanguage.json",
+        "python" to "grammars/python.tmLanguage.json",
+        "go" to "grammars/go.tmLanguage.json",
+        "java" to "grammars/java.tmLanguage.json",
+        "json" to "grammars/json.tmLanguage.json",
+        "yaml" to "grammars/yaml.tmLanguage.json",
+        "shell" to "grammars/shell.tmLanguage.json",
+    )
 
 /** 加载 TextMate 语法（remember 缓存；不支持的语言返回 null） */
 @Composable
@@ -40,11 +41,12 @@ fun rememberTextMateGrammar(language: String): Grammar? {
 fun rememberTextMateTheme(darkTheme: Boolean): Theme {
     val context = LocalContext.current
     return remember(context, darkTheme) {
-        val (base, plus) = if (darkTheme) {
-            "themes/dark_vs.json" to "themes/dark_plus.json"
-        } else {
-            "themes/light_vs.json" to "themes/light_plus.json"
-        }
+        val (base, plus) =
+            if (darkTheme) {
+                "themes/dark_vs.json" to "themes/dark_plus.json"
+            } else {
+                "themes/light_vs.json" to "themes/light_plus.json"
+            }
         context.assets.open(base).use { b ->
             context.assets.open(plus).use { p ->
                 ThemeReader.readTheme(b, p)
@@ -55,7 +57,11 @@ fun rememberTextMateTheme(darkTheme: Boolean): Theme {
 
 /** markdown 代码块：KotlinTextMate 渲染（VS Code 同款），无语法时纯文本 */
 @Composable
-fun TextMateCodeBlock(code: String, language: String?, darkTheme: Boolean) {
+fun TextMateCodeBlock(
+    code: String,
+    language: String?,
+    darkTheme: Boolean,
+) {
     val theme = rememberTextMateTheme(darkTheme)
     val grammar = language?.let { rememberTextMateGrammar(it) }
     if (grammar != null) {
