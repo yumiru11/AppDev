@@ -1,0 +1,153 @@
+/*
+ * markdown-you.css — Material You 风格 Markdown 渲染样式（自维护）。
+ *
+ * 设计原则（plan.md §2.10 / ADR-0004）：
+ * - 不照搬 GitHub 蓝灰 CSS，基于 Material 3 色板语义
+ * - 颜色全部走 CSS 变量（:root --md-sys-color-*），由 Kotlin 注入（MarkdownThemeTokens）
+ * - 明暗切换时 Kotlin 重新注入 :root 变量即生效，本文件静态不变
+ * - 字体/圆角常量直接在此声明（不随主题变）
+ */
+
+:root {
+  --md-sys-color-primary: #6750A4;
+  --md-sys-color-on-surface: #1C1B1F;
+  --md-sys-color-surface: #FFFBFE;
+  --md-sys-color-surface-container-low: #F7F2FA;
+  --md-sys-color-surface-container-high: #ECE6F0;
+  --md-sys-color-outline-variant: #CAC4D0;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --md-sys-font-mono: "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, monospace;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.markdown-body {
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--md-sys-font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  padding: 16px;
+  word-wrap: break-word;
+  overflow-x: auto;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.markdown-body h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.markdown-body h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.markdown-body h3 { font-size: 1.25em; }
+.markdown-body h4 { font-size: 1em; }
+.markdown-body h5 { font-size: 0.875em; }
+.markdown-body h6 { font-size: 0.85em; color: var(--md-sys-color-on-surface); opacity: 0.7; }
+
+.markdown-body p { margin: 0 0 16px; }
+
+.markdown-body a {
+  color: var(--md-sys-color-primary);
+  text-decoration: none;
+}
+.markdown-body a:hover { text-decoration: underline; }
+
+.markdown-body strong { font-weight: 600; }
+.markdown-body em { font-style: italic; }
+.markdown-body del { text-decoration: line-through; }
+
+.markdown-body code {
+  font-family: var(--md-sys-font-mono);
+  font-size: 0.875em;
+  background: var(--md-sys-color-surface-container-low);
+  padding: 2px 6px;
+  border-radius: var(--md-sys-shape-corner-small);
+}
+
+.markdown-body pre {
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: var(--md-sys-shape-corner-medium);
+  padding: 12px;
+  overflow-x: auto;
+  margin: 0 0 16px;
+}
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.875em;
+}
+
+.markdown-body blockquote {
+  margin: 0 0 16px;
+  padding: 0 16px;
+  background: var(--md-sys-color-surface-container-low);
+  border-left: 3px solid var(--md-sys-color-primary);
+  border-radius: var(--md-sys-shape-corner-small);
+  color: var(--md-sys-color-on-surface);
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0 0 16px;
+  padding-left: 2em;
+}
+.markdown-body li { margin: 4px 0; }
+
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 16px;
+  overflow-x: auto;
+  display: block;
+}
+.markdown-body table th,
+.markdown-body table td {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  padding: 6px 13px;
+}
+.markdown-body table th {
+  background: var(--md-sys-color-surface-container-low);
+  font-weight: 600;
+}
+
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+  loading: lazy;
+}
+
+/* GitHub Alerts ([!NOTE]/[!TIP]/[!IMPORTANT]/[!WARNING]/[!CAUTION]) */
+.markdown-body .markdown-alert {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--md-sys-color-primary);
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-surface-container-low);
+}
+.markdown-body .markdown-alert-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* 任务列表 */
+.markdown-body .task-list-item { list-style: none; }
+.markdown-body .task-list-item-checkbox {
+  margin: 0 8px 0 0;
+  vertical-align: middle;
+}
+
+/* 横向滚动容器（长表格/长代码） */
+.markdown-body .overflow-x-auto { overflow-x: auto; }

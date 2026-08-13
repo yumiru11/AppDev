@@ -3,6 +3,7 @@ package com.yumiru11.githubapp.core.githubrest.di
 import com.yumiru11.githubapp.core.common.GitHubApiConfig
 import com.yumiru11.githubapp.core.githubrest.BuildConfig
 import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
+import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.api.UserApi
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
@@ -71,4 +72,8 @@ object RestNetworkModule {
     @Provides
     @Singleton
     fun provideRepositoryApi(retrofit: Retrofit): RepositoryApi = retrofit.create(RepositoryApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideReadmeApi(retrofit: Retrofit): ReadmeApi = retrofit.create(ReadmeApi::class.java)
 }

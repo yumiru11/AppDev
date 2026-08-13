@@ -12,11 +12,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * v1 schema 验证（MigrationTestHelper + Robolectric）。
- *
- * createDatabase 会用导出的 schema（src/test/assets/schemas）校验
- * Room 生成的 v1 建库语句一致，并实际建库返回可查询的 SupportSQLiteDatabase。
- * 注意 Room 2.8 起 schemaDirectory 须显式传入（旧默认值为空串）。
+ * v1/v2 schema 验证 + v1→v2 迁移测试（MigrationTestHelper + Robolectric）。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -24,17 +20,61 @@ class AppDatabaseMigrationTest {
     private val helper =
         MigrationTestHelper(
             InstrumentationRegistry.getInstrumentation(),
-            // 导出目录名是带点的全限定类名（非斜杠拆分）：assets/schemas/<类名>/<version>.json
             "$SCHEMA_DIRECTORY/${AppDatabase::class.java.name}",
             FrameworkSQLiteOpenHelperFactory(),
         )
 
     @Test
     fun createDatabase_v1_buildsExpectedSchema() {
-        helper.createDatabase(TEST_DB_NAME, 1).use { db ->
+        helper.createDatabase(TEST_DB_NAME_V1, 1).use { db ->
             val tables = queryTableNames(db)
             assertTrue("应包含 cached_repositories 表", tables.contains("cached_repositories"))
             assertEquals(1, tables.size)
+        }
+    }
+
+    @Test
+    fun migrate_1to2_addsCachedReadmeTable() {
+        // 先创建 v1 数据库
+        helper.createDatabase(TEST_DB_NAME_V2, 1).use { db ->
+            // 插入一条 v1 数据，验证迁移后数据保留
+            db.execSQL(
+                """
+                INSERT INTO cached_repositories (owner, name, etag, payload, updatedAt)
+                VALUES ('octocat', 'Hello-World', 'W/"abc"', '{"id":1}', 1700000000000)
+                """.trimIndent(),
+            )
+        }
+
+        // 迁移到 v2
+        helper.runMigrationsAndValidate(TEST_DB_NAME_V2, 2, true, AppDatabase.MIGRATION_1_2).use { db ->
+            val tables = queryTableNames(db)
+            assertTrue("应包含 cached_repositories 表", tables.contains("cached_repositories"))
+            assertTrue("应包含 cached_readme 表", tables.contains("cached_readme"))
+            assertEquals(2, tables.size)
+
+            // 验证 v1 数据保留
+            val cursor = db.query("SELECT owner, name FROM cached_repositories", emptyArray())
+            cursor.use {
+                assertTrue(it.moveToFirst())
+                assertEquals("octocat", it.getString(0))
+                assertEquals("Hello-World", it.getString(1))
+            }
+
+            // 验证 cached_readme 表结构：插入并查询
+            db.execSQL(
+                """
+                INSERT INTO cached_readme (owner, repo, contentHash, themeVersion, html, updatedAt)
+                VALUES ('octocat', 'Hello-World', 'abc123', 'v1', '<h1>Hi</h1>', 1700000000000)
+                """.trimIndent(),
+            )
+            val readmeCursor = db.query("SELECT owner, repo, contentHash FROM cached_readme", emptyArray())
+            readmeCursor.use {
+                assertTrue(it.moveToFirst())
+                assertEquals("octocat", it.getString(0))
+                assertEquals("Hello-World", it.getString(1))
+                assertEquals("abc123", it.getString(2))
+            }
         }
     }
 
@@ -55,7 +95,8 @@ class AppDatabaseMigrationTest {
     }
 
     private companion object {
-        const val TEST_DB_NAME = "migration-test-v1"
+        const val TEST_DB_NAME_V1 = "migration-test-v1"
+        const val TEST_DB_NAME_V2 = "migration-test-v2"
         const val SCHEMA_DIRECTORY = "schemas"
     }
 }

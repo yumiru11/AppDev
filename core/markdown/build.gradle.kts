@@ -22,17 +22,18 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
 
-    // Markdown 渲染链路。
-    // ⚠️ 版本覆盖：toml 全局 markdown=0.43.0 需 compileSdk 37 / AGP 9（本机不可用），
-    // 按 ADR-0005 决策模块内固定 0.38.1；不动 toml 全局条目（待 AGP 9 迁移后统一升）。
-    implementation("com.mikepenz:multiplatform-markdown-renderer:0.38.1")
-    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.38.1")
-    implementation("com.mikepenz:multiplatform-markdown-renderer-code:0.38.1")
-    implementation("com.mikepenz:multiplatform-markdown-renderer-coil3:0.38.1")
+    // Markdown 渲染链路（toml 全局 markdown=0.38.1：0.43.0 需 compileSdk 37 / AGP 9，见 AGENTS.md）
+    implementation(libs.markdown.renderer)
+    implementation(libs.markdown.renderer.m3)
+    implementation(libs.markdown.renderer.code)
+    implementation(libs.markdown.renderer.coil3)
 
     // 图片（Coil 3 + okhttp 网络）
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+
+    // WebViewAssetLoader（assets 安全加载，禁 file://；T8 WebView 兜底通道用）
+    implementation(libs.androidx.webkit)
 
     // 图标（Material Symbols cmp 变体：GitHub Alert 卡片用 MaterialSymbols.Rounded.*）
     implementation(libs.icons.material.symbols.base.cmp)

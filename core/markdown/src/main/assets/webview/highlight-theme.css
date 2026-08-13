@@ -1,0 +1,102 @@
+/*
+ * highlight-theme.css — highlight.js 11 语法高亮令牌主题（Material You，自维护）。
+ *
+ * 设计原则（plan.md §2.10 / ADR-0004）：
+ * - 与 markdown-you.css 一致：颜色全部走 CSS 变量（--md-sys-color-*），由 Kotlin 注入
+ * - 明暗切换时 Kotlin 重新注入 :root 变量即生效，本文件静态不变
+ * - 令牌色基于 on-surface 透明度分层 + primary 强调，保证两种主题下对比度
+ *
+ * 配套：highlight.min.js（highlight.js 11 UMD bundle，定义全局 hljs）。
+ */
+
+.hljs {
+  color: var(--md-sys-color-on-surface);
+  background: transparent;
+}
+
+/* 注释 / 引用：弱化 */
+.hljs-comment,
+.hljs-quote {
+  color: var(--md-sys-color-on-surface);
+  opacity: 0.55;
+  font-style: italic;
+}
+
+/* 关键字 / 控制流：primary 强调 */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-doctag,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag {
+  color: var(--md-sys-color-primary);
+}
+
+/* 字符串 / 正则 / 模板变量：中强调 */
+.hljs-string,
+.hljs-regexp,
+.hljs-template-variable,
+.hljs-addition {
+  color: var(--md-sys-color-on-surface);
+  opacity: 0.85;
+}
+
+/* 数字 / 字面量 / 符号 */
+.hljs-number,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet {
+  color: var(--md-sys-color-on-surface);
+  opacity: 0.75;
+}
+
+/* 函数名 / 类名 / 标题 */
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.class_,
+.hljs-section {
+  color: var(--md-sys-color-primary);
+  opacity: 0.9;
+}
+
+/* 内置类型 / 属性名 / 标签名 */
+.hljs-built_in,
+.hljs-type,
+.hljs-attr,
+.hljs-attribute,
+.hljs-name,
+.hljs-selector-attr,
+.hljs-selector-pseudo,
+.hljs-selector-class,
+.hljs-selector-id {
+  color: var(--md-sys-color-on-surface);
+  opacity: 0.7;
+}
+
+/* 变量 / 参数 / 元信息 */
+.hljs-variable,
+.hljs-params,
+.hljs-meta,
+.hljs-subst {
+  color: var(--md-sys-color-on-surface);
+  opacity: 0.65;
+}
+
+/* 删除 / 强调 / 链接 */
+.hljs-deletion {
+  color: var(--md-sys-color-on-surface);
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 700;
+}
+
+.hljs-link {
+  color: var(--md-sys-color-primary);
+  text-decoration: underline;
+}

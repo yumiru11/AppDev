@@ -3,6 +3,7 @@ package com.yumiru11.githubapp.core.database.di
 import android.content.Context
 import androidx.room.Room
 import com.yumiru11.githubapp.core.database.AppDatabase
+import com.yumiru11.githubapp.core.database.dao.CachedReadmeDao
 import com.yumiru11.githubapp.core.database.dao.CachedRepositoryDao
 import dagger.Module
 import dagger.Provides
@@ -27,10 +28,14 @@ object DatabaseModule {
                 context,
                 AppDatabase::class.java,
                 DATABASE_NAME,
-            ).build()
+            ).addMigrations(AppDatabase.MIGRATION_1_2)
+            .build()
 
     @Provides
     fun provideCachedRepositoryDao(db: AppDatabase): CachedRepositoryDao = db.cachedRepositoryDao()
+
+    @Provides
+    fun provideCachedReadmeDao(db: AppDatabase): CachedReadmeDao = db.cachedReadmeDao()
 
     private const val DATABASE_NAME = "githubapp.db"
 }
