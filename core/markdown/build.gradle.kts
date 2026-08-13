@@ -34,6 +34,9 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 
+    // WebViewAssetLoader（assets 安全加载，禁 file://；T8 WebView 兜底通道用）
+    implementation(libs.androidx.webkit)
+
     // 图标（Material Symbols cmp 变体：GitHub Alert 卡片用 MaterialSymbols.Rounded.*）
     implementation(libs.icons.material.symbols.base.cmp)
     implementation(libs.icons.material.symbols.rounded.cmp)
