@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 设置页（T24） -->
+    <string name="settings_title">设置</string>
+
+    <!-- 外观分组 -->
+    <string name="settings_appearance_group">外观</string>
+    <string name="settings_theme_mode">主题模式</string>
+    <string name="settings_theme_system">跟随系统</string>
+    <string name="settings_theme_light">浅色</string>
+    <string name="settings_theme_dark">深色</string>
+    <string name="settings_dynamic_color">动态取色</string>
+    <string name="settings_dynamic_color_desc">使用壁纸取色（Android 12+）</string>
+    <string name="settings_seed_color">主题色</string>
+    <string name="settings_oled">OLED 纯黑</string>
+    <string name="settings_oled_desc">AMOLED 纯黑省电背景</string>
+    <string name="settings_high_contrast">高对比</string>
+    <string name="settings_high_contrast_desc">无障碍高对比</string>
+    <string name="settings_blur">毛玻璃效果</string>
+    <string name="settings_blur_desc">顶栏与底栏毛玻璃</string>
+    <string name="settings_corner_scale">圆角强度</string>
+    <string name="settings_motion_scale">动画强度</string>
+    <string name="settings_icon_style">图标风格</string>
+    <string name="settings_icon_outlined">线性</string>
+    <string name="settings_icon_rounded">圆润</string>
+    <string name="settings_icon_filled">填充</string>
+    <string name="settings_code_font">代码字体</string>
+    <string name="settings_code_font_mono">等宽</string>
+    <string name="settings_code_font_system">系统默认</string>
+    <string name="settings_code_line_numbers">行号</string>
+
+    <!-- 开发者分组 -->
+    <string name="settings_developer_group">开发者</string>
+    <string name="settings_pat">Personal Access Token</string>
+    <string name="settings_pat_hint">输入 PAT</string>
+    <string name="settings_pat_save">保存</string>
+    <string name="settings_pat_show">显示</string>
+    <string name="settings_pat_hide">隐藏</string>
+    <string name="settings_pat_desc">fine-grained PAT 不支持 GraphQL，应用将自动降级为仅 REST 模式。</string>
+    <string name="settings_rest_only_notice">当前为仅 REST 模式——GraphQL 功能不可用。</string>
+    <string name="settings_rate_limit">剩余配额</string>
+    <string name="settings_rate_limit_unavailable">待接入</string>
+
+    <!-- 通用分组 -->
+    <string name="settings_general_group">通用</string>
+    <string name="settings_language">语言</string>
+    <string name="settings_language_system">跟随系统</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_zh">中文</string>
+    <string name="settings_about">关于</string>
+
+    <!-- 关于对话框 -->
+    <string name="about_title">关于</string>
+    <string name="about_version">版本 %1$s</string>
+    <string name="about_description">轻量、流畅、全 Material You 的 GitHub 客户端。</string>
+    <string name="about_ok">好</string>
+</resources>

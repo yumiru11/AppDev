@@ -129,6 +129,8 @@ dependencies {
     implementation(project(":feature:notifications"))
     // 个人主页（T20：资料头 + 四列表分页）
     implementation(project(":feature:profile"))
+    // 设置页（T24）：SettingsScreen/SettingsViewModel 装配进 app 导航
+    implementation(project(":feature:settings"))
 
     // Hilt（app 图根）
     implementation(libs.hilt.android)

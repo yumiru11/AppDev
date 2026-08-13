@@ -4,6 +4,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 
@@ -28,6 +29,7 @@ import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 fun AppTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     darkTheme: Boolean = isSystemInDarkTheme(),
+    seedColor: Color? = null,
     content: @Composable () -> Unit,
 ) {
     val isDark =
@@ -54,7 +56,13 @@ fun AppTheme(
 
             ThemeMode.DYNAMIC_DARK -> dynamicDarkColors(LocalContext.current)
 
-            else -> resolveThemeColors(themeMode, isDark)
+            // OLED / HIGH_CONTRAST keep their fixed palettes; seed only tints the
+            // base SYSTEM/LIGHT/DARK modes (T24 settings "seed 色盘").
+            ThemeMode.OLED,
+            ThemeMode.HIGH_CONTRAST,
+            -> resolveThemeColors(themeMode, isDark)
+
+            else -> seedColor?.let { seedColorScheme(it, isDark) } ?: resolveThemeColors(themeMode, isDark)
         }
 
     CompositionLocalProvider(

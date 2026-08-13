@@ -19,4 +19,5 @@
     <string name="profile_error_unknown">出错了</string>
     <string name="profile_retry">重试</string>
     <string name="profile_avatar">头像</string>
+    <string name="profile_settings">设置</string>
 </resources>

@@ -9,6 +9,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.yumiru11.githubapp.core.datastore.model.CodeFont
+import com.yumiru11.githubapp.core.datastore.model.IconStyle
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.designsystem.theme.darkPalette
@@ -144,12 +146,39 @@ private class FakeUserPreferencesRepository(
 
     private val blurEnabledFlow = MutableStateFlow(true)
     private val languageTagFlow = MutableStateFlow<String?>(null)
+    private val dynamicColorEnabledFlow = MutableStateFlow(false)
+    private val seedColorFlow = MutableStateFlow(UserPreferencesRepository.DEFAULT_SEED_COLOR)
+    private val oledEnabledFlow = MutableStateFlow(false)
+    private val highContrastEnabledFlow = MutableStateFlow(false)
+    private val cornerScaleFlow = MutableStateFlow(UserPreferencesRepository.DEFAULT_CORNER_SCALE)
+    private val motionScaleFlow = MutableStateFlow(UserPreferencesRepository.DEFAULT_MOTION_SCALE)
+    private val iconStyleFlow = MutableStateFlow(IconStyle.ROUNDED)
+    private val codeFontFlow = MutableStateFlow(CodeFont.MONO)
+    private val codeLineNumbersFlow = MutableStateFlow(true)
 
     override val themeMode: Flow<ThemeMode> = themeModeFlow
 
     override val languageTag: Flow<String?> = languageTagFlow
 
     override val blurEnabled: Flow<Boolean> = blurEnabledFlow
+
+    override val dynamicColorEnabled: Flow<Boolean> = dynamicColorEnabledFlow
+
+    override val seedColor: Flow<Long> = seedColorFlow
+
+    override val oledEnabled: Flow<Boolean> = oledEnabledFlow
+
+    override val highContrastEnabled: Flow<Boolean> = highContrastEnabledFlow
+
+    override val cornerScale: Flow<Float> = cornerScaleFlow
+
+    override val motionScale: Flow<Float> = motionScaleFlow
+
+    override val iconStyle: Flow<IconStyle> = iconStyleFlow
+
+    override val codeFont: Flow<CodeFont> = codeFontFlow
+
+    override val codeLineNumbers: Flow<Boolean> = codeLineNumbersFlow
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         themeModeFlow.value = mode
@@ -161,6 +190,42 @@ private class FakeUserPreferencesRepository(
 
     override suspend fun setLanguageTag(tag: String?) {
         languageTagFlow.value = tag
+    }
+
+    override suspend fun setDynamicColorEnabled(enabled: Boolean) {
+        dynamicColorEnabledFlow.value = enabled
+    }
+
+    override suspend fun setSeedColor(color: Long) {
+        seedColorFlow.value = color
+    }
+
+    override suspend fun setOledEnabled(enabled: Boolean) {
+        oledEnabledFlow.value = enabled
+    }
+
+    override suspend fun setHighContrastEnabled(enabled: Boolean) {
+        highContrastEnabledFlow.value = enabled
+    }
+
+    override suspend fun setCornerScale(scale: Float) {
+        cornerScaleFlow.value = scale
+    }
+
+    override suspend fun setMotionScale(scale: Float) {
+        motionScaleFlow.value = scale
+    }
+
+    override suspend fun setIconStyle(style: IconStyle) {
+        iconStyleFlow.value = style
+    }
+
+    override suspend fun setCodeFont(font: CodeFont) {
+        codeFontFlow.value = font
+    }
+
+    override suspend fun setCodeLineNumbers(enabled: Boolean) {
+        codeLineNumbersFlow.value = enabled
     }
 }
 

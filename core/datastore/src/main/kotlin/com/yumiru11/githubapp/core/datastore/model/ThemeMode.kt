@@ -28,3 +28,37 @@ enum class ThemeMode {
     /** 无障碍高对比主题（跟随系统亮/暗）。 */
     HIGH_CONTRAST,
 }
+
+/**
+ * 把设置页的分立开关合成「生效主题模式」（T24 设置页 + AppThemeHost 消费）。
+ *
+ * [base] 来自主题模式选择（System/Light/Dark）；开关优先级（无障碍优先）：
+ * 高对比 > OLED 纯黑 > 动态取色 > 基础模式。动态取色按 [base] 亮暗选
+ * DYNAMIC_LIGHT/DYNAMIC_DARK（Android 12+ 壁纸取色，低版本由色板函数回退）。
+ */
+fun resolveEffectiveThemeMode(
+    base: ThemeMode,
+    dynamicColorEnabled: Boolean,
+    oledEnabled: Boolean,
+    highContrastEnabled: Boolean,
+): ThemeMode =
+    when {
+        highContrastEnabled -> {
+            ThemeMode.HIGH_CONTRAST
+        }
+
+        oledEnabled -> {
+            ThemeMode.OLED
+        }
+
+        dynamicColorEnabled -> {
+            when (base) {
+                ThemeMode.DARK -> ThemeMode.DYNAMIC_DARK
+                else -> ThemeMode.DYNAMIC_LIGHT
+            }
+        }
+
+        else -> {
+            base
+        }
+    }

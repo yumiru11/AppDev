@@ -436,6 +436,26 @@ fun highContrastDarkPalette(): ThemeColors =
     )
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Seed-color scheme（T24 设置页「seed 色盘」）
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 由单个 seed 色派生 Material 3 色板（T24 设置页「seed 色盘」）。
+ *
+ * 仅 primary 取 seed，其余角色用 M3 基线值；扩展色按色板角色映射
+ * （[rememberExtendedColors]）。OLED / HIGH_CONTRAST / DYNAMIC 模式保留各自
+ * 固定色板——seed 只作用于基础 SYSTEM/LIGHT/DARK 模式（AppTheme 内判断）。
+ */
+@Composable
+fun seedColorScheme(
+    seed: Color,
+    isDark: Boolean,
+): ThemeColors {
+    val scheme = if (isDark) darkColorScheme(primary = seed) else lightColorScheme(primary = seed)
+    return ThemeColors(colorScheme = scheme, extendedColors = rememberExtendedColors(scheme))
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Resolver
 // ══════════════════════════════════════════════════════════════════════════════
 

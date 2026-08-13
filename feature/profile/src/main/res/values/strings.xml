@@ -19,4 +19,5 @@
     <string name="profile_error_unknown">Something went wrong</string>
     <string name="profile_retry">Retry</string>
     <string name="profile_avatar">Avatar</string>
+    <string name="profile_settings">Settings</string>
 </resources>
