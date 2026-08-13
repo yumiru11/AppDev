@@ -1,3 +1,5 @@
+@file:Suppress("LongMethod") // onCreate 聚合导航装配（T19 通知 + T20 Profile + T3 深链），拆分收益低于装配代码的强内聚
+
 package com.yumiru11.githubapp
 
 import android.content.Intent
@@ -32,6 +34,7 @@ import com.yumiru11.githubapp.feature.auth.AuthNavigation
 import com.yumiru11.githubapp.feature.auth.AuthViewModel
 import com.yumiru11.githubapp.feature.auth.LoginScreen
 import com.yumiru11.githubapp.feature.notifications.NotificationsScreen
+import com.yumiru11.githubapp.feature.profile.ProfileScreen
 import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -106,6 +109,23 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onNotificationClick = { parsed -> navigateToParsedUrl(navController, parsed) },
+                        )
+                    },
+                    profileScreen = { onLoginClick ->
+                        ProfileScreen(
+                            onLoginClick = onLoginClick,
+                            onOpenRepository = { owner, repo ->
+                                navController.navigate(
+                                    AppRoute.REPO
+                                        .replace("{owner}", owner)
+                                        .replace("{repo}", repo),
+                                )
+                            },
+                            onOpenUser = { login ->
+                                navController.navigate(
+                                    AppRoute.USER.replace("{login}", login),
+                                )
+                            },
                         )
                     },
                 )

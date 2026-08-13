@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_title">个人主页</string>
+    <string name="profile_login_guide_title">登录后查看个人主页</string>
+    <string name="profile_login_guide_body">使用 GitHub 账号登录，查看个人资料、仓库等。</string>
+    <string name="profile_sign_in">登录</string>
+    <string name="profile_tab_repositories">仓库</string>
+    <string name="profile_tab_starred">星标</string>
+    <string name="profile_tab_followers">关注者</string>
+    <string name="profile_tab_following">关注中</string>
+    <string name="profile_stats_repos">%d 个仓库</string>
+    <string name="profile_stats_followers">%d 关注者</string>
+    <string name="profile_stats_following">%d 关注中</string>
+    <string name="profile_list_empty">这里还没有内容</string>
+    <string name="profile_list_error">加载失败</string>
+    <string name="profile_list_retry">重试</string>
+    <string name="profile_error_not_found">用户不存在</string>
+    <string name="profile_error_network">网络错误，请检查网络连接。</string>
+    <string name="profile_error_unknown">出错了</string>
+    <string name="profile_retry">重试</string>
+    <string name="profile_avatar">头像</string>
+</resources>

@@ -161,4 +161,106 @@ class GitHubRestApiTest {
                 assertTrue(e.code() in 500..599)
             }
         }
+
+    @Test
+    fun getUser_validResponse_mapsStatsFields() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        {
+                          "login": "torvalds",
+                          "id": 1024025,
+                          "name": "Linus Torvalds",
+                          "avatar_url": "https://avatars.githubusercontent.com/u/1024025",
+                          "html_url": "https://github.com/torvalds",
+                          "bio": "Linux kernel",
+                          "type": "User",
+                          "public_repos": 8,
+                          "followers": 250000,
+                          "following": 0
+                        }
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val user = userApi.getUser("torvalds")
+
+            assertEquals("torvalds", user.login)
+            assertEquals(8, user.publicRepos)
+            assertEquals(250_000, user.followers)
+            assertEquals(0, user.following)
+            assertEquals("/users/torvalds", server.takeRequest().url.encodedPath)
+        }
+
+    @Test
+    fun currentUserRepositories_validResponse_mapsListAndPagingParams() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        [
+                          {
+                            "id": 1296269,
+                            "name": "Hello-World",
+                            "full_name": "octocat/Hello-World",
+                            "private": false,
+                            "owner": { "login": "octocat", "id": 1, "avatar_url": "https://a/u/1", "html_url": "https://github.com/octocat" },
+                            "description": "My first repository",
+                            "html_url": "https://github.com/octocat/Hello-World",
+                            "stargazers_count": 1700,
+                            "forks_count": 1900,
+                            "language": "JavaScript",
+                            "default_branch": "master"
+                          }
+                        ]
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val repos = userApi.currentUserRepositories(perPage = 30, page = 2)
+
+            assertEquals(1, repos.size)
+            assertEquals("Hello-World", repos.first().name)
+            assertEquals("octocat", repos.first().owner.login)
+            val request = server.takeRequest()
+            assertEquals("/user/repos", request.url.encodedPath)
+            assertEquals("30", request.url.queryParameter("per_page"))
+            assertEquals("2", request.url.queryParameter("page"))
+        }
+
+    @Test
+    fun userFollowers_validResponse_mapsList() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        [
+                          {
+                            "login": "follower-1",
+                            "id": 2,
+                            "avatar_url": "https://avatars.githubusercontent.com/u/2",
+                            "html_url": "https://github.com/follower-1",
+                            "type": "User"
+                          }
+                        ]
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val followers = userApi.userFollowers("octocat", perPage = 30, page = 1)
+
+            assertEquals(1, followers.size)
+            assertEquals("follower-1", followers.first().login)
+            assertEquals("/users/octocat/followers", server.takeRequest().url.encodedPath)
+        }
 }

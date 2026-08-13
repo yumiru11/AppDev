@@ -38,6 +38,7 @@ import androidx.navigation.navArgument
 import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.screens.HomeScreen
+import com.yumiru11.githubapp.core.ui.screens.NotificationScreen
 import com.yumiru11.githubapp.core.ui.screens.ProfileScreen
 import com.yumiru11.githubapp.core.ui.screens.SearchScreen
 
@@ -52,6 +53,8 @@ import com.yumiru11.githubapp.core.ui.screens.SearchScreen
  * - [loginScreen]：登录页 Composable（宿主注入，避免 core:ui 依赖 feature:auth）
  * - [repoDetailScreen]：仓库详情页 Composable（宿主注入，避免 core:ui 依赖 feature:repo）
  * - [notificationsScreen]：通知页 Composable（宿主注入，避免 core:ui 依赖 feature:notifications）
+ * - [profileScreen]：个人主页 Composable（宿主注入，避免 core:ui 依赖 feature:profile；
+ *   onLoginClick 由宿主接线到 LOGIN 路由）
  */
 @Composable
 fun AppNavHost(
@@ -62,6 +65,7 @@ fun AppNavHost(
     loginScreen: @Composable () -> Unit = {},
     repoDetailScreen: @Composable (owner: String, repo: String) -> Unit = { _, _ -> },
     notificationsScreen: @Composable () -> Unit = {},
+    profileScreen: @Composable (onLoginClick: () -> Unit) -> Unit = { _ -> },
 ) {
     NavHost(
         navController = navController,
@@ -117,7 +121,7 @@ fun AppNavHost(
         }
 
         composable(AppRoute.PROFILE) {
-            ProfileScreen()
+            profileScreen { navController.navigate(AppRoute.LOGIN) }
         }
 
         composable(
@@ -178,7 +182,7 @@ fun AppNavHost(
                     navArgument("login") { type = NavType.StringType },
                 ),
         ) {
-            ProfileScreen()
+            profileScreen { navController.navigate(AppRoute.LOGIN) }
         }
 
         composable(

@@ -127,6 +127,8 @@ dependencies {
     implementation(project(":feature:repo"))
     // 通知页（T19 通知列表/已读/过滤）
     implementation(project(":feature:notifications"))
+    // 个人主页（T20：资料头 + 四列表分页）
+    implementation(project(":feature:profile"))
 
     // Hilt（app 图根）
     implementation(libs.hilt.android)
