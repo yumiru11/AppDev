@@ -24,6 +24,7 @@ object AppRoute {
     const val SEARCH = "search"
     const val NOTIFICATION = "notification"
     const val PROFILE = "profile"
+    const val SETTINGS = "settings"
     const val EXTERNAL = "external"
 
     /**

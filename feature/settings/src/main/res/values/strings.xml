@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings screen (T24) -->
+    <string name="settings_title">Settings</string>
+
+    <!-- Appearance group -->
+    <string name="settings_appearance_group">Appearance</string>
+    <string name="settings_theme_mode">Theme</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_dynamic_color">Dynamic color</string>
+    <string name="settings_dynamic_color_desc">Use wallpaper colors (Android 12+)</string>
+    <string name="settings_seed_color">Seed color</string>
+    <string name="settings_oled">OLED pure black</string>
+    <string name="settings_oled_desc">True black background for AMOLED</string>
+    <string name="settings_high_contrast">High contrast</string>
+    <string name="settings_high_contrast_desc">Accessibility-friendly contrast</string>
+    <string name="settings_blur">Glass effect</string>
+    <string name="settings_blur_desc">Blurred top and bottom bars</string>
+    <string name="settings_corner_scale">Corner radius</string>
+    <string name="settings_motion_scale">Animation intensity</string>
+    <string name="settings_icon_style">Icon style</string>
+    <string name="settings_icon_outlined">Outlined</string>
+    <string name="settings_icon_rounded">Rounded</string>
+    <string name="settings_icon_filled">Filled</string>
+    <string name="settings_code_font">Code font</string>
+    <string name="settings_code_font_mono">Monospace</string>
+    <string name="settings_code_font_system">System default</string>
+    <string name="settings_code_line_numbers">Line numbers</string>
+
+    <!-- Developer group -->
+    <string name="settings_developer_group">Developer</string>
+    <string name="settings_pat">Personal Access Token</string>
+    <string name="settings_pat_hint">Enter PAT</string>
+    <string name="settings_pat_save">Save</string>
+    <string name="settings_pat_show">Show</string>
+    <string name="settings_pat_hide">Hide</string>
+    <string name="settings_pat_desc">Fine-grained PATs do not support GraphQL. The app falls back to REST-only mode.</string>
+    <string name="settings_rest_only_notice">REST-only mode active — GraphQL features are unavailable.</string>
+    <string name="settings_rate_limit">Rate limit</string>
+    <string name="settings_rate_limit_unavailable">Not available yet</string>
+
+    <!-- General group -->
+    <string name="settings_general_group">General</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_system">System default</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_language_zh">中文</string>
+    <string name="settings_about">About</string>
+
+    <!-- About dialog -->
+    <string name="about_title">About</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_description">A lightweight, Material You GitHub client.</string>
+    <string name="about_ok">OK</string>
+</resources>

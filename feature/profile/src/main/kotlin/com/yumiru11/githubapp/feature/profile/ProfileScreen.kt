@@ -17,12 +17,14 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -64,6 +66,7 @@ fun ProfileScreen(
     onLoginClick: () -> Unit = {},
     onOpenRepository: (owner: String, repo: String) -> Unit = { _, _ -> },
     onOpenUser: (login: String) -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -73,6 +76,11 @@ fun ProfileScreen(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.profile_title)) },
+                actions = {
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.profile_settings))
+                    }
+                },
             )
         },
     ) { padding ->

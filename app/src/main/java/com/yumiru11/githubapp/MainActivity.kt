@@ -2,7 +2,9 @@
 
 package com.yumiru11.githubapp
 
+import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -36,8 +38,11 @@ import com.yumiru11.githubapp.feature.auth.LoginScreen
 import com.yumiru11.githubapp.feature.notifications.NotificationsScreen
 import com.yumiru11.githubapp.feature.profile.ProfileScreen
 import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
+import com.yumiru11.githubapp.feature.settings.SettingsScreen
+import com.yumiru11.githubapp.feature.settings.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
 
 /**
@@ -58,6 +63,8 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
     private val authViewModel: AuthViewModel by viewModels()
 
+    private val settingsViewModel: SettingsViewModel by viewModels()
+
     @Inject lateinit var sessionManager: OAuthSessionManager
 
     // 主题/毛玻璃偏好仓库（T6 Wave2）：themeMode → AppThemeHost，blurEnabled → 顶/底栏玻璃
@@ -68,6 +75,10 @@ class MainActivity : ComponentActivity() {
 
     // OAuth 回调 scheme（取自 OAuthConfig.REDIRECT_URI 单一事实来源，不重复硬编码字面量）
     private val oauthCallbackScheme: String? = Uri.parse(OAuthConfig.REDIRECT_URI).scheme
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(applyLanguageLocale(newBase, cachedLanguageTag))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -80,6 +91,8 @@ class MainActivity : ComponentActivity() {
             val authState by authViewModel.authState.collectAsStateWithLifecycle()
             // 毛玻璃开关（ADR-0004：默认开启，设置页 T24 提供关闭项）→ 顶栏/底栏 GlassSurface
             val blurEnabled by userPreferencesRepository.blurEnabled.collectAsStateWithLifecycle(initialValue = true)
+            // 语言偏好（T24 设置页语言切换）：变化 → 缓存 + recreate 应用 locale
+            val languageTag by userPreferencesRepository.languageTag.collectAsStateWithLifecycle(initialValue = null)
 
             AppThemeHost(repository = userPreferencesRepository) {
                 AppNavHost(
@@ -111,7 +124,7 @@ class MainActivity : ComponentActivity() {
                             onNotificationClick = { parsed -> navigateToParsedUrl(navController, parsed) },
                         )
                     },
-                    profileScreen = { onLoginClick ->
+                    profileScreen = { onLoginClick, onSettingsClick ->
                         ProfileScreen(
                             onLoginClick = onLoginClick,
                             onOpenRepository = { owner, repo ->
@@ -126,9 +139,22 @@ class MainActivity : ComponentActivity() {
                                     AppRoute.USER.replace("{login}", login),
                                 )
                             },
+                            onSettingsClick = { navController.navigate(AppRoute.SETTINGS) },
                         )
+                    settingsScreen = {
+                        SettingsScreen(viewModel = settingsViewModel)
+                    },
                     },
                 )
+            }
+
+            // 语言切换（T24）：仓库 Flow 发射新 tag → 缓存（attachBaseContext 同步读取）
+            // → recreate 应用 locale；冷启动首帧用系统语言，Flow 发射后补一次 recreate
+            LaunchedEffect(languageTag) {
+                if (languageTag != cachedLanguageTag) {
+                    cachedLanguageTag = languageTag
+                    recreate()
+                }
             }
 
             // 登录态驱动导航：仅状态变化且目标页不符时 navigate，popUpTo(0) 清栈防循环
@@ -198,7 +224,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * 应用语言 locale（T24）：tag 非空 → 构造对应 locale 的 ConfigurationContext；
+     * null（跟随系统）→ 原样返回。Locale.setDefault 同步更新非 UI 格式化。
+     */
+    private fun applyLanguageLocale(
+        base: Context,
+        tag: String?,
+    ): Context {
+        if (tag == null) return base
+        val locale = Locale.forLanguageTag(tag)
+        Locale.setDefault(locale)
+        val configuration = Configuration(base.resources.configuration)
+        configuration.setLocale(locale)
+        return base.createConfigurationContext(configuration)
+    }
+
     private companion object {
         const val TAG = "MainActivity"
+
+        /**
+         * 语言 tag 缓存：attachBaseContext 在 DataStore 异步 Flow 可用前同步读取
+         * （冷启动首帧系统语言 → Flow 发射后 recreate 补应用）。
+         */
+        @Volatile
+        var cachedLanguageTag: String? = null
     }
 }

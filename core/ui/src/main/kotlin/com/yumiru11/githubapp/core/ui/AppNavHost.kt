@@ -55,6 +55,7 @@ import com.yumiru11.githubapp.core.ui.screens.SearchScreen
  * - [notificationsScreen]：通知页 Composable（宿主注入，避免 core:ui 依赖 feature:notifications）
  * - [profileScreen]：个人主页 Composable（宿主注入，避免 core:ui 依赖 feature:profile；
  *   onLoginClick 由宿主接线到 LOGIN 路由）
+ * - [settingsScreen]：设置页 Composable（宿主注入，避免 core:ui 依赖 feature:settings）
  */
 @Composable
 fun AppNavHost(
@@ -65,7 +66,8 @@ fun AppNavHost(
     loginScreen: @Composable () -> Unit = {},
     repoDetailScreen: @Composable (owner: String, repo: String) -> Unit = { _, _ -> },
     notificationsScreen: @Composable () -> Unit = {},
-    profileScreen: @Composable (onLoginClick: () -> Unit) -> Unit = { _ -> },
+    profileScreen: @Composable (onLoginClick: () -> Unit, onSettingsClick: () -> Unit) -> Unit = { _, _ -> },
+    settingsScreen: @Composable () -> Unit = {},
 ) {
     NavHost(
         navController = navController,
@@ -121,7 +123,15 @@ fun AppNavHost(
         }
 
         composable(AppRoute.PROFILE) {
-            profileScreen { navController.navigate(AppRoute.LOGIN) }
+            // T20：宿主注入真实 ProfileScreen；T24：设置入口经 onSettingsClick 由 Feature ProfileScreen 透传
+            profileScreen(
+                onLoginClick = { navController.navigate(AppRoute.LOGIN) },
+                onSettingsClick = { navController.navigate(AppRoute.SETTINGS) },
+            )
+        }
+
+        composable(AppRoute.SETTINGS) {
+            settingsScreen()
         }
 
         composable(
