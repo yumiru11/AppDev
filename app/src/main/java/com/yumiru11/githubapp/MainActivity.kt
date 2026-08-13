@@ -36,6 +36,8 @@ import com.yumiru11.githubapp.feature.auth.AuthNavigation
 import com.yumiru11.githubapp.feature.auth.AuthViewModel
 import com.yumiru11.githubapp.feature.auth.LoginScreen
 import com.yumiru11.githubapp.feature.home.HomeScreen
+import com.yumiru11.githubapp.feature.issue.IssueDetailScreen
+import com.yumiru11.githubapp.feature.issue.IssueListScreen
 import com.yumiru11.githubapp.feature.notifications.NotificationsScreen
 import com.yumiru11.githubapp.feature.profile.ProfileScreen
 import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
@@ -165,6 +167,23 @@ class MainActivity : ComponentActivity() {
                     },
                     settingsScreen = {
                         SettingsScreen(viewModel = settingsViewModel)
+                    },
+                    issueListScreen = { owner, repo, onIssueClick ->
+                        IssueListScreen(
+                            owner = owner,
+                            repo = repo,
+                            onBackClick = { navController.popBackStack() },
+                            onIssueClick = onIssueClick,
+                        )
+                    },
+                    issueDetailScreen = { owner, repo, number ->
+                        IssueDetailScreen(
+                            owner = owner,
+                            repo = repo,
+                            number = number,
+                            onBackClick = { navController.popBackStack() },
+                            onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
+                        )
                     },
                 )
             }

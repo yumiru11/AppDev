@@ -52,6 +52,12 @@ fun AppNavHost(
     notificationsScreen: @Composable () -> Unit = {},
     profileScreen: @Composable (onLoginClick: () -> Unit, onSettingsClick: () -> Unit) -> Unit = { _, _ -> },
     settingsScreen: @Composable () -> Unit = {},
+    issueListScreen: @Composable (
+        owner: String,
+        repo: String,
+        onIssueClick: (owner: String, repo: String, number: Int, isPullRequest: Boolean) -> Unit,
+    ) -> Unit = { _, _, _ -> },
+    issueDetailScreen: @Composable (owner: String, repo: String, number: Int) -> Unit = { _, _, _ -> },
 ) {
     NavHost(
         navController = navController,
@@ -119,6 +125,28 @@ fun AppNavHost(
         }
 
         composable(
+            route = AppRoute.ISSUES,
+            arguments =
+                listOf(
+                    navArgument("owner") { type = NavType.StringType },
+                    navArgument("repo") { type = NavType.StringType },
+                ),
+        ) { backStackEntry ->
+            val owner = backStackEntry.arguments?.getString("owner") ?: ""
+            val repo = backStackEntry.arguments?.getString("repo") ?: ""
+            // T13：Issue 列表页；点击项 → PR 走 PR 路由，否则走 Issue 详情路由
+            issueListScreen(owner, repo) { o, r, number, isPullRequest ->
+                val routeTemplate = if (isPullRequest) AppRoute.PR else AppRoute.ISSUE
+                navController.navigate(
+                    routeTemplate
+                        .replace("{owner}", o)
+                        .replace("{repo}", r)
+                        .replace("{number}", number.toString()),
+                )
+            }
+        }
+
+        composable(
             route = AppRoute.ISSUE,
             arguments =
                 listOf(
@@ -126,9 +154,12 @@ fun AppNavHost(
                     navArgument("repo") { type = NavType.StringType },
                     navArgument("number") { type = NavType.IntType },
                 ),
-        ) {
-            // T5+ Issue 详情页
-            SearchScreen()
+        ) { backStackEntry ->
+            val owner = backStackEntry.arguments?.getString("owner") ?: ""
+            val repo = backStackEntry.arguments?.getString("repo") ?: ""
+            val number = backStackEntry.arguments?.getInt("number") ?: 0
+            // T13：Issue 详情页
+            issueDetailScreen(owner, repo, number)
         }
 
         composable(

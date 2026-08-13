@@ -3,6 +3,7 @@ package com.yumiru11.githubapp.core.githubrest.di
 import com.yumiru11.githubapp.core.common.GitHubApiConfig
 import com.yumiru11.githubapp.core.githubrest.BuildConfig
 import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
+import com.yumiru11.githubapp.core.githubrest.api.IssueApi
 import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.api.UserApi
@@ -76,4 +77,8 @@ object RestNetworkModule {
     @Provides
     @Singleton
     fun provideReadmeApi(retrofit: Retrofit): ReadmeApi = retrofit.create(ReadmeApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideIssueApi(retrofit: Retrofit): IssueApi = retrofit.create(IssueApi::class.java)
 }
