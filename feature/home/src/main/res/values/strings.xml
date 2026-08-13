@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feed_require_login">Sign in to see your feed</string>
+    <string name="feed_login">Sign in</string>
+    <string name="feed_empty">No activity yet</string>
+    <string name="feed_retry">Retry</string>
+    <string name="feed_error_network">Network error. Check your connection.</string>
+    <string name="feed_error_unknown">Something went wrong</string>
+    <string name="feed_action_issue_opened">%1$s opened issue #%2$d</string>
+    <string name="feed_action_issue_closed">%1$s closed issue #%2$d</string>
+    <string name="feed_action_issue_reopened">%1$s reopened issue #%2$d</string>
+    <string name="feed_action_issue_other">%1$s updated issue #%2$d</string>
+    <string name="feed_action_issue_comment">%1$s commented on issue #%2$d</string>
+    <string name="feed_action_issue_comment_edited">%1$s edited a comment on issue #%2$d</string>
+    <string name="feed_action_issue_comment_deleted">%1$s deleted a comment on issue #%2$d</string>
+    <string name="feed_action_pr_opened">%1$s opened pull request #%2$d</string>
+    <string name="feed_action_pr_closed">%1$s closed pull request #%2$d</string>
+    <string name="feed_action_pr_reopened">%1$s reopened pull request #%2$d</string>
+    <string name="feed_action_pr_other">%1$s updated pull request #%2$d</string>
+    <string name="feed_action_push">%1$s pushed %2$d commits</string>
+    <string name="feed_action_star">%1$s starred</string>
+    <string name="feed_action_fork">%1$s forked</string>
+</resources>

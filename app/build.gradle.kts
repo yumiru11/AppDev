@@ -123,6 +123,8 @@ dependencies {
 
     // 登录页（T4 Wave2 接线）：LoginScreen/AuthViewModel 装配进 app 导航
     implementation(project(":feature:auth"))
+    // 首页动态流（T10）：HomeScreen/HomeViewModel 装配进 app 导航
+    implementation(project(":feature:home"))
     // 仓库详情页（T9 README 浏览 tracer bullet）
     implementation(project(":feature:repo"))
     // 通知页（T19 通知列表/已读/过滤）
