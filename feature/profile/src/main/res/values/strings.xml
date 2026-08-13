@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_title">Profile</string>
+    <string name="profile_login_guide_title">Sign in to view your profile</string>
+    <string name="profile_login_guide_body">Sign in with your GitHub account to see your profile, repositories and more.</string>
+    <string name="profile_sign_in">Sign in</string>
+    <string name="profile_tab_repositories">Repos</string>
+    <string name="profile_tab_starred">Starred</string>
+    <string name="profile_tab_followers">Followers</string>
+    <string name="profile_tab_following">Following</string>
+    <string name="profile_stats_repos">%d repos</string>
+    <string name="profile_stats_followers">%d followers</string>
+    <string name="profile_stats_following">%d following</string>
+    <string name="profile_list_empty">Nothing here yet</string>
+    <string name="profile_list_error">Failed to load</string>
+    <string name="profile_list_retry">Retry</string>
+    <string name="profile_error_not_found">User not found</string>
+    <string name="profile_error_network">Network error. Check your connection.</string>
+    <string name="profile_error_unknown">Something went wrong</string>
+    <string name="profile_retry">Retry</string>
+    <string name="profile_avatar">Avatar</string>
+</resources>

@@ -32,6 +32,7 @@ import com.yumiru11.githubapp.feature.auth.AuthNavigation
 import com.yumiru11.githubapp.feature.auth.AuthViewModel
 import com.yumiru11.githubapp.feature.auth.LoginScreen
 import com.yumiru11.githubapp.feature.notifications.NotificationsScreen
+import com.yumiru11.githubapp.feature.profile.ProfileScreen
 import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -106,6 +107,25 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onNotificationClick = { parsed -> navigateToParsedUrl(navController, parsed) },
+                        )
+                    },
+                    profileScreen = { onLoginClick ->
+                        ProfileScreen(
+                            onLoginClick = onLoginClick,
+                            onOpenRepository = { owner, repo ->
+                                navController.navigate(
+                                    AppRoute.REPO
+                                        .replace("{owner}", owner)
+                                        .replace("{repo}", repo),
+                                )
+                            },
+                            onOpenUser = { login ->
+                                navController.navigate(
+                                    AppRoute.USER.replace("{login}", login),
+                                )
+                            },
+                        )
+                    },
                         )
                     },
                 )
