@@ -3,7 +3,6 @@
 package com.yumiru11.githubapp.core.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -12,40 +11,37 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.yumiru11.githubapp.core.ui.AppBottomBar
 import com.yumiru11.githubapp.core.ui.AppTopBar
 import com.yumiru11.githubapp.core.ui.HomePager
 import com.yumiru11.githubapp.core.ui.HomeTabs
-import com.yumiru11.githubapp.core.ui.NotificationPanel
 
 /**
- * 首页：AppTopBar + HomeTabs + HomePager + AppBottomBar + 通知面板覆盖。
+ * 首页：AppTopBar + HomeTabs + HomePager + AppBottomBar。
  *
- * 点击顶栏通知铃铛触发全屏滑入 [NotificationPanel]，不走导航。
+ * 点击顶栏通知铃铛 → 导航到 AppRoute.NOTIFICATION（T19 全屏 slide-in 通知页，
+ * 替换 T3 占位 NotificationPanel 弹出面板，docs/ui-design.md §3.4）。
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     onSearchClick: () -> Unit,
-    @Suppress("unused") onNotificationClick: () -> Unit,
+    onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
     onTabSelected: (String) -> Unit,
     selectedTab: String,
     blurEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    var showNotifPanel by remember { mutableStateOf(false) }
     val pagerState = rememberPagerState(pageCount = { 4 })
 
     Scaffold(
         topBar = {
             AppTopBar(
                 onSearchClick = onSearchClick,
-                onNotificationClick = { showNotifPanel = true },
+                onNotificationClick = onNotificationClick,
                 onProfileClick = onProfileClick,
                 blurEnabled = blurEnabled,
             )
@@ -59,24 +55,16 @@ fun HomeScreen(
         },
         modifier = modifier,
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-            ) {
-                HomeTabs(pagerState = pagerState)
-                HomePager(
-                    pagerState = pagerState,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-
-            NotificationPanel(
-                visible = showNotifPanel,
-                onDismiss = { showNotifPanel = false },
-                onMarkAllRead = { /* T5+ */ },
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+        ) {
+            HomeTabs(pagerState = pagerState)
+            HomePager(
+                pagerState = pagerState,
+                modifier = Modifier.weight(1f),
             )
         }
     }

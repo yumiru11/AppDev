@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_title">通知</string>
+    <string name="notification_back">返回</string>
+    <string name="notification_mark_all_read">全部已读</string>
+    <string name="notification_empty">暂无通知</string>
+    <string name="notification_require_login">登录后查看你的通知</string>
+    <string name="notification_login">登录</string>
+    <string name="notification_retry">重试</string>
+    <string name="notification_error_network">网络错误，请检查网络连接</string>
+    <string name="notification_error_unknown">出错了，请重试</string>
+    <string name="notification_filter_all">全部</string>
+    <string name="notification_filter_participating">参与</string>
+    <string name="notification_filter_mention">提及</string>
+    <string name="notification_reason_mention">提及了你</string>
+    <string name="notification_reason_assign">分配给你</string>
+    <string name="notification_reason_author">作者动态</string>
+    <string name="notification_reason_comment">评论了你</string>
+    <string name="notification_reason_ci_activity">CI 动态</string>
+    <string name="notification_reason_invitation">邀请</string>
+    <string name="notification_reason_manual">手动订阅</string>
+    <string name="notification_reason_member">团队成员</string>
+    <string name="notification_reason_review_requested">请求审查</string>
+    <string name="notification_reason_security_alert">安全警报</string>
+    <string name="notification_reason_state_change">状态变更</string>
+    <string name="notification_reason_subscribed">已订阅</string>
+    <string name="notification_reason_team_mention">团队提及了你</string>
+    <string name="notification_reason_unknown">通知</string>
+</resources>
