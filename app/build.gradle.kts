@@ -127,13 +127,10 @@ dependencies {
     implementation(project(":feature:repo"))
     // 通知页（T19 通知列表/已读/过滤）
     implementation(project(":feature:notifications"))
-<<<<<<< HEAD
     // 个人主页（T20：资料头 + 四列表分页）
     implementation(project(":feature:profile"))
-=======
     // 设置页（T24）：SettingsScreen/SettingsViewModel 装配进 app 导航
     implementation(project(":feature:settings"))
->>>>>>> 0de86b1 (T24: 设置页（主题/动态色/seed/滑杆/图标风格/开发者 PAT，datastore 持久化即时生效）)
 
     // Hilt（app 图根）
     implementation(libs.hilt.android)

@@ -1,4 +1,4 @@
-@file:Suppress("LongMethod") // onCreate 聚合导航装配（T19 通知 + T20 Profile + T3 深链），拆分收益低于装配代码的强内聚
+@file:Suppress("LongMethod") // onCreate 聚合导航装配（T19 通知 + T20 Profile + T24 设置 + 语言切换），拆分收益低于装配强内聚
 
 package com.yumiru11.githubapp
 
@@ -143,7 +143,6 @@ class MainActivity : ComponentActivity() {
                         )
                     settingsScreen = {
                         SettingsScreen(viewModel = settingsViewModel)
-                    },
                     },
                 )
             }
