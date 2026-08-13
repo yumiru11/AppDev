@@ -125,8 +125,8 @@ fun AppNavHost(
         composable(AppRoute.PROFILE) {
             // T20：宿主注入真实 ProfileScreen；T24：设置入口经 onSettingsClick 由 Feature ProfileScreen 透传
             profileScreen(
-                onLoginClick = { navController.navigate(AppRoute.LOGIN) },
-                onSettingsClick = { navController.navigate(AppRoute.SETTINGS) },
+                { navController.navigate(AppRoute.LOGIN) },
+                { navController.navigate(AppRoute.SETTINGS) },
             )
         }
 
@@ -192,7 +192,10 @@ fun AppNavHost(
                     navArgument("login") { type = NavType.StringType },
                 ),
         ) {
-            profileScreen { navController.navigate(AppRoute.LOGIN) }
+            profileScreen(
+                { navController.navigate(AppRoute.LOGIN) },
+                { navController.navigate(AppRoute.SETTINGS) },
+            )
         }
 
         composable(

@@ -124,7 +124,7 @@ class MainActivity : ComponentActivity() {
                             onNotificationClick = { parsed -> navigateToParsedUrl(navController, parsed) },
                         )
                     },
-                    profileScreen = { onLoginClick, onSettingsClick ->
+                    profileScreen = { onLoginClick: () -> Unit, onSettingsClick: () -> Unit ->
                         ProfileScreen(
                             onLoginClick = onLoginClick,
                             onOpenRepository = { owner, repo ->
@@ -141,6 +141,7 @@ class MainActivity : ComponentActivity() {
                             },
                             onSettingsClick = { navController.navigate(AppRoute.SETTINGS) },
                         )
+                    },
                     settingsScreen = {
                         SettingsScreen(viewModel = settingsViewModel)
                     },
