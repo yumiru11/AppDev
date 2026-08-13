@@ -15,7 +15,6 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.screens.HomeScreen
 import com.yumiru11.githubapp.core.ui.screens.NotificationScreen
 import com.yumiru11.githubapp.core.ui.screens.ProfileScreen
-import com.yumiru11.githubapp.core.ui.screens.ReposScreen
 import com.yumiru11.githubapp.core.ui.screens.SearchScreen
 
 /**
@@ -27,6 +26,7 @@ import com.yumiru11.githubapp.core.ui.screens.SearchScreen
  * - [startDestination]：起始 destination（T4 Wave2 登录态驱动首屏：Anonymous → 登录页，
  *   由宿主按 AuthState 传入；默认 HOME 保持向后兼容）
  * - [loginScreen]：登录页 Composable（宿主注入，避免 core:ui 依赖 feature:auth）
+ * - [repoDetailScreen]：仓库详情页 Composable（宿主注入，避免 core:ui 依赖 feature:repo）
  */
 @Composable
 fun AppNavHost(
@@ -35,6 +35,7 @@ fun AppNavHost(
     startDestination: String = AppRoute.HOME,
     blurEnabled: Boolean = true,
     loginScreen: @Composable () -> Unit = {},
+    repoDetailScreen: @Composable (owner: String, repo: String) -> Unit = { _, _ -> },
 ) {
     NavHost(
         navController = navController,
@@ -84,7 +85,7 @@ fun AppNavHost(
         ) { backStackEntry ->
             val owner = backStackEntry.arguments?.getString("owner") ?: ""
             val repo = backStackEntry.arguments?.getString("repo") ?: ""
-            ReposScreen(owner = owner, repo = repo)
+            repoDetailScreen(owner, repo)
         }
 
         composable(

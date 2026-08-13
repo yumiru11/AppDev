@@ -14,8 +14,12 @@ class GitHubHeaderInterceptor : Interceptor {
             chain
                 .request()
                 .newBuilder()
-                .header(HEADER_ACCEPT, GitHubHeaders.ACCEPT_VALUE)
-                .header(GitHubHeaders.API_VERSION_HEADER, GitHubHeaders.API_VERSION_VALUE)
+                .apply {
+                    // 仅当请求未设置 Accept 时设置默认值（允许 @Header("Accept") 覆盖）
+                    if (chain.request().header(HEADER_ACCEPT) == null) {
+                        header(HEADER_ACCEPT, GitHubHeaders.ACCEPT_VALUE)
+                    }
+                }.header(GitHubHeaders.API_VERSION_HEADER, GitHubHeaders.API_VERSION_VALUE)
                 .header(HEADER_USER_AGENT, GitHubHeaders.USER_AGENT_VALUE)
                 .build()
         return chain.proceed(request)

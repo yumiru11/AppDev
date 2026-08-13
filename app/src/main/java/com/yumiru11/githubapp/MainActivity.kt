@@ -31,6 +31,7 @@ import com.yumiru11.githubapp.core.ui.navigateToParsedUrl
 import com.yumiru11.githubapp.feature.auth.AuthNavigation
 import com.yumiru11.githubapp.feature.auth.AuthViewModel
 import com.yumiru11.githubapp.feature.auth.LoginScreen
+import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -86,6 +87,13 @@ class MainActivity : ComponentActivity() {
                             onSignIn = { authViewModel.onSignIn() },
                             onBrowseAsGuest = { authViewModel.onBrowseAsGuest() },
                             onSavePat = { authViewModel.onSavePat(it) },
+                        )
+                    },
+                    repoDetailScreen = { owner, repo ->
+                        RepoDetailScreen(
+                            owner = owner,
+                            repo = repo,
+                            onBackClick = { navController.popBackStack() },
                         )
                     },
                 )

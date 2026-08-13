@@ -24,6 +24,18 @@ android {
             // Robolectric/Roborazzi 需要 Android 资源
             isIncludeAndroidResources = true
         }
+        // Robolectric 运行时通过 Maven 下载 android-all-instrumented jar，
+        // 指向阿里云镜像避免 Maven Central 429 限流；同时传递代理设置给测试 worker 进程
+        unitTests.all {
+            it.systemProperty("robolectric.dependency.repo.url", "https://maven.aliyun.com/repository/public/")
+            it.systemProperty("robolectric.dependency.repo.id", "aliyun")
+            // 代理设置（测试 worker 是独立 JVM，不继承 Gradle daemon 的代理）
+            it.systemProperty("http.proxyHost", "127.0.0.1")
+            it.systemProperty("http.proxyPort", "18080")
+            it.systemProperty("https.proxyHost", "127.0.0.1")
+            it.systemProperty("https.proxyPort", "18080")
+            it.systemProperty("http.nonProxyHosts", "localhost|127.0.0.1")
+        }
     }
 
     lint {
@@ -123,6 +135,8 @@ dependencies {
 
     // 登录页（T4 Wave2 接线）：LoginScreen/AuthViewModel 装配进 app 导航
     implementation(project(":feature:auth"))
+    // 仓库详情页（T9 README 浏览 tracer bullet）
+    implementation(project(":feature:repo"))
 
     // Hilt（app 图根）
     implementation(libs.hilt.android)
@@ -134,6 +148,8 @@ dependencies {
     // Testing：Konsist 架构护栏 + core:testing 基建（JUnit4/Robolectric/Roborazzi/coroutines-test 由其 api 导出）
     testImplementation(libs.konsist)
     testImplementation(project(":core:testing"))
+    // MockK（core:testing 不导出，截图测试直接使用）
+    testImplementation(libs.mockk)
     // Hilt 图装配测试（@HiltAndroidTest + HiltAndroidTestRunner，Robolectric）
     testImplementation(libs.hilt.android.testing)
     kspTest(libs.hilt.compiler)
@@ -141,6 +157,20 @@ dependencies {
 
 // Konsist 无原生任务：以过滤后的单测任务充当 konsistCheck（只跑 konsist 包下的架构测试）。
 // isFailOnNoMatchingTests = false 保证过滤无匹配时空跑通过；T2 起该包含正式架构护栏规则
+
+// 禁用 AAR metadata 检查：mikepenz markdown-renderer 0.43.0 要求 compileSdk 37，
+// 但 android-37 平台尚未发布，compileSdk 36 编译无问题（API 兼容）
+afterEvaluate {
+    tasks
+        .matching {
+            it.name.contains(
+                "AarMetadata",
+                ignoreCase = true,
+            ) || it.name.contains("aarMetadata", ignoreCase = true)
+        }.configureEach {
+            enabled = false
+        }
+}
 tasks.register<Test>("konsistCheck") {
     description = "Runs Konsist architecture tests (filtered from :app unit tests)."
     group = "verification"

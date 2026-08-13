@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="repo_detail_title">Repository</string>
+    <string name="repo_readme_loading">Loading README…</string>
+    <string name="repo_readme_error">Failed to load README</string>
+    <string name="repo_readme_empty">No README</string>
+    <string name="repo_readme_section">README</string>
+    <string name="repo_stars">%d stars</string>
+    <string name="repo_forks">%d forks</string>
+    <string name="repo_language">%s</string>
+    <string name="repo_error_not_found">Repository not found</string>
+    <string name="repo_error_network">Network error. Check your connection.</string>
+    <string name="repo_error_unknown">Unknown error</string>
+    <string name="repo_retry">Retry</string>
+    <string name="repo_back">Back</string>
+    <string name="repo_avatar">Avatar</string>
+</resources>

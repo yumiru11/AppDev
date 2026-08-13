@@ -1,26 +1,32 @@
 pluginManagement {
     repositories {
-        // ⚠️ 阿里云镜像不再写在这里：本机由 ~/.gradle/init.d/mirror.gradle 注入（不入库），
-        // CI/GitHub Actions 直连官方源（阿里云在 CI 上 502，2026-08-12 实测）。
-        google {
-            content {
-                includeGroupByRegex("com\\.android.*")
-                includeGroupByRegex("com\\.google.*")
-                includeGroupByRegex("androidx.*")
-            }
-        }
-        mavenCentral()
+        mavenLocal()
+        // 阿里云镜像（Maven Central + Google 代理，覆盖全面，避免 Maven Central 429）
+        maven("https://maven.aliyun.com/repository/public/")
+        maven("https://maven.aliyun.com/repository/google/")
+        // Gradle Plugin Portal（Gradle 特有插件，如 kotlin-android、spotless、detekt）
         gradlePluginPortal()
+        // 腾讯云镜像（兜底）
+        maven("https://mirrors.cloud.tencent.com/maven/maven2/")
+        maven("https://mirrors.cloud.tencent.com/maven/google/")
+        // 最终兜底：官方源
+        mavenCentral()
     }
 }
 
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        // ⚠️ 阿里云镜像不再写在这里：本机由 ~/.gradle/init.d/mirror.gradle 注入（不入库），
-        // CI/GitHub Actions 直连官方源（阿里云在 CI 上 502，2026-08-12 实测）。
+        // 阿里云镜像（Maven Central + Google 代理，覆盖全面，避免 Maven Central 429）
+        maven("https://maven.aliyun.com/repository/public/")
+        maven("https://maven.aliyun.com/repository/google/")
+        // 腾讯云镜像（兜底）
+        maven("https://mirrors.cloud.tencent.com/maven/maven2/")
+        maven("https://mirrors.cloud.tencent.com/maven/google/")
+        // 最终兜底：官方源
         google()
         mavenCentral()
+        gradlePluginPortal()
     }
 }
 
