@@ -43,7 +43,9 @@ fun AppThemeHost(
         )
     AppTheme(
         themeMode = effectiveMode,
-        seedColor = Color(seedColor),
+        // 默认 seed（未自定义）传 null → 走默认调色板（与 T6/T12 行为一致，AppThemeHostTest 断言依赖）；
+        // 用户改过 seed 才激活 seed 色板（T24「seed 色盘」）
+        seedColor = seedColor.takeIf { it != UserPreferencesRepository.DEFAULT_SEED_COLOR }?.let(::Color),
         content = content,
     )
 }
