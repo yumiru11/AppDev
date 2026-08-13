@@ -35,6 +35,7 @@ import com.yumiru11.githubapp.core.ui.navigateToParsedUrl
 import com.yumiru11.githubapp.feature.auth.AuthNavigation
 import com.yumiru11.githubapp.feature.auth.AuthViewModel
 import com.yumiru11.githubapp.feature.auth.LoginScreen
+import com.yumiru11.githubapp.feature.home.HomeScreen
 import com.yumiru11.githubapp.feature.notifications.NotificationsScreen
 import com.yumiru11.githubapp.feature.profile.ProfileScreen
 import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
@@ -98,7 +99,27 @@ class MainActivity : ComponentActivity() {
                 AppNavHost(
                     navController = navController,
                     startDestination = authStateToDestination(authState),
-                    blurEnabled = blurEnabled,
+                    homeScreen = {
+                        HomeScreen(
+                            onSearchClick = { navController.navigate(AppRoute.SEARCH) },
+                            onNotificationClick = { navController.navigate(AppRoute.NOTIFICATION) },
+                            onProfileClick = { navController.navigate(AppRoute.PROFILE) },
+                            onTabSelected = { route ->
+                                navController.navigate(route) {
+                                    popUpTo(AppRoute.HOME) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                            blurEnabled = blurEnabled,
+                            onLoginClick = {
+                                navController.navigate(AppRoute.LOGIN) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            },
+                            onFeedItemClick = { parsed -> navigateToParsedUrl(navController, parsed) },
+                        )
+                    },
                     loginScreen = {
                         LoginScreen(
                             onSignIn = { authViewModel.onSignIn() },

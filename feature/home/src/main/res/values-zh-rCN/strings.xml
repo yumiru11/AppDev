@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feed_require_login">登录后查看你的动态</string>
+    <string name="feed_login">登录</string>
+    <string name="feed_empty">暂无动态</string>
+    <string name="feed_retry">重试</string>
+    <string name="feed_error_network">网络错误，请检查网络连接</string>
+    <string name="feed_error_unknown">出错了，请重试</string>
+    <string name="feed_action_issue_opened">%1$s 打开了 Issue #%2$d</string>
+    <string name="feed_action_issue_closed">%1$s 关闭了 Issue #%2$d</string>
+    <string name="feed_action_issue_reopened">%1$s 重新打开了 Issue #%2$d</string>
+    <string name="feed_action_issue_other">%1$s 更新了 Issue #%2$d</string>
+    <string name="feed_action_issue_comment">%1$s 评论了 Issue #%2$d</string>
+    <string name="feed_action_issue_comment_edited">%1$s 编辑了 Issue #%2$d 的评论</string>
+    <string name="feed_action_issue_comment_deleted">%1$s 删除了 Issue #%2$d 的评论</string>
+    <string name="feed_action_pr_opened">%1$s 打开了 Pull Request #%2$d</string>
+    <string name="feed_action_pr_closed">%1$s 关闭了 Pull Request #%2$d</string>
+    <string name="feed_action_pr_reopened">%1$s 重新打开了 Pull Request #%2$d</string>
+    <string name="feed_action_pr_other">%1$s 更新了 Pull Request #%2$d</string>
+    <string name="feed_action_push">%1$s 推送了 %2$d 个提交</string>
+    <string name="feed_action_star">%1$s Star 了</string>
+    <string name="feed_action_fork">%1$s Fork 了</string>
+</resources>
