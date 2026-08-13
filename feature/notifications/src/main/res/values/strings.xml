@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_title">Notifications</string>
+    <string name="notification_back">Back</string>
+    <string name="notification_mark_all_read">Mark all read</string>
+    <string name="notification_empty">No notifications</string>
+    <string name="notification_require_login">Sign in to view your notifications</string>
+    <string name="notification_login">Sign in</string>
+    <string name="notification_retry">Retry</string>
+    <string name="notification_error_network">Network error. Check your connection.</string>
+    <string name="notification_error_unknown">Something went wrong</string>
+    <string name="notification_filter_all">All</string>
+    <string name="notification_filter_participating">Participating</string>
+    <string name="notification_filter_mention">Mentions</string>
+    <string name="notification_reason_mention">Mentioned you</string>
+    <string name="notification_reason_assign">Assigned to you</string>
+    <string name="notification_reason_author">Author activity</string>
+    <string name="notification_reason_comment">Commented</string>
+    <string name="notification_reason_ci_activity">CI activity</string>
+    <string name="notification_reason_invitation">Invitation</string>
+    <string name="notification_reason_manual">Subscribed manually</string>
+    <string name="notification_reason_member">Team member</string>
+    <string name="notification_reason_review_requested">Review requested</string>
+    <string name="notification_reason_security_alert">Security alert</string>
+    <string name="notification_reason_state_change">State changed</string>
+    <string name="notification_reason_subscribed">Subscribed</string>
+    <string name="notification_reason_team_mention">Team mentioned you</string>
+    <string name="notification_reason_unknown">Notification</string>
+</resources>

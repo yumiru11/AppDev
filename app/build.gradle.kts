@@ -125,6 +125,8 @@ dependencies {
     implementation(project(":feature:auth"))
     // 仓库详情页（T9 README 浏览 tracer bullet）
     implementation(project(":feature:repo"))
+    // 通知页（T19 通知列表/已读/过滤）
+    implementation(project(":feature:notifications"))
 
     // Hilt（app 图根）
     implementation(libs.hilt.android)

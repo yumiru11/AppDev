@@ -4,6 +4,10 @@
 package com.yumiru11.githubapp.core.ui
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,7 +38,6 @@ import androidx.navigation.navArgument
 import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.screens.HomeScreen
-import com.yumiru11.githubapp.core.ui.screens.NotificationScreen
 import com.yumiru11.githubapp.core.ui.screens.ProfileScreen
 import com.yumiru11.githubapp.core.ui.screens.SearchScreen
 
@@ -48,6 +51,7 @@ import com.yumiru11.githubapp.core.ui.screens.SearchScreen
  *   由宿主按 AuthState 传入；默认 HOME 保持向后兼容）
  * - [loginScreen]：登录页 Composable（宿主注入，避免 core:ui 依赖 feature:auth）
  * - [repoDetailScreen]：仓库详情页 Composable（宿主注入，避免 core:ui 依赖 feature:repo）
+ * - [notificationsScreen]：通知页 Composable（宿主注入，避免 core:ui 依赖 feature:notifications）
  */
 @Composable
 fun AppNavHost(
@@ -57,6 +61,7 @@ fun AppNavHost(
     blurEnabled: Boolean = true,
     loginScreen: @Composable () -> Unit = {},
     repoDetailScreen: @Composable (owner: String, repo: String) -> Unit = { _, _ -> },
+    notificationsScreen: @Composable () -> Unit = {},
 ) {
     NavHost(
         navController = navController,
@@ -101,8 +106,14 @@ fun AppNavHost(
             SearchScreen()
         }
 
-        composable(AppRoute.NOTIFICATION) {
-            NotificationScreen()
+        // 通知页（T19，docs/ui-design.md §3.4）：全屏 slide-in 面板——从顶部滑入
+        // （与 T3 占位 NotificationPanel 的滑入方向一致），退出反向滑出
+        composable(
+            route = AppRoute.NOTIFICATION,
+            enterTransition = { slideInVertically(initialOffsetY = { -it }) + fadeIn() },
+            exitTransition = { slideOutVertically(targetOffsetY = { -it }) + fadeOut() },
+        ) {
+            notificationsScreen()
         }
 
         composable(AppRoute.PROFILE) {

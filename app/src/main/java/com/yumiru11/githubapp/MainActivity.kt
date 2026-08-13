@@ -31,6 +31,7 @@ import com.yumiru11.githubapp.core.ui.navigateToParsedUrl
 import com.yumiru11.githubapp.feature.auth.AuthNavigation
 import com.yumiru11.githubapp.feature.auth.AuthViewModel
 import com.yumiru11.githubapp.feature.auth.LoginScreen
+import com.yumiru11.githubapp.feature.notifications.NotificationsScreen
 import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -94,6 +95,17 @@ class MainActivity : ComponentActivity() {
                             owner = owner,
                             repo = repo,
                             onBackClick = { navController.popBackStack() },
+                        )
+                    },
+                    notificationsScreen = {
+                        NotificationsScreen(
+                            onBackClick = { navController.popBackStack() },
+                            onLoginClick = {
+                                navController.navigate(AppRoute.LOGIN) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            },
+                            onNotificationClick = { parsed -> navigateToParsedUrl(navController, parsed) },
                         )
                     },
                 )
