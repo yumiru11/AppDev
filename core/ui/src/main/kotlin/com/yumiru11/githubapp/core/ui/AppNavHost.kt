@@ -2,8 +2,29 @@
 // NavHost 的 composable 注册样板天然较长（每个 destination 一段），拆散反损可读性；精准抑制。
 
 package com.yumiru11.githubapp.core.ui
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -47,20 +68,33 @@ fun AppNavHost(
         }
 
         composable(AppRoute.HOME) {
-            HomeScreen(
-                onSearchClick = { navController.navigate(AppRoute.SEARCH) },
-                onNotificationClick = { navController.navigate(AppRoute.NOTIFICATION) },
-                onProfileClick = { navController.navigate(AppRoute.PROFILE) },
-                onTabSelected = { route ->
-                    navController.navigate(route) {
-                        popUpTo(AppRoute.HOME) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
-                selectedTab = AppRoute.HOME,
-                blurEnabled = blurEnabled,
-            )
+            Column(modifier = Modifier.fillMaxSize()) {
+                // T9 验收第 1 条：owner/repo 输入入口（最小可用，不重设计 HomeScreen 布局）
+                OpenRepoEntry(
+                    onOpen = { owner, repo ->
+                        navController.navigate(
+                            AppRoute.REPO
+                                .replace("{owner}", owner)
+                                .replace("{repo}", repo),
+                        )
+                    },
+                )
+                HomeScreen(
+                    onSearchClick = { navController.navigate(AppRoute.SEARCH) },
+                    onNotificationClick = { navController.navigate(AppRoute.NOTIFICATION) },
+                    onProfileClick = { navController.navigate(AppRoute.PROFILE) },
+                    onTabSelected = { route ->
+                        navController.navigate(route) {
+                            popUpTo(AppRoute.HOME) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                    selectedTab = AppRoute.HOME,
+                    blurEnabled = blurEnabled,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
 
         composable(AppRoute.SEARCH) {
@@ -85,7 +119,19 @@ fun AppNavHost(
         ) { backStackEntry ->
             val owner = backStackEntry.arguments?.getString("owner") ?: ""
             val repo = backStackEntry.arguments?.getString("repo") ?: ""
-            repoDetailScreen(owner, repo)
+            val context = LocalContext.current
+            // T9 验收第 3 条：README 链接接线——内部链接应用内导航，外部链接 CustomTabs
+            CompositionLocalProvider(
+                LocalRepoDetailActions provides
+                    RepoDetailActions(
+                        onNavigateToParsedUrl = { parsed -> navigateToParsedUrl(navController, parsed) },
+                        onOpenExternal = { url ->
+                            CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+                        },
+                    ),
+            ) {
+                repoDetailScreen(owner, repo)
+            }
         }
 
         composable(
@@ -172,4 +218,59 @@ fun navigateToParsedUrl(
     val route = AppRoute.fromParsedUrl(parsedUrl) ?: return false
     navController.navigate(route)
     return true
+}
+
+/**
+ * 最小「打开仓库」输入入口（T9 验收第 1 条）。
+ *
+ * 输入 `owner/repo` → 格式校验（GitHub 用户名/仓库名合法字符）→ 导航 REPO 路由。
+ */
+@Composable
+private fun OpenRepoEntry(
+    onOpen: (owner: String, repo: String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var input by remember { mutableStateOf("") }
+    var showError by remember { mutableStateOf(false) }
+    val ownerRepoRegex = remember { Regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$") }
+
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlinedTextField(
+            value = input,
+            onValueChange = {
+                input = it
+                showError = false
+            },
+            modifier = Modifier.weight(1f),
+            placeholder = { Text(stringResource(R.string.open_repo_hint)) },
+            singleLine = true,
+            isError = showError,
+            supportingText =
+                if (showError) {
+                    { Text(stringResource(R.string.open_repo_invalid)) }
+                } else {
+                    null
+                },
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Button(
+            onClick = {
+                val trimmed = input.trim()
+                if (ownerRepoRegex.matches(trimmed)) {
+                    val (owner, repo) = trimmed.split('/', limit = 2)
+                    onOpen(owner, repo)
+                } else {
+                    showError = true
+                }
+            },
+        ) {
+            Text(text = stringResource(R.string.open_repo_button))
+        }
+    }
 }

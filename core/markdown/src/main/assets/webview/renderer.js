@@ -9,7 +9,8 @@
  *    - img click → onImageClick(src)
  *    - 任务列表 checkbox change → onCheckboxClick(index, checked)
  *    - ResizeObserver → onHeightChanged(height)
- * 3. 离线模式（OFFLINE_MARKDOWN_IT）：调用 markdown-it 渲染原始 markdown
+ * 3. 离线模式（OFFLINE_MARKDOWN_IT）：调用 markdown-it 渲染原始 markdown，
+ *    并用 highlight.js（全局 hljs）对代码块做语法高亮
  *
  * 安全：本脚本不接收任何 token；token 仅由 PrivateImageInterceptor 加到网络请求。
  */
@@ -123,6 +124,18 @@
     observer.observe(root);
   }
 
+  function highlightCodeBlocks(root) {
+    if (typeof window.hljs === 'undefined') return;
+    var codes = root.querySelectorAll('code[class*="language-"]');
+    for (var i = 0; i < codes.length; i++) {
+      try {
+        window.hljs.highlightElement(codes[i]);
+      } catch (e) {
+        // 未知语言/解析失败时保留原文，不阻断渲染
+      }
+    }
+  }
+
   function renderOfflineMarkdown() {
     var rawEl = document.getElementById('markdown-raw');
     if (!rawEl) return;
@@ -137,6 +150,7 @@
     container.innerHTML = html;
     rawEl.parentNode.replaceChild(container, rawEl);
     container.className = 'markdown-body';
+    highlightCodeBlocks(container);
     return container;
   }
 

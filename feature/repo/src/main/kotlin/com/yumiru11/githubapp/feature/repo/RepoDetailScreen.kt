@@ -1,5 +1,8 @@
 package com.yumiru11.githubapp.feature.repo
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,12 +48,17 @@ import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
+import com.yumiru11.githubapp.core.ui.LocalRepoDetailActions
+import com.yumiru11.githubapp.core.ui.RepoDetailActions
 
 /**
  * 仓库详情页（T9 README 浏览 tracer bullet）。
  *
  * 顶部：仓库元数据（名称/描述/星/分叉/语言）
- * 下方：README 内容（服务端 HTML → WebView 兜底通道；原生 Markdown → MarkdownViewer）
+ * 下方：README 内容（FeatureDetector 判定：复杂 → WebView 服务端 HTML；普通 → 原生 MarkdownViewer）
+ *
+ * 链接分发（T9 验收第 3 条）：WebView bridge 与原生 MarkdownViewer 的链接统一经
+ * [RepoDetailActions] 处理——内部链接应用内导航，外部链接 CustomTabs，纯锚点忽略。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +67,7 @@ fun RepoDetailScreen(
     repo: String,
     onBackClick: () -> Unit = {},
     viewModel: RepoDetailViewModel = hiltViewModel(),
+    actions: RepoDetailActions = LocalRepoDetailActions.current,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -100,7 +110,7 @@ fun RepoDetailScreen(
 
                 is RepoDetailUiState.Error -> {
                     ErrorContent(
-                        message = state.message,
+                        errorType = state.errorType,
                         onRetry = { viewModel.retry() },
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -110,6 +120,8 @@ fun RepoDetailScreen(
                     RepoDetailContent(
                         repo = state.repo,
                         readmeState = state.readmeState,
+                        actions = actions,
+                        onRetryReadme = { viewModel.retry() },
                     )
                 }
             }
@@ -121,6 +133,8 @@ fun RepoDetailScreen(
 private fun RepoDetailContent(
     repo: Repository,
     readmeState: ReadmeState,
+    actions: RepoDetailActions,
+    onRetryReadme: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -133,7 +147,11 @@ private fun RepoDetailContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        ReadmeSection(readmeState = readmeState)
+        ReadmeSection(
+            readmeState = readmeState,
+            actions = actions,
+            onRetryReadme = onRetryReadme,
+        )
     }
 }
 
@@ -217,7 +235,11 @@ private fun RepoHeader(repo: Repository) {
 }
 
 @Composable
-private fun ReadmeSection(readmeState: ReadmeState) {
+private fun ReadmeSection(
+    readmeState: ReadmeState,
+    actions: RepoDetailActions,
+    onRetryReadme: () -> Unit,
+) {
     Text(
         text = stringResource(R.string.repo_readme_section),
         style = MaterialTheme.typography.titleMedium,
@@ -255,16 +277,16 @@ private fun ReadmeSection(readmeState: ReadmeState) {
             when (readmeState.renderMode) {
                 ReadmeRenderMode.WEBVIEW -> {
                     WebViewMarkdownRenderer(
-                        sanitizedHtml = readmeState.html,
+                        sanitizedHtml = readmeState.content,
                         tokenProvider = { null },
-                        bridgeCallback = createBridgeCallback(),
+                        bridgeCallback = createBridgeCallback(actions),
                     )
                 }
 
                 ReadmeRenderMode.NATIVE -> {
                     MarkdownViewer(
-                        markdown = readmeState.html,
-                        onInternalLink = { /* T14 深链导航 */ },
+                        markdown = readmeState.content,
+                        onInternalLink = { parsed -> handleParsedUrl(parsed, actions) },
                     )
                 }
             }
@@ -272,25 +294,52 @@ private fun ReadmeSection(readmeState: ReadmeState) {
 
         is ReadmeState.Error -> {
             ErrorContent(
-                message = readmeState.message,
-                onRetry = {},
+                errorType = readmeState.errorType,
+                onRetry = onRetryReadme,
             )
         }
     }
 }
 
 /**
- * 默认 bridge callback：link/copy/image/checkbox/height 全空实现（T14 接线真实导航）。
+ * 链接统一分发：内部链接 → 应用内导航；外部链接 → CustomTabs；纯锚点（#xxx）忽略
+ * （WebView 内锚点由页面自身处理，原生渲染器无滚动定位，忽略即可）。
  */
-@Suppress("EmptyFunctionBlock") // T14 接线真实导航前为占位桩
+private fun handleParsedUrl(
+    parsed: ParsedUrl,
+    actions: RepoDetailActions,
+) {
+    if (parsed is ParsedUrl.External) {
+        if (parsed.url.startsWith("#")) return
+        actions.onOpenExternal(parsed.url)
+    } else {
+        actions.onNavigateToParsedUrl(parsed)
+    }
+}
+
+/**
+ * WebView bridge callback：链接/复制已接线（T9 验收第 3 条），
+ * 图片预览/任务列表写回留待 T14。
+ */
+@Suppress("EmptyFunctionBlock") // onImageClick/onCheckboxClick/onHeightChanged 为 T14 占位桩
 @Composable
-private fun createBridgeCallback(): MarkdownBridgeCallback =
-    object : MarkdownBridgeCallback {
-        override fun onExternalLink(url: String) {}
+private fun createBridgeCallback(actions: RepoDetailActions): MarkdownBridgeCallback {
+    val context = LocalContext.current
+    return object : MarkdownBridgeCallback {
+        override fun onExternalLink(url: String) {
+            // 纯锚点（#xxx）由页面自身处理，不拦截
+            if (url.startsWith("#")) return
+            actions.onOpenExternal(url)
+        }
 
-        override fun onInternalLink(parsed: ParsedUrl) {}
+        override fun onInternalLink(parsed: ParsedUrl) {
+            actions.onNavigateToParsedUrl(parsed)
+        }
 
-        override fun onCodeCopy(code: String) {}
+        override fun onCodeCopy(code: String) {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("code", code))
+        }
 
         override fun onImageClick(src: String) {}
 
@@ -301,10 +350,11 @@ private fun createBridgeCallback(): MarkdownBridgeCallback =
 
         override fun onHeightChanged(heightPx: Int) {}
     }
+}
 
 @Composable
 private fun ErrorContent(
-    message: String,
+    errorType: RepoErrorType,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -314,7 +364,7 @@ private fun ErrorContent(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = message,
+                text = errorMessage(errorType),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -325,3 +375,12 @@ private fun ErrorContent(
         }
     }
 }
+
+/** 错误类型 → 本地化文案（ViewModel 只传类型，不产英文） */
+@Composable
+private fun errorMessage(errorType: RepoErrorType): String =
+    when (errorType) {
+        RepoErrorType.NOT_FOUND -> stringResource(R.string.repo_error_not_found)
+        RepoErrorType.NETWORK -> stringResource(R.string.repo_error_network)
+        RepoErrorType.UNKNOWN -> stringResource(R.string.repo_error_unknown)
+    }

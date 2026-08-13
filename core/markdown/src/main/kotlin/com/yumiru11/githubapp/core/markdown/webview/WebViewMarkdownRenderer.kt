@@ -33,8 +33,11 @@ import okhttp3.OkHttpClient
  * - WebView settings 全锁（[WebViewSecurity.apply]）
  * - 资源经 WebViewAssetLoader 加载（appassets.androidplatform.net 域，禁 file://）
  * - token 绝不进入 HTML/JS（仅由 [PrivateImageInterceptor] 加到图片网络请求）
+ * - SERVER_HTML 内容由 [WebViewHtmlBuilder] 内建 [HtmlSanitizer] 强制清洗（组件责任，
+ *   不依赖调用方；离线模式渲染产物由 DOMPurify 二次权威清洗）
  *
- * @param sanitizedHtml 已清洗内容（SERVER_HTML 模式：服务端 HTML；OFFLINE 模式：原始 markdown）
+ * @param sanitizedHtml 待渲染内容（SERVER_HTML 模式：服务端 HTML，构建时强制清洗；
+ *   OFFLINE 模式：原始 markdown）
  * @param tokenProvider OAuth token 提供方（私有图床白名单拦截用；游客返回 null）
  * @param bridgeCallback JS bridge 白名单回调（链接/代码/图片/复选框/高度）
  * @param renderMode 渲染模式（默认 SERVER_HTML）
@@ -121,18 +124,6 @@ fun WebViewMarkdownRenderer(
                 "utf-8",
                 null,
             )
-        },
-        onReset = { webView ->
-            // 主题变更时注入新令牌（plan.md §2.9 Kotlin→JS updateTheme）
-            val themeVars =
-                tokens
-                    .toCssVariables()
-                    .replace("'", "\\'")
-                    .replace("\n", "\\n")
-            val themeJs =
-                "if(window.AndroidBridge&&window.AndroidBridge.updateTheme)" +
-                    "{AndroidBridge.updateTheme('$themeVars');}"
-            webView.evaluateJavascript(themeJs, null)
         },
     )
 }

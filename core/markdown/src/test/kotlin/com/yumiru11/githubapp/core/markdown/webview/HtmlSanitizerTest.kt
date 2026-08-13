@@ -108,6 +108,39 @@ class HtmlSanitizerTest {
     }
 
     @Test
+    fun sanitize_unquotedJavascriptHref_stripped() {
+        // 绕过面补强（审查确认）：无引号属性值 href=javascript:...
+        val html = "<a href=javascript:alert(1)>click</a>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("unquoted javascript: href must be stripped", result.contains("javascript:"))
+        assertFalse(result.contains("alert"))
+    }
+
+    @Test
+    fun sanitize_xlinkHrefJavascript_stripped() {
+        // 绕过面补强（审查确认）：SVG xlink:href 可携带 javascript: 载荷
+        val html = "<svg><a xlink:href=\"javascript:alert(1)\">x</a></svg>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("xlink:href javascript: must be stripped", result.contains("javascript:"))
+        assertFalse(result.contains("alert"))
+    }
+
+    @Test
+    fun sanitize_unquotedEventHandler_stripped() {
+        // 绕过面补强（审查确认）：无引号事件处理器 onerror=alert(1)
+        val html = "<img src=x onerror=alert(1)>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("unquoted onerror must be stripped", result.contains("onerror"))
+        assertFalse(result.contains("alert"))
+    }
+
+    @Test
     fun sanitize_safeRelativeHref_preserved() {
         val html = "<a href=\"./docs\">docs</a><a href=\"#section\">section</a>"
 

@@ -28,4 +28,9 @@
     <string name="placeholder_item">项目 %1$d</string>
     <string name="placeholder_content">敬请期待</string>
     <string name="repo_owner_repo">%1$s / %2$s</string>
+
+    <!-- 打开仓库入口（T9） -->
+    <string name="open_repo_hint">打开仓库（owner/repo）</string>
+    <string name="open_repo_button">打开</string>
+    <string name="open_repo_invalid">格式：owner/repo</string>
 </resources>

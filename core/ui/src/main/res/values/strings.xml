@@ -28,4 +28,9 @@
     <string name="placeholder_item">Item %1$d</string>
     <string name="placeholder_content">Coming soon</string>
     <string name="repo_owner_repo">%1$s / %2$s</string>
+
+    <!-- Open repo entry (T9) -->
+    <string name="open_repo_hint">Open repository (owner/repo)</string>
+    <string name="open_repo_button">Open</string>
+    <string name="open_repo_invalid">Format: owner/repo</string>
 </resources>

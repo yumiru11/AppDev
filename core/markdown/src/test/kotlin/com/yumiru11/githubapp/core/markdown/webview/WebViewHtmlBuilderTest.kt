@@ -73,6 +73,7 @@ class WebViewHtmlBuilderTest {
         val html = WebViewHtmlBuilder.build(sanitizedHtml = "<p>x</p>", tokens = MarkdownThemeTokens.fromLightScheme())
 
         assertTrue("markdown-you.css must be loaded", html.contains("markdown-you.css"))
+        assertTrue("highlight-theme.css must be loaded", html.contains("highlight-theme.css"))
         assertTrue("purify.min.js must be loaded", html.contains("purify.min.js"))
         assertTrue("renderer.js must be loaded", html.contains("renderer.js"))
     }
@@ -105,6 +106,52 @@ class WebViewHtmlBuilderTest {
     }
 
     @Test
+    fun build_sanitizesServerHtmlEvenWhenCallerDidNot() {
+        // 安全红线（审查确认）：清洗是组件内建责任，调用方未清洗也必须被强制清洗
+        val dangerousHtml = "<p>safe</p><script>alert(1)</script><a href=javascript:alert(2)>x</a>"
+
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = dangerousHtml,
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+            )
+
+        assertFalse("script must be stripped by built-in sanitizer", html.contains("<script>alert"))
+        assertFalse("unquoted javascript: href must be stripped", html.contains("javascript:"))
+        assertTrue("safe content must survive", html.contains("<p>safe</p>"))
+    }
+
+    @Test
+    fun build_offlineMode_doesNotMangleRawMarkdownCodeFence() {
+        // 离线模式原始 markdown 不做正则清洗（避免破坏代码围栏），渲染产物由 DOMPurify 权威清洗
+        val markdown = "```html\n<script>alert(1)</script>\n```"
+
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = markdown,
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+            )
+
+        assertTrue("code fence content must survive offline mode", html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"))
+    }
+
+    @Test
+    fun build_themeVarsStyleComesAfterCssLinks() {
+        // 暗色主题修复（审查确认）：theme-vars 必须位于 CSS <link> 之后，
+        // 否则 markdown-you.css 的 :root 静态色覆盖注入令牌
+        val html = WebViewHtmlBuilder.build(sanitizedHtml = "<p>x</p>", tokens = MarkdownThemeTokens.fromDarkScheme())
+
+        val cssLinkIndex = html.indexOf("markdown-you.css")
+        val themeVarsIndex = html.indexOf("id=\"theme-vars\"")
+        assertTrue("theme-vars style must exist", themeVarsIndex >= 0)
+        assertTrue(
+            "theme-vars style must come after markdown-you.css link",
+            themeVarsIndex > cssLinkIndex,
+        )
+    }
+
+    @Test
     fun build_containsMarkdownBodyWrapper() {
         val html = WebViewHtmlBuilder.build(sanitizedHtml = "<p>x</p>", tokens = MarkdownThemeTokens.fromLightScheme())
 
@@ -121,7 +168,7 @@ class WebViewHtmlBuilderTest {
             )
 
         assertTrue("offline mode must load markdown-it.min.js", html.contains("markdown-it.min.js"))
-        assertTrue("offline mode must load shiki", html.contains("shiki.min.js"))
+        assertTrue("offline mode must load highlight.min.js", html.contains("highlight.min.js"))
     }
 
     @Test

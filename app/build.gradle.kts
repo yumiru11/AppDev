@@ -24,18 +24,6 @@ android {
             // Robolectric/Roborazzi 需要 Android 资源
             isIncludeAndroidResources = true
         }
-        // Robolectric 运行时通过 Maven 下载 android-all-instrumented jar，
-        // 指向阿里云镜像避免 Maven Central 429 限流；同时传递代理设置给测试 worker 进程
-        unitTests.all {
-            it.systemProperty("robolectric.dependency.repo.url", "https://maven.aliyun.com/repository/public/")
-            it.systemProperty("robolectric.dependency.repo.id", "aliyun")
-            // 代理设置（测试 worker 是独立 JVM，不继承 Gradle daemon 的代理）
-            it.systemProperty("http.proxyHost", "127.0.0.1")
-            it.systemProperty("http.proxyPort", "18080")
-            it.systemProperty("https.proxyHost", "127.0.0.1")
-            it.systemProperty("https.proxyPort", "18080")
-            it.systemProperty("http.nonProxyHosts", "localhost|127.0.0.1")
-        }
     }
 
     lint {

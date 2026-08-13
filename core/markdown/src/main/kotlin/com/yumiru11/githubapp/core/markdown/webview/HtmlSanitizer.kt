@@ -30,33 +30,23 @@ object HtmlSanitizer {
             Regex("(?is)<link\\b[^>]*/?>"),
         )
 
-    /** 危险协议（href/src 中需剥离），仅允许 http/https/mailto（plan.md §15.3） */
+    /**
+     * 危险协议（href/src/xlink:href 中需剥离），仅允许 http/https/mailto（plan.md §15.3）。
+     *
+     * 每个协议覆盖三种取值形态：双引号、单引号、无引号（`href=javascript:alert(1)` 绕过面，
+     * 审查确认后补强）。xlink:href 是 SVG 命名空间属性，同样可携带 javascript: 载荷。
+     */
     private val DANGEROUS_PROTOCOL_PATTERNS =
         listOf(
-            Regex("(?i)\\s+href\\s*=\\s*\"\\s*javascript:[^\"]*\""),
-            Regex("(?i)\\s+href\\s*=\\s*'\\s*javascript:[^']*'"),
-            Regex("(?i)\\s+src\\s*=\\s*\"\\s*javascript:[^\"]*\""),
-            Regex("(?i)\\s+src\\s*=\\s*'\\s*javascript:[^']*'"),
-            Regex("(?i)\\s+href\\s*=\\s*\"\\s*data:[^\"]*\""),
-            Regex("(?i)\\s+href\\s*=\\s*'\\s*data:[^']*'"),
-            Regex("(?i)\\s+src\\s*=\\s*\"\\s*data:[^\"]*\""),
-            Regex("(?i)\\s+src\\s*=\\s*'\\s*data:[^']*'"),
-            Regex("(?i)\\s+href\\s*=\\s*\"\\s*blob:[^\"]*\""),
-            Regex("(?i)\\s+href\\s*=\\s*'\\s*blob:[^']*'"),
-            Regex("(?i)\\s+src\\s*=\\s*\"\\s*blob:[^\"]*\""),
-            Regex("(?i)\\s+src\\s*=\\s*'\\s*blob:[^']*'"),
-            Regex("(?i)\\s+href\\s*=\\s*\"\\s*file:[^\"]*\""),
-            Regex("(?i)\\s+href\\s*=\\s*'\\s*file:[^']*'"),
-            Regex("(?i)\\s+src\\s*=\\s*\"\\s*file:[^\"]*\""),
-            Regex("(?i)\\s+src\\s*=\\s*'\\s*file:[^']*'"),
-            Regex("(?i)\\s+href\\s*=\\s*\"\\s*vbscript:[^\"]*\""),
-            Regex("(?i)\\s+href\\s*=\\s*'\\s*vbscript:[^']*'"),
-            Regex("(?i)\\s+src\\s*=\\s*\"\\s*vbscript:[^\"]*\""),
-            Regex("(?i)\\s+src\\s*=\\s*'\\s*vbscript:[^']*'"),
+            Regex("(?i)\\s+(?:href|xlink:href|src)\\s*=\\s*(?:\"javascript:[^\"]*\"|'javascript:[^']*'|javascript:[^\\s>]+)"),
+            Regex("(?i)\\s+(?:href|xlink:href|src)\\s*=\\s*(?:\"data:[^\"]*\"|'data:[^']*'|data:[^\\s>]+)"),
+            Regex("(?i)\\s+(?:href|xlink:href|src)\\s*=\\s*(?:\"blob:[^\"]*\"|'blob:[^']*'|blob:[^\\s>]+)"),
+            Regex("(?i)\\s+(?:href|xlink:href|src)\\s*=\\s*(?:\"file:[^\"]*\"|'file:[^']*'|file:[^\\s>]+)"),
+            Regex("(?i)\\s+(?:href|xlink:href|src)\\s*=\\s*(?:\"vbscript:[^\"]*\"|'vbscript:[^']*'|vbscript:[^\\s>]+)"),
         )
 
-    /** 事件处理器属性（on* 全剥离） */
-    private val EVENT_HANDLER_PATTERN = Regex("(?i)\\s+on[a-z]+\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s>]+)")
+    /** 事件处理器属性（on\w+ 全剥离，含无引号取值变体） */
+    private val EVENT_HANDLER_PATTERN = Regex("(?i)\\s+on\\w+\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s>]+)")
 
     /** style 属性（CSS 表达式注入风险） */
     private val STYLE_ATTR_PATTERN = Regex("(?i)\\s+style\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s>]+)")

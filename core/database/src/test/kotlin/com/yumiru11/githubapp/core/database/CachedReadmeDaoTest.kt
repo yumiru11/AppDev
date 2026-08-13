@@ -68,6 +68,22 @@ class CachedReadmeDaoTest {
         }
 
     @Test
+    fun upsert_sameOwnerDifferentRepos_coexistIndependently() =
+        runTest {
+            dao.upsert(cachedReadme(owner = "octocat", repo = "Hello-World", contentHash = "sha-a", html = "<p>A</p>"))
+            dao.upsert(cachedReadme(owner = "octocat", repo = "Other-Repo", contentHash = "sha-b", html = "<p>B</p>"))
+
+            val first = dao.getByOwnerAndRepo("octocat", "Hello-World")
+            val second = dao.getByOwnerAndRepo("octocat", "Other-Repo")
+
+            assertEquals("sha-a", first?.contentHash)
+            assertEquals("<p>A</p>", first?.html)
+            assertEquals("sha-b", second?.contentHash)
+            assertEquals("<p>B</p>", second?.html)
+            assertEquals(2, dao.getAll().size)
+        }
+
+    @Test
     fun getAll_returnsEntriesOrderedByUpdatedAtDescending() =
         runTest {
             dao.upsert(cachedReadme(owner = "a", repo = "older", updatedAt = 1_000L))

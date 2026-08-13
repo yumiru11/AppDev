@@ -15,9 +15,9 @@ sealed interface RepoDetailUiState {
         val readmeState: ReadmeState,
     ) : RepoDetailUiState
 
-    /** 加载失败 */
+    /** 加载失败（错误类型驱动文案，UI 层 stringResource 映射，ViewModel 不产英文） */
     data class Error(
-        val message: String,
+        val errorType: RepoErrorType,
     ) : RepoDetailUiState
 }
 
@@ -30,16 +30,17 @@ sealed interface ReadmeState {
     data object Empty : ReadmeState
 
     /**
-     * @param html 服务端渲染 HTML（WEBVIEW 模式）或原始 Markdown 文本（NATIVE 模式）
+     * @param content 渲染内容：WEBVIEW 模式为服务端渲染 HTML，NATIVE 模式为原始 Markdown 文本
      * @param renderMode 渲染通道：WEBVIEW 走 T8 WebViewMarkdownRenderer，NATIVE 走 MarkdownViewer
      */
     data class Loaded(
-        val html: String,
+        val content: String,
         val renderMode: ReadmeRenderMode = ReadmeRenderMode.WEBVIEW,
     ) : ReadmeState
 
+    /** 加载失败（错误类型驱动文案，UI 层 stringResource 映射） */
     data class Error(
-        val message: String,
+        val errorType: RepoErrorType,
     ) : ReadmeState
 }
 
@@ -52,4 +53,18 @@ enum class ReadmeRenderMode {
 
     /** 原生 Markdown 文本 → MarkdownViewer（简单 Markdown） */
     NATIVE,
+}
+
+/**
+ * 仓库/README 加载错误类型（UI 层映射为本地化文案）。
+ */
+enum class RepoErrorType {
+    /** 404：仓库或 README 不存在 */
+    NOT_FOUND,
+
+    /** 网络/IO 错误 */
+    NETWORK,
+
+    /** 其他未知错误 */
+    UNKNOWN,
 }

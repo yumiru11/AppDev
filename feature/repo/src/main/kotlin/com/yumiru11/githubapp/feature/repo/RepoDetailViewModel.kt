@@ -11,12 +11,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
+import java.io.IOException
 import javax.inject.Inject
 
 /**
  * 仓库详情页 ViewModel。
  *
  * 从 SavedStateHandle 读取 [owner]/[repo] 导航参数，加载仓库元数据与 README。
+ * 错误一律映射为 [RepoErrorType]（UI 层 stringResource 本地化，ViewModel 不产英文文案）。
  */
 @HiltViewModel
 class RepoDetailViewModel
@@ -52,10 +55,7 @@ class RepoDetailViewModel
                         )
                     loadReadme()
                 } catch (e: Exception) {
-                    _uiState.value =
-                        RepoDetailUiState.Error(
-                            message = e.message ?: "Unknown error",
-                        )
+                    _uiState.value = RepoDetailUiState.Error(errorType = mapError(e))
                 }
             }
         }
@@ -65,20 +65,47 @@ class RepoDetailViewModel
             if (currentState !is RepoDetailUiState.Success) return
 
             val themeVersion = MarkdownThemeTokens.versionHash()
-            val result = repoRepository.getReadmeHtml(owner, repo, themeVersion)
+            val result = repoRepository.getReadme(owner, repo, themeVersion)
             val newReadmeState =
                 result.fold(
-                    onSuccess = { html ->
-                        if (html.isBlank()) {
-                            ReadmeState.Empty
-                        } else {
-                            ReadmeState.Loaded(html, ReadmeRenderMode.WEBVIEW)
+                    onSuccess = { content ->
+                        when {
+                            content.renderMode == ReadmeRenderMode.NATIVE -> {
+                                ReadmeState.Loaded(
+                                    content = content.markdown,
+                                    renderMode = ReadmeRenderMode.NATIVE,
+                                )
+                            }
+
+                            content.html.isNullOrBlank() -> {
+                                ReadmeState.Empty
+                            }
+
+                            else -> {
+                                ReadmeState.Loaded(
+                                    content = content.html,
+                                    renderMode = ReadmeRenderMode.WEBVIEW,
+                                )
+                            }
                         }
                     },
                     onFailure = { e ->
-                        ReadmeState.Error(e.message ?: "Failed to load README")
+                        if (e is HttpException && e.code() == 404) {
+                            // 仓库无 README（GitHub 404）→ 空态
+                            ReadmeState.Empty
+                        } else {
+                            ReadmeState.Error(errorType = mapError(e))
+                        }
                     },
                 )
             _uiState.value = currentState.copy(readmeState = newReadmeState)
         }
+
+        /** 异常 → 错误类型（404 → NOT_FOUND，IO → NETWORK，其余 → UNKNOWN） */
+        private fun mapError(e: Throwable): RepoErrorType =
+            when {
+                e is HttpException && e.code() == 404 -> RepoErrorType.NOT_FOUND
+                e is IOException -> RepoErrorType.NETWORK
+                else -> RepoErrorType.UNKNOWN
+            }
     }

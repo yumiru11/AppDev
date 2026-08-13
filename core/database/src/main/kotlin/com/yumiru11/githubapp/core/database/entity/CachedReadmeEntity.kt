@@ -1,7 +1,6 @@
 package com.yumiru11.githubapp.core.database.entity
 
 import androidx.room.Entity
-import androidx.room.PrimaryKey
 
 /**
  * README 缓存实体（双 key 失效：contentHash + themeVersion）。
@@ -12,9 +11,8 @@ import androidx.room.PrimaryKey
  *
  * 复合主键 [owner]/[repo] 对应 GitHub 仓库唯一标识。
  */
-@Entity(tableName = "cached_readme")
+@Entity(tableName = "cached_readme", primaryKeys = ["owner", "repo"])
 data class CachedReadmeEntity(
-    @PrimaryKey
     val owner: String,
     val repo: String,
     /** 内容 SHA（GitHub API ReadmeDto.sha），用于检测内容变更 */
