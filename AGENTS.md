@@ -25,17 +25,17 @@
 |---|---|---|
 | Gradle | **无全局 `gradle` CLI，一律 `./gradlew`** | 不装全局 gradle |
 | Wrapper | `8.12-bin`，`distributionUrl=https://mirrors.cloud.tencent.com/gradle/gradle-8.12-bin.zip` | 走腾讯镜像；~/.gradle/wrapper/dists 已缓存 8.12-all/bin |
-| JDK | **固定 `/usr/lib/jvm/java-21-openjdk`**，写进项目 `gradle.properties` 的 `org.gradle.java.home` | AGP 8.7.3 最高支持 JDK 21；机器默认 zulu-25 会导致构建失败（"25.0.3" 报错）。`java -version` 显示 21 但不要依赖它 |
+
 | Android SDK | `/home/zhiyi/Android/Sdk`（`local.properties` 里写 `sdk.dir=`） | platforms: android-35、android-37；build-tools: 35.0.0、36.0.0 |
-| compileSdk / targetSdk / minSdk | 35 / 35 / 26 | buildToolsVersion 35.0.0 |
+
 | JVM target | 17（compileOptions + kotlinOptions 一致） | |
-| **Google Maven** | **本机不可达，走阿里云镜像（init script）** | `dl.google.com`/`maven.google.com` 在本机返回 HTTP 000（2026-08-09 实测）。镜像由本机 `~/.gradle/init.d/mirror.gradle` 注入（**不入库**），settings.gradle.kts 保持官方源（google()/mavenCentral()），CI/GitHub Actions 直连官方源（阿里云在 CI 上 502，2026-08-12 实测）。**勿在 settings.gradle.kts 写镜像，勿删 ~/.gradle/init.d/mirror.gradle** |
+
 
 ## Gradle 脚手架（模仿 GitLight 的配置）
 
 新建项目时直接参照 `~/dev/GitLight` 以下文件，**以及已落地的 buildSrc 约定插件**：
 
-- **约定插件（已实现，勿回退成逐模块复制）**：`buildSrc/src/main/kotlin/appdev.android.{library,application}.gradle.kts`——统一 compileSdk 35 / minSdk 26 / targetSdk 35 / buildTools 35.0.0 / JVM 17 / compose+（buildConfig）/ Apollo packaging 豁免。新模块的 `build.gradle.kts` 只需两行：`plugins { id("appdev.android.library") }` + `android { namespace = ... }`
+
 - **根 `build.gradle.kts` 不要重复声明 AGP/Kotlin/Compose 插件**（它们在 buildSrc 类路径上，重复声明报 "already on the classpath"）；只留 serialization/ksp/hilt/apollo `apply false`
 
 - `gradle/wrapper/gradle-wrapper.properties` → 上面表格的腾讯镜像 8.12-bin
