@@ -133,6 +133,8 @@ dependencies {
     implementation(project(":feature:profile"))
     // 设置页（T24）：SettingsScreen/SettingsViewModel 装配进 app 导航
     implementation(project(":feature:settings"))
+    // Issue 列表/详情（T13）
+    implementation(project(":feature:issue"))
 
     // Hilt（app 图根）
     implementation(libs.hilt.android)
