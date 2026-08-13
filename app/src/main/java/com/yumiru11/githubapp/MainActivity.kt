@@ -1,3 +1,5 @@
+@file:Suppress("LongMethod") // onCreate 聚合导航装配（T19 通知 + T20 Profile + T3 深链），拆分收益低于装配代码的强内聚
+
 package com.yumiru11.githubapp
 
 import android.content.Intent
@@ -124,8 +126,6 @@ class MainActivity : ComponentActivity() {
                                     AppRoute.USER.replace("{login}", login),
                                 )
                             },
-                        )
-                    },
                         )
                     },
                 )
