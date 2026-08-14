@@ -21,6 +21,4 @@
     <string name="repos_title">仓库</string>
     <string name="placeholder_content">敬请期待</string>
     <string name="repo_owner_repo">%1$s / %2$s</string>
-    <string name="placeholder_title">开发中</string>
-    <string name="placeholder_desc">该页面正在开发中，敬请期待</string>
 </resources>

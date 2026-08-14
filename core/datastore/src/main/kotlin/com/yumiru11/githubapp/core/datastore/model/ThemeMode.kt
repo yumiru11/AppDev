@@ -41,7 +41,6 @@ fun resolveEffectiveThemeMode(
     dynamicColorEnabled: Boolean,
     oledEnabled: Boolean,
     highContrastEnabled: Boolean,
-    systemDark: Boolean = false,
 ): ThemeMode =
     when {
         highContrastEnabled -> {
@@ -55,10 +54,6 @@ fun resolveEffectiveThemeMode(
         dynamicColorEnabled -> {
             when (base) {
                 ThemeMode.DARK -> ThemeMode.DYNAMIC_DARK
-
-                // SYSTEM 跟随系统明暗（2026-08-14 真机走查 P0-3 修复：原实现写死 DYNAMIC_LIGHT）
-                ThemeMode.SYSTEM -> if (systemDark) ThemeMode.DYNAMIC_DARK else ThemeMode.DYNAMIC_LIGHT
-
                 else -> ThemeMode.DYNAMIC_LIGHT
             }
         }

@@ -1,6 +1,5 @@
 package com.yumiru11.githubapp
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
@@ -41,7 +40,6 @@ fun AppThemeHost(
             dynamicColorEnabled = dynamicColorEnabled,
             oledEnabled = oledEnabled,
             highContrastEnabled = highContrastEnabled,
-            systemDark = isSystemInDarkTheme(),
         )
     AppTheme(
         themeMode = effectiveMode,
