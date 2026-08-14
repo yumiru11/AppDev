@@ -101,6 +101,25 @@ class HomeViewModelTest {
         }
 
     @Test
+    fun load_loginFetchThrowsUnauthorized_emitsErrorUnauthorized() =
+        runTest {
+            // P0-7：401/403 是凭据问题，不是网络问题（2026-08-14 真机走查：PAT 无效被误报「网络错误」）
+            val repo =
+                mockk<FeedRepository> {
+                    coEvery { currentLogin() } throws
+                        retrofit2.HttpException(retrofit2.Response.error<Any>(401, okhttp3.ResponseBody.create(null, "Unauthorized")))
+                }
+
+            val viewModel =
+                HomeViewModel(
+                    repo,
+                    sessionManager(AuthState.PAT),
+                )
+
+            assertEquals(HomeUiState.Error(HomeErrorType.UNAUTHORIZED), viewModel.uiState.value)
+        }
+
+    @Test
     fun retry_afterError_reloadsAndSucceeds() =
         runTest {
             val repo =

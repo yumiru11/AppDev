@@ -20,4 +20,6 @@
     <string name="feed_action_push">%1$s pushed %2$d commits</string>
     <string name="feed_action_star">%1$s starred</string>
     <string name="feed_action_fork">%1$s forked</string>
+    <string name="feed_require_login_desc">Sign in to view your activity feed, notifications and more</string>
+    <string name="feed_error_unauthorized">Sign-in expired. Please sign in again.</string>
 </resources>
