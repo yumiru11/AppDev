@@ -103,8 +103,7 @@ internal fun AppearanceSettingsSection(
         HorizontalDivider()
         MotionScaleRow(scale = uiState.motionScale, onScaleChange = viewModel::setMotionScale)
         HorizontalDivider()
-        IconStyleRow(selected = uiState.iconStyle, onSelect = viewModel::setIconStyle)
-        HorizontalDivider()
+        // IconStyleRow 暂隐藏（P1-6：消费点未落地，2026-08-14 真机走查决策；Material Symbols 图标大票时恢复）
         CodeFontRow(selected = uiState.codeFont, onSelect = viewModel::setCodeFont)
         HorizontalDivider()
         SwitchSettingRow(
@@ -259,6 +258,7 @@ private fun MotionPulsePreview(scale: Float) {
 }
 
 /** 图标风格三选一（Outlined/Rounded/Filled，Material Icons Core 同图标三风格预览）。 */
+@Suppress("UnusedPrivateMember") // P1-6：消费点未落地暂隐藏（2026-08-14 真机走查决策），Material Symbols 图标大票时恢复调用
 @Composable
 private fun IconStyleRow(
     selected: IconStyle,

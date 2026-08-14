@@ -388,6 +388,34 @@ class UserPreferencesRepositoryTest {
     }
 
     @Test
+    fun resolveEffectiveThemeMode_systemBaseWithDynamicColor_systemDark_resolvesDynamicDark() {
+        assertEquals(
+            ThemeMode.DYNAMIC_DARK,
+            resolveEffectiveThemeMode(
+                ThemeMode.SYSTEM,
+                dynamicColorEnabled = true,
+                oledEnabled = false,
+                highContrastEnabled = false,
+                systemDark = true,
+            ),
+        )
+    }
+
+    @Test
+    fun resolveEffectiveThemeMode_systemBaseWithDynamicColor_systemLight_resolvesDynamicLight() {
+        assertEquals(
+            ThemeMode.DYNAMIC_LIGHT,
+            resolveEffectiveThemeMode(
+                ThemeMode.SYSTEM,
+                dynamicColorEnabled = true,
+                oledEnabled = false,
+                highContrastEnabled = false,
+                systemDark = false,
+            ),
+        )
+    }
+
+    @Test
     fun resolveEffectiveThemeMode_noSwitches_returnsBase() {
         assertEquals(
             ThemeMode.LIGHT,
