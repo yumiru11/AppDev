@@ -68,7 +68,6 @@ fun AppBottomBar(
                     onClick = { onTabSelected(tab.route) },
                     colors =
                         NavigationBarItemDefaults.colors(
-                            // 选中实心高亮（P1-5：胶囊+实心，2026-08-14 真机走查决策）
                             selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
                             selectedTextColor = MaterialTheme.colorScheme.onSecondaryContainer,
                             indicatorColor = MaterialTheme.colorScheme.secondaryContainer,

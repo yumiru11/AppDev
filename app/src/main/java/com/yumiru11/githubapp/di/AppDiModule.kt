@@ -1,6 +1,7 @@
 package com.yumiru11.githubapp.di
 
 import com.yumiru11.githubapp.core.githubauth.auth.AuthHttpClient
+import com.yumiru11.githubapp.core.githubrest.auth.TokenProvider
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,6 +23,10 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppDiModule {
+    @Provides
+    @Singleton
+    fun provideTokenProvider(provider: SessionTokenProvider): TokenProvider = provider
+
     @Provides
     @Singleton
     fun provideTokenEndpointOkHttpClient(

@@ -74,11 +74,7 @@ class HomeViewModel
             }
         }
 
-        /** 异常 → 错误类型（401/403 → UNAUTHORIZED；IO → NETWORK；其余 → UNKNOWN） */
+        /** 异常 → 错误类型（IO/HTTP → NETWORK，其余 → UNKNOWN） */
         private fun mapError(e: Throwable): HomeErrorType =
-            when {
-                e is HttpException && (e.code() == 401 || e.code() == 403) -> HomeErrorType.UNAUTHORIZED
-                e is IOException || e is HttpException -> HomeErrorType.NETWORK
-                else -> HomeErrorType.UNKNOWN
-            }
+            if (e is IOException || e is HttpException) HomeErrorType.NETWORK else HomeErrorType.UNKNOWN
     }

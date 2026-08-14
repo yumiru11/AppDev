@@ -1,3 +1,5 @@
+@file:Suppress("ComplexCondition") // 相对资源路径判定（http/https/data:/# 四种绝对形态 + 相对）分支天然多，拆散反损可读性（T3 先例）
+
 package com.yumiru11.githubapp.core.markdown.webview
 
 /**
@@ -59,10 +61,11 @@ object WebViewHtmlBuilder {
         sanitizedHtml: String,
         tokens: MarkdownThemeTokens,
         renderMode: RenderMode = RenderMode.SERVER_HTML,
+        baseRepoUrl: String? = null,
     ): String {
         val themeVars = tokens.toCssVariables()
         val themeMarker = if (tokens.isDark) "dark" else "light"
-        val contentBlock = buildContentBlock(sanitizedHtml, renderMode)
+        val contentBlock = rewriteRelativeUrls(buildContentBlock(sanitizedHtml, renderMode), baseRepoUrl)
         val offlineScripts =
             if (renderMode == RenderMode.OFFLINE_MARKDOWN_IT) {
                 "\n    <script src=\"${ASSET_BASE}markdown-it.min.js\"></script>" +
@@ -120,6 +123,69 @@ object WebViewHtmlBuilder {
                 "    <div id=\"markdown-raw\" data-markdown-raw=\"$escaped\"></div>"
             }
         }
+
+    /**
+     * 改写服务端 HTML 中的相对资源路径（2026-08-14 真机走查修复：README 相对图/链接空白）。
+     *
+     * - img src 相对路径 → `https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{path}`
+     * - a href 相对路径 → `https://github.com/{owner}/{repo}/blob/HEAD/{path}`
+     * - 绝对 URL（http/https/data）与无 baseRepoUrl 时原样保留
+     */
+    private fun rewriteRelativeUrls(
+        html: String,
+        baseRepoUrl: String?,
+    ): String {
+        if (baseRepoUrl == null) return html
+        val (owner, repo) = parseBaseRepo(baseRepoUrl) ?: return html
+
+        fun resolve(path: String): String =
+            if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:") || path.startsWith("#")) {
+                path
+            } else {
+                val trimmed = path.removePrefix("./").removePrefix("/")
+                if (trimmed.isEmpty()) path else trimmed
+            }
+
+        var out = html
+        // img src：相对路径 → raw 域
+        out =
+            UrlRegexes.IMG_SRC_REGEX.replace(out) { match ->
+                val src = resolve(match.groupValues[1])
+                if (src.startsWith("http") || src.startsWith("data:")) {
+                    match.value
+                } else {
+                    val rawUrl = "https://raw.githubusercontent.com/$owner/$repo/HEAD/$src"
+                    match.value.replaceFirst(match.groupValues[1], rawUrl)
+                }
+            }
+        // a href：相对路径 → github blob 域（点击后由链接分发走应用内导航）
+        out =
+            UrlRegexes.ANCHOR_HREF_REGEX.replace(out) { match ->
+                val href = resolve(match.groupValues[1])
+                if (href.startsWith("http") || href.startsWith("mailto:") || href.startsWith("#")) {
+                    match.value
+                } else {
+                    val blobUrl = "https://github.com/$owner/$repo/blob/HEAD/$href"
+                    match.value.replaceFirst(match.groupValues[1], blobUrl)
+                }
+            }
+        return out
+    }
+
+    /** 解析 `https://github.com/{owner}/{repo}` → (owner, repo)；非法格式返回 null */
+    private fun parseBaseRepo(baseRepoUrl: String): Pair<String, String>? {
+        val parts = baseRepoUrl.removePrefix("https://github.com/").split('/')
+        return if (parts.size >= 2 && parts[0].isNotEmpty() && parts[1].isNotEmpty()) {
+            parts[0] to parts[1]
+        } else {
+            null
+        }
+    }
+
+    private object UrlRegexes {
+        val IMG_SRC_REGEX = Regex("""<img[^>]*?\ssrc="([^"]*)"""")
+        val ANCHOR_HREF_REGEX = Regex("""<a[^>]*?\shref="([^"]*)"""")
+    }
 
     /** 转义 markdown 文本以安全注入 HTML 属性值（双引号、&、<） */
     private fun escapeForHtmlAttribute(text: String): String =

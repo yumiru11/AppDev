@@ -67,12 +67,13 @@ fun ProfileScreen(
     onOpenRepository: (owner: String, repo: String) -> Unit = { _, _ -> },
     onOpenUser: (login: String) -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.profile_title)) },

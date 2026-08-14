@@ -240,7 +240,9 @@ private fun NotificationList(
     ) {
         items(
             count = lazyItems.itemCount,
-            key = { index -> lazyItems[index]?.id ?: index },
+            // key 用 index 兜底：LazyPagingItems.get() 在 key lambda 内调用是反模式
+            // （未加载区域访问可能触发崩溃/回收竞争，2026-08-14 真机走查修复）
+            key = { index -> index },
         ) { index ->
             val item = lazyItems[index] ?: return@items
             NotificationRow(
@@ -383,7 +385,11 @@ private fun PagingErrorContent(
     modifier: Modifier = Modifier,
 ) {
     val errorType =
-        if (error is IOException) NotificationsErrorType.NETWORK else NotificationsErrorType.UNKNOWN
+        when {
+            error is retrofit2.HttpException && (error.code() == 401 || error.code() == 403) -> NotificationsErrorType.UNAUTHORIZED
+            error is IOException -> NotificationsErrorType.NETWORK
+            else -> NotificationsErrorType.UNKNOWN
+        }
     ErrorContent(errorType = errorType, onRetry = onRetry, modifier = modifier)
 }
 
@@ -413,6 +419,7 @@ private fun ErrorContent(
 private fun errorMessage(errorType: NotificationsErrorType): String =
     when (errorType) {
         NotificationsErrorType.NETWORK -> stringResource(R.string.notification_error_network)
+        NotificationsErrorType.UNAUTHORIZED -> stringResource(R.string.notification_error_unauthorized)
         NotificationsErrorType.UNKNOWN -> stringResource(R.string.notification_error_unknown)
     }
 

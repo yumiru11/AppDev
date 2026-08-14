@@ -26,8 +26,7 @@ import org.junit.Test
 class AuthNavigationTest {
     @Test
     fun authState_anonymous_mapsToHomeForGuestBrowsing() {
-        // 游客直进首页（2026-08-14 真机走查 P0-2 决策）：Anonymous 不再落登录门，
-        // 登录页仅由显式入口（首页登录引导卡/顶栏头像）可达
+        // 游客直进首页（P0-2 真机走查决策）：登录页仅显式入口可达
         assertEquals(AppRoute.HOME, authStateToDestination(AuthState.Anonymous))
     }
 
@@ -68,8 +67,7 @@ class AuthNavigationTest {
     }
 
     @Test
-    fun shouldNavigateForAuthState_atHomeNavigatesToLogin_whenExplicitLoginRequested() {
-        // 游客直进首页后（P0-2），LOGIN 只作为显式入口：当前非登录页时才导航
+    fun shouldNavigateForAuthState_atHomeNavigatesToLogin_whenAnonymous() {
         assertTrue(shouldNavigateForAuthState(AppRoute.HOME, AppRoute.LOGIN))
     }
 

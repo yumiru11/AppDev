@@ -58,4 +58,60 @@ class MarkdownLinkDispatchTest {
 
         assertEquals(listOf<ParsedUrl>(ParsedUrl.IssueRef(owner = null, repo = null, number = 123)), received)
     }
+// ── resolveMarkdownUrl：仓库上下文相对链接解析（2026-08-14 真机走查：README 相对链接跳浏览器）──
+
+    private val repoUrl = "https://github.com/owner/repo"
+
+    @Test
+    fun resolveMarkdownUrl_relativeFilePath_resolvesToBlobUrl() {
+        assertEquals(
+            "https://github.com/owner/repo/blob/HEAD/docs/guide.md",
+            resolveMarkdownUrl("docs/guide.md", repoUrl),
+        )
+    }
+
+    @Test
+    fun resolveMarkdownUrl_relativeFilePathWithLeadingSlash_resolvesToBlobUrl() {
+        assertEquals(
+            "https://github.com/owner/repo/blob/HEAD/docs/guide.md",
+            resolveMarkdownUrl("/docs/guide.md", repoUrl),
+        )
+    }
+
+    @Test
+    fun resolveMarkdownUrl_dotSlashPrefix_resolvesToBlobUrl() {
+        assertEquals(
+            "https://github.com/owner/repo/blob/HEAD/CONTRIBUTING.md",
+            resolveMarkdownUrl("./CONTRIBUTING.md", repoUrl),
+        )
+    }
+
+    @Test
+    fun resolveMarkdownUrl_anchorOnly_resolvesToRepoPageAnchor() {
+        assertEquals(
+            "https://github.com/owner/repo#installation",
+            resolveMarkdownUrl("#installation", repoUrl),
+        )
+    }
+
+    @Test
+    fun resolveMarkdownUrl_absoluteGitHubUrl_staysUntouched() {
+        assertEquals(
+            "https://github.com/other/proj/issues/3",
+            resolveMarkdownUrl("https://github.com/other/proj/issues/3", repoUrl),
+        )
+    }
+
+    @Test
+    fun resolveMarkdownUrl_externalUrl_staysUntouched() {
+        assertEquals(
+            "https://example.com/page",
+            resolveMarkdownUrl("https://example.com/page", repoUrl),
+        )
+    }
+
+    @Test
+    fun resolveMarkdownUrl_noBaseRepo_returnsRawUrl() {
+        assertEquals("docs/guide.md", resolveMarkdownUrl("docs/guide.md", null))
+    }
 }

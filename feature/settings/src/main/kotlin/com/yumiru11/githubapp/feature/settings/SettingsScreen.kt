@@ -5,6 +5,7 @@ package com.yumiru11.githubapp.feature.settings
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -46,6 +47,7 @@ fun SettingsScreen(
             dynamicColorEnabled = uiState.dynamicColorEnabled,
             oledEnabled = uiState.oledEnabled,
             highContrastEnabled = uiState.highContrastEnabled,
+            systemDark = isSystemInDarkTheme(),
         )
 
     Crossfade(

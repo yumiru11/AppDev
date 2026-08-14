@@ -36,6 +36,7 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 fun MarkdownViewer(
     markdown: String,
     onInternalLink: (ParsedUrl) -> Unit = {},
+    baseRepoUrl: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val darkTheme = isSystemInDarkTheme()
@@ -46,11 +47,12 @@ fun MarkdownViewer(
     // 在此覆盖 handler，把每次点击解析为 ParsedUrl 后交上层（Internal→应用内导航，
     // External→CustomTabs）。上层可能重组替换回调，用 rememberUpdatedState 取最新值。
     val currentOnInternalLink by rememberUpdatedState(onInternalLink)
+    val currentBaseRepoUrl by rememberUpdatedState(baseRepoUrl)
     val linkUriHandler =
         remember {
             object : UriHandler {
                 override fun openUri(uri: String) {
-                    dispatchMarkdownLink(uri, currentOnInternalLink)
+                    dispatchMarkdownLink(uri, currentBaseRepoUrl, currentOnInternalLink)
                 }
             }
         }
@@ -89,7 +91,33 @@ fun MarkdownViewer(
  * // parsed = ParsedUrl.Issue("owner", "repo", 42)
  * ```
  */
-fun parseMarkdownLink(url: String): ParsedUrl = GitHubLinkParser.parseUrl(url)
+fun parseMarkdownLink(
+    url: String,
+    baseRepoUrl: String? = null,
+): ParsedUrl = GitHubLinkParser.parseUrl(resolveMarkdownUrl(url, baseRepoUrl))
+
+/**
+ * 仓库上下文相对链接解析（2026-08-14 真机走查修复：README 相对链接跳浏览器）。
+ *
+ * - 绝对 URL（http/https/mailto）→ 原样返回
+ * - 相对路径（`docs/x.md`、`./x`、`/x`）→ `{baseRepoUrl}/blob/HEAD/{path}`
+ * - 锚点（`#section`）→ `{baseRepoUrl}#section`
+ * - 无 [baseRepoUrl] → 原样返回（无上下文可解析）
+ */
+fun resolveMarkdownUrl(
+    url: String,
+    baseRepoUrl: String?,
+): String {
+    if (baseRepoUrl == null) return url
+    if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("mailto:")) return url
+
+    val trimmed = url.removePrefix("./").removePrefix("/")
+    return if (trimmed.startsWith("#")) {
+        "$baseRepoUrl$trimmed"
+    } else {
+        "$baseRepoUrl/blob/HEAD/$trimmed"
+    }
+}
 
 /**
  * Markdown 链接点击分流：解析 URL 后回调 [onInternalLink]。
@@ -100,7 +128,8 @@ fun parseMarkdownLink(url: String): ParsedUrl = GitHubLinkParser.parseUrl(url)
  */
 fun dispatchMarkdownLink(
     url: String,
+    baseRepoUrl: String? = null,
     onInternalLink: (ParsedUrl) -> Unit,
 ) {
-    onInternalLink(parseMarkdownLink(url))
+    onInternalLink(parseMarkdownLink(url, baseRepoUrl))
 }

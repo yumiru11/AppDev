@@ -7,7 +7,6 @@ import com.yumiru11.githubapp.core.githubrest.api.IssueApi
 import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.api.UserApi
-import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
 import com.yumiru11.githubapp.core.githubrest.auth.TokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.EtagStore
 import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
@@ -24,15 +23,13 @@ import javax.inject.Singleton
 /**
  * REST 通道 Hilt 装配（SingletonComponent）。
  *
- * 游客期 [TokenProvider] 绑定 [GuestTokenProvider]；OAuth 票落地后替换绑定。
+ * [TokenProvider] 由 app 装配层提供（SessionTokenProvider，读 TokenStorage；
+ * core:github-rest 不依赖 core:github-auth，P0-7 修复：原实现绑死 GuestTokenProvider
+ * 导致 PAT/登录令牌永不注入请求，2026-08-14 真机走查）。
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object RestNetworkModule {
-    @Provides
-    @Singleton
-    fun provideTokenProvider(): TokenProvider = GuestTokenProvider()
-
     @Provides
     @Singleton
     fun provideEtagStore(): EtagStore = InMemoryEtagStore()

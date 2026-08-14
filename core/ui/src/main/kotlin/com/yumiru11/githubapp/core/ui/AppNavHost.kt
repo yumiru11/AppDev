@@ -22,6 +22,7 @@ import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.screens.NotificationScreen
 import com.yumiru11.githubapp.core.ui.screens.ProfileScreen
+import com.yumiru11.githubapp.core.ui.screens.SearchScreen
 
 /**
  * 应用导航宿主：入口 Composable，内部 Navigation Compose NavHost。
@@ -73,7 +74,7 @@ fun AppNavHost(
         }
 
         composable(AppRoute.SEARCH) {
-            PlaceholderScreen()
+            SearchScreen()
         }
 
         // 通知页（T19，docs/ui-design.md §3.4）：全屏 slide-in 面板——从顶部滑入
@@ -84,14 +85,6 @@ fun AppNavHost(
             exitTransition = { slideOutVertically(targetOffsetY = { -it }) + fadeOut() },
         ) {
             notificationsScreen()
-        }
-
-        composable(AppRoute.PROFILE) {
-            // T20：宿主注入真实 ProfileScreen；T24：设置入口经 onSettingsClick 由 Feature ProfileScreen 透传
-            profileScreen(
-                { navController.navigate(AppRoute.LOGIN) },
-                { navController.navigate(AppRoute.SETTINGS) },
-            )
         }
 
         composable(AppRoute.SETTINGS) {
@@ -171,7 +164,7 @@ fun AppNavHost(
                 ),
         ) {
             // T5+ PR 详情页
-            PlaceholderScreen()
+            SearchScreen()
         }
 
         composable(
@@ -197,7 +190,7 @@ fun AppNavHost(
                 ),
         ) {
             // T5+ Commit 详情页
-            PlaceholderScreen()
+            SearchScreen()
         }
 
         composable(
@@ -211,12 +204,7 @@ fun AppNavHost(
                 ),
         ) {
             // T5+ Blob 详情页
-            PlaceholderScreen()
-        }
-
-        composable("repos") {
-            // T5+ 仓库列表页
-            PlaceholderScreen()
+            SearchScreen()
         }
     }
 }

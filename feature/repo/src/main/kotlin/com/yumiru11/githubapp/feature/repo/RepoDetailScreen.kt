@@ -151,6 +151,7 @@ private fun RepoDetailContent(
             readmeState = readmeState,
             actions = actions,
             onRetryReadme = onRetryReadme,
+            baseRepoUrl = buildRepoUrl(repo),
         )
     }
 }
@@ -239,6 +240,7 @@ private fun ReadmeSection(
     readmeState: ReadmeState,
     actions: RepoDetailActions,
     onRetryReadme: () -> Unit,
+    baseRepoUrl: String,
 ) {
     Text(
         text = stringResource(R.string.repo_readme_section),
@@ -280,6 +282,7 @@ private fun ReadmeSection(
                         sanitizedHtml = readmeState.content,
                         tokenProvider = { null },
                         bridgeCallback = createBridgeCallback(actions),
+                        baseRepoUrl = baseRepoUrl,
                     )
                 }
 
@@ -287,6 +290,7 @@ private fun ReadmeSection(
                     MarkdownViewer(
                         markdown = readmeState.content,
                         onInternalLink = { parsed -> handleParsedUrl(parsed, actions) },
+                        baseRepoUrl = baseRepoUrl,
                     )
                 }
             }
@@ -384,3 +388,6 @@ private fun errorMessage(errorType: RepoErrorType): String =
         RepoErrorType.NETWORK -> stringResource(R.string.repo_error_network)
         RepoErrorType.UNKNOWN -> stringResource(R.string.repo_error_unknown)
     }
+
+/** Repository → GitHub 仓库页 URL（相对链接解析基址，2026-08-14 修复） */
+private fun buildRepoUrl(repo: Repository): String = "https://github.com/${repo.ownerLogin}/${repo.name}"

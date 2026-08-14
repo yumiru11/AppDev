@@ -4,9 +4,9 @@ import com.yumiru11.githubapp.core.githubauth.auth.AuthState
 import com.yumiru11.githubapp.core.navigation.AppRoute
 
 /**
- * 登录态 → 导航目标映射（T4 Wave2 登录态驱动首屏；P0-2 游客直进首页）。
+ * 登录态 → 导航目标映射（T4 Wave2 登录态驱动首屏）。
  *
- * - [AuthState.Anonymous] → 主页（游客浏览；登录页仅显式入口可达，2026-08-14 真机走查决策）
+ * - [AuthState.Anonymous] → 登录页
  * - [AuthState.SignedIn] / [AuthState.PAT] → 主页
  */
 fun authStateToDestination(authState: AuthState): String =

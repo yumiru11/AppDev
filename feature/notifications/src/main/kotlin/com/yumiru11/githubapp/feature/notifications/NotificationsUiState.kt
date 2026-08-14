@@ -38,6 +38,9 @@ enum class NotificationsErrorType {
     /** 网络/IO 错误 */
     NETWORK,
 
+    /** 凭据无效/过期（401/403，与网络错误区分） */
+    UNAUTHORIZED,
+
     /** 其他未知错误 */
     UNKNOWN,
 }

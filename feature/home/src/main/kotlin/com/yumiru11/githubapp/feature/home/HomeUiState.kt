@@ -33,11 +33,8 @@ sealed interface HomeUiState {
  * 首页动态流加载错误类型。
  */
 enum class HomeErrorType {
-    /** 网络/IO 错误 */
+    /** 网络/HTTP 错误 */
     NETWORK,
-
-    /** 凭据无效/过期（401/403，P0-7：与网络错误区分） */
-    UNAUTHORIZED,
 
     /** 其他未知错误 */
     UNKNOWN,

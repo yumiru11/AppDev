@@ -53,6 +53,7 @@ fun WebViewMarkdownRenderer(
     modifier: Modifier = Modifier,
     httpClient: OkHttpClient? = null,
     renderMode: RenderMode = RenderMode.SERVER_HTML,
+    baseRepoUrl: String? = null,
 ) {
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
@@ -116,7 +117,7 @@ fun WebViewMarkdownRenderer(
             }
         },
         update = { webView ->
-            val html = WebViewHtmlBuilder.build(sanitizedHtml, tokens, renderMode)
+            val html = WebViewHtmlBuilder.build(sanitizedHtml, tokens, renderMode, baseRepoUrl)
             webView.loadDataWithBaseURL(
                 "https://appassets.androidplatform.net/",
                 html,

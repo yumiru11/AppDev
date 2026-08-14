@@ -17,17 +17,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -36,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -46,10 +41,8 @@ import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import coil3.compose.AsyncImage
-import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
-import com.yumiru11.githubapp.core.ui.AppBottomBar
 import com.yumiru11.githubapp.core.ui.AppTopBar
 import com.yumiru11.githubapp.feature.home.model.FeedEventType
 import com.yumiru11.githubapp.feature.home.model.FeedItem
@@ -60,7 +53,7 @@ import java.time.Instant
 import java.time.ZoneId
 
 /**
- * 首页动态流页（T10）：AppTopBar + 动态流列表 + AppBottomBar。
+ * 首页动态流页（T10）：AppTopBar + 动态流列表（底栏已上移 MainTabPager 容器，2026-08-14 分区重构）。
  *
  * - 登录态驱动：未登录 → 登录引导（T10 验收第 1 条）
  * - 列表：Paging 分页（T10 验收第 2 条）+ PullToRefreshBox 下拉刷新（T10 验收第 3 条）
@@ -73,28 +66,21 @@ fun HomeScreen(
     onSearchClick: () -> Unit,
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
-    onTabSelected: (String) -> Unit,
     blurEnabled: Boolean = true,
     onLoginClick: () -> Unit = {},
     onFeedItemClick: (ParsedUrl) -> Unit = {},
+    modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier,
         topBar = {
             AppTopBar(
                 onSearchClick = onSearchClick,
                 onNotificationClick = onNotificationClick,
                 onProfileClick = onProfileClick,
-                blurEnabled = blurEnabled,
-            )
-        },
-        bottomBar = {
-            AppBottomBar(
-                selectedTab = AppRoute.HOME,
-                onTabSelected = onTabSelected,
                 blurEnabled = blurEnabled,
             )
         },
@@ -352,39 +338,16 @@ private fun UnauthenticatedContent(
     onLoginClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Surface(
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(40.dp),
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = stringResource(R.string.feed_require_login),
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.feed_require_login_desc),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Button(onClick = onLoginClick) {
-                    Text(text = stringResource(R.string.feed_login))
-                }
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = stringResource(R.string.feed_require_login),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onLoginClick) {
+                Text(text = stringResource(R.string.feed_login))
             }
         }
     }
@@ -444,6 +407,5 @@ private fun ErrorContent(
 private fun errorMessage(errorType: HomeErrorType): String =
     when (errorType) {
         HomeErrorType.NETWORK -> stringResource(R.string.feed_error_network)
-        HomeErrorType.UNAUTHORIZED -> stringResource(R.string.feed_error_unauthorized)
         HomeErrorType.UNKNOWN -> stringResource(R.string.feed_error_unknown)
     }
