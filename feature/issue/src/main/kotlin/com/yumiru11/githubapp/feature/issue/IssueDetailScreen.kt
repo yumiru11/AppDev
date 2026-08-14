@@ -139,6 +139,7 @@ fun IssueDetailScreen(
                         issue = state.issue,
                         timeline = state.timeline,
                         onInternalLink = onInternalLink,
+                        baseRepoUrl = "https://github.com/$owner/$repo",
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -196,6 +197,7 @@ private fun SuccessContent(
     issue: Issue,
     timeline: List<IssueTimelineItem>,
     onInternalLink: (ParsedUrl) -> Unit,
+    baseRepoUrl: String,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -215,6 +217,7 @@ private fun SuccessContent(
                 MarkdownViewer(
                     markdown = issue.body,
                     onInternalLink = onInternalLink,
+                    baseRepoUrl = baseRepoUrl,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -232,7 +235,7 @@ private fun SuccessContent(
         } else {
             items(items = timeline, key = { it.id.toString() }) { item ->
                 when (item) {
-                    is IssueTimelineItem.Comment -> CommentItem(item = item, onInternalLink = onInternalLink)
+                    is IssueTimelineItem.Comment -> CommentItem(item = item, onInternalLink = onInternalLink, baseRepoUrl = baseRepoUrl)
                     is IssueTimelineItem.Event -> EventItem(event = item)
                 }
             }
@@ -363,6 +366,7 @@ private fun AssigneeRow(assignees: List<IssueUser>) {
 private fun CommentItem(
     item: IssueTimelineItem.Comment,
     onInternalLink: (ParsedUrl) -> Unit,
+    baseRepoUrl: String,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -399,6 +403,7 @@ private fun CommentItem(
                 MarkdownViewer(
                     markdown = item.body,
                     onInternalLink = onInternalLink,
+                    baseRepoUrl = baseRepoUrl,
                 )
             }
         }
