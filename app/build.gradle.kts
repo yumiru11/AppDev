@@ -118,6 +118,7 @@ dependencies {
 
     // 认证（T4 Wave2 接线）：OAuthSessionManager/TokenStorage 注入 MainActivity + AuthViewModel
     implementation(project(":core:github-auth"))
+    implementation(project(":core:github-rest"))
     // OkHttp（AppDiModule 桥接 @AuthHttpClient 客户端需要直接引用；core:github-auth 的 implementation 不外泄编译类路径）
     implementation(libs.okhttp)
 

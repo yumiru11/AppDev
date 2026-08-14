@@ -25,8 +25,9 @@ import org.junit.Test
  */
 class AuthNavigationTest {
     @Test
-    fun authState_anonymous_mapsToLoginDestination() {
-        assertEquals(AppRoute.LOGIN, authStateToDestination(AuthState.Anonymous))
+    fun authState_anonymous_mapsToHomeForGuestBrowsing() {
+        // 游客直进首页（P0-2 真机走查决策）：登录页仅显式入口可达
+        assertEquals(AppRoute.HOME, authStateToDestination(AuthState.Anonymous))
     }
 
     @Test
@@ -41,13 +42,13 @@ class AuthNavigationTest {
     }
 
     @Test
-    fun authStateFlow_anonymousToSignedInToPat_drivesLoginThenHome() =
+    fun authStateFlow_anonymousToSignedInToPat_staysOnHome() =
         runTest {
             val storage = InMemoryTokenStorage()
             val manager = OAuthSessionManager(storage, NavigationFakeTokenEndpointClient(), OAuthConfig())
 
-            // 初始：Anonymous → 登录页
-            assertEquals(AppRoute.LOGIN, authStateToDestination(manager.authState.value))
+            // 初始：Anonymous → 主页（游客直进首页，P0-2）
+            assertEquals(AppRoute.HOME, authStateToDestination(manager.authState.value))
 
             // OAuth 会话落盘 → SignedIn → 主页
             storage.saveSession(SessionData(accessToken = "gho_test_access", refreshToken = "ghr_test_refresh"))

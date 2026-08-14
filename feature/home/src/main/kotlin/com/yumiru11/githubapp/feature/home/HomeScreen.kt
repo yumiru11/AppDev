@@ -41,10 +41,8 @@ import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import coil3.compose.AsyncImage
-import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
-import com.yumiru11.githubapp.core.ui.AppBottomBar
 import com.yumiru11.githubapp.core.ui.AppTopBar
 import com.yumiru11.githubapp.feature.home.model.FeedEventType
 import com.yumiru11.githubapp.feature.home.model.FeedItem
@@ -55,7 +53,7 @@ import java.time.Instant
 import java.time.ZoneId
 
 /**
- * 首页动态流页（T10）：AppTopBar + 动态流列表 + AppBottomBar。
+ * 首页动态流页（T10）：AppTopBar + 动态流列表（底栏已上移 MainTabPager 容器，2026-08-14 分区重构）。
  *
  * - 登录态驱动：未登录 → 登录引导（T10 验收第 1 条）
  * - 列表：Paging 分页（T10 验收第 2 条）+ PullToRefreshBox 下拉刷新（T10 验收第 3 条）
@@ -68,28 +66,21 @@ fun HomeScreen(
     onSearchClick: () -> Unit,
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
-    onTabSelected: (String) -> Unit,
     blurEnabled: Boolean = true,
     onLoginClick: () -> Unit = {},
     onFeedItemClick: (ParsedUrl) -> Unit = {},
+    modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier,
         topBar = {
             AppTopBar(
                 onSearchClick = onSearchClick,
                 onNotificationClick = onNotificationClick,
                 onProfileClick = onProfileClick,
-                blurEnabled = blurEnabled,
-            )
-        },
-        bottomBar = {
-            AppBottomBar(
-                selectedTab = AppRoute.HOME,
-                onTabSelected = onTabSelected,
                 blurEnabled = blurEnabled,
             )
         },

@@ -87,14 +87,6 @@ fun AppNavHost(
             notificationsScreen()
         }
 
-        composable(AppRoute.PROFILE) {
-            // T20：宿主注入真实 ProfileScreen；T24：设置入口经 onSettingsClick 由 Feature ProfileScreen 透传
-            profileScreen(
-                { navController.navigate(AppRoute.LOGIN) },
-                { navController.navigate(AppRoute.SETTINGS) },
-            )
-        }
-
         composable(AppRoute.SETTINGS) {
             settingsScreen()
         }
@@ -212,11 +204,6 @@ fun AppNavHost(
                 ),
         ) {
             // T5+ Blob 详情页
-            SearchScreen()
-        }
-
-        composable("repos") {
-            // T5+ 仓库列表页
             SearchScreen()
         }
     }

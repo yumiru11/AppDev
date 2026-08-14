@@ -11,7 +11,7 @@ import com.yumiru11.githubapp.core.navigation.AppRoute
  */
 fun authStateToDestination(authState: AuthState): String =
     when (authState) {
-        is AuthState.Anonymous -> AppRoute.LOGIN
+        is AuthState.Anonymous -> AppRoute.HOME
         is AuthState.SignedIn -> AppRoute.HOME
         is AuthState.PAT -> AppRoute.HOME
     }

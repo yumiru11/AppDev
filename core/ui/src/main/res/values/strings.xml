@@ -21,4 +21,6 @@
     <string name="repos_title">Repositories</string>
     <string name="placeholder_content">Coming soon</string>
     <string name="repo_owner_repo">%1$s / %2$s</string>
+    <string name="placeholder_title">Coming soon</string>
+    <string name="placeholder_desc">This page is under development</string>
 </resources>

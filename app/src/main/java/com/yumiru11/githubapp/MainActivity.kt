@@ -13,9 +13,16 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -31,6 +38,8 @@ import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppNavHost
+import com.yumiru11.githubapp.core.ui.MainTabPager
+import com.yumiru11.githubapp.core.ui.PlaceholderScreen
 import com.yumiru11.githubapp.core.ui.navigateToParsedUrl
 import com.yumiru11.githubapp.feature.auth.AuthNavigation
 import com.yumiru11.githubapp.feature.auth.AuthViewModel
@@ -96,30 +105,64 @@ class MainActivity : ComponentActivity() {
             val blurEnabled by userPreferencesRepository.blurEnabled.collectAsStateWithLifecycle(initialValue = true)
             // 语言偏好（T24 设置页语言切换）：变化 → 缓存 + recreate 应用 locale
             val languageTag by userPreferencesRepository.languageTag.collectAsStateWithLifecycle(initialValue = null)
+            // 底部三分区当前页（分区重构 2026-08-14：tab 切换 = pager 横滑，非导航）
+            var mainTab by rememberSaveable { mutableStateOf(AppRoute.HOME) }
 
             AppThemeHost(repository = userPreferencesRepository) {
                 AppNavHost(
                     navController = navController,
                     startDestination = authStateToDestination(authState),
                     homeScreen = {
-                        HomeScreen(
-                            onSearchClick = { navController.navigate(AppRoute.SEARCH) },
-                            onNotificationClick = { navController.navigate(AppRoute.NOTIFICATION) },
-                            onProfileClick = { navController.navigate(AppRoute.PROFILE) },
-                            onTabSelected = { route ->
-                                navController.navigate(route) {
-                                    popUpTo(AppRoute.HOME) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
+                        MainTabPager(
+                            selectedTab = mainTab,
+                            onTabSelected = { mainTab = it },
                             blurEnabled = blurEnabled,
-                            onLoginClick = {
-                                navController.navigate(AppRoute.LOGIN) {
-                                    popUpTo(0) { inclusive = true }
-                                }
+                            homePage = { padding ->
+                                HomeScreen(
+                                    onSearchClick = { navController.navigate(AppRoute.SEARCH) },
+                                    onNotificationClick = { navController.navigate(AppRoute.NOTIFICATION) },
+                                    onProfileClick = { mainTab = AppRoute.PROFILE },
+                                    blurEnabled = blurEnabled,
+                                    onLoginClick = {
+                                        navController.navigate(AppRoute.LOGIN) {
+                                            popUpTo(0) { inclusive = true }
+                                        }
+                                    },
+                                    onFeedItemClick = { parsed -> navigateToParsedUrl(navController, parsed) },
+                                    modifier = Modifier.padding(padding),
+                                )
                             },
-                            onFeedItemClick = { parsed -> navigateToParsedUrl(navController, parsed) },
+                            reposPage = { padding ->
+                                PlaceholderScreen(
+                                    modifier =
+                                        Modifier
+                                            .padding(padding)
+                                            .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()),
+                                )
+                            },
+                            profilePage = { padding ->
+                                ProfileScreen(
+                                    onLoginClick = {
+                                        navController.navigate(AppRoute.LOGIN) {
+                                            popUpTo(0) { inclusive = true }
+                                        }
+                                    },
+                                    onOpenRepository = { owner, repo ->
+                                        navController.navigate(
+                                            AppRoute.REPO
+                                                .replace("{owner}", owner)
+                                                .replace("{repo}", repo),
+                                        )
+                                    },
+                                    onOpenUser = { login ->
+                                        navController.navigate(
+                                            AppRoute.USER.replace("{login}", login),
+                                        )
+                                    },
+                                    onSettingsClick = { navController.navigate(AppRoute.SETTINGS) },
+                                    modifier = Modifier.padding(padding),
+                                )
+                            },
                         )
                     },
                     loginScreen = {
