@@ -109,6 +109,7 @@ class RepoRepository
          * 获取 README HTML（三级降级 + 双 key 缓存）。
          * @param themeVersion 当前主题版本，用于缓存失效
          */
+        @Suppress("NestedBlockDepth") // JSON 回退判定（try→content-type/首字符→markdown 三级降级）结构固有，拆散反损可读性（T3 先例）
         suspend fun getReadmeHtml(
             owner: String,
             repo: String,
@@ -135,7 +136,29 @@ class RepoRepository
                 // Tier 1: 服务端已渲染 HTML
                 val html =
                     try {
-                        readmeApi.getReadmeHtml(owner, repo).string()
+                        val response = readmeApi.getReadmeHtml(owner, repo)
+                        val body = response.string()
+                        // GitHub 对部分 README（symlink/超限等）无视 html Accept 返回 API JSON；
+                        // 检测到 JSON 响应体时回退 markdown 渲染（2026-08-14 真机走查修复：
+                        // openchamber 等仓库 README 显示原始 JSON）
+                        val contentType = response.contentType()?.toString().orEmpty()
+                        if (body.trimStart().startsWith("{") || contentType.contains("application/json")) {
+                            val fallbackMarkdown = meta.decodeContent() ?: ""
+                            if (fallbackMarkdown.isNotBlank()) {
+                                readmeApi
+                                    .renderMarkdown(
+                                        MarkdownRenderRequest(
+                                            text = fallbackMarkdown,
+                                            mode = MarkdownRenderRequest.MODE_GFM,
+                                            context = "$owner/$repo",
+                                        ),
+                                    ).string()
+                            } else {
+                                error("README HTML 响应为 JSON 且内容为空")
+                            }
+                        } else {
+                            body
+                        }
                     } catch (e: Exception) {
                         // Tier 2: POST /markdown GFM 渲染
                         val markdown = meta.decodeContent() ?: ""

@@ -174,4 +174,45 @@ class RepoRepositoryTest {
                 )
             }
         }
+
+    @Test
+    fun getReadme_htmlResponseIsJson_fallsBackToRenderedMarkdown() =
+        runTest {
+            // 2026-08-14 真机走查修复：GitHub 对部分 README 无视 html Accept 返回 API JSON，
+            // 直接 .string() 当 HTML 会显示原始 JSON（openchamber 案例）——须回退 markdown 渲染
+            val markdown = "```mermaid\ngraph TD; A-->B;\n```"
+            val jsonBody = """{"name":"README.md","content":"${Base64.getEncoder().encodeToString(
+                markdown.toByteArray(),
+            )}","encoding":"base64"}"""
+            coEvery { readmeApi.getReadmeMeta(any(), any()) } returns readmeDto(markdown)
+            coEvery { cachedReadmeDao.getByOwnerAndRepo("octocat", "Hello-World") } returns null
+            coEvery { cachedReadmeDao.upsert(any()) } returns Unit
+            coEvery { readmeApi.getReadmeHtml(any(), any()) } returns
+                jsonBody.toResponseBody("application/json".toMediaType())
+            coEvery { readmeApi.renderMarkdown(any()) } returns
+                "<pre><code class=\"language-mermaid\">graph TD; A-->B;</code></pre>".toResponseBody("text/html".toMediaType())
+
+            val result = repository.getReadme("octocat", "Hello-World", "th-v1")
+
+            assertTrue(result.isSuccess)
+            assertEquals("<pre><code class=\"language-mermaid\">graph TD; A-->B;</code></pre>", result.getOrThrow().html)
+            coVerify(exactly = 1) { readmeApi.renderMarkdown(any()) }
+        }
+
+    @Test
+    fun getReadme_htmlResponseIsHtml_usesHtmlDirectly() =
+        runTest {
+            val markdown = "```mermaid\ngraph TD; A-->B;\n```"
+            coEvery { readmeApi.getReadmeMeta(any(), any()) } returns readmeDto(markdown)
+            coEvery { cachedReadmeDao.getByOwnerAndRepo("octocat", "Hello-World") } returns null
+            coEvery { cachedReadmeDao.upsert(any()) } returns Unit
+            coEvery { readmeApi.getReadmeHtml(any(), any()) } returns
+                "<p>rendered html</p>".toResponseBody("text/html".toMediaType())
+
+            val result = repository.getReadme("octocat", "Hello-World", "th-v1")
+
+            assertTrue(result.isSuccess)
+            assertEquals("<p>rendered html</p>", result.getOrThrow().html)
+            coVerify(exactly = 0) { readmeApi.renderMarkdown(any()) }
+        }
 }
