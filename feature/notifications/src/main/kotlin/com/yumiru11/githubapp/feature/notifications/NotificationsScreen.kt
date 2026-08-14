@@ -383,7 +383,11 @@ private fun PagingErrorContent(
     modifier: Modifier = Modifier,
 ) {
     val errorType =
-        if (error is IOException) NotificationsErrorType.NETWORK else NotificationsErrorType.UNKNOWN
+        when {
+            error is retrofit2.HttpException && (error.code() == 401 || error.code() == 403) -> NotificationsErrorType.UNAUTHORIZED
+            error is IOException -> NotificationsErrorType.NETWORK
+            else -> NotificationsErrorType.UNKNOWN
+        }
     ErrorContent(errorType = errorType, onRetry = onRetry, modifier = modifier)
 }
 
@@ -413,6 +417,7 @@ private fun ErrorContent(
 private fun errorMessage(errorType: NotificationsErrorType): String =
     when (errorType) {
         NotificationsErrorType.NETWORK -> stringResource(R.string.notification_error_network)
+        NotificationsErrorType.UNAUTHORIZED -> stringResource(R.string.notification_error_unauthorized)
         NotificationsErrorType.UNKNOWN -> stringResource(R.string.notification_error_unknown)
     }
 

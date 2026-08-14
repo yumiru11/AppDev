@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.core.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -10,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.navigation.AppRoute
 import kotlinx.coroutines.launch
 
@@ -50,6 +52,9 @@ fun MainTabPager(
 
     Scaffold(
         modifier = modifier,
+        // 分区页各自处理 insets（Home/Profile 有 TopAppBar 自带 statusBars；
+        // 容器不再叠加顶部 padding，否则出现「顶栏距状态栏空一段」——2026-08-14 真机走查修复）
+        contentWindowInsets = WindowInsets(0.dp),
         bottomBar = {
             AppBottomBar(
                 selectedTab = selectedTab,

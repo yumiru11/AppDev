@@ -26,4 +26,5 @@
     <string name="notification_reason_subscribed">Subscribed</string>
     <string name="notification_reason_team_mention">Team mentioned you</string>
     <string name="notification_reason_unknown">Notification</string>
+    <string name="notification_error_unauthorized">Sign-in expired. Please sign in again.</string>
 </resources>

@@ -26,4 +26,5 @@
     <string name="notification_reason_subscribed">已订阅</string>
     <string name="notification_reason_team_mention">团队提及了你</string>
     <string name="notification_reason_unknown">通知</string>
+    <string name="notification_error_unauthorized">登录已失效，请重新登录</string>
 </resources>
