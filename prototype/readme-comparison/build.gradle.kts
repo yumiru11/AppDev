@@ -24,6 +24,8 @@ dependencies {
     // 现有两套渲染链路（prototype 只在一次性模块消费，不改 feature:repo）
     implementation(project(":core:markdown"))
     implementation(project(":core:navigation"))
+    implementation(libs.markdown.renderer)
+    implementation(libs.markdown.renderer.coil3)
 
     testImplementation(project(":core:testing"))
     testImplementation(libs.junit)

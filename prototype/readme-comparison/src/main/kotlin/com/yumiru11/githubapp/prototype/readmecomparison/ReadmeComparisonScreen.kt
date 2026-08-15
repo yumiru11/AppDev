@@ -5,6 +5,7 @@
 
 package com.yumiru11.githubapp.prototype.readmecomparison
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,7 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.yumiru11.githubapp.core.markdown.MarkdownViewer
+import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
@@ -82,9 +83,11 @@ fun ReadmeComparisonScreen(modifier: Modifier = Modifier) {
                 }
 
                 ComparisonVersion.NATIVE -> {
-                    MarkdownViewer(
+                    EnhancedMarkdownViewer(
                         markdown = markdown,
                         onInternalLink = { },
+                        imageTransformer = remember(context) { AssetMarkdownImageTransformer(context) },
+                        darkTheme = isSystemInDarkTheme(),
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

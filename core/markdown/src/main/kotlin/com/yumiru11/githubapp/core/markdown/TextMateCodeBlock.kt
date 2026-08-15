@@ -55,14 +55,23 @@ fun rememberTextMateGrammar(language: String): Grammar? {
 @Composable
 fun rememberTextMateTheme(darkTheme: Boolean): Theme = rememberM3TextMateTheme(darkTheme = darkTheme)
 
-/** markdown 代码块：KotlinTextMate 渲染（VS Code 同款），无语法/失败时带样式代码块兜底 */
+/** markdown 代码块（M3 全融合主题便捷入口）。 */
 @Composable
 fun TextMateCodeBlock(
     code: String,
     language: String?,
     darkTheme: Boolean,
 ) {
-    val theme = rememberTextMateTheme(darkTheme)
+    TextMateCodeBlock(code = code, language = language, theme = rememberTextMateTheme(darkTheme))
+}
+
+/** markdown 代码块：KotlinTextMate 渲染（VS Code 同款），无语法/失败时带样式代码块兜底 */
+@Composable
+fun TextMateCodeBlock(
+    code: String,
+    language: String?,
+    theme: Theme,
+) {
     val grammar = language?.let { rememberTextMateGrammar(it) }
     if (grammar != null) {
         CodeBlock(code = code, grammar = grammar, theme = theme)
