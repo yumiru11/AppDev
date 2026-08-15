@@ -25,7 +25,14 @@ class AssetMarkdownImageTransformer(
         }
         val bitmap =
             remember(link) {
-                context.assets.open(link).use { BitmapFactory.decodeStream(it) }
+                try {
+                    context.assets.open(link.removePrefix("assets/")).use { BitmapFactory.decodeStream(it) }
+                } catch (_: Exception) {
+                    // Robolectric 的测试 context 不合并 library assets；prototype 截图退化为读源文件。
+                    java.io.File("src/main/assets", link).takeIf { it.isFile }?.inputStream()?.use {
+                        BitmapFactory.decodeStream(it)
+                    }
+                }
             } ?: return Coil3ImageTransformerImpl.transform(link)
         return ImageData(painter = BitmapPainter(bitmap.asImageBitmap()))
     }

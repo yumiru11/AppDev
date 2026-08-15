@@ -46,6 +46,7 @@ fun EnhancedMarkdownViewer(
     modifier: Modifier = Modifier,
     imageTransformer: ImageTransformer = Coil3ImageTransformerImpl,
     darkTheme: Boolean = isSystemInDarkTheme(),
+    horizontalScrollEnabled: Boolean = true,
 ) {
     val state = rememberMarkdownState(markdown, immediate = true)
     val scheme = MaterialTheme.colorScheme
@@ -105,12 +106,22 @@ fun EnhancedMarkdownViewer(
                     blockQuote = { model -> GitHubAlertOrQuote(model) },
                     codeFence = { model ->
                         MarkdownCodeFence(model.content, model.node, model.typography.code) { code, language, _ ->
-                            EnhancedCodeBlock(code = code, language = language, isDark = darkTheme)
+                            EnhancedCodeBlock(
+                                code = code,
+                                language = language,
+                                isDark = darkTheme,
+                                horizontalScrollEnabled = horizontalScrollEnabled,
+                            )
                         }
                     },
                     horizontalRule = { EnhancedHorizontalRule() },
                     image = { model -> EnhancedMarkdownImage(model) },
-                    table = { model -> EnhancedMarkdownTable(model) },
+                    table = { model ->
+                        EnhancedMarkdownTable(
+                            model = model,
+                            horizontalScrollEnabled = horizontalScrollEnabled,
+                        )
+                    },
                     custom = { type, model ->
                         if (type == MarkdownElementTypes.HTML_BLOCK) {
                             EnhancedHtmlBlock(model)

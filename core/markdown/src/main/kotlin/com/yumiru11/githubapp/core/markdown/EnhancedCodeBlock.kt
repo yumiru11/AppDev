@@ -39,6 +39,7 @@ fun EnhancedCodeBlock(
     code: String,
     language: String?,
     isDark: Boolean,
+    horizontalScrollEnabled: Boolean = true,
 ) {
     val context = LocalContext.current
     val copyState = rememberCopyFeedbackState()
@@ -78,8 +79,13 @@ fun EnhancedCodeBlock(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(bottom = 12.dp),
+                        .then(
+                            if (horizontalScrollEnabled) {
+                                Modifier.horizontalScroll(rememberScrollState())
+                            } else {
+                                Modifier
+                            },
+                        ).padding(bottom = 12.dp),
             ) {
                 TextMateCodeBlock(
                     code = code,

@@ -31,7 +31,10 @@ import com.yumiru11.githubapp.core.markdown.native.MarkdownTableParser
  * 单元格用 [MarkdownText] 渲染，保留 `**bold**` / `code` 等行内格式。
  */
 @Composable
-fun EnhancedMarkdownTable(model: MarkdownComponentModel) {
+fun EnhancedMarkdownTable(
+    model: MarkdownComponentModel,
+    horizontalScrollEnabled: Boolean = true,
+) {
     val data = remember(model.content, model.node) { MarkdownTableParser.parse(model.content, model.node) }
     if (data.header.isEmpty()) return
 
@@ -44,7 +47,16 @@ fun EnhancedMarkdownTable(model: MarkdownComponentModel) {
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Box(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+        Box(
+            modifier =
+                Modifier.then(
+                    if (horizontalScrollEnabled) {
+                        Modifier.horizontalScroll(rememberScrollState())
+                    } else {
+                        Modifier
+                    },
+                ),
+        ) {
             Column(modifier = Modifier.widthIn(min = minWidth)) {
                 TableRow(
                     cells = data.header,
