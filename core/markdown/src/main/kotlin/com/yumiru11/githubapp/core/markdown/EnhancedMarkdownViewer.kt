@@ -1,3 +1,5 @@
+@file:Suppress("LongMethod") // B 增强渲染器装配点集中（typography/colors/components），拆分反损可读性。
+
 package com.yumiru11.githubapp.core.markdown
 
 import androidx.compose.foundation.isSystemInDarkTheme
