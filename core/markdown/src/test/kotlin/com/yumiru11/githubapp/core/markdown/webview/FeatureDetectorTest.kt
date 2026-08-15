@@ -50,7 +50,7 @@ class FeatureDetectorTest {
     }
 
     @Test
-    fun shouldFallback_heavyHtmlTable_returnsWebView() {
+    fun repeatedTables_nowRenderedByNative() {
         val markdown =
             """
             # Comparison
@@ -68,12 +68,12 @@ class FeatureDetectorTest {
 
         val decision = FeatureDetector.shouldFallback(markdown)
 
-        assertTrue(decision is FallbackDecision.WebView)
-        assertEquals(FallbackReason.HEAVY_HTML, (decision as FallbackDecision.WebView).reason)
+        // 2026-08-16 原型真机验证：EnhancedMarkdownTable 已能渲染表格，不再兜底
+        assertTrue(decision is FallbackDecision.Native)
     }
 
     @Test
-    fun shouldFallback_detailsSummary_returnsWebView() {
+    fun detailsNowRenderedByNative() {
         val markdown =
             """
             <details>
@@ -84,8 +84,8 @@ class FeatureDetectorTest {
 
         val decision = FeatureDetector.shouldFallback(markdown)
 
-        assertTrue(decision is FallbackDecision.WebView)
-        assertEquals(FallbackReason.HEAVY_HTML, (decision as FallbackDecision.WebView).reason)
+        // 2026-08-16 原型真机验证：NativeDetailsCard 已能渲染折叠，不再兜底
+        assertTrue(decision is FallbackDecision.Native)
     }
 
     @Test

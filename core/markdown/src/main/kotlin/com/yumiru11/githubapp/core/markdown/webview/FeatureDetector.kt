@@ -57,11 +57,15 @@ object FeatureDetector {
     /** 重复型重型 HTML 块计数阈值：table / details 出现次数 ≥ 此值才走兜底（单个由原生裁剪） */
     const val REPEATED_HTML_THRESHOLD = 2
 
-    /** 单次出现即触发的复杂 HTML 标签（renderer 0.38.1 无法渲染图形/交互/折叠） */
-    private val CRITICAL_HTML_TAGS = listOf("<svg", "<canvas", "<iframe", "<math", "<details")
+    /** 单次出现即触发的复杂 HTML 标签（原生处理不了：图形/交互/数学） */
+    private val CRITICAL_HTML_TAGS = listOf("<svg", "<canvas", "<iframe", "<math")
 
-    /** 重复型重型 HTML 标签（多次出现才触发兜底；单次由原生处理，如单个 table 走原生裁剪 ADR-0005） */
-    private val REPEATED_HTML_TAGS = listOf("<table")
+    /**
+     * 重复型重型 HTML 标签。2026-08-16 原型真机验证后收紧：details/table 原生已能渲染
+     * （NativeDetailsCard/EnhancedMarkdownTable），不再触发兜底；仅保留原生确实无法处理的
+     * 标签（当前无——预留结构，避免未来误判直接走 WebView）。
+     */
+    private val REPEATED_HTML_TAGS = emptyList<String>()
 
     /** mermaid 围栏正则（大小写不敏感，宽松匹配 ```mermaid 后缀） */
     private val MERMAID_FENCE_REGEX = Regex("""```mermaid\b""", RegexOption.IGNORE_CASE)
