@@ -13,6 +13,8 @@ body {
   margin: 0;
   padding: 0;
   background: transparent;
+  /* WebView 默认点击高亮（蓝色闪烁）与 M3 主题割裂，禁用（2026-08-16 真机验证） */
+  -webkit-tap-highlight-color: transparent;
 }
 
 .markdown-body {
@@ -46,22 +48,22 @@ body {
 
 /* Inline code: primary 10% tint background + primary text. */
 .markdown-body code {
-  background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+  background: var(--inline-code-bg);
   color: var(--md-sys-color-primary);
   border-radius: var(--md-sys-shape-corner-small);
 }
 
 /* Code blocks: card-like surface; dark mode one level deeper than the page background. */
 .markdown-body pre {
-  background: var(--md-sys-color-surface-container);
+  background: var(--code-bg);
   border-radius: var(--md-sys-shape-corner-medium);
   padding: 12px;
   overflow-x: auto;
   margin: 0 0 16px;
 }
 
-body[data-theme="dark"] .markdown-body pre {
-  background: var(--md-sys-color-surface-container-lowest);
+[data-theme="dark"] .markdown-body pre {
+  background: var(--code-bg);
 }
 
 .markdown-body pre code {
@@ -140,24 +142,24 @@ body[data-theme="dark"] .markdown-body pre {
   border-radius: var(--md-sys-shape-corner-small);
 }
 
-.markdown-body .markdown-alert-note {
-  background: color-mix(in srgb, var(--borderColor-accent-emphasis) 12%, var(--bgColor-default));
+.markdown-body .markdown-alert.markdown-alert-note {
+  background: var(--alert-note-bg);
 }
 
-.markdown-body .markdown-alert-tip {
-  background: color-mix(in srgb, var(--borderColor-success-emphasis) 12%, var(--bgColor-default));
+.markdown-body .markdown-alert.markdown-alert-tip {
+  background: var(--alert-tip-bg);
 }
 
-.markdown-body .markdown-alert-important {
-  background: color-mix(in srgb, var(--borderColor-done-emphasis) 12%, var(--bgColor-default));
+.markdown-body .markdown-alert.markdown-alert-important {
+  background: var(--alert-important-bg);
 }
 
-.markdown-body .markdown-alert-warning {
-  background: color-mix(in srgb, var(--borderColor-attention-emphasis) 14%, var(--bgColor-default));
+.markdown-body .markdown-alert.markdown-alert-warning {
+  background: var(--alert-warning-bg);
 }
 
-.markdown-body .markdown-alert-caution {
-  background: color-mix(in srgb, var(--borderColor-danger-emphasis) 12%, var(--bgColor-default));
+.markdown-body .markdown-alert.markdown-alert-caution {
+  background: var(--alert-caution-bg);
 }
 
 .markdown-body .markdown-alert-title {

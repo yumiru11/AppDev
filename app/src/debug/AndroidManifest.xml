@@ -10,5 +10,15 @@
         <activity
             android:name="androidx.activity.ComponentActivity"
             android:exported="true" />
+        <!-- 原型入口（PROTOTYPE ONLY）：README A/B 对照，仅 debug 变体存在，release 不受影响 -->
+        <activity
+            android:name="com.yumiru11.githubapp.PrototypeActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AppDev">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>

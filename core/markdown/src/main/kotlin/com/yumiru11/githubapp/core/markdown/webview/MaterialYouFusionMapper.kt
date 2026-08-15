@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.core.markdown.webview
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import java.util.Locale
 
 /**
@@ -153,7 +154,43 @@ object MaterialYouFusionMapper {
     private fun colorDeclarations(
         scheme: ColorScheme,
         isDark: Boolean,
-    ): Map<String, String> = materialRoleDeclarations(scheme) + githubSemanticDeclarations(scheme) + syntaxDeclarations(isDark)
+    ): Map<String, String> =
+        materialRoleDeclarations(scheme) +
+            githubSemanticDeclarations(scheme, isDark) +
+            syntaxDeclarations(isDark) +
+            preMixedBackgrounds(scheme)
+
+    /**
+     * 预混色背景（Kotlin 侧算好，替代 CSS color-mix）。
+     *
+     * 真机 WebView（vivo 系统自带，Chromium 版本较老）实测 `CSS.supports('color-mix') == false`
+     * ——所有 color-mix 规则静默失效 → alert/代码块/行内代码背景全透明（2026-08-16 真机诊断）。
+     * 混色系数与 markdown-you.css 原规则一致（45%/35%/30%），颜色随 MaterialTheme 深浅自动切换。
+     */
+    private fun preMixedBackgrounds(scheme: ColorScheme): Map<String, String> {
+        fun mix(
+            bg: Color,
+            fg: Color,
+            fraction: Float,
+        ): String =
+            cssColor(
+                androidx.compose.ui.graphics
+                    .lerp(bg, fg, fraction),
+            )
+
+        // Alert 背景直接用 M3 语义容器色（与原生 GitHubAlertCard 一致，用户拍板）；
+        // 代码块/行内代码用淡混色（用户反馈 45%/35% 太深，恢复浅色观感）。
+        return mapOf(
+            "--alert-note-bg" to cssColor(scheme.primaryContainer),
+            "--alert-tip-bg" to cssColor(scheme.tertiaryContainer),
+            "--alert-important-bg" to cssColor(scheme.secondaryContainer),
+            "--alert-warning-bg" to cssColor(scheme.secondaryContainer),
+            "--alert-caution-bg" to cssColor(scheme.errorContainer),
+            // 代码框与行内代码同款淡色（用户拍板：15% 混色还是太蓝，行内 10% 观感好）
+            "--code-bg" to mix(scheme.surfaceContainerLow, scheme.primary, 0.10f),
+            "--inline-code-bg" to cssColor(scheme.primary.copy(alpha = 0.10f)),
+        )
+    }
 
     private fun allDeclarations(
         scheme: ColorScheme,
@@ -212,8 +249,18 @@ object MaterialYouFusionMapper {
             "--md-sys-color-surface-container-highest" to cssColor(scheme.surfaceContainerHighest),
         )
 
-    private fun githubSemanticDeclarations(scheme: ColorScheme): Map<String, String> =
-        mapOf(
+    private fun githubSemanticDeclarations(
+        scheme: ColorScheme,
+        isDark: Boolean,
+    ): Map<String, String> {
+        // 深色背景 = 近黑 + 主题色（与原型 Activity 背景一致，用户拍板：
+        // 纯 M3 surface 发灰，要黑色融入一点点主题色）。
+        val nearBlack = Color(0xFF0B0B0D)
+        val bgDefault = if (isDark) lerp(nearBlack, scheme.primary, 0.06f) else scheme.surface
+        val bgMuted = if (isDark) lerp(nearBlack, scheme.primary, 0.10f) else scheme.surfaceContainerLow
+        val bgInset = if (isDark) lerp(nearBlack, scheme.primary, 0.04f) else scheme.surfaceContainerLowest
+        val bgNeutral = if (isDark) lerp(nearBlack, scheme.primary, 0.14f) else scheme.surfaceContainerHigh
+        return mapOf(
             "--fgColor-default" to cssColor(scheme.onSurface),
             "--fgColor-muted" to cssColor(scheme.onSurfaceVariant),
             "--fgColor-accent" to cssColor(scheme.primary),
@@ -221,10 +268,10 @@ object MaterialYouFusionMapper {
             "--fgColor-attention" to cssColor(scheme.secondary),
             "--fgColor-done" to cssColor(scheme.secondary),
             "--fgColor-danger" to cssColor(scheme.error),
-            "--bgColor-default" to cssColor(scheme.surface),
-            "--bgColor-muted" to cssColor(scheme.surfaceContainerLow),
-            "--bgColor-inset" to cssColor(scheme.surfaceContainerLowest),
-            "--bgColor-neutral-muted" to cssColor(scheme.surfaceContainerHigh),
+            "--bgColor-default" to cssColor(bgDefault),
+            "--bgColor-muted" to cssColor(bgMuted),
+            "--bgColor-inset" to cssColor(bgInset),
+            "--bgColor-neutral-muted" to cssColor(bgNeutral),
             "--bgColor-attention-muted" to cssColor(scheme.surfaceContainerHigh),
             "--bgColor-danger-muted" to cssColor(scheme.errorContainer),
             "--borderColor-default" to cssColor(scheme.outlineVariant),
@@ -239,6 +286,7 @@ object MaterialYouFusionMapper {
             "--color-prettylights-syntax-invalid-illegal-bg" to cssColor(scheme.errorContainer),
             "--color-prettylights-syntax-invalid-illegal-text" to cssColor(scheme.error),
         )
+    }
 
     private fun syntaxDeclarations(isDark: Boolean): Map<String, String> =
         (if (isDark) GITHUB_SYNTAX_DARK else GITHUB_SYNTAX_LIGHT).mapKeys { "--${it.key}" }

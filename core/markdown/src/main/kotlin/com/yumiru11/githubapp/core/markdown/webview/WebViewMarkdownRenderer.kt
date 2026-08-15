@@ -1,6 +1,9 @@
+@file:Suppress("LongMethod") // WebView 装配（安全锁/资产加载器/JS bridge/更新回调）是单体初始化流程，拆分反而碎片化
+
 package com.yumiru11.githubapp.core.markdown.webview
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -107,6 +110,9 @@ fun WebViewMarkdownRenderer(
         factory = { ctx ->
             WebView(ctx).apply {
                 WebViewSecurity.apply(this)
+                // body 背景 transparent（markdown-you.css），此处必须同步透明，
+                // 否则 WebView 控件默认白底在深色主题下与页面不融合（2026-08-15 真机验证）。
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 // 防双重变暗：页面 CSS 已按 data-theme/prefers-color-scheme 出图，
                 // 关闭 WebView 的算法暗化并保留 web-theme 策略（androidx.webkit 1.12.1）。
                 WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false)
@@ -115,13 +121,14 @@ fun WebViewMarkdownRenderer(
                     WebSettingsCompat.DARK_STRATEGY_WEB_THEME_DARKENING_ONLY,
                 )
                 if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                    // allowedOriginRules 只接受 origin（scheme://host 或 * / *.host），
+                    // 不接受路径通配符 —— "https://appassets.androidplatform.net/*" 会使
+                    // 真机 chromium 抛 IllegalArgumentException（Robolectric stub 不校验，
+                    // 测试全绿但真机崩溃；2026-08-15 真机验证发现）
                     WebViewCompat.addDocumentStartJavaScript(
                         this,
                         startScript,
-                        setOf(
-                            "https://appassets.androidplatform.net",
-                            "https://appassets.androidplatform.net/*",
-                        ),
+                        setOf("https://appassets.androidplatform.net"),
                     )
                 }
                 addJavascriptInterface(bridge, "AndroidBridge")
@@ -131,7 +138,9 @@ fun WebViewMarkdownRenderer(
                             view: WebView,
                             request: WebResourceRequest,
                         ): WebResourceResponse? {
-                            assetLoader.shouldInterceptRequest(request.url)?.let { return it }
+                            assetLoader.shouldInterceptRequest(request.url)?.let {
+                                return it
+                            }
                             httpClient?.let { client ->
                                 return PrivateImageInterceptor(tokenProvider, client).intercept(request)
                             }
@@ -142,7 +151,15 @@ fun WebViewMarkdownRenderer(
             }
         },
         update = { webView ->
-            val html = WebViewHtmlBuilder.build(sanitizedHtml, themeVariables, isDark, renderMode, baseRepoUrl)
+            // 内联 CSS：assets 加载失败（AssetLoader 未拦截/缓存）会丢全部背景样式，
+            // 内联后根治（2026-08-16 真机验证：alert/代码块/行内代码背景缺失）。
+            val inlineCss =
+                mapOf(
+                    "github-markdown.css" to readAsset(context, "webview/github-markdown.css"),
+                    "markdown-you.css" to readAsset(context, "webview/markdown-you.css"),
+                    "highlight-theme.css" to readAsset(context, "webview/highlight-theme.css"),
+                )
+            val html = WebViewHtmlBuilder.build(sanitizedHtml, themeVariables, isDark, renderMode, baseRepoUrl, inlineCss)
             webView.loadDataWithBaseURL(
                 "https://appassets.androidplatform.net/",
                 html,
@@ -150,6 +167,26 @@ fun WebViewMarkdownRenderer(
                 "utf-8",
                 null,
             )
+            // addDocumentStartJavaScript 注册后脚本固定，重组（如系统深浅色切换）
+            // 生成的新 startScript 不会自动生效；必须在此用 evaluateJavascript
+            // 重放当前脚本，否则旧 light 脚本会把变量内联钉死导致不随主题切换。
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                webView.evaluateJavascript(startScript, null)
+            }
         },
     )
 }
+
+/** 读取 assets 文件为字符串（CSS 内联用）。 */
+private fun readAsset(
+    context: Context,
+    path: String,
+): String =
+    try {
+        context.assets
+            .open(path)
+            .bufferedReader()
+            .use { it.readText() }
+    } catch (_: Exception) {
+        ""
+    }

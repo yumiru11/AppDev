@@ -1,4 +1,5 @@
-@file:Suppress("ComplexCondition") // 相对资源路径判定（http/https/data:/# 四种绝对形态 + 相对）分支天然多，拆散反损可读性（T3 先例）
+@file:Suppress("ComplexCondition", "CyclomaticComplexMethod")
+// 相对资源路径改写分支是需求本身（T3 先例 + 2026-08-16）
 
 package com.yumiru11.githubapp.core.markdown.webview
 
@@ -50,6 +51,10 @@ enum class RenderMode {
 object WebViewHtmlBuilder {
     private const val ASSET_BASE = "https://appassets.androidplatform.net/assets/webview/"
 
+    /** 离线 markdown 里的本地图片 `![alt](assets/xxx.png)` → 绝对 appassets URL。 */
+    private val REWRITE_ASSETS_IMAGE_REGEX =
+        Regex("""!\[([^\]]*)\]\(assets/([^)]*)\)""")
+
     /**
      * 兼容旧签名：仅注入 [MarkdownThemeTokens] 的 md-sys 变量（T8/T9 既有调用）。
      */
@@ -75,6 +80,7 @@ object WebViewHtmlBuilder {
         isDark: Boolean,
         renderMode: RenderMode = RenderMode.SERVER_HTML,
         baseRepoUrl: String? = null,
+        inlineCss: Map<String, String> = emptyMap(),
     ): String {
         val themeMarker = if (isDark) "dark" else "light"
         val contentBlock = rewriteRelativeUrls(buildContentBlock(sanitizedHtml, renderMode), baseRepoUrl)
@@ -93,9 +99,17 @@ object WebViewHtmlBuilder {
             append("  <meta charset=\"utf-8\">\n")
             append("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1\">\n")
             append("  <meta name=\"color-scheme\" content=\"light dark\">\n")
-            append("  <link rel=\"stylesheet\" href=\"${ASSET_BASE}github-markdown.css\">")
-            append("\n  <link rel=\"stylesheet\" href=\"${ASSET_BASE}markdown-you.css\">")
-            append("\n  <link rel=\"stylesheet\" href=\"${ASSET_BASE}highlight-theme.css\">")
+            if (inlineCss.isEmpty()) {
+                append("  <link rel=\"stylesheet\" href=\"${ASSET_BASE}github-markdown.css\">")
+                append("\n  <link rel=\"stylesheet\" href=\"${ASSET_BASE}markdown-you.css\">")
+                append("\n  <link rel=\"stylesheet\" href=\"${ASSET_BASE}highlight-theme.css\">")
+            } else {
+                append("<style id=\"app-css\">\n")
+                listOf("github-markdown.css", "markdown-you.css", "highlight-theme.css").forEach { name ->
+                    inlineCss[name]?.let { append(it).append("\n") }
+                }
+                append("</style>")
+            }
             // theme-vars 必须位于 CSS <link> 之后：github-markdown-css 与 markdown-you.css
             // 的变量声明会被后声明同特异性规则覆盖，保证 Material You 融合生效。
             append("\n  <style id=\"theme-vars\">\n")
@@ -133,7 +147,16 @@ object WebViewHtmlBuilder {
             }
 
             RenderMode.OFFLINE_MARKDOWN_IT -> {
-                val escaped = escapeForHtmlAttribute(content)
+                // 离线 raw 里的相对图片路径改写成绝对 appassets URL：
+                // DOMPurify 的 URI 白名单会把相对 src（assets/...）从 img 上删掉，
+                // 导致图片永远加载不出来（2026-08-16 真机诊断：IMG_HTML 无 src）。
+                val absolutized =
+                    REWRITE_ASSETS_IMAGE_REGEX.replace(content) { match ->
+                        val alt = match.groupValues[1]
+                        val path = match.groupValues[2].removePrefix("./")
+                        "![$alt](https://appassets.androidplatform.net/assets/$path)"
+                    }
+                val escaped = escapeForHtmlAttribute(absolutized)
                 "    <div id=\"markdown-raw\" data-markdown-raw=\"$escaped\"></div>"
             }
         }
@@ -167,6 +190,9 @@ object WebViewHtmlBuilder {
                 val src = resolve(match.groupValues[1])
                 if (src.startsWith("http") || src.startsWith("data:")) {
                     match.value
+                } else if (src.startsWith("assets/")) {
+                    // 本地 fixture 资产（原型/测试）：走 appassets 域，避免 raw 域被墙
+                    match.value.replaceFirst(match.groupValues[1], "$ASSET_BASE${src.removePrefix("assets/")}")
                 } else {
                     val rawUrl = "https://raw.githubusercontent.com/$owner/$repo/HEAD/$src"
                     match.value.replaceFirst(match.groupValues[1], rawUrl)

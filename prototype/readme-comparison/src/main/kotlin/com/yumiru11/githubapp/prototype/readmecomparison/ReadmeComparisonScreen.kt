@@ -5,6 +5,9 @@
 
 package com.yumiru11.githubapp.prototype.readmecomparison
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +55,12 @@ fun ReadmeComparisonScreen(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
         )
+        Text(
+            text = stringResource(R.string.prototype_meow),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
         PrimaryTabRow(selectedTabIndex = version.ordinal) {
             Tab(
                 selected = version == ComparisonVersion.WEBVIEW,
@@ -75,7 +84,7 @@ fun ReadmeComparisonScreen(modifier: Modifier = Modifier) {
                     WebViewMarkdownRenderer(
                         sanitizedHtml = markdown,
                         tokenProvider = { null },
-                        bridgeCallback = InertBridgeCallback,
+                        bridgeCallback = InertBridgeCallback(context),
                         renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
                         baseRepoUrl = "https://appassets.androidplatform.net/",
                         modifier = Modifier.fillMaxSize(),
@@ -96,12 +105,18 @@ fun ReadmeComparisonScreen(modifier: Modifier = Modifier) {
     }
 }
 
-private object InertBridgeCallback : MarkdownBridgeCallback {
+private class InertBridgeCallback(
+    private val context: Context,
+) : MarkdownBridgeCallback {
     override fun onExternalLink(url: String) {}
 
     override fun onInternalLink(parsed: ParsedUrl) {}
 
-    override fun onCodeCopy(code: String) {}
+    override fun onCodeCopy(code: String) {
+        // WebView JS 复制按钮走 bridge；原型阶段在此实现真复制（2026-08-16 真机验证：点了没反应）
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("code", code))
+    }
 
     override fun onImageClick(src: String) {}
 

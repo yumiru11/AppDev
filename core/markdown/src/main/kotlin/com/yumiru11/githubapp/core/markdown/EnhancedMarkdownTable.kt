@@ -1,117 +1,63 @@
 package com.yumiru11.githubapp.core.markdown
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
-import com.mikepenz.markdown.compose.elements.MarkdownText
-import com.yumiru11.githubapp.core.markdown.native.MarkdownCell
-import com.yumiru11.githubapp.core.markdown.native.MarkdownTableData
+import com.mikepenz.markdown.compose.elements.MarkdownTable
+import com.mikepenz.markdown.compose.elements.MarkdownTableHeader
+import com.mikepenz.markdown.compose.elements.MarkdownTableRow
 import com.yumiru11.githubapp.core.markdown.native.MarkdownTableParser
 
 /**
- * B 增强版表格：圆角容器 + 横向滚动 + 表头加粗/上下边框 + 斑马纹。
+ * B 增强版表格：圆角容器 + 官方 MarkdownTable 布局 + 粗体表头 + 表头底色。
  *
- * 单元格用 [MarkdownText] 渲染，保留 `**bold**` / `code` 等行内格式。
+ * 布局委托官方 MarkdownTable（内部 requiredWidth 保证列宽；此前自绘用
+ * widthIn(min) 在父级 maxWidth 更小时塌缩为 0 → 真机字符叠加，2026-08-16 验证）。
  */
 @Composable
-fun EnhancedMarkdownTable(
-    model: MarkdownComponentModel,
-    horizontalScrollEnabled: Boolean = true,
-) {
+fun EnhancedMarkdownTable(model: MarkdownComponentModel) {
     val data = remember(model.content, model.node) { MarkdownTableParser.parse(model.content, model.node) }
     if (data.header.isEmpty()) return
-
-    val columnCount = data.header.size
-    val minWidth = (columnCount * 112).dp
 
     Surface(
         color = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.medium,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.padding(vertical = 8.dp),
     ) {
-        Box(
-            modifier =
-                Modifier.then(
-                    if (horizontalScrollEnabled) {
-                        Modifier.horizontalScroll(rememberScrollState())
-                    } else {
-                        Modifier
-                    },
-                ),
-        ) {
-            Column(modifier = Modifier.widthIn(min = minWidth)) {
-                TableRow(
-                    cells = data.header,
-                    content = model.content,
-                    style = model.typography.table.copy(fontWeight = FontWeight.Bold),
-                    background = MaterialTheme.colorScheme.surfaceContainerLow,
-                    showTopDivider = false,
+        MarkdownTable(
+            content = model.content,
+            node = model.node,
+            style = model.typography.table,
+            headerBlock = { content, header, tableWidth, style ->
+                MarkdownTableHeader(
+                    content = content,
+                    header = header,
+                    tableWidth = tableWidth,
+                    style = style.copy(fontWeight = FontWeight.Bold),
+                    // 官方默认 maxLines=1 + Ellipsis：长单元格被截断成 "GitHub token..."
+                    // （2026-08-16 真机验证），放开行数让单元格自动换行。
+                    maxLines = Int.MAX_VALUE,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Visible,
                 )
-                data.rows.forEachIndexed { index, row ->
-                    TableRow(
-                        cells = row,
-                        content = model.content,
-                        style = model.typography.table,
-                        background =
-                            if (index % 2 == 0) {
-                                MaterialTheme.colorScheme.surfaceContainerLow
-                            } else {
-                                Color.Transparent
-                            },
-                        showTopDivider = index == 0,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TableRow(
-    cells: List<MarkdownCell>,
-    content: String,
-    style: androidx.compose.ui.text.TextStyle,
-    background: Color,
-    showTopDivider: Boolean,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(background)
-                .padding(vertical = 6.dp),
-    ) {
-        cells.forEach { cell ->
-            MarkdownText(
-                content = content,
-                node = cell.node,
-                modifier = Modifier.weight(1f).padding(horizontal = 13.dp),
-                style = style,
-            )
-        }
-    }
-    if (showTopDivider) {
-        androidx.compose.material3.HorizontalDivider(
-            thickness = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant,
+            },
+            rowBlock = { content, header, tableWidth, style ->
+                MarkdownTableRow(
+                    content = content,
+                    header = header,
+                    tableWidth = tableWidth,
+                    style = style,
+                    maxLines = Int.MAX_VALUE,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Visible,
+                )
+            },
         )
     }
 }

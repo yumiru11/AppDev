@@ -3,7 +3,6 @@ package com.yumiru11.githubapp.core.markdown
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,12 +38,12 @@ fun EnhancedCodeBlock(
     code: String,
     language: String?,
     isDark: Boolean,
-    horizontalScrollEnabled: Boolean = true,
 ) {
     val context = LocalContext.current
     val copyState = rememberCopyFeedbackState()
-    val codeBackground =
-        if (isDark) MaterialTheme.colorScheme.surfaceContainerLowest else MaterialTheme.colorScheme.surfaceContainer
+    // 深色用 surfaceContainer（比 surface 亮一档、带紫调），不用 surfaceContainerLowest
+    // （#0F0D13 接近纯黑，用户反馈「全黑」；2026-08-16 真机验证）
+    val codeBackground = MaterialTheme.colorScheme.surfaceContainer
 
     Surface(
         color = codeBackground,
@@ -75,17 +74,12 @@ fun EnhancedCodeBlock(
                     )
                 }
             }
+            // 外层不做横向滚动：horizontalScroll 会给子级无限宽度，而内层
+            // FallbackCodeBlock/CodeBlock 自带 horizontalScroll，双重横滚在真机
+            // 抛 IllegalStateException（2026-08-15 真机验证）。fillMaxWidth 固定
+            // 有限宽度，内层自持横滚即可。
             Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .then(
-                            if (horizontalScrollEnabled) {
-                                Modifier.horizontalScroll(rememberScrollState())
-                            } else {
-                                Modifier
-                            },
-                        ).padding(bottom = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             ) {
                 TextMateCodeBlock(
                     code = code,

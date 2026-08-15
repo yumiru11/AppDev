@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="prototype_readme_title">README rendering prototype</string>
+    <string name="prototype_meow">meow v2</string>
     <string name="prototype_readme_tab_webview">A · WebView fusion</string>
     <string name="prototype_readme_tab_native">B · Native enhanced</string>
     <string name="prototype_readme_tab_webview_description">Version A, WebView rendering</string>
