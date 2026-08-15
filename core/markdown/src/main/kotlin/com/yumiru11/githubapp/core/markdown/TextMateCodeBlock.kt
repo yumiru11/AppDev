@@ -5,6 +5,7 @@ package com.yumiru11.githubapp.core.markdown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -15,7 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import dev.textmate.compose.CodeBlock
+import dev.textmate.compose.rememberHighlightedCode
 import dev.textmate.grammar.Grammar
 import dev.textmate.grammar.raw.GrammarReader
 import dev.textmate.regex.JoniOnigLib
@@ -55,17 +56,27 @@ fun rememberTextMateGrammar(language: String): Grammar? {
 @Composable
 fun rememberTextMateTheme(darkTheme: Boolean): Theme = rememberM3TextMateTheme(darkTheme = darkTheme)
 
-/** markdown 代码块：KotlinTextMate 渲染（VS Code 同款），无语法/失败时带样式代码块兜底 */
+/** markdown 代码块（M3 全融合主题便捷入口）。 */
 @Composable
 fun TextMateCodeBlock(
     code: String,
     language: String?,
     darkTheme: Boolean,
 ) {
-    val theme = rememberTextMateTheme(darkTheme)
+    TextMateCodeBlock(code = code, language = language, theme = rememberTextMateTheme(darkTheme))
+}
+
+/** markdown 代码块：KotlinTextMate 渲染（VS Code 同款），无语法/失败时带样式代码块兜底 */
+@Composable
+fun TextMateCodeBlock(
+    code: String,
+    language: String?,
+    theme: Theme,
+) {
     val grammar = language?.let { rememberTextMateGrammar(it) }
     if (grammar != null) {
-        CodeBlock(code = code, grammar = grammar, theme = theme)
+        val highlighted = rememberHighlightedCode(code = code, grammar = grammar, theme = theme)
+        CodeBlockContainer(annotated = highlighted)
     } else {
         FallbackCodeBlock(code)
     }
@@ -90,5 +101,35 @@ private fun FallbackCodeBlock(code: String) {
                     .horizontalScroll(rememberScrollState())
                     .padding(12.dp),
         )
+    }
+}
+
+/**
+ * 代码块容器：M3 容器色背景（融入主题）+ 横向滚动 + 等宽字体。
+ * 不用 dev.textmate.compose.CodeBlock：其内部用 theme.background 绘制背景，
+ * VS Code Dark+/Light+ 主题背景为深黑/纯白，与 M3 主题割裂（2026-08-16 真机验证）。
+ */
+@Composable
+private fun CodeBlockContainer(annotated: androidx.compose.ui.text.AnnotatedString) {
+    // 背景由外层 EnhancedCodeBlock 统一提供（语言标签 + 代码区同一容器），
+    // 此处不再自绘背景，避免出现「代码区有底、上下包围无底」的割裂（2026-08-16 真机验证）。
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        val scrollState = rememberScrollState()
+        androidx.compose.foundation.layout.Box(
+            modifier =
+                Modifier
+                    .width(maxWidth)
+                    .horizontalScroll(scrollState),
+        ) {
+            Text(
+                text = annotated,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontFamily = FontFamily.Monospace,
+                fontSize = MaterialTheme.typography.bodySmall.fontSize,
+                modifier = Modifier.padding(12.dp),
+            )
+        }
     }
 }

@@ -28,6 +28,8 @@ rootProject.name = "AppDev"
 
 include(":app")
 
+include(":prototype:readme-comparison")
+
 include(":core:common")
 include(":core:designsystem")
 include(":core:data")

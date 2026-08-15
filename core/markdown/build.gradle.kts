@@ -45,6 +45,9 @@ dependencies {
     // GitHubLinkParser（core:navigation 提供，Markdown 内链接解析后交上层导航）
     implementation(project(":core:navigation"))
 
+    // 设计系统（Octicons ImageVector + ExtendedColors 语义色，GitHub Alert 增强用）
+    implementation(project(":core:designsystem"))
+
     // 测试基建（ScreenshotTest 基类 + Robolectric/Roborazzi，见 AGENTS.md）
     testImplementation(project(":core:testing"))
 }

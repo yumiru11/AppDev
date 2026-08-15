@@ -1,64 +1,51 @@
 /*
- * highlight-theme.css — highlight.js 11 语法高亮令牌主题（Material You，自维护）。
+ * highlight-theme.css — half-fusion C syntax theme (GitHub original token colors).
  *
- * 设计原则（plan.md §2.10 / ADR-0004）：
- * - 与 markdown-you.css 一致：颜色全部走 CSS 变量（--md-sys-color-*），由 Kotlin 注入
- * - 明暗切换时 Kotlin 重新注入 :root 变量即生效，本文件静态不变
- * - 令牌色基于 on-surface 透明度分层 + primary 强调，保证两种主题下对比度
- *
- * 配套：highlight.min.js（highlight.js 11 UMD bundle，定义全局 hljs）。
+ * - Container/background comes from the surrounding Material You CSS.
+ * - Token colors consume github-markdown-css --color-prettylights-syntax-* tokens,
+ *   so they intentionally do NOT follow the M3 scheme.
+ * - highlight.min.js emits hljs-* classes; this file maps them to PrettyLights roles.
  */
 
 .hljs {
-  color: var(--md-sys-color-on-surface);
+  color: var(--fgColor-default);
   background: transparent;
 }
 
-/* 注释 / 引用：弱化 */
 .hljs-comment,
 .hljs-quote {
-  color: var(--md-sys-color-on-surface);
-  opacity: 0.55;
+  color: var(--color-prettylights-syntax-comment);
   font-style: italic;
 }
 
-/* 关键字 / 控制流：primary 强调 */
 .hljs-keyword,
 .hljs-selector-tag,
 .hljs-doctag,
 .hljs-meta .hljs-keyword,
 .hljs-template-tag {
-  color: var(--md-sys-color-primary);
+  color: var(--color-prettylights-syntax-keyword);
 }
 
-/* 字符串 / 正则 / 模板变量：中强调 */
 .hljs-string,
 .hljs-regexp,
-.hljs-template-variable,
-.hljs-addition {
-  color: var(--md-sys-color-on-surface);
-  opacity: 0.85;
+.hljs-template-variable {
+  color: var(--color-prettylights-syntax-string);
 }
 
-/* 数字 / 字面量 / 符号 */
 .hljs-number,
 .hljs-literal,
 .hljs-symbol,
 .hljs-bullet {
-  color: var(--md-sys-color-on-surface);
-  opacity: 0.75;
+  color: var(--color-prettylights-syntax-constant);
 }
 
-/* 函数名 / 类名 / 标题 */
 .hljs-title,
 .hljs-title.function_,
 .hljs-title.class_,
 .hljs-section {
-  color: var(--md-sys-color-primary);
-  opacity: 0.9;
+  color: var(--color-prettylights-syntax-entity);
 }
 
-/* 内置类型 / 属性名 / 标签名 */
 .hljs-built_in,
 .hljs-type,
 .hljs-attr,
@@ -68,23 +55,22 @@
 .hljs-selector-pseudo,
 .hljs-selector-class,
 .hljs-selector-id {
-  color: var(--md-sys-color-on-surface);
-  opacity: 0.7;
+  color: var(--color-prettylights-syntax-entity-tag);
 }
 
-/* 变量 / 参数 / 元信息 */
 .hljs-variable,
 .hljs-params,
 .hljs-meta,
 .hljs-subst {
-  color: var(--md-sys-color-on-surface);
-  opacity: 0.65;
+  color: var(--color-prettylights-syntax-variable);
 }
 
-/* 删除 / 强调 / 链接 */
+.hljs-addition {
+  color: var(--color-prettylights-syntax-markup-inserted-text);
+}
+
 .hljs-deletion {
-  color: var(--md-sys-color-on-surface);
-  opacity: 0.5;
+  color: var(--color-prettylights-syntax-markup-deleted-text);
   text-decoration: line-through;
 }
 
@@ -97,6 +83,6 @@
 }
 
 .hljs-link {
-  color: var(--md-sys-color-primary);
+  color: var(--fgColor-accent);
   text-decoration: underline;
 }

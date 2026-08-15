@@ -125,6 +125,7 @@ datastore-preferences = { group = "androidx.datastore", name = "datastore-prefer
 # Coil 3（coil-core 默认不带网络，必须另加 coil-network-*）
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
+coil-svg = { group = "io.coil-kt.coil3", name = "coil-svg", version.ref = "coil" }
 
 # Markdown（mikepenz multiplatform-markdown-renderer，与 M3 主题模块 + coil3 桥 + 高亮模块同版本）
 markdown-renderer = { group = "com.mikepenz", name = "multiplatform-markdown-renderer", version.ref = "markdown" }

@@ -5,6 +5,7 @@ import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import coil3.svg.SvgDecoder
 import com.yumiru11.githubapp.core.githubrest.di.GitHubHttpClient
 import dagger.hilt.android.HiltAndroidApp
 import okhttp3.OkHttpClient
@@ -31,5 +32,7 @@ class GitHubApp :
             .Builder(platformContext)
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = okHttpClient))
+                // shields 徽章是 SVG（GitHub README 高频元素）；Coil 3 默认不含 SVG 解码器
+                add(SvgDecoder.Factory())
             }.build()
 }

@@ -1,153 +1,273 @@
 /*
- * markdown-you.css — Material You 风格 Markdown 渲染样式（自维护）。
+ * markdown-you.css — Material You override layer on top of github-markdown-css 5.9.0 (MIT).
  *
- * 设计原则（plan.md §2.10 / ADR-0004）：
- * - 不照搬 GitHub 蓝灰 CSS，基于 Material 3 色板语义
- * - 颜色全部走 CSS 变量（:root --md-sys-color-*），由 Kotlin 注入（MarkdownThemeTokens）
- * - 明暗切换时 Kotlin 重新注入 :root 变量即生效，本文件静态不变
- * - 字体/圆角常量直接在此声明（不随主题变）
+ * Design rules (docs/ui-design.md §3.11, user decisions):
+ * - Containers follow MaterialTheme tokens injected by MaterialYouFusionMapper.
+ * - Syntax colors stay GitHub original (prettylights tokens, half-fusion C).
+ * - GitHub typography baseline: 16px body / 1.6 line height.
+ * - This file is loaded after github-markdown.css and before the injected theme-vars style.
  */
 
-:root {
-  --md-sys-color-primary: #6750A4;
-  --md-sys-color-on-surface: #1C1B1F;
-  --md-sys-color-surface: #FFFBFE;
-  --md-sys-color-surface-container-low: #F7F2FA;
-  --md-sys-color-surface-container-high: #ECE6F0;
-  --md-sys-color-outline-variant: #CAC4D0;
-  --md-sys-shape-corner-medium: 12px;
-  --md-sys-shape-corner-small: 8px;
-  --md-sys-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --md-sys-font-mono: "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, monospace;
-}
-
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   background: transparent;
+  /* WebView 默认点击高亮（蓝色闪烁）与 M3 主题割裂，禁用（2026-08-16 真机验证） */
+  -webkit-tap-highlight-color: transparent;
 }
 
 .markdown-body {
   background: transparent;
-  color: var(--md-sys-color-on-surface);
-  font-family: var(--md-sys-font-sans);
-  font-size: 15px;
+  color: var(--fgColor-default);
+  font-family: var(--fontStack-sansSerif);
+  font-size: 16px;
   line-height: 1.6;
   padding: 16px;
   word-wrap: break-word;
-  overflow-x: auto;
 }
 
+.markdown-body p {
+  margin: 0 0 16px;
+}
+
+/* GitHub heading proportions are kept; only body density is aligned with the spec. */
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3,
 .markdown-body h4,
 .markdown-body h5,
 .markdown-body h6 {
-  margin-top: 24px;
-  margin-bottom: 16px;
-  font-weight: 600;
   line-height: 1.25;
 }
 
-.markdown-body h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
-.markdown-body h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
-.markdown-body h3 { font-size: 1.25em; }
-.markdown-body h4 { font-size: 1em; }
-.markdown-body h5 { font-size: 0.875em; }
-.markdown-body h6 { font-size: 0.85em; color: var(--md-sys-color-on-surface); opacity: 0.7; }
-
-.markdown-body p { margin: 0 0 16px; }
-
+/* Links: theme primary. */
 .markdown-body a {
-  color: var(--md-sys-color-primary);
-  text-decoration: none;
+  color: var(--fgColor-accent);
 }
-.markdown-body a:hover { text-decoration: underline; }
 
-.markdown-body strong { font-weight: 600; }
-.markdown-body em { font-style: italic; }
-.markdown-body del { text-decoration: line-through; }
-
+/* Inline code: primary 10% tint background + primary text. */
 .markdown-body code {
-  font-family: var(--md-sys-font-mono);
-  font-size: 0.875em;
-  background: var(--md-sys-color-surface-container-low);
-  padding: 2px 6px;
+  background: var(--inline-code-bg);
+  color: var(--md-sys-color-primary);
   border-radius: var(--md-sys-shape-corner-small);
 }
 
+/* Code blocks: card-like surface; dark mode one level deeper than the page background. */
 .markdown-body pre {
-  background: var(--md-sys-color-surface-container-low);
+  background: var(--code-bg);
   border-radius: var(--md-sys-shape-corner-medium);
   padding: 12px;
   overflow-x: auto;
   margin: 0 0 16px;
 }
-.markdown-body pre code {
-  background: transparent;
-  padding: 0;
-  font-size: 0.875em;
+
+[data-theme="dark"] .markdown-body pre {
+  background: var(--code-bg);
 }
 
+.markdown-body pre code {
+  background: transparent;
+  color: var(--fgColor-default);
+  padding: 0;
+}
+
+/* Blockquote: 3dp primary left bar + soft surface tint. */
 .markdown-body blockquote {
   margin: 0 0 16px;
-  padding: 0 16px;
+  padding: 4px 16px;
   background: var(--md-sys-color-surface-container-low);
   border-left: 3px solid var(--md-sys-color-primary);
   border-radius: var(--md-sys-shape-corner-small);
-  color: var(--md-sys-color-on-surface);
+  color: var(--fgColor-default);
 }
 
-.markdown-body ul,
-.markdown-body ol {
-  margin: 0 0 16px;
-  padding-left: 2em;
-}
-.markdown-body li { margin: 4px 0; }
-
+/* Tables: GitHub layout plus a Material outline and rounded overflow clip. */
 .markdown-body table {
   border-collapse: collapse;
-  width: 100%;
-  margin: 0 0 16px;
-  overflow-x: auto;
   display: block;
-}
-.markdown-body table th,
-.markdown-body table td {
-  border: 1px solid var(--md-sys-color-outline-variant);
-  padding: 6px 13px;
-}
-.markdown-body table th {
-  background: var(--md-sys-color-surface-container-low);
-  font-weight: 600;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: var(--md-sys-shape-corner-small);
 }
 
+.markdown-body table th {
+  background: var(--md-sys-color-surface-container-low);
+  border-top: 1px solid var(--borderColor-default);
+  border-bottom: 1px solid var(--borderColor-default);
+}
+
+.markdown-body table th,
+.markdown-body table td {
+  border-left: none;
+  border-right: none;
+}
+
+.markdown-body table tr:nth-child(2n) {
+  background: var(--bgColor-muted);
+}
+
+/* Images: rounded corners + tonal shadow. */
 .markdown-body img {
   max-width: 100%;
   height: auto;
-  loading: lazy;
+  border-radius: var(--md-sys-shape-corner-medium);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24), 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
-/* GitHub Alerts ([!NOTE]/[!TIP]/[!IMPORTANT]/[!WARNING]/[!CAUTION]) */
-.markdown-body .markdown-alert {
-  margin: 0 0 16px;
-  padding: 12px 16px;
-  border-left: 3px solid var(--md-sys-color-primary);
-  border-radius: var(--md-sys-shape-corner-small);
-  background: var(--md-sys-color-surface-container-low);
+/* Task list: M3-style rounded checkbox via accent-color. */
+.markdown-body .task-list-item {
+  list-style: none;
 }
+
+.markdown-body .task-list-item-checkbox {
+  accent-color: var(--md-sys-color-primary);
+  border-radius: var(--md-sys-shape-corner-small);
+  margin: 0 8px 0 0;
+  vertical-align: middle;
+}
+
+/* Horizontal rule: outlineVariant 1px with 16dp rhythm. */
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  margin: 16px 0;
+}
+
+/* GitHub alerts: left color bar (from github-markdown-css) + tinted card backgrounds. */
+.markdown-body .markdown-alert {
+  background: var(--md-sys-color-surface-container-low);
+  border-left-width: 4px;
+  border-radius: var(--md-sys-shape-corner-small);
+}
+
+.markdown-body .markdown-alert.markdown-alert-note {
+  background: var(--alert-note-bg);
+}
+
+.markdown-body .markdown-alert.markdown-alert-tip {
+  background: var(--alert-tip-bg);
+}
+
+.markdown-body .markdown-alert.markdown-alert-important {
+  background: var(--alert-important-bg);
+}
+
+.markdown-body .markdown-alert.markdown-alert-warning {
+  background: var(--alert-warning-bg);
+}
+
+.markdown-body .markdown-alert.markdown-alert-caution {
+  background: var(--alert-caution-bg);
+}
+
 .markdown-body .markdown-alert-title {
   font-weight: 600;
   margin-bottom: 4px;
 }
 
-/* 任务列表 */
-.markdown-body .task-list-item { list-style: none; }
-.markdown-body .task-list-item-checkbox {
-  margin: 0 8px 0 0;
-  vertical-align: middle;
+.markdown-body .markdown-alert-title .octicon {
+  margin-right: 8px;
+  vertical-align: text-bottom;
 }
 
-/* 横向滚动容器（长表格/长代码） */
-.markdown-body .overflow-x-auto { overflow-x: auto; }
+/* Code copy button overlay. */
+.md-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-family: var(--fontStack-sansSerif);
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.markdown-body pre:hover .md-copy-btn,
+.markdown-body pre .md-copy-btn:focus-visible {
+  opacity: 1;
+}
+
+
+/* Octicons v11.2.0 (MIT) vector icons as CSS masks; no emoji icons (user rule). */
+
+.octicon-note {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask-image: url('data:image/svg+xml,%3Csvg%20xmlns%3D"http://www.w3.org/2000/svg"%20viewBox%3D"0%200%2016%2016"%3E%3Cpath%20d%3D"M8%201.5a6.5%206.5%200%20100%2013%206.5%206.5%200%20000-13zM0%208a8%208%200%201116%200A8%208%200%20010%208zm6.5-.25A.75.75%200%20017.25%207h1a.75.75%200%2001.75.75v2.75h.25a.75.75%200%20010%201.5h-2a.75.75%200%20010-1.5h.25v-2h-.25a.75.75%200%2001-.75-.75zM8%206a1%201%200%20100-2%201%201%200%20000%202z"/%3E%3C/svg%3E');
+  mask-image: url('data:image/svg+xml,%3Csvg%20xmlns%3D"http://www.w3.org/2000/svg"%20viewBox%3D"0%200%2016%2016"%3E%3Cpath%20d%3D"M8%201.5a6.5%206.5%200%20100%2013%206.5%206.5%200%20000-13zM0%208a8%208%200%201116%200A8%208%200%20010%208zm6.5-.25A.75.75%200%20017.25%207h1a.75.75%200%2001.75.75v2.75h.25a.75.75%200%20010%201.5h-2a.75.75%200%20010-1.5h.25v-2h-.25a.75.75%200%2001-.75-.75zM8%206a1%201%200%20100-2%201%201%200%20000%202z"/%3E%3C/svg%3E');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.octicon-tip {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask-image: url('data:image/svg+xml,%3Csvg%20xmlns%3D"http://www.w3.org/2000/svg"%20viewBox%3D"0%200%2016%2016"%3E%3Cpath%20d%3D"M8%201.5c-2.363%200-4%201.69-4%203.75%200%20.984.424%201.625.984%202.304l.214.253c.223.264.47.556.673.848.284.411.537.896.621%201.49a.75.75%200%2001-1.484.211c-.04-.282-.163-.547-.37-.847a8.695%208.695%200%2000-.542-.68c-.084-.1-.173-.205-.268-.32C3.201%207.75%202.5%206.766%202.5%205.25%202.5%202.31%204.863%200%208%200s5.5%202.31%205.5%205.25c0%201.516-.701%202.5-1.328%203.259-.095.115-.184.22-.268.319-.207.245-.383.453-.541.681-.208.3-.33.565-.37.847a.75.75%200%2001-1.485-.212c.084-.593.337-1.078.621-1.489.203-.292.45-.584.673-.848.075-.088.147-.173.213-.253.561-.679.985-1.32.985-2.304%200-2.06-1.637-3.75-4-3.75zM6%2015.25a.75.75%200%2001.75-.75h2.5a.75.75%200%20010%201.5h-2.5a.75.75%200%2001-.75-.75zM5.75%2012a.75.75%200%20000%201.5h4.5a.75.75%200%20000-1.5h-4.5z"/%3E%3C/svg%3E');
+  mask-image: url('data:image/svg+xml,%3Csvg%20xmlns%3D"http://www.w3.org/2000/svg"%20viewBox%3D"0%200%2016%2016"%3E%3Cpath%20d%3D"M8%201.5c-2.363%200-4%201.69-4%203.75%200%20.984.424%201.625.984%202.304l.214.253c.223.264.47.556.673.848.284.411.537.896.621%201.49a.75.75%200%2001-1.484.211c-.04-.282-.163-.547-.37-.847a8.695%208.695%200%2000-.542-.68c-.084-.1-.173-.205-.268-.32C3.201%207.75%202.5%206.766%202.5%205.25%202.5%202.31%204.863%200%208%200s5.5%202.31%205.5%205.25c0%201.516-.701%202.5-1.328%203.259-.095.115-.184.22-.268.319-.207.245-.383.453-.541.681-.208.3-.33.565-.37.847a.75.75%200%2001-1.485-.212c.084-.593.337-1.078.621-1.489.203-.292.45-.584.673-.848.075-.088.147-.173.213-.253.561-.679.985-1.32.985-2.304%200-2.06-1.637-3.75-4-3.75zM6%2015.25a.75.75%200%2001.75-.75h2.5a.75.75%200%20010%201.5h-2.5a.75.75%200%2001-.75-.75zM5.75%2012a.75.75%200%20000%201.5h4.5a.75.75%200%20000-1.5h-4.5z"/%3E%3C/svg%3E');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.octicon-important {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask-image: url('data:image/svg+xml,%3Csvg%20xmlns%3D"http://www.w3.org/2000/svg"%20viewBox%3D"0%200%2016%2016"%3E%3Cpath%20d%3D"M8.22%201.754a.25.25%200%2000-.44%200L1.698%2013.132a.25.25%200%2000.22.368h12.164a.25.25%200%2000.22-.368L8.22%201.754zm-1.763-.707c.659-1.234%202.427-1.234%203.086%200l6.082%2011.378A1.75%201.75%200%200114.082%2015H1.918a1.75%201.75%200%2001-1.543-2.575L6.457%201.047zM9%2011a1%201%200%2011-2%200%201%201%200%20012%200zm-.25-5.25a.75.75%200%2000-1.5%200v2.5a.75.75%200%20001.5%200v-2.5z"/%3E%3C/svg%3E');
+  mask-image: url('data:image/svg+xml,%3Csvg%20xmlns%3D"http://www.w3.org/2000/svg"%20viewBox%3D"0%200%2016%2016"%3E%3Cpath%20d%3D"M8.22%201.754a.25.25%200%2000-.44%200L1.698%2013.132a.25.25%200%2000.22.368h12.164a.25.25%200%2000.22-.368L8.22%201.754zm-1.763-.707c.659-1.234%202.427-1.234%203.086%200l6.082%2011.378A1.75%201.75%200%200114.082%2015H1.918a1.75%201.75%200%2001-1.543-2.575L6.457%201.047zM9%2011a1%201%200%2011-2%200%201%201%200%20012%200zm-.25-5.25a.75.75%200%2000-1.5%200v2.5a.75.75%200%20001.5%200v-2.5z"/%3E%3C/svg%3E');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.octicon-warning {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask-image: url('data:image/svg+xml,%3Csvg%20xmlns%3D"http://www.w3.org/2000/svg"%20viewBox%3D"0%200%2016%2016"%3E%3Cpath%20d%3D"M4.47.22A.75.75%200%20015%200h6a.75.75%200%2001.53.22l4.25%204.25c.141.14.22.331.22.53v6a.75.75%200%2001-.22.53l-4.25%204.25A.75.75%200%200111%2016H5a.75.75%200%2001-.53-.22L.22%2011.53A.75.75%200%20010%2011V5a.75.75%200%2001.22-.53L4.47.22zm.84%201.28L1.5%205.31v5.38l3.81%203.81h5.38l3.81-3.81V5.31L10.69%201.5H5.31zM8%204a.75.75%200%2001.75.75v3.5a.75.75%200%2001-1.5%200v-3.5A.75.75%200%20018%204zm0%208a1%201%200%20100-2%201%201%200%20000%202z"/%3E%3C/svg%3E');
+  mask-image: url('data:image/svg+xml,%3Csvg%20xmlns%3D"http://www.w3.org/2000/svg"%20viewBox%3D"0%200%2016%2016"%3E%3Cpath%20d%3D"M4.47.22A.75.75%200%20015%200h6a.75.75%200%2001.53.22l4.25%204.25c.141.14.22.331.22.53v6a.75.75%200%2001-.22.53l-4.25%204.25A.75.75%200%200111%2016H5a.75.75%200%2001-.53-.22L.22%2011.53A.75.75%200%20010%2011V5a.75.75%200%2001.22-.53L4.47.22zm.84%201.28L1.5%205.31v5.38l3.81%203.81h5.38l3.81-3.81V5.31L10.69%201.5H5.31zM8%204a.75.75%200%2001.75.75v3.5a.75.75%200%2001-1.5%200v-3.5A.75.75%200%20018%204zm0%208a1%201%200%20100-2%201%201%200%20000%202z"/%3E%3C/svg%3E');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.octicon-caution {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask-image: url('data:image/svg+xml,%3Csvg%20xmlns%3D"http://www.w3.org/2000/svg"%20viewBox%3D"0%200%2016%2016"%3E%3Cpath%20d%3D"M7.998%2014.5c2.832%200%205-1.98%205-4.5%200-1.463-.68-2.19-1.879-3.383l-.036-.037c-1.013-1.008-2.3-2.29-2.834-4.434-.322.256-.63.579-.864.953-.432.696-.621%201.58-.046%202.73.473.947.67%202.284-.278%203.232-.61.61-1.545.84-2.403.633a2.788%202.788%200%2001-1.436-.874A3.21%203.21%200%20003%2010c0%202.53%202.164%204.5%204.998%204.5zM9.533.753C9.496.34%209.16.009%208.77.146%207.035.75%204.34%203.187%205.997%206.5c.344.689.285%201.218.003%201.5-.419.419-1.54.487-2.04-.832-.173-.454-.659-.762-1.035-.454C2.036%207.44%201.5%208.702%201.5%2010c0%203.512%202.998%206%206.498%206s6.5-2.5%206.5-6c0-2.137-1.128-3.26-2.312-4.438-1.19-1.184-2.436-2.425-2.653-4.81z"/%3E%3C/svg%3E');
+  mask-image: url('data:image/svg+xml,%3Csvg%20xmlns%3D"http://www.w3.org/2000/svg"%20viewBox%3D"0%200%2016%2016"%3E%3Cpath%20d%3D"M7.998%2014.5c2.832%200%205-1.98%205-4.5%200-1.463-.68-2.19-1.879-3.383l-.036-.037c-1.013-1.008-2.3-2.29-2.834-4.434-.322.256-.63.579-.864.953-.432.696-.621%201.58-.046%202.73.473.947.67%202.284-.278%203.232-.61.61-1.545.84-2.403.633a2.788%202.788%200%2001-1.436-.874A3.21%203.21%200%20003%2010c0%202.53%202.164%204.5%204.998%204.5zM9.533.753C9.496.34%209.16.009%208.77.146%207.035.75%204.34%203.187%205.997%206.5c.344.689.285%201.218.003%201.5-.419.419-1.54.487-2.04-.832-.173-.454-.659-.762-1.035-.454C2.036%207.44%201.5%208.702%201.5%2010c0%203.512%202.998%206%206.498%206s6.5-2.5%206.5-6c0-2.137-1.128-3.26-2.312-4.438-1.19-1.184-2.436-2.425-2.653-4.81z"/%3E%3C/svg%3E');
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+

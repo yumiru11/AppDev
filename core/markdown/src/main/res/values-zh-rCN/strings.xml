@@ -5,4 +5,8 @@
     <string name="alert_important">重要</string>
     <string name="alert_warning">警告</string>
     <string name="alert_caution">注意</string>
+    <string name="code_copy">复制</string>
+    <string name="code_copied">已复制</string>
+    <string name="code_plain_text">文本</string>
+    <string name="details_expand">展开/收起详情</string>
 </resources>

@@ -121,6 +121,7 @@ dependencies {
     implementation(project(":core:github-rest"))
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.coil.svg) // shields 徽章是 SVG，Coil 3 默认无 SVG 解码器
     // OkHttp（AppDiModule 桥接 @AuthHttpClient 客户端需要直接引用；core:github-auth 的 implementation 不外泄编译类路径）
     implementation(libs.okhttp)
 
@@ -138,6 +139,8 @@ dependencies {
     implementation(project(":feature:settings"))
     // Issue 列表/详情（T13）
     implementation(project(":feature:issue"))
+    // 原型入口（仅 debug）：README 双版本对照（prototype/readme-comparison 分支产物）
+    debugImplementation(project(":prototype:readme-comparison"))
 
     // Hilt（app 图根）
     implementation(libs.hilt.android)
