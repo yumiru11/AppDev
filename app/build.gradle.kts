@@ -121,6 +121,7 @@ dependencies {
     implementation(project(":core:github-rest"))
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    implementation(libs.coil.svg) // shields 徽章是 SVG，Coil 3 默认无 SVG 解码器
     // OkHttp（AppDiModule 桥接 @AuthHttpClient 客户端需要直接引用；core:github-auth 的 implementation 不外泄编译类路径）
     implementation(libs.okhttp)
 

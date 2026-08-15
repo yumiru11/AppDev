@@ -153,6 +153,7 @@ fun EnhancedMarkdownViewer(
                             }
                         },
                         horizontalRule = { EnhancedHorizontalRule() },
+                        paragraph = { model -> EnhancedParagraph(model) },
                         heading1 = { model ->
                             MarkdownHeadingWithDivider(
                                 model,

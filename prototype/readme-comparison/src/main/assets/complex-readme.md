@@ -80,3 +80,13 @@ If the native renderer cannot intercept the `HTML_BLOCK` node, this section is r
 
 - [Relative repository link](./docs/architecture.md)
 - [External documentation](https://developer.android.com/jetpack/compose)
+
+## Shields badge sample
+
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+[![CI](https://github.com/yumiru11/AppDev/actions/workflows/ci.yml/badge.svg)](https://github.com/yumiru11/AppDev/actions)
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Build-Passing-brightgreen.svg" alt="Build passing">
+</p>

@@ -8,7 +8,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,7 +37,10 @@ import com.mikepenz.markdown.compose.elements.MarkdownImage
 private val IMAGE_SRC_REGEX = Regex("""!\[[^\]]*]\(([^)\s]+)""")
 
 @Composable
-fun EnhancedMarkdownImage(model: MarkdownComponentModel) {
+fun EnhancedMarkdownImage(
+    model: MarkdownComponentModel,
+    stretch: Boolean = true,
+) {
     val transformer = LocalImageTransformer.current
     val src =
         remember(model.content, model.node) {
@@ -47,14 +52,38 @@ fun EnhancedMarkdownImage(model: MarkdownComponentModel) {
 
     Box(
         modifier =
-            Modifier
-                .fillMaxWidth()
+            (if (stretch) Modifier.fillMaxWidth() else Modifier)
                 .padding(vertical = 4.dp)
-                .shadow(4.dp, shape)
+                .shadow(8.dp, shape)
                 .clip(shape)
                 .clickable { preview = true },
     ) {
-        MarkdownImage(content = model.content, node = model.node)
+        if (src.startsWith("http")) {
+            // 网络图直接走 Coil AsyncImage：mikepenz transformer 链（Coil3ImageTransformerImpl）
+            // 在原型真机加载失败（2026-08-16 徽章验证），直接加载可绕开并暴露真实错误。
+            // 复用外层容器（圆角 + tonal 阴影 + 点击预览），对齐 WebView markdown-you.css 的 img 观感。
+            // stretch=false（徽章段落）：保持原始尺寸——用户反馈 fillMaxWidth 是「导弹」（2026-08-16）。
+            if (stretch) {
+                coil3.compose.AsyncImage(
+                    model = src,
+                    contentDescription = null,
+                    contentScale = ContentScale.FillWidth,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                // Coil SvgDecoder 的 intrinsic size 是 SVG 声明尺寸的 ~10 倍（真机 BadgeSize=857x209，
+                // SVG 实际 82x20——渲染 DPI 换算特性），任何宽约束都会被巨大 intrinsic 撑破。
+                // 修：固定标准徽章高度 20dp + Fit 等比（shields 徽章标准高 = 20，2026-08-16 真机验证）。
+                coil3.compose.AsyncImage(
+                    model = src,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.height(20.dp),
+                )
+            }
+        } else {
+            MarkdownImage(content = model.content, node = model.node)
+        }
     }
 
     if (preview) {
