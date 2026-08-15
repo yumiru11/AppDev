@@ -19,7 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewAssetLoader
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import okhttp3.OkHttpClient
 
@@ -45,6 +48,7 @@ import okhttp3.OkHttpClient
  * @param httpClient 复用 OkHttp（私有图床代理请求用；默认 null 表示不代理，图直通）
  */
 @SuppressLint("SetJavaScriptEnabled")
+@Suppress("DEPRECATION") // WebSettingsCompat darkening APIs are deprecated upstream but required by the pre-approved darkening policy.
 @Composable
 fun WebViewMarkdownRenderer(
     sanitizedHtml: String,
@@ -58,9 +62,13 @@ fun WebViewMarkdownRenderer(
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
     val colorScheme = MaterialTheme.colorScheme
-    val tokens =
+    val themeVariables =
         remember(isDark, colorScheme) {
-            MarkdownThemeTokens.fromColorScheme(colorScheme, isDark = isDark)
+            MaterialYouFusionMapper.buildCss(colorScheme, isDark = isDark)
+        }
+    val startScript =
+        remember(isDark, colorScheme) {
+            MaterialYouFusionMapper.buildStartScript(colorScheme, isDark = isDark)
         }
 
     val assetLoader =
@@ -99,6 +107,23 @@ fun WebViewMarkdownRenderer(
         factory = { ctx ->
             WebView(ctx).apply {
                 WebViewSecurity.apply(this)
+                // 防双重变暗：页面 CSS 已按 data-theme/prefers-color-scheme 出图，
+                // 关闭 WebView 的算法暗化并保留 web-theme 策略（androidx.webkit 1.12.1）。
+                WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false)
+                WebSettingsCompat.setForceDarkStrategy(
+                    settings,
+                    WebSettingsCompat.DARK_STRATEGY_WEB_THEME_DARKENING_ONLY,
+                )
+                if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                    WebViewCompat.addDocumentStartJavaScript(
+                        this,
+                        startScript,
+                        setOf(
+                            "https://appassets.androidplatform.net",
+                            "https://appassets.androidplatform.net/*",
+                        ),
+                    )
+                }
                 addJavascriptInterface(bridge, "AndroidBridge")
                 webViewClient =
                     object : WebViewClient() {
@@ -117,7 +142,7 @@ fun WebViewMarkdownRenderer(
             }
         },
         update = { webView ->
-            val html = WebViewHtmlBuilder.build(sanitizedHtml, tokens, renderMode, baseRepoUrl)
+            val html = WebViewHtmlBuilder.build(sanitizedHtml, themeVariables, isDark, renderMode, baseRepoUrl)
             webView.loadDataWithBaseURL(
                 "https://appassets.androidplatform.net/",
                 html,

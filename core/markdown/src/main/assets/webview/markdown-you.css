@@ -1,27 +1,15 @@
 /*
- * markdown-you.css — Material You 风格 Markdown 渲染样式（自维护）。
+ * markdown-you.css — Material You override layer on top of github-markdown-css 5.9.0 (MIT).
  *
- * 设计原则（plan.md §2.10 / ADR-0004）：
- * - 不照搬 GitHub 蓝灰 CSS，基于 Material 3 色板语义
- * - 颜色全部走 CSS 变量（:root --md-sys-color-*），由 Kotlin 注入（MarkdownThemeTokens）
- * - 明暗切换时 Kotlin 重新注入 :root 变量即生效，本文件静态不变
- * - 字体/圆角常量直接在此声明（不随主题变）
+ * Design rules (docs/ui-design.md §3.11, user decisions):
+ * - Containers follow MaterialTheme tokens injected by MaterialYouFusionMapper.
+ * - Syntax colors stay GitHub original (prettylights tokens, half-fusion C).
+ * - GitHub typography baseline: 16px body / 1.6 line height.
+ * - This file is loaded after github-markdown.css and before the injected theme-vars style.
  */
 
-:root {
-  --md-sys-color-primary: #6750A4;
-  --md-sys-color-on-surface: #1C1B1F;
-  --md-sys-color-surface: #FFFBFE;
-  --md-sys-color-surface-container-low: #F7F2FA;
-  --md-sys-color-surface-container-high: #ECE6F0;
-  --md-sys-color-outline-variant: #CAC4D0;
-  --md-sys-shape-corner-medium: 12px;
-  --md-sys-shape-corner-small: 8px;
-  --md-sys-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --md-sys-font-mono: "JetBrains Mono", "Fira Code", "SF Mono", Menlo, Consolas, monospace;
-}
-
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   background: transparent;
@@ -29,125 +17,176 @@ html, body {
 
 .markdown-body {
   background: transparent;
-  color: var(--md-sys-color-on-surface);
-  font-family: var(--md-sys-font-sans);
-  font-size: 15px;
+  color: var(--fgColor-default);
+  font-family: var(--fontStack-sansSerif);
+  font-size: 16px;
   line-height: 1.6;
   padding: 16px;
   word-wrap: break-word;
-  overflow-x: auto;
 }
 
+.markdown-body p {
+  margin: 0 0 16px;
+}
+
+/* GitHub heading proportions are kept; only body density is aligned with the spec. */
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3,
 .markdown-body h4,
 .markdown-body h5,
 .markdown-body h6 {
-  margin-top: 24px;
-  margin-bottom: 16px;
-  font-weight: 600;
   line-height: 1.25;
 }
 
-.markdown-body h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
-.markdown-body h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
-.markdown-body h3 { font-size: 1.25em; }
-.markdown-body h4 { font-size: 1em; }
-.markdown-body h5 { font-size: 0.875em; }
-.markdown-body h6 { font-size: 0.85em; color: var(--md-sys-color-on-surface); opacity: 0.7; }
-
-.markdown-body p { margin: 0 0 16px; }
-
+/* Links: theme primary. */
 .markdown-body a {
-  color: var(--md-sys-color-primary);
-  text-decoration: none;
+  color: var(--fgColor-accent);
 }
-.markdown-body a:hover { text-decoration: underline; }
 
-.markdown-body strong { font-weight: 600; }
-.markdown-body em { font-style: italic; }
-.markdown-body del { text-decoration: line-through; }
-
+/* Inline code: primary 10% tint background + primary text. */
 .markdown-body code {
-  font-family: var(--md-sys-font-mono);
-  font-size: 0.875em;
-  background: var(--md-sys-color-surface-container-low);
-  padding: 2px 6px;
+  background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+  color: var(--md-sys-color-primary);
   border-radius: var(--md-sys-shape-corner-small);
 }
 
+/* Code blocks: card-like surface; dark mode one level deeper than the page background. */
 .markdown-body pre {
-  background: var(--md-sys-color-surface-container-low);
+  background: var(--md-sys-color-surface-container);
   border-radius: var(--md-sys-shape-corner-medium);
   padding: 12px;
   overflow-x: auto;
   margin: 0 0 16px;
 }
-.markdown-body pre code {
-  background: transparent;
-  padding: 0;
-  font-size: 0.875em;
+
+body[data-theme="dark"] .markdown-body pre {
+  background: var(--md-sys-color-surface-container-lowest);
 }
 
+.markdown-body pre code {
+  background: transparent;
+  color: var(--fgColor-default);
+  padding: 0;
+}
+
+/* Blockquote: 3dp primary left bar + soft surface tint. */
 .markdown-body blockquote {
   margin: 0 0 16px;
-  padding: 0 16px;
+  padding: 4px 16px;
   background: var(--md-sys-color-surface-container-low);
   border-left: 3px solid var(--md-sys-color-primary);
   border-radius: var(--md-sys-shape-corner-small);
-  color: var(--md-sys-color-on-surface);
+  color: var(--fgColor-default);
 }
 
-.markdown-body ul,
-.markdown-body ol {
-  margin: 0 0 16px;
-  padding-left: 2em;
-}
-.markdown-body li { margin: 4px 0; }
-
+/* Tables: GitHub layout plus a Material outline and rounded overflow clip. */
 .markdown-body table {
   border-collapse: collapse;
-  width: 100%;
-  margin: 0 0 16px;
-  overflow-x: auto;
   display: block;
-}
-.markdown-body table th,
-.markdown-body table td {
-  border: 1px solid var(--md-sys-color-outline-variant);
-  padding: 6px 13px;
-}
-.markdown-body table th {
-  background: var(--md-sys-color-surface-container-low);
-  font-weight: 600;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: var(--md-sys-shape-corner-small);
 }
 
+.markdown-body table th {
+  background: var(--md-sys-color-surface-container-low);
+  border-top: 1px solid var(--borderColor-default);
+  border-bottom: 1px solid var(--borderColor-default);
+}
+
+.markdown-body table th,
+.markdown-body table td {
+  border-left: none;
+  border-right: none;
+}
+
+.markdown-body table tr:nth-child(2n) {
+  background: var(--bgColor-muted);
+}
+
+/* Images: rounded corners + tonal shadow. */
 .markdown-body img {
   max-width: 100%;
   height: auto;
-  loading: lazy;
+  border-radius: var(--md-sys-shape-corner-medium);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24), 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
-/* GitHub Alerts ([!NOTE]/[!TIP]/[!IMPORTANT]/[!WARNING]/[!CAUTION]) */
-.markdown-body .markdown-alert {
-  margin: 0 0 16px;
-  padding: 12px 16px;
-  border-left: 3px solid var(--md-sys-color-primary);
-  border-radius: var(--md-sys-shape-corner-small);
-  background: var(--md-sys-color-surface-container-low);
+/* Task list: M3-style rounded checkbox via accent-color. */
+.markdown-body .task-list-item {
+  list-style: none;
 }
+
+.markdown-body .task-list-item-checkbox {
+  accent-color: var(--md-sys-color-primary);
+  border-radius: var(--md-sys-shape-corner-small);
+  margin: 0 8px 0 0;
+  vertical-align: middle;
+}
+
+/* Horizontal rule: outlineVariant 1px with 16dp rhythm. */
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--md-sys-color-outline-variant);
+  margin: 16px 0;
+}
+
+/* GitHub alerts: left color bar (from github-markdown-css) + tinted card backgrounds. */
+.markdown-body .markdown-alert {
+  background: var(--md-sys-color-surface-container-low);
+  border-left-width: 4px;
+  border-radius: var(--md-sys-shape-corner-small);
+}
+
+.markdown-body .markdown-alert-note {
+  background: color-mix(in srgb, var(--borderColor-accent-emphasis) 12%, var(--bgColor-default));
+}
+
+.markdown-body .markdown-alert-tip {
+  background: color-mix(in srgb, var(--borderColor-success-emphasis) 12%, var(--bgColor-default));
+}
+
+.markdown-body .markdown-alert-important {
+  background: color-mix(in srgb, var(--borderColor-done-emphasis) 12%, var(--bgColor-default));
+}
+
+.markdown-body .markdown-alert-warning {
+  background: color-mix(in srgb, var(--borderColor-attention-emphasis) 14%, var(--bgColor-default));
+}
+
+.markdown-body .markdown-alert-caution {
+  background: color-mix(in srgb, var(--borderColor-danger-emphasis) 12%, var(--bgColor-default));
+}
+
 .markdown-body .markdown-alert-title {
   font-weight: 600;
   margin-bottom: 4px;
 }
 
-/* 任务列表 */
-.markdown-body .task-list-item { list-style: none; }
-.markdown-body .task-list-item-checkbox {
-  margin: 0 8px 0 0;
-  vertical-align: middle;
+.markdown-body .markdown-alert-title .octicon {
+  margin-right: 8px;
+  vertical-align: text-bottom;
 }
 
-/* 横向滚动容器（长表格/长代码） */
-.markdown-body .overflow-x-auto { overflow-x: auto; }
+/* Code copy button overlay. */
+.md-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-family: var(--fontStack-sansSerif);
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.markdown-body pre:hover .md-copy-btn,
+.markdown-body pre .md-copy-btn:focus-visible {
+  opacity: 1;
+}

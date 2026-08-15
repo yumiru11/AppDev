@@ -25,9 +25,11 @@ enum class RenderMode {
  * <head>
  *   <meta charset="utf-8">
  *   <meta name="viewport" ...>
+ *   <meta name="color-scheme" content="light dark">
+ *   <link rel="stylesheet" href="github-markdown.css">
  *   <link rel="stylesheet" href="markdown-you.css">
  *   <link rel="stylesheet" href="highlight-theme.css">
- *   <style id="theme-vars">:root { --md-sys-color-*: #...; }</style>
+ *   <style id="theme-vars">Material You + GitHub semantic variables</style>
  *   [offline] <script src="markdown-it.min.js"></script>
  *   [offline] <script src="highlight.min.js"></script>
  *   <script src="purify.min.js"></script>
@@ -49,22 +51,32 @@ object WebViewHtmlBuilder {
     private const val ASSET_BASE = "https://appassets.androidplatform.net/assets/webview/"
 
     /**
-     * 组装完整 HTML 文档。
-     *
-     * @param sanitizedHtml 待渲染内容（SERVER_HTML 模式：服务端 HTML，[build] 内强制清洗；
-     *   OFFLINE_MARKDOWN_IT 模式：原始 markdown 文本，由 markdown-it 在 WebView 内渲染）
-     * @param tokens Material You 主题令牌（注入 :root CSS 变量）
-     * @param renderMode 渲染模式（决定是否加载 markdown-it/highlight.js 与内容注入方式）
-     * @return 完整 HTML 文档字符串
+     * 兼容旧签名：仅注入 [MarkdownThemeTokens] 的 md-sys 变量（T8/T9 既有调用）。
      */
     fun build(
         sanitizedHtml: String,
         tokens: MarkdownThemeTokens,
         renderMode: RenderMode = RenderMode.SERVER_HTML,
         baseRepoUrl: String? = null,
+    ): String = build(sanitizedHtml, tokens.toCssVariables(), tokens.isDark, renderMode, baseRepoUrl)
+
+    /**
+     * 组装完整 HTML 文档（融合版）。
+     *
+     * @param sanitizedHtml 待渲染内容（SERVER_HTML 模式：服务端 HTML，构建内强制清洗；
+     *   OFFLINE_MARKDOWN_IT 模式：原始 markdown 文本，由 markdown-it 在 WebView 内渲染）
+     * @param themeVariables [MaterialYouFusionMapper] 生成的完整 CSS 变量声明块，
+     *   必须放在 github-markdown-css 之后注入（后声明同特异性规则胜出）
+     * @param isDark 当前深色主题（同时设置 `<html data-theme>` 与 `<body data-theme>`）
+     */
+    fun build(
+        sanitizedHtml: String,
+        themeVariables: String,
+        isDark: Boolean,
+        renderMode: RenderMode = RenderMode.SERVER_HTML,
+        baseRepoUrl: String? = null,
     ): String {
-        val themeVars = tokens.toCssVariables()
-        val themeMarker = if (tokens.isDark) "dark" else "light"
+        val themeMarker = if (isDark) "dark" else "light"
         val contentBlock = rewriteRelativeUrls(buildContentBlock(sanitizedHtml, renderMode), baseRepoUrl)
         val offlineScripts =
             if (renderMode == RenderMode.OFFLINE_MARKDOWN_IT) {
@@ -76,16 +88,18 @@ object WebViewHtmlBuilder {
 
         return buildString {
             append("<!DOCTYPE html>\n")
-            append("<html lang=\"en\">\n")
+            append("<html lang=\"en\" data-theme=\"$themeMarker\">\n")
             append("<head>\n")
             append("  <meta charset=\"utf-8\">\n")
             append("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1\">\n")
-            append("  <link rel=\"stylesheet\" href=\"${ASSET_BASE}markdown-you.css\">")
+            append("  <meta name=\"color-scheme\" content=\"light dark\">\n")
+            append("  <link rel=\"stylesheet\" href=\"${ASSET_BASE}github-markdown.css\">")
+            append("\n  <link rel=\"stylesheet\" href=\"${ASSET_BASE}markdown-you.css\">")
             append("\n  <link rel=\"stylesheet\" href=\"${ASSET_BASE}highlight-theme.css\">")
-            // theme-vars 必须位于 CSS <link> 之后：markdown-you.css 的 :root 静态色
-            // 会覆盖注入令牌，后声明同特异性规则胜出（暗色主题修复，审查确认）
+            // theme-vars 必须位于 CSS <link> 之后：github-markdown-css 与 markdown-you.css
+            // 的变量声明会被后声明同特异性规则覆盖，保证 Material You 融合生效。
             append("\n  <style id=\"theme-vars\">\n")
-            append(themeVars)
+            append(themeVariables)
             append("  </style>\n")
             append(offlineScripts)
             append("\n  <script src=\"${ASSET_BASE}purify.min.js\"></script>\n")
