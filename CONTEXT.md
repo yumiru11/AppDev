@@ -45,3 +45,22 @@
 - **双通道** — GraphQL 读优先（Apollo 5）+ REST 写优先（Retrofit 3）；统一模型映射（core:github-data）。
 - **ETag 304** — OkHttp 拦截器缓存（core:github-rest）。
 - **mockwebserver3** — 新 artifact（com.squareup.okhttp3:mockwebserver3），集成测试用。
+
+## UI 设计域（2026-08-15 grill 拍板，ADR-0006）
+
+- **两层导航** — 底部 NavigationBar = 大分区（首页/仓库/我的）；首页大分区内部有顶部小分区条（动态/Issue/PR）切小分区（ADR-0006）。「首页是大的，套着小的」。
+- **Home 长条按钮** — 首页内容区顶部的占宽圆角矩形按钮（新建 Issue/查看 PR/新建仓库），模仿 GitHub 网页登录后首页。
+- **玻璃清单（8 项）** — 顶栏/底栏/通知面板/BottomSheet 默认开；图片查看器纯黑；FAB/设置分组头/卡片不用玻璃（ADR-0006）。强度 8dp，全局总开关 + 逐项开关。
+- **玻璃的本质 = 滚动穿越感** — macOS 访达侧边栏效果：内容滚过栏下被糊掉，能看到「有东西在动」（非 iOS 整屏雾感/非桌面小组件透色）。
+- **卡片 PiliPlus 风格** — 中性 surfaceContainer 底 + 一点点主题色点缀（星标/链接/时间）；语言点 GitHub 原色；网格/通栏用户可切换；长按弹菜单。
+- **半融合高亮** — 代码块容器随主题 + 语法色保留 GitHub 原色（C 方案）。
+- **Alert 卡片** — GitHub 网页样式（左侧色条）+ Octicons 图标；**全应用禁 emoji 图标**。
+- **Home 分区条** — 首页内横向 Tab（动态/Issue/PR），底部主题色指示条，随内容横移；顶栏固定不动。
+- **Trending 数据源** — 官方无 API；gh4a 同款第三方 JSON 镜像（Unpublished/GithubTrending），fallback Search API 变通。
+
+## 参考仓库（~/dev，克隆自 2026-08-15）
+
+- **PiliPlus** — B 站客户端（Flutter）：卡片主题色点缀参考（B2-1）。
+- **rikkahub** — LLM 客户端：原生 Markdown 全套（表格工具栏/复制/字号比例/自研 hljs 移植高亮）；**AGPL-3.0 不可引用**，只参考思路，从源头（hljs BSD-3）实现。
+- **XMSLEEP** — 白噪音 MD3 + MaterialKolor 动态色：主题/动效参考。
+- **gh4a** — OctoDroid：WebView markdown + Trending 数据源（Unpublished/GithubTrending JSON 镜像）。
