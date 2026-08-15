@@ -11,4 +11,4 @@ captures/
 *.aab
 .omo/
 .cortexkit/
-.kotlin/tmp-prompt.md
+tmp-prompt.md
