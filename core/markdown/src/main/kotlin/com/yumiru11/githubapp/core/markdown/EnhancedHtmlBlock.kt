@@ -39,13 +39,18 @@ fun EnhancedHtmlBlock(model: MarkdownComponentModel) {
     val details = remember(model.content, model.node) { HtmlDetailsParser.parse(model.content, model.node) }
     if (details != null) {
         NativeDetailsCard(summary = details.summary, body = details.body)
-    } else {
+    } else if (!isClosingDetailsOnly(model)) {
         MarkdownText(
             content = model.content,
             node = model.node,
             style = model.typography.text,
         )
     }
+}
+
+private fun isClosingDetailsOnly(model: MarkdownComponentModel): Boolean {
+    val text = model.content.substring(model.node.startOffset, model.node.endOffset).trim()
+    return text.equals("</details>", ignoreCase = true)
 }
 
 @Composable
