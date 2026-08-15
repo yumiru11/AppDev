@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="prototype_readme_title">README 渲染原型</string>
+    <string name="prototype_readme_tab_webview">A · WebView 融合版</string>
+    <string name="prototype_readme_tab_native">B · 原生增强版</string>
+    <string name="prototype_readme_tab_webview_description">版本 A，WebView 渲染</string>
+    <string name="prototype_readme_tab_native_description">版本 B，原生 Compose 渲染</string>
+</resources>
