@@ -2,7 +2,7 @@
 
 Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
 
-**⚠️ 现状：AppDev 尚未 push 到 GitHub（无 remote，纯规划期）。** 仓库目标为 `github.com/yumiru11`（GitLight 同账号）。remote 配置前，用 `gh issue create/edit/list` 时显式带 `--repo yumiru11/<repo>`；push 之后 `gh` 会自动从 `git remote -v` 推断。
+**现状（2026-08-15）：仓库已 push 到 `github.com/yumiru11/AppDev`（public）。** `gh` 自动从 `git remote -v` 推断仓库，无需显式 `--repo`（除非在 worktree 外执行）。
 
 ## Conventions
 
