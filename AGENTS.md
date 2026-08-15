@@ -7,13 +7,13 @@
 
 开发一个**功能全面的 Android GitHub 客户端**（轻量、流畅、全 Material You）。技术规划 = `plan.md`（41KB，必读），需求来源 = `request.txt`。应用名/包名仍为占位符：applicationId 与 namespace = `com.yumiru11.githubapp`（模块 namespace 用 `core.github_xxx` 下划线写法），产品定名后统一改。
 
-**当前状态（2026-08-15）**：T1-T10 + T13 + T19/T20/T24 + T26 共 **15 票已完成并合入 main**（main = `68868b1` + 文档提交，工作区干净）。剩余 11 票见 `docs/agents/project-status.md`。**进行中：README 渲染原型**（分支 `prototype/readme-comparison`，DSH 执行，见 dsh-guide.md）。
+**当前状态（2026-08-16）**：T1-T10 + T13 + T19/T20/T24 + T26 共 **15 票已完成并合入 main**。**README 渲染原型已完成并合入**（prototype/readme-comparison → main `97dfef8`）：原生主渲染 + WebView 兜底拍板（ADR-0007），FeatureDetector 已收紧（details/table 原生渲染）。剩余 11 票见 `docs/agents/project-status.md`。
 
 ## 核心决策（来自 plan.md，勿偏离）
 
 - **无 Kotlin Multiplatform**、**无 Waydroid/虚拟机**：测试与截图全跑 Linux 纯 JVM（Robolectric + Roborazzi）
 - **GraphQL 读优先（Apollo Kotlin 5）、REST 写优先（Retrofit 3/OkHttp 5）**；认证用 OAuth PKCE（AppAuth），PAT 仅开发者模式（fine-grained PAT 不支持 GraphQL → 自动降级 REST-only）
-- **Markdown 分层渲染**：原生渲染器 mikepenz `multiplatform-markdown-renderer` **0.38.1**（compileSdk 36 天花板；0.43 需 SDK 37/AGP 9，不碰）+ KotlinTextMate 0.2.0 高亮；README/长文档/复杂 GFM 走 WebView 兜底（GitHub 服务端 `/markdown` HTML + github-markdown-css + DOMPurify + markdown-it + highlight.js，Material You CSS 变量注入）；**README 渲染方向（A/B/C）待 prototype 拍板**（docs/ui-design.md §3.11）
+- **Markdown 分层渲染**：原生渲染器 mikepenz `multiplatform-markdown-renderer` **0.38.1** + KotlinTextMate 0.2.0 高亮（**主渲染，ADR-0007 拍板**；增强组件 EnhancedList/Paragraph/MarkdownImage/HtmlBlock/Table）；WebView 兜底（github-markdown-css + DOMPurify + markdown-it + highlight.js，Material You 变量注入——**真机 WebView 不支持 CSS color-mix，混色必须 Kotlin 预计算**）；shields 徽章需 **coil-svg + SvgDecoder**（Coil 默认无 SVG；SvgDecoder intrinsic 放大 ~10 倍，徽章固定高 20dp）；FeatureDetector 分流仅限 mermaid/数学/`<svg>/<canvas>/<iframe>/<math>`/超长
 - **评论列表绝不用 WebView**；**token 绝不注入 WebView**；代码浏览/编辑用 Rosemoe Sora Editor
 - i18n 从第一天落实：Compose 一律 `stringResource()`，禁止硬编码字符串（GitLight 教训）
 - 版本目录（`gradle/libs.versions.toml`）单一事实来源；设计令牌、Konsist 架构测试从第一行代码开始

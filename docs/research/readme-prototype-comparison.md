@@ -70,3 +70,24 @@
 - `MarkdownTableParserTest` / `HtmlDetailsParserTest` / `GitHubAlertParserTest` / `CopyFeedbackStateTest`
 - `ReadmeComparisonScreenshotTest`（B light/dark 基准）、`WebViewHeadlessHtmlWriterTest`（A 截图 HTML 生成）
 - B 基准记录：`./gradlew :prototype:readme-comparison:recordRoborazziDebug --tests "*ReadmeComparisonScreenshotTest"`
+
+
+## 真机验证补充（2026-08-16，prototype 分支 4+ 小时逐项）
+
+原始报告基于 Robolectric/headless 截图；以下为真机（vivo，系统 WebView）验证后的修正与结论：
+
+### 与报告不同的实测结论
+
+| 报告项 | 真机实测 |
+|---|---|
+| 行内代码圆角「0.38.1 无解」 | **有解**：`markdownExtendedSpans` + `RoundedCornerSpanPainter`（topMargin 按字号/行高计算居中） |
+| 表格「Robolectric 假阴性」 | 真机 widthIn(min) 列宽塌缩为 0 → 官方 `requiredWidth` 组件 |
+| WebView 背景色 | 内联 CSS 生效但 **真机 WebView 不支持 color-mix()** → 全部背景透明 → **Kotlin 预计算混色变量** |
+| WebView 图片 | DOMPurify URI 白名单**删除相对路径 src** → 离线 raw 图片改写绝对 URL |
+| 原生徽章 | Coil 3 无 SVG 解码器 → coil-svg；SvgDecoder intrinsic ≈ 声明尺寸 10 倍 → 固定高 20dp；HTML 形态需 HtmlBadgeParser |
+
+### 路线结论（用户拍板）
+
+**原生主渲染 + WebView 兜底**（ADR-0007）：原生补齐表格/列表/徽章/details/Alert 后足以主渲染，
+复杂 HTML（mermaid/数学/svg 等）走 WebView。原型壳保留（app debug 入口 + prototype 模块），
+后续真机验收/回归可复用。
