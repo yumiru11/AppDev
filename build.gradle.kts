@@ -47,6 +47,22 @@ tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
 // okhttp：Apollo KMP 传递依赖会拉高版本，必须强制单一版本（见 AGENTS.md「依赖选型」）
 // kotlin-metadata-jvm：Hilt 2.57.2 编译器自带 metadata 2.2，Kotlin 2.3 的 @Metadata
 // 版本 2.3.x 会报 “maximum supported version is 2.2.0” → force 到 Kotlin 同版本（AGENTS.md 指引）
+// ── JaCoCo 覆盖率（Phase A，testing-strategy.md）：Kover 官方已转向 JaCoCo（kotlinx-kover#746）
+// 0.8.13+ 支持 Kotlin inline functions（jacoco#1670）。AGP 8 的 enableUnitTestCoverage 是
+// BuildType 级属性，启用时 AGP 自动应用 JacocoPlugin；版本经 testCoverage.jacocoVersion 指定。
+subprojects {
+    plugins.withId("com.android.application") {
+        extensions.configure<com.android.build.gradle.AppExtension> {
+            buildTypes.getByName("debug") { enableUnitTestCoverage = true }
+        }
+    }
+    plugins.withId("com.android.library") {
+        extensions.configure<com.android.build.gradle.LibraryExtension> {
+            buildTypes.getByName("debug") { enableUnitTestCoverage = true }
+        }
+    }
+}
+
 subprojects {
     configurations.all {
         resolutionStrategy {

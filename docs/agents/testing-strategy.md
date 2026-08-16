@@ -69,7 +69,7 @@
 
 ## 7. 落地路线（4 阶段，对应方法论文档 §23）
 
-- **Phase A（下一步）**：根 build 接 JaCoCo 0.8.13+ → `enableUnitTestCoverage` → 每模块 verification rules（宽松起步：核心模块 70-80%）→ 本地 `./gradlew jacocoTestReport` 可看
+- **Phase A（✅ 2026-08-16 完成）**：根 build 接 JaCoCo（AGP `enableUnitTestCoverage`，BuildType 级）→ `./gradlew :<模块>:createDebugUnitTestCoverageReport` 生成报告 → 基线数字（github-rest 23.5% / app 3.4%，注：AGP 报告只统计测试加载类，未加载类不计入——数字偏低，Phase B 定统计口径）→ **Phase B**：CI 门禁 + verification rules + diff coverage
 - **Phase B**：CI 加覆盖率任务 + PR 评论/报告上传 + diff coverage 门禁（新增代码 ≥80%）
 - **Phase C**：按 `docs/agents/testing-checklist.md` 分点清单补齐（A 纯逻辑 → B 数据层 → E ViewModel → G 可注入性，共 9 组 60+ 业务点）
 - **Phase D**：UI 自动化主流程（Compose UI Test 关键路径）+ Nightly 全量
