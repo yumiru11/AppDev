@@ -5,6 +5,8 @@ package com.yumiru11.githubapp.feature.repo
 import com.yumiru11.githubapp.core.`data`.model.Repository
 import com.yumiru11.githubapp.core.database.dao.CachedReadmeDao
 import com.yumiru11.githubapp.core.database.entity.CachedReadmeEntity
+import com.yumiru11.githubapp.core.githubrest.api.ContentApi
+import com.yumiru11.githubapp.core.githubrest.api.GitTreeApi
 import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.model.MarkdownRenderRequest
@@ -31,6 +33,8 @@ class RepoRepository
         private val repositoryApi: RepositoryApi,
         private val readmeApi: ReadmeApi,
         private val cachedReadmeDao: CachedReadmeDao,
+        private val gitTreeApi: GitTreeApi,
+        private val contentApi: ContentApi,
     ) {
         /**
          * 获取仓库元数据。
@@ -51,6 +55,65 @@ class RepoRepository
                 defaultBranch = dto.defaultBranch,
             )
         }
+
+        /**
+         * 获取根文件树（T11：按需展开第一步）。
+         *
+         * @param ref 分支/Tag/SHA（Git Data API 接受 ref 作 tree_sha，无需先取 commit）
+         */
+        suspend fun getTree(
+            owner: String,
+            repo: String,
+            ref: String,
+        ): Result<List<GitTreeNode>> =
+            runCatching {
+                val response = gitTreeApi.getTree(owner, repo, ref)
+                FileTreeBuilder.buildRootNodes(response.tree)
+            }
+
+        /**
+         * 获取子目录树（T11：目录点击展开）。
+         *
+         * @param treeSha 目录条目 SHA
+         * @param parentPath 父目录完整路径（子树条目 path 相对该目录，需拼接）
+         */
+        suspend fun getChildTree(
+            owner: String,
+            repo: String,
+            treeSha: String,
+            parentPath: String,
+        ): Result<List<GitTreeNode>> =
+            runCatching {
+                val response = gitTreeApi.getTree(owner, repo, treeSha)
+                FileTreeBuilder.buildChildNodes(response.tree, parentPath)
+            }
+
+        /**
+         * 获取文件内容并分类（T11 验收：大文件/二进制给提示而非卡死）。
+         *
+         * 解码 → [FileClassifier] 判定（TOO_LARGE 不取内容；BINARY 嗅探；MARKDOWN/CODE 返回文本）。
+         *
+         * @param ref 分支/Tag/SHA（Contents API ref 查询参数，null 由调用方传默认分支名）
+         */
+        suspend fun getFileContent(
+            owner: String,
+            repo: String,
+            path: String,
+            ref: String?,
+        ): Result<FileContentData> =
+            runCatching {
+                val dto = contentApi.getFileContent(owner, repo, path, ref)
+                val bytes = dto.decodeBytes()
+                val kind = FileClassifier.classify(dto.name, dto.size, bytes)
+                val text = if (kind == FileKind.CODE || kind == FileKind.MARKDOWN) bytes?.decodeToString().orEmpty() else null
+                FileContentData(
+                    fileName = dto.name,
+                    path = dto.path,
+                    size = dto.size,
+                    kind = kind,
+                    text = text,
+                )
+            }
 
         /**
          * 获取 README 内容（T9 验收第 2 条：普通 README 原生渲染，复杂自动走兜底）。

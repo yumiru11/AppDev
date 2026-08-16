@@ -14,4 +14,18 @@
     <string name="repo_retry">重试</string>
     <string name="repo_back">返回</string>
     <string name="repo_avatar">头像</string>
+
+    <!-- T11 文件树与代码浏览 -->
+    <string name="repo_tab_readme">README</string>
+    <string name="repo_tab_files">文件</string>
+    <string name="repo_files_loading">正在加载文件…</string>
+    <string name="repo_file_too_large">文件过大，无法预览（超过 1 MB）</string>
+    <string name="repo_file_binary">二进制文件，无法预览</string>
+    <string name="repo_file_rendered">渲染</string>
+    <string name="repo_file_source">源码</string>
+    <string name="repo_file_search">在文件中搜索</string>
+    <string name="repo_file_jump_to_line">跳转到行</string>
+    <string name="repo_file_line_number">行号</string>
+    <string name="repo_file_go">跳转</string>
+    <string name="repo_file_cancel">取消</string>
 </resources>

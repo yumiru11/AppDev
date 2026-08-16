@@ -60,6 +60,9 @@ dependencies {
     implementation(libs.markdown.renderer)
     implementation(libs.markdown.renderer.m3)
 
+    // 代码浏览（Sora 只读视图，T11；依赖隔离在 core:editor）
+    implementation(project(":core:editor"))
+
     // 导航
     implementation(project(":core:navigation"))
     implementation(project(":core:ui"))

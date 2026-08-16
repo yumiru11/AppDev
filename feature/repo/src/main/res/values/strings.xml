@@ -14,4 +14,18 @@
     <string name="repo_retry">Retry</string>
     <string name="repo_back">Back</string>
     <string name="repo_avatar">Avatar</string>
+
+    <!-- T11 文件树与代码浏览 -->
+    <string name="repo_tab_readme">README</string>
+    <string name="repo_tab_files">Files</string>
+    <string name="repo_files_loading">Loading files…</string>
+    <string name="repo_file_too_large">File is too large to preview (over 1 MB)</string>
+    <string name="repo_file_binary">This is a binary file and cannot be previewed</string>
+    <string name="repo_file_rendered">Rendered</string>
+    <string name="repo_file_source">Source</string>
+    <string name="repo_file_search">Search in file</string>
+    <string name="repo_file_jump_to_line">Jump to line</string>
+    <string name="repo_file_line_number">Line number</string>
+    <string name="repo_file_go">Go</string>
+    <string name="repo_file_cancel">Cancel</string>
 </resources>
