@@ -33,6 +33,9 @@ dependencies {
     implementation(project(":core:github-rest"))
     implementation(project(":core:github-graphql"))
 
+    // IssueDto.pullRequest 为 JsonObject（github-rest api 暴露的公共类型，需传递可见）
+    implementation(libs.kotlinx.serialization.json)
+
     // Paging 3（GraphQL cursor PagingSource）
     implementation(libs.paging.runtime)
 

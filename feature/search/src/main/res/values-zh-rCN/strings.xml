@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 搜索框 -->
+    <string name="search_hint">搜索 GitHub…</string>
+    <string name="search_back">返回</string>
+    <string name="search_clear_input">清空搜索</string>
+
+    <!-- 历史 -->
+    <string name="search_history">搜索历史</string>
+    <string name="search_history_clear">全部清除</string>
+    <string name="search_history_empty">暂无搜索历史</string>
+
+    <!-- Qualifier 建议 -->
+    <string name="search_qualifier_title">快速建议</string>
+
+    <!-- 结果 Tab -->
+    <string name="search_tab_repositories">仓库</string>
+    <string name="search_tab_users">用户</string>
+    <string name="search_tab_issues">Issue</string>
+    <string name="search_tab_pull_requests">PR</string>
+    <string name="search_tab_code">代码</string>
+
+    <!-- 状态 -->
+    <string name="search_empty">没有找到结果</string>
+    <string name="search_retry">重试</string>
+    <string name="search_load_more_failed">加载更多失败</string>
+    <string name="search_error_network">网络错误，请检查网络连接</string>
+    <string name="search_error_rate_limited">请求过于频繁，请稍后再试</string>
+    <string name="search_error_unauthorized">请登录后搜索</string>
+    <string name="search_error_unknown">出错了，请重试</string>
+
+    <!-- 代码搜索登录门 -->
+    <string name="search_code_require_login">代码搜索需要登录</string>
+    <string name="search_login">登录</string>
+</resources>
