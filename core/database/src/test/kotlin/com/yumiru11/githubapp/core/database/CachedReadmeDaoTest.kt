@@ -117,6 +117,43 @@ class CachedReadmeDaoTest {
             assertEquals(0, dao.getAll().size)
         }
 
+    @Test
+    fun getByOwnerAndRepo_missingKey_returnsNull() =
+        runTest {
+            dao.upsert(cachedReadme(owner = "octocat", repo = "Hello-World"))
+
+            val missing = dao.getByOwnerAndRepo("nobody", "No-Such-Repo")
+            val wrongOwner = dao.getByOwnerAndRepo("other", "Hello-World")
+
+            assertNull(missing)
+            assertNull(wrongOwner)
+        }
+
+    @Test
+    fun delete_missingKey_keepsExistingRowsUntouched() =
+        runTest {
+            dao.upsert(cachedReadme(owner = "octocat", repo = "Hello-World", html = "<p>kept</p>"))
+
+            dao.delete("nobody", "No-Such-Repo")
+
+            assertEquals(1, dao.getAll().size)
+            assertEquals("<p>kept</p>", dao.getByOwnerAndRepo("octocat", "Hello-World")?.html)
+        }
+
+    @Test
+    fun upsert_sameKeyNewThemeVersion_overwritesThemeVersion() =
+        runTest {
+            // 主题升级（themeVersion 变更）时同一 key 重新写入 → 覆盖旧版本哈希（缓存失效语义）
+            dao.upsert(cachedReadme(themeVersion = "v1", html = "<p>old theme</p>"))
+
+            dao.upsert(cachedReadme(themeVersion = "v2", html = "<p>new theme</p>"))
+
+            val loaded = dao.getByOwnerAndRepo("octocat", "Hello-World")
+            assertEquals("v2", loaded?.themeVersion)
+            assertEquals("<p>new theme</p>", loaded?.html)
+            assertEquals(1, dao.getAll().size)
+        }
+
     private fun cachedReadme(
         owner: String = "octocat",
         repo: String = "Hello-World",

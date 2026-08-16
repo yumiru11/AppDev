@@ -100,10 +100,46 @@ class CachedRepositoryDaoTest {
             assertEquals(0, dao.getAll().size)
         }
 
+    @Test
+    fun getByOwnerAndName_missingKey_returnsNull() =
+        runTest {
+            dao.upsert(cachedRepository(owner = "octocat", name = "Hello-World"))
+
+            val missing = dao.getByOwnerAndName("nobody", "No-Such-Repo")
+            val wrongOwner = dao.getByOwnerAndName("other", "Hello-World")
+
+            assertNull(missing)
+            assertNull(wrongOwner)
+        }
+
+    @Test
+    fun delete_missingKey_keepsExistingRowsUntouched() =
+        runTest {
+            dao.upsert(cachedRepository(owner = "octocat", name = "Hello-World", payload = "{\"kept\":true}"))
+
+            dao.delete("nobody", "No-Such-Repo")
+
+            assertEquals(1, dao.getAll().size)
+            assertEquals("{\"kept\":true}", dao.getByOwnerAndName("octocat", "Hello-World")?.payload)
+        }
+
+    @Test
+    fun upsert_nullEtag_roundTripsAsNull() =
+        runTest {
+            // 响应未带校验头（etag 为空）→ 存库后仍为 null，payload 等非空字段保留
+            dao.upsert(cachedRepository(etag = null, payload = "{\"id\":1}"))
+
+            val loaded = dao.getByOwnerAndName("octocat", "Hello-World")
+
+            assertNull(loaded?.etag)
+            assertEquals("{\"id\":1}", loaded?.payload)
+            assertEquals(1_700_000_000_000L, loaded?.updatedAt)
+        }
+
     private fun cachedRepository(
         owner: String = "octocat",
         name: String = "Hello-World",
-        etag: String = "W/\"etag\"",
+        etag: String? = "W/\"etag\"",
         payload: String = "{\"name\":\"Hello-World\"}",
         updatedAt: Long = 1_700_000_000_000L,
     ): CachedRepositoryEntity =

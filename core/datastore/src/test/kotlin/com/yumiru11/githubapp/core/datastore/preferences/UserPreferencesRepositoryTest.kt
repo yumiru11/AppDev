@@ -267,6 +267,19 @@ class UserPreferencesRepositoryTest {
         }
 
     @Test
+    fun setMotionScale_0_5_newInstance_readsBackPersistedValue() =
+        runTest {
+            val file = newPreferencesFile()
+            val scope = newScope()
+            createRepository(scope, file).setMotionScale(0.5f)
+            scope.cancel()
+
+            val reloaded = createRepository(newScope(), file)
+
+            assertEquals(0.5f, reloaded.motionScale.first())
+        }
+
+    @Test
     fun setIconStyle_filled_persistsAndEmits() =
         runTest {
             val repository = createRepository()
@@ -420,6 +433,42 @@ class UserPreferencesRepositoryTest {
         assertEquals(
             ThemeMode.LIGHT,
             resolveEffectiveThemeMode(ThemeMode.LIGHT, dynamicColorEnabled = false, oledEnabled = false, highContrastEnabled = false),
+        )
+    }
+
+    @Test
+    fun resolveEffectiveThemeMode_lightBaseWithDynamicColor_resolvesDynamicLight() {
+        // DYNAMIC 分支的 else 兜底：LIGHT 基础 + 动态取色 → DYNAMIC_LIGHT（仅 DARK 走 DYNAMIC_DARK）
+        assertEquals(
+            ThemeMode.DYNAMIC_LIGHT,
+            resolveEffectiveThemeMode(ThemeMode.LIGHT, dynamicColorEnabled = true, oledEnabled = false, highContrastEnabled = false),
+        )
+    }
+
+    @Test
+    fun resolveEffectiveThemeMode_systemBaseNoSwitches_returnsSystem() {
+        // 全部开关关闭 → 基础模式原样透传（SYSTEM 由 AppTheme 跟随系统明暗）
+        assertEquals(
+            ThemeMode.SYSTEM,
+            resolveEffectiveThemeMode(ThemeMode.SYSTEM, dynamicColorEnabled = false, oledEnabled = false, highContrastEnabled = false),
+        )
+    }
+
+    @Test
+    fun resolveEffectiveThemeMode_systemBaseOledEnabled_returnsOled() {
+        // SYSTEM 基础 + OLED 开关（无动态取色）→ OLED（纯黑优先级高于基础模式）
+        assertEquals(
+            ThemeMode.OLED,
+            resolveEffectiveThemeMode(ThemeMode.SYSTEM, dynamicColorEnabled = false, oledEnabled = true, highContrastEnabled = false),
+        )
+    }
+
+    @Test
+    fun resolveEffectiveThemeMode_systemBaseDynamicColor_oledWins() {
+        // SYSTEM 基础 + 动态取色 + OLED 同开 → OLED 优先（与 LIGHT 基础行为一致）
+        assertEquals(
+            ThemeMode.OLED,
+            resolveEffectiveThemeMode(ThemeMode.SYSTEM, dynamicColorEnabled = true, oledEnabled = true, highContrastEnabled = false),
         )
     }
 

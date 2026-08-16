@@ -28,6 +28,8 @@ concurrency:
 
 permissions:
   contents: read
+  # 覆盖率 PR 评论（gh pr comment 需要 pull-requests 写权限）
+  pull-requests: write
 
 jobs:
   quality:
@@ -98,3 +100,112 @@ jobs:
         with:
           name: app-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+
+      # ── 覆盖率门禁（Phase B，testing-strategy.md §6/§7）─────────────────────
+      # coverageReport / coverageVerify 是根级聚合任务（构建侧契约，见根 build 任务实现）；
+      # 必须在此步执行——它们聚合各模块 testDebugUnitTest 的 JaCoCo 数据（单测步骤在上面）。
+      # coverageVerify 是硬门禁：任一模块低于阈值 → job 红（per-module thresholds）。
+      - name: Coverage report + verify (hard gate)
+        run: ./gradlew coverageReport coverageVerify --no-daemon
+
+      # diffCoverageCheck 是软门禁（PR 变更的新增代码 ≥80%，-PdiffCoverageThreshold 可调）。
+      # 任务可能尚未落地（与构建侧任务并行开发），先 --dry-run 探测：不存在 → 显式跳过并告警，
+      # 不把 job 染红；continue-on-error 兜底（软门禁，暂不硬卡合并）。
+      - name: Diff coverage check (soft gate, best-effort)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          if ./gradlew diffCoverageCheck --dry-run -q >/dev/null 2>&1; then
+            ./gradlew diffCoverageCheck -PdiffCoverageThreshold=80 -PdiffBaseSha=${{ github.event.pull_request.base.sha }} --no-daemon
+          else
+            echo "::warning::diffCoverageCheck task not present; diff coverage gate skipped"
+          fi
+
+      # 聚合报告上传：if: always() —— coverageVerify 失败时也保留报告供排查。
+      # glob 覆盖根级聚合报告（build/reports/jacoco/coverageReport/html）与各模块报告。
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: |
+            **/build/reports/jacoco/*/html/**
+            **/build/reports/coverage/**/html/**
+          if-no-files-found: ignore
+
+      # PR 覆盖率摘要评论：GitHub artifact URL 不能内联为图片（screenshot-automation.md 调研
+      # 结论），文本摘要 + artifact 链接是稳妥方案。解析聚合/各模块 jacoco XML 的 LINE counter
+      # 汇总成每模块表格；XML 缺失时降级为纯链接评论。仅 pull_request 事件且全绿时运行；
+      # 评论失败不染红 job（continue-on-error）。
+      - name: Post coverage summary comment
+        if: github.event_name == 'pull_request' && success()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          python3 - <<'PYEOF' > /tmp/coverage-comment.md
+          import glob
+          import os
+          import xml.etree.ElementTree as ET
+
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          run_id = os.environ.get("GITHUB_RUN_ID", "")
+
+          def line_pct(path):
+              try:
+                  root = ET.parse(path).getroot()
+                  counters = {c.get("type"): c for c in root.findall("counter")}
+                  c = counters.get("LINE")
+                  if c is None:
+                      return None
+                  missed = int(c.get("missed", "0"))
+                  covered = int(c.get("covered", "0"))
+                  total = missed + covered
+                  return (covered * 100.0 / total) if total else None
+              except Exception:
+                  return None
+
+          def module_label(rel):
+              parts = rel.split("/")
+              if parts and parts[0] in ("core", "feature") and len(parts) > 1:
+                  return "/".join(parts[:2])
+              return parts[0] if parts else "?"
+
+          # 聚合 XML（根级 coverageReport 任务产物）→ 总覆盖率
+          agg = sorted(glob.glob("build/reports/jacoco/coverageReport/*.xml"))
+          overall = line_pct(agg[0]) if agg else None
+
+          # 各模块 XML → 每模块 LINE 覆盖率（同模块多份报告取最大）
+          paths = sorted(glob.glob("**/build/reports/jacoco/*/*.xml", recursive=True))
+          paths += sorted(glob.glob("**/build/reports/coverage/**/xml/*.xml", recursive=True))
+          by_mod = {}
+          for p in paths:
+              p = p.replace(os.sep, "/")
+              # 聚合 XML 已由 overall 表示，不再重复计入模块表
+              if p.startswith("build/reports/jacoco/coverageReport/"):
+                  continue
+              pct = line_pct(p)
+              if pct is not None:
+                  mod = module_label(p)
+                  by_mod[mod] = max(by_mod.get(mod, 0.0), pct)
+
+          lines = []
+          if overall is not None:
+              lines.append(f"**Overall line coverage: {overall:.1f}%**")
+          else:
+              lines.append("Coverage report generated (overall percentage not parseable).")
+          if by_mod:
+              lines.append("")
+              lines.append("<details><summary>Per-module line coverage</summary>")
+              lines.append("")
+              lines.append("| Module | Line coverage |")
+              lines.append("|---|---|")
+              for mod, pct in sorted(by_mod.items()):
+                  lines.append(f"| {mod} | {pct:.1f}% |")
+              lines.append("</details>")
+          lines.append("")
+          lines.append(f"[Download full coverage report](https://github.com/{repo}/actions/runs/{run_id}/artifacts)")
+          print("\n".join(lines))
+          PYEOF
+          gh pr comment "$PR_NUMBER" --body-file /tmp/coverage-comment.md

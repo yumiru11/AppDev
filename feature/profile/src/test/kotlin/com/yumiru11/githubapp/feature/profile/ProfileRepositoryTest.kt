@@ -5,6 +5,8 @@ import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
 import com.yumiru11.githubapp.core.githubrest.api.UserApi
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -16,6 +18,7 @@ import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import retrofit2.HttpException
+import java.io.IOException
 
 /**
  * ProfileRepository 单测（MockWebServer 模拟 GitHub API，零真实网络）。
@@ -237,6 +240,23 @@ class ProfileRepositoryTest {
             val result = repository.repositories(login = null).load(refreshParams())
 
             assertTrue(result is PagingSource.LoadResult.Error)
+        }
+
+    @Test
+    fun getProfile_networkError_propagatesIOException() =
+        runTest {
+            val failingApi =
+                mockk<UserApi> {
+                    coEvery { currentUser() } throws IOException("socket closed")
+                }
+            val failingRepository = ProfileRepository(userApi = failingApi)
+
+            try {
+                failingRepository.getProfile(login = null)
+                fail("IOException 应向上传播（非 Paging 路径不收敛为 Error）")
+            } catch (e: IOException) {
+                assertEquals("socket closed", e.message)
+            }
         }
 
     private fun refreshParams(): PagingSource.LoadParams.Refresh<Int> =

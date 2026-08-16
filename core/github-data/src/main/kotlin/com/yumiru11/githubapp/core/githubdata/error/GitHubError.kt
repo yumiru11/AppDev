@@ -103,12 +103,36 @@ private fun Throwable.httpStatusError(
     retryAfter: String?,
 ): GitHubError =
     when (code) {
-        401 -> GitHubError.Unauthorized
-        403 -> GitHubError.Forbidden
-        404 -> GitHubError.NotFound
-        409 -> GitHubError.Conflict
-        422 -> GitHubError.Validation
-        429 -> GitHubError.RateLimited(retryAfterSeconds = retryAfter?.toLongOrNull())
-        in HTTP_SERVER_MIN..HTTP_SERVER_MAX -> GitHubError.Server(code)
-        else -> GitHubError.Unknown(this)
+        401 -> {
+            GitHubError.Unauthorized
+        }
+
+        403 -> {
+            // GitHub 次级限流：403 + 可解析 Retry-After 头 → 归入限流（isRetryable 语义依赖）
+            retryAfter?.toLongOrNull()?.let { GitHubError.RateLimited(it) } ?: GitHubError.Forbidden
+        }
+
+        404 -> {
+            GitHubError.NotFound
+        }
+
+        409 -> {
+            GitHubError.Conflict
+        }
+
+        422 -> {
+            GitHubError.Validation
+        }
+
+        429 -> {
+            GitHubError.RateLimited(retryAfterSeconds = retryAfter?.toLongOrNull())
+        }
+
+        in HTTP_SERVER_MIN..HTTP_SERVER_MAX -> {
+            GitHubError.Server(code)
+        }
+
+        else -> {
+            GitHubError.Unknown(this)
+        }
     }

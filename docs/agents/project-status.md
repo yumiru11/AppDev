@@ -84,3 +84,17 @@
 - 进行中任务开始/结束 → 更新第 4 节
 - 遗留项闭环 → 从第 5 节移除
 - 本文档由主代理维护（不派子代理更新）
+
+
+## 工作流 grill 结论（2026-08-16）
+
+- 已拍板：验收卡 + 分级验收、PR 测试清单、意图直读文档/ASCII 图、里程碑走查、设计闸门、基线改动需批准、全局性问题专项票
+- 完整规则见 `docs/agents/workflow.md` §4；问题与用户回答原文见 `docs/workflow-grill.md`
+- **待办**：截图工具调研（CICD 自动截图 + PR 评论）——用户用别的 AI 跑 research-questions.md 截图相关
+
+
+## 测试覆盖率推进（2026-08-16 规划）
+
+- 策略：`docs/agents/testing-strategy.md`（JaCoCo 0.8.13+ / 分层目标 / diff coverage 门禁）
+- 分点清单：`docs/agents/testing-checklist.md`（A 纯逻辑 / B 数据层 / C 网络 / D 认证 / E ViewModel / F UI / G 可注入性 / H 断言质量）
+- 待办：Phase A 接 JaCoCo → Phase B CI 门禁 → Phase C 按清单补测试（优先 A13/A14/A16/A8/A9 + B7 + E1/E4）→ Phase D UI 自动化

@@ -20,6 +20,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import java.io.IOException
 
 /**
  * SettingsViewModel 测试（T24）。
@@ -229,9 +230,83 @@ class SettingsViewModelTest {
             assertNull(storage.loadSession().pat)
         }
 
-    private fun createViewModel(): SettingsViewModel =
+    @Test
+    fun setThemeMode_light_persistsAndEmits() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.setThemeMode(ThemeMode.LIGHT)
+                assertEquals(ThemeMode.LIGHT, awaitItem().themeMode)
+            }
+        }
+
+    @Test
+    fun uiState_persistedDarkTheme_emitsDarkOnStartup() =
+        runTest {
+            // 前一次会话已持久化 DARK：新 VM 首帧直接读到持久化值（首帧不闪烁）
+            val repository = FakeUserPreferencesRepository()
+            repository.setThemeMode(ThemeMode.DARK)
+
+            val viewModel = createViewModel(repository)
+
+            viewModel.uiState.test {
+                assertEquals(ThemeMode.DARK, awaitItem().themeMode)
+            }
+        }
+
+    @Test
+    fun setMotionScale_max1_5_persistsAndEmits() =
+        runTest {
+            // 滑杆上界边界值（AppMotion 缩放 0.5–1.5）往返无损
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.setMotionScale(1.5f)
+                assertEquals(1.5f, awaitItem().motionScale)
+            }
+        }
+
+    @Test
+    fun setBlurEnabled_falseThenTrue_togglesBack() =
+        runTest {
+            // 毛玻璃开关往返：默认开启 → 关闭 → 再开启
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                assertEquals(true, awaitItem().blurEnabled)
+                viewModel.setBlurEnabled(false)
+                assertEquals(false, awaitItem().blurEnabled)
+                viewModel.setBlurEnabled(true)
+                assertEquals(true, awaitItem().blurEnabled)
+            }
+        }
+
+    @Test
+    fun setThemeMode_persistenceFailure_stateUnchangedAndNoCrash() =
+        runTest {
+            // 持久化失败（DataStore 写失败/磁盘满）必须静默降级：不崩溃、状态保持旧值、无新发射
+            val failingRepo = FakeUserPreferencesRepository(failOnSetThemeMode = true)
+            val viewModel = createViewModel(failingRepo)
+
+            viewModel.uiState.test {
+                val initial = awaitItem()
+                assertEquals(ThemeMode.SYSTEM, initial.themeMode)
+
+                viewModel.setThemeMode(ThemeMode.DARK)
+
+                expectNoEvents()
+                assertEquals(ThemeMode.SYSTEM, viewModel.uiState.value.themeMode)
+            }
+        }
+
+    private fun createViewModel(): SettingsViewModel = createViewModel(FakeUserPreferencesRepository())
+
+    private fun createViewModel(repository: UserPreferencesRepository): SettingsViewModel =
         SettingsViewModel(
-            preferences = FakeUserPreferencesRepository(),
+            preferences = repository,
             tokenStorage = InMemoryTokenStorage(),
             sessionManager = OAuthSessionManager(InMemoryTokenStorage(), FakeTokenEndpointClient(), OAuthConfig()),
         )
@@ -248,7 +323,10 @@ private class FakeTokenEndpointClient : TokenEndpointClient {
 }
 
 /** 假偏好仓库：全部字段 MutableStateFlow 可编程注入/发射（零 DataStore）。 */
-private class FakeUserPreferencesRepository : UserPreferencesRepository {
+private class FakeUserPreferencesRepository(
+    /** true 时 setThemeMode 抛 IOException（模拟 DataStore 写失败）。 */
+    private val failOnSetThemeMode: Boolean = false,
+) : UserPreferencesRepository {
     private val themeModeFlow = MutableStateFlow(ThemeMode.SYSTEM)
     private val languageTagFlow = MutableStateFlow<String?>(null)
     private val blurEnabledFlow = MutableStateFlow(true)
@@ -287,6 +365,7 @@ private class FakeUserPreferencesRepository : UserPreferencesRepository {
     override val codeLineNumbers: Flow<Boolean> = codeLineNumbersFlow
 
     override suspend fun setThemeMode(mode: ThemeMode) {
+        if (failOnSetThemeMode) throw IOException("disk full")
         themeModeFlow.value = mode
     }
 

@@ -17,6 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.HttpException
 import retrofit2.Response
+import java.io.IOException
 import java.util.Base64
 
 /**
@@ -214,5 +215,78 @@ class RepoRepositoryTest {
             assertTrue(result.isSuccess)
             assertEquals("<p>rendered html</p>", result.getOrThrow().html)
             coVerify(exactly = 0) { readmeApi.renderMarkdown(any()) }
+        }
+
+    @Test
+    fun getReadmeHtml_themeVersionMismatchContentChanged_refetchesHtmlAndUpserts() =
+        runTest {
+            // 缓存存在但主题版本过期且内容 sha 已变（README 更新过）→ 缓存 miss，重新拉取 HTML 并落新缓存
+            val markdown = "```mermaid\ngraph TD; A-->B;\n```"
+            coEvery { readmeApi.getReadmeMeta(any(), any()) } returns readmeDto(markdown, sha = "newsha")
+            coEvery { cachedReadmeDao.getByOwnerAndRepo("octocat", "Hello-World") } returns cachedEntity(themeVersion = "th-old")
+            coEvery { cachedReadmeDao.upsert(any()) } returns Unit
+            coEvery { readmeApi.getReadmeHtml(any(), any()) } returns
+                "<p>fresh html</p>".toResponseBody("text/html".toMediaType())
+
+            val result = repository.getReadmeHtml("octocat", "Hello-World", "th-v1")
+
+            assertTrue(result.isSuccess)
+            assertEquals("<p>fresh html</p>", result.getOrThrow())
+            coVerify(exactly = 1) { readmeApi.getReadmeHtml("octocat", "Hello-World") }
+            coVerify {
+                cachedReadmeDao.upsert(
+                    match { entity ->
+                        entity.themeVersion == "th-v1" &&
+                            entity.contentHash == "newsha" &&
+                            entity.html == "<p>fresh html</p>"
+                    },
+                )
+            }
+        }
+
+    @Test
+    fun getReadmeHtml_networkFailureWithStaleCache_returnsStaleCachedHtml() =
+        runTest {
+            // 三级降级（Tier 3）：主题版本过期 + 内容已变 + 网络拉取失败 → 返回过期缓存 HTML
+            val markdown = "```mermaid\ngraph TD; A-->B;\n```"
+            coEvery { readmeApi.getReadmeMeta(any(), any()) } returns readmeDto(markdown, sha = "newsha")
+            coEvery { cachedReadmeDao.getByOwnerAndRepo("octocat", "Hello-World") } returns cachedEntity(themeVersion = "th-old")
+            coEvery { readmeApi.getReadmeHtml(any(), any()) } throws IOException("network down")
+
+            val result = repository.getReadmeHtml("octocat", "Hello-World", "th-v1")
+
+            assertTrue(result.isSuccess)
+            assertEquals("<p>cached html</p>", result.getOrThrow())
+        }
+
+    @Test
+    fun getReadmeHtml_networkFailureWithoutCache_returnsFailure() =
+        runTest {
+            // 无缓存可降级 → 网络失败原样上抛（VM 映射为 NETWORK 错误态）
+            val markdown = "```mermaid\ngraph TD; A-->B;\n```"
+            coEvery { readmeApi.getReadmeMeta(any(), any()) } returns readmeDto(markdown, sha = "newsha")
+            coEvery { cachedReadmeDao.getByOwnerAndRepo(any(), any()) } returns null
+            coEvery { readmeApi.getReadmeHtml(any(), any()) } throws IOException("network down")
+
+            val result = repository.getReadmeHtml("octocat", "Hello-World", "th-v1")
+
+            assertTrue(result.isFailure)
+        }
+
+    @Test
+    fun getReadme_simpleMarkdownWithoutDownloadUrl_returnsMarkdownUnrewritten() =
+        runTest {
+            // 原生路径：downloadUrl 缺失（空串）→ 相对链接保持原样（不重写、不崩溃，由解析器兜底）
+            val markdown = "# Hello\n\nSee [guide](./docs/guide.md)"
+            coEvery { readmeApi.getReadmeMeta(any(), any()) } returns readmeDto(markdown, downloadUrl = "")
+            coEvery { cachedReadmeDao.getByOwnerAndRepo(any(), any()) } returns null
+
+            val result = repository.getReadme("octocat", "Hello-World", "th-v1")
+
+            assertTrue(result.isSuccess)
+            val content = result.getOrThrow()
+            assertEquals(ReadmeRenderMode.NATIVE, content.renderMode)
+            assertEquals(markdown, content.markdown)
+            coVerify(exactly = 0) { readmeApi.getReadmeHtml(any(), any()) }
         }
 }

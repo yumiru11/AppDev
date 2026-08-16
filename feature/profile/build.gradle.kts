@@ -67,6 +67,8 @@ dependencies {
     testImplementation(libs.mockwebserver3)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
+    testImplementation(libs.turbine)
+    testImplementation(libs.paging.testing)
     testImplementation(kotlin("test"))
     // MockWebServer 测试构造 Retrofit 需直接引用 Json 类型（core:github-rest 的 implementation 不外泄）
     testImplementation(libs.kotlinx.serialization.json)

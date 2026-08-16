@@ -38,8 +38,9 @@ internal fun computeRelativeTime(
     now: Instant,
 ): RelativeTime? {
     val then = runCatching { Instant.parse(isoTimestamp) }.getOrNull() ?: return null
+    // 未来时间直接回退；不能用 toMinutes() < 0 判断——Duration 截断会把 <60s 的未来时间变成 0 分钟
+    if (then.isAfter(now)) return null
     val minutes = Duration.between(then, now).toMinutes()
-    if (minutes < 0) return null
     return when {
         minutes < 1 -> RelativeTime.JustNow
         minutes < 60 -> RelativeTime.Ago(minutes.toInt(), RelativeTimeUnit.MINUTES)
