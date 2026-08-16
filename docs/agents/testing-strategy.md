@@ -70,9 +70,56 @@
 ## 7. 落地路线（4 阶段，对应方法论文档 §23）
 
 - **Phase A（✅ 2026-08-16 完成）**：根 build 接 JaCoCo（AGP `enableUnitTestCoverage`，BuildType 级）→ `./gradlew :<模块>:createDebugUnitTestCoverageReport` 生成报告 → 基线数字（github-rest 23.5% / app 3.4%，注：AGP 报告只统计测试加载类，未加载类不计入——数字偏低，Phase B 定统计口径）→ **Phase B**：CI 门禁 + verification rules + diff coverage
-- **Phase B**：CI 加覆盖率任务 + PR 评论/报告上传 + diff coverage 门禁（新增代码 ≥80%）
+- **Phase B（✅ 2026-08-16 完成，本票）**：版本锁定 + 分母口径 + 聚合报告/验证 + diff coverage 门禁，详见下方「Phase B 交付物」。
 - **Phase C**：按 `docs/agents/testing-checklist.md` 分点清单补齐（A 纯逻辑 → B 数据层 → E ViewModel → G 可注入性，共 9 组 60+ 业务点）
 - **Phase D**：UI 自动化主流程（Compose UI Test 关键路径）+ Nightly 全量
+
+### Phase B 交付物（根 build.gradle.kts，契约任务名）
+
+| 任务 | 契约 | 说明 |
+|---|---|---|
+| `coverageReport` | 根级 | 聚合全部模块 exec 的单一 JaCoCo 报告（XML+HTML，`build/reports/jacoco/coverageReport/`），依赖全部模块 `testDebugUnitTest` |
+| `coverageVerify` | 根级 | 聚合各模块 `jacocoTestCoverageVerification` 门禁（LINE COVEREDRATIO），不达标即失败 |
+| `:<mod>:jacocoTestReport` | 每模块 | 全量分母报告（T2 口径，AGP 自带 `createDebugUnitTestCoverageReport` 保留） |
+| `diffCoverageCheck` | 根级 | PR 新增生产代码行覆盖率 ≥ 阈值（默认 0.80），用法 `./gradlew diffCoverageCheck -PdiffBaseSha=<base> [-PdiffCoverageThreshold=0.80]` |
+
+**CI 用法**（GitHub Actions `pull_request` 事件）：
+```bash
+./gradlew coverageReport coverageVerify
+./gradlew diffCoverageCheck -PdiffBaseSha=${{ github.event.pull_request.base.sha }}
+```
+
+**T1 版本锁定 0.8.13**：AGP 官方 DSL `testCoverage.jacocoVersion`（`TestCoverage` 接口，在 `CommonExtension` 新 DSL 上——legacy `AppExtension/LibraryExtension` 没有；根脚本须 `extensions.getByName("android") as CommonExtension<*,*,*,*,*,*>` 强转，`configure<CommonExtension>` 按注册类型精确匹配会失败）。此前尝试在 `plugins.withId("com.android.*")` 回调里改 jacoco 插件扩展不可行（插件尚未应用）。根聚合任务经 `apply(plugin = "org.gradle.jacoco")` 加载内置插件 + `the<JacocoPluginExtension>().toolVersion = "0.8.13"`——**注意 Gradle 内置 jacoco 插件 id 是 `org.gradle.jacoco`**（`plugins {}` 块无法无版本解析它，门户版 `org.jacoco` marker 在本机镜像下解析不到）。全链路统一 0.8.13（exec 合并跨版本会失败，jacoco#1471）。
+
+**T2 分母口径（重要修正）**：实测证实 **AGP 8.7 的 `createDebugUnitTestCoverageReport` 并不排除未执行类**（feature/settings 报告中 40 类里有 19 类从未被测试加载，按 0% 计入）——Phase A 记录的"只统计测试加载类"是早期状态（github-rest 当时 23.5%/243 行，现为 78.2%/数百行）。真正的分母控制点：
+- **synthetic 类**（`$$serializer`、`$WhenMappings`、Compose lambda 类）：JaCoCo 0.8.13 Analyzer 对 `ACC_SYNTHETIC` 类直接跳过（`Analyzer.analyzeClass` 显式 return），两侧报告均不含——设计如此（生成代码），无需处理；
+- **Hilt 生成类**：本配置在 classDirs 统一排除（`**/*_Factory.class`、`**/Hilt_*.class`、`**/*_HiltComponents*.class`、`**/Dagger*Component*.class`、`**/hilt_aggregated_deps/**`、R/BuildConfig/Manifest）。
+- **跨模块执行**：app/feature 测试会执行下层模块的类 → 单模块 exec 与聚合 exec 数字不一致。`coverageVerify` 契约要求"同一份聚合数据"→ 每模块报告/验证的 executionData 取全部模块 exec 的并集（惰性 provider），并显式 dependsOn 全部 `testDebugUnitTest`（否则 Gradle implicit-dependency 校验失败）。
+- 统计口径：JaCoCo LINE 计数器——部分覆盖行同时计入 covered 和 missed（COVEREDRATIO = covered/(covered+missed)），不要用逐行 `ci>0` 简单相除，会虚高。
+
+**T3 阈值表（2026-08-16 聚合口径实测，LINE COVEREDRATIO）**：
+
+| 模块 | 阈值 | 实测 | 模块类型 |
+|---|---|---|---|
+| core:navigation | 0.94 | 96.1% | 逻辑 |
+| core:github-data | 0.94 | 96.1% | 逻辑 |
+| core:datastore | 0.84 | 86.7% | 逻辑 |
+| core:github-graphql | 0.90 | 92.5% | 逻辑 |
+| core:github-auth | 0.70 | 72.5% | 逻辑 |
+| core:markdown | 0.42 | 44.2% | UI/渲染 |
+| core:designsystem | 0.64 | 66.7% | UI/渲染 |
+| core:github-rest | 0.76 | 78.2% | 网络 DTO |
+| feature:repo | 0.37 | 39.0% | 逻辑（地板 70，Phase C 目标） |
+| feature:profile | 0.29 | 30.9% | 逻辑（地板 60，Phase C 目标） |
+| feature:notifications | 0.28 | 30.2% | 逻辑（地板 60，Phase C 目标） |
+| feature:home | 0.28 | 30.7% | 逻辑（地板 60，Phase C 目标） |
+| feature:issue | 0.21 | 23.7% | 逻辑（地板 50，Phase C 目标） |
+| feature:settings | 0.17 | 19.6% | UI/渲染（地板 25，Phase C 目标） |
+| app、feature:auth | — | — | 豁免（纯 UI 装配） |
+
+阈值 = max(地板, 实测 − 2pt)，保证 CI 今天能过；实测低于地板的 6 个模块按实测 − 2pt 设阈值，地板作为 Phase C 收紧目标。无单元测试的模块（无 exec）跳过验证。
+
+**T4 diff coverage**：自研任务（方案 c）而非 diff-coverage 插件——插件任务名不满足契约且 Gradle 8.12/Kotlin 2.3 兼容性需额外验证；自研零新依赖（JDK XML + git）。算法：`git diff --unified=0 base...HEAD` 解析新增行（仅 `src/main/` 下 .kt/.java）→ 与聚合 XML 的 `<sourcefile>/<line>` 逐行比对（`ci>0` 计覆盖）→ 未达阈值列出未覆盖文件与行号并失败。base 来源：`-PdiffBaseSha` > `DIFF_BASE_SHA` 环境变量 > `HEAD~1`。实测：HEAD~3 基线 diff（49 行新增，49.0% 覆盖）在默认 0.80 下正确失败，`-PdiffCoverageThreshold=0.40` 下正确通过。
 
 ## 8. 参考
 
