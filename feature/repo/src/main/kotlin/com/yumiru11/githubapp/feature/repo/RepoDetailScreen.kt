@@ -27,11 +27,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,6 +75,8 @@ fun RepoDetailScreen(
     actions: RepoDetailActions = LocalRepoDetailActions.current,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val filesViewModel: RepoFilesViewModel = hiltViewModel()
+    val filesState by filesViewModel.uiState.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -117,12 +124,28 @@ fun RepoDetailScreen(
                 }
 
                 is RepoDetailUiState.Success -> {
-                    RepoDetailContent(
-                        repo = state.repo,
-                        readmeState = state.readmeState,
-                        actions = actions,
-                        onRetryReadme = { viewModel.retry() },
-                    )
+                    if (filesState.selectedPath != null) {
+                        // T11：文件查看器全屏覆盖（树/README 内容隐藏，返回键回文件树）
+                        FileViewerScreen(
+                            fileState = filesState.fileState,
+                            selectedPath = filesState.selectedPath.orEmpty(),
+                            ref = state.repo.defaultBranch ?: DEFAULT_REF,
+                            viewModel = filesViewModel,
+                            actions = actions,
+                            baseRepoUrl = buildRepoUrl(state.repo),
+                            onClose = { filesViewModel.closeFile() },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        RepoDetailContent(
+                            repo = state.repo,
+                            readmeState = state.readmeState,
+                            filesState = filesState,
+                            filesViewModel = filesViewModel,
+                            actions = actions,
+                            onRetryReadme = { viewModel.retry() },
+                        )
+                    }
                 }
             }
         }
@@ -133,10 +156,14 @@ fun RepoDetailScreen(
 private fun RepoDetailContent(
     repo: Repository,
     readmeState: ReadmeState,
+    filesState: RepoFilesUiState,
+    filesViewModel: RepoFilesViewModel,
     actions: RepoDetailActions,
     onRetryReadme: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+
     Column(
         modifier =
             modifier
@@ -147,12 +174,39 @@ private fun RepoDetailContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        ReadmeSection(
-            readmeState = readmeState,
-            actions = actions,
-            onRetryReadme = onRetryReadme,
-            baseRepoUrl = buildRepoUrl(repo),
-        )
+        TabRow(selectedTabIndex = tab) {
+            Tab(
+                selected = tab == 0,
+                onClick = { tab = 0 },
+                text = { Text(text = stringResource(R.string.repo_tab_readme)) },
+            )
+            Tab(
+                selected = tab == 1,
+                onClick = { tab = 1 },
+                text = { Text(text = stringResource(R.string.repo_tab_files)) },
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        when (tab) {
+            0 -> {
+                ReadmeSection(
+                    readmeState = readmeState,
+                    actions = actions,
+                    onRetryReadme = onRetryReadme,
+                    baseRepoUrl = buildRepoUrl(repo),
+                )
+            }
+
+            else -> {
+                FileTreeSection(
+                    treeState = filesState.treeState,
+                    defaultBranch = repo.defaultBranch,
+                    viewModel = filesViewModel,
+                )
+            }
+        }
     }
 }
 
@@ -307,9 +361,10 @@ private fun ReadmeSection(
 
 /**
  * 链接统一分发：内部链接 → 应用内导航；外部链接 → CustomTabs；纯锚点（#xxx）忽略
- * （WebView 内锚点由页面自身处理，原生渲染器无滚动定位，忽略即可）。
+ * （WebView 内锚点由页面自身处理，原生渲染器无滚动定位，忽略即可；
+ * 文件查看器的 .md Rendered 模式共用此逻辑）。
  */
-private fun handleParsedUrl(
+internal fun handleParsedUrl(
     parsed: ParsedUrl,
     actions: RepoDetailActions,
 ) {
@@ -357,7 +412,7 @@ private fun createBridgeCallback(actions: RepoDetailActions): MarkdownBridgeCall
 }
 
 @Composable
-private fun ErrorContent(
+internal fun ErrorContent(
     errorType: RepoErrorType,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,

@@ -2,9 +2,14 @@ package com.yumiru11.githubapp.feature.repo
 
 import com.yumiru11.githubapp.core.database.dao.CachedReadmeDao
 import com.yumiru11.githubapp.core.database.entity.CachedReadmeEntity
+import com.yumiru11.githubapp.core.githubrest.api.ContentApi
+import com.yumiru11.githubapp.core.githubrest.api.GitTreeApi
 import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
+import com.yumiru11.githubapp.core.githubrest.model.FileContentDto
+import com.yumiru11.githubapp.core.githubrest.model.GitTreeResponseDto
 import com.yumiru11.githubapp.core.githubrest.model.ReadmeDto
+import com.yumiru11.githubapp.core.githubrest.model.TreeItemDto
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -30,12 +35,16 @@ class RepoRepositoryTest {
     private val repositoryApi = mockk<RepositoryApi>()
     private val readmeApi = mockk<ReadmeApi>()
     private val cachedReadmeDao = mockk<CachedReadmeDao>()
+    private val gitTreeApi = mockk<GitTreeApi>()
+    private val contentApi = mockk<ContentApi>()
 
     private val repository =
         RepoRepository(
             repositoryApi = repositoryApi,
             readmeApi = readmeApi,
             cachedReadmeDao = cachedReadmeDao,
+            gitTreeApi = gitTreeApi,
+            contentApi = contentApi,
         )
 
     private fun readmeDto(
@@ -288,5 +297,154 @@ class RepoRepositoryTest {
             assertEquals(ReadmeRenderMode.NATIVE, content.renderMode)
             assertEquals(markdown, content.markdown)
             coVerify(exactly = 0) { readmeApi.getReadmeHtml(any(), any()) }
+        }
+
+    @Test
+    fun getTree_validResponse_buildsRootNodes() =
+        runTest {
+            coEvery { gitTreeApi.getTree("octocat", "Hello-World", "main") } returns
+                GitTreeResponseDto(
+                    sha = "rootsha",
+                    tree =
+                        listOf(
+                            TreeItemDto(path = "README.md", type = "blob", sha = "s1", size = 10),
+                            TreeItemDto(path = "src", type = "tree", sha = "s2"),
+                        ),
+                )
+
+            val result = repository.getTree("octocat", "Hello-World", "main")
+
+            assertTrue(result.isSuccess)
+            val nodes = result.getOrThrow()
+            assertEquals(2, nodes.size)
+            // 排序：目录（src）在前，文件（README.md）在后
+            assertTrue(nodes[0].isDirectory)
+            assertEquals("src", nodes[0].path)
+            assertEquals("s2", nodes[0].sha)
+            assertEquals("README.md", nodes[1].path)
+            coVerify(exactly = 1) { gitTreeApi.getTree("octocat", "Hello-World", "main") }
+        }
+
+    @Test
+    fun getTree_apiFailure_returnsFailure() =
+        runTest {
+            coEvery { gitTreeApi.getTree(any(), any(), any()) } throws IOException("network down")
+
+            val result = repository.getTree("octocat", "Hello-World", "main")
+
+            assertTrue(result.isFailure)
+        }
+
+    @Test
+    fun getChildTree_validResponse_prependsParentPath() =
+        runTest {
+            coEvery { gitTreeApi.getTree("octocat", "Hello-World", "s2") } returns
+                GitTreeResponseDto(
+                    tree =
+                        listOf(
+                            TreeItemDto(path = "Main.kt", type = "blob", sha = "s3"),
+                            TreeItemDto(path = "util", type = "tree", sha = "s4"),
+                        ),
+                )
+
+            val result = repository.getChildTree("octocat", "Hello-World", "s2", parentPath = "src")
+
+            assertTrue(result.isSuccess)
+            val nodes = result.getOrThrow()
+            // 排序：目录（util）在前，文件（Main.kt）在后
+            assertEquals(listOf("src/util", "src/Main.kt"), nodes.map { it.path })
+        }
+
+    @Test
+    fun getFileContent_codeFile_decodesAndClassifiesCode() =
+        runTest {
+            val source = "fun main() = println(\"hi\")"
+            coEvery { contentApi.getFileContent("octocat", "Hello-World", "src/Main.kt", "main") } returns
+                FileContentDto(
+                    name = "Main.kt",
+                    path = "src/Main.kt",
+                    size = source.length.toLong(),
+                    content = Base64.getEncoder().encodeToString(source.toByteArray()),
+                    encoding = "base64",
+                )
+
+            val result = repository.getFileContent("octocat", "Hello-World", "src/Main.kt", "main")
+
+            assertTrue(result.isSuccess)
+            val data = result.getOrThrow()
+            assertEquals(FileKind.CODE, data.kind)
+            assertEquals(source, data.text)
+            coVerify(exactly = 1) { contentApi.getFileContent("octocat", "Hello-World", "src/Main.kt", "main") }
+        }
+
+    @Test
+    fun getFileContent_markdownFile_classifiesMarkdown() =
+        runTest {
+            val source = "# Title\n\nbody"
+            coEvery { contentApi.getFileContent(any(), any(), any(), any()) } returns
+                FileContentDto(
+                    name = "README.md",
+                    path = "README.md",
+                    size = source.length.toLong(),
+                    content = Base64.getEncoder().encodeToString(source.toByteArray()),
+                    encoding = "base64",
+                )
+
+            val result = repository.getFileContent("octocat", "Hello-World", "README.md", null)
+
+            assertTrue(result.isSuccess)
+            assertEquals(FileKind.MARKDOWN, result.getOrThrow().kind)
+            assertEquals(source, result.getOrThrow().text)
+        }
+
+    @Test
+    fun getFileContent_largeFile_classifiesTooLargeWithoutText() =
+        runTest {
+            coEvery { contentApi.getFileContent(any(), any(), any(), any()) } returns
+                FileContentDto(
+                    name = "big.bin",
+                    path = "big.bin",
+                    size = FileClassifier.LARGE_FILE_LIMIT_BYTES + 1,
+                    content = "",
+                    encoding = "base64",
+                )
+
+            val result = repository.getFileContent("octocat", "Hello-World", "big.bin", "main")
+
+            assertTrue(result.isSuccess)
+            val data = result.getOrThrow()
+            assertEquals(FileKind.TOO_LARGE, data.kind)
+            assertNull(data.text)
+        }
+
+    @Test
+    fun getFileContent_binaryFile_classifiesBinaryWithoutText() =
+        runTest {
+            val binaryBytes = byteArrayOf(0x50, 0x4B, 0x03, 0x04, 0x00, 0x00, 0x00)
+            coEvery { contentApi.getFileContent(any(), any(), any(), any()) } returns
+                FileContentDto(
+                    name = "archive.zip",
+                    path = "archive.zip",
+                    size = binaryBytes.size.toLong(),
+                    content = Base64.getEncoder().encodeToString(binaryBytes),
+                    encoding = "base64",
+                )
+
+            val result = repository.getFileContent("octocat", "Hello-World", "archive.zip", "main")
+
+            assertTrue(result.isSuccess)
+            val data = result.getOrThrow()
+            assertEquals(FileKind.BINARY, data.kind)
+            assertNull(data.text)
+        }
+
+    @Test
+    fun getFileContent_apiFailure_returnsFailure() =
+        runTest {
+            coEvery { contentApi.getFileContent(any(), any(), any(), any()) } throws httpException(404)
+
+            val result = repository.getFileContent("octocat", "Hello-World", "missing.txt", "main")
+
+            assertTrue(result.isFailure)
         }
 }
