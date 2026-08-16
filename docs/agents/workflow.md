@@ -1,7 +1,7 @@
 # AppDev 执行流程手册（AI Agent 工作流）
 
 > 本文件定义 AppDev 从「接到 ticket」到「合并关票」的完整执行流程。所有 AI 代理（OpenCode / DSH / 云端）在 AppDev 干活前必读。
-> 配合阅读：`AGENTS.md`（环境/门禁/铁律）、`docs/agents/project-status.md`（当前进度）。
+> 配合阅读：`AGENTS.md`（环境/门禁/铁律）、`docs/agents/project-status.md`（当前进度）、`docs/agents/testing-strategy.md`（测试/覆盖率策略）。
 
 ## 1. Ticket 工作流总览
 
@@ -42,6 +42,8 @@
 ```bash
 ./gradlew spotlessCheck detekt konsistCheck :app:lintDebug :app:testDebugUnitTest :app:verifyRoborazziDebug :app:assembleDebug
 ```
+
+- **覆盖率门禁**（Phase A 起）：`./gradlew jacocoTestReport`（或模块级）——覆盖率策略见 `docs/agents/testing-strategy.md`；CI PR 阶段加 diff coverage（新增代码 ≥80%）
 
 - 违规修复：`./gradlew spotlessApply`；detekt 业务合理违规用 `@file:Suppress("RuleName")` + 理由注释
 - **只跑 compile/test 会漏 spotless/detekt → CI 必挂**（T4/T6/T7 三票 9 个违规的教训）

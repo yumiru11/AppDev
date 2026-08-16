@@ -62,6 +62,7 @@
 - 测试命名：**`methodName_scenario_expectedBehavior`**（如 `guestWelcomeScreen_lightTheme_matchesBaseline`）
 - 测试基建在 `core:testing`（MainDispatcherRule / ScreenshotTest / GitHubFakes）；新增测试依赖一律 `testImplementation(project(":core:testing"))`
 - 截图基准路径：`app/src/test/screenshots/*.png`（入库）；CI `verifyRoborazziDebug` 校验
+- **覆盖率（Phase A 进行中）**：JaCoCo 0.8.13+（不用 Kover——官方已转向，kotlinx-kover#746）；AGP `enableUnitTestCoverage`；diff coverage 门禁（新增代码 ≥80%）——完整策略见 `docs/agents/testing-strategy.md`
 
 ## 模块架构（plan.md §10.1）
 
