@@ -300,14 +300,14 @@ jobs:
             fi
             echo ""
             echo "[Download screenshots artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts)"
-            echo ""
-            echo "> GitHub artifact URLs cannot be inlined as images; download the artifact to review."
           } > /tmp/screenshots-comment.md
 
-      - name: Post screenshot review comment (sticky)
+      - name: Post screenshot review comment (sticky, images inlined)
         if: github.event_name == 'pull_request' && !cancelled()
         continue-on-error: true
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: screenshots
           path: /tmp/screenshots-comment.md
+          # marocchino 上传图片并内联到评论（glob 匹配全部截图）
+          images: 'artifacts/screenshots/**/*.png'
