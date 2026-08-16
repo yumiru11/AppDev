@@ -14,6 +14,7 @@ import com.yumiru11.githubapp.core.datastore.model.IconStyle
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.designsystem.theme.darkPalette
+import com.yumiru11.githubapp.core.designsystem.theme.highContrastDarkPalette
 import com.yumiru11.githubapp.core.designsystem.theme.highContrastLightPalette
 import com.yumiru11.githubapp.core.designsystem.theme.lightPalette
 import com.yumiru11.githubapp.core.designsystem.theme.oledPalette
@@ -133,6 +134,65 @@ class AppThemeHostTest {
         composeRule.waitForIdle()
 
         assertEquals(oledPalette().colorScheme.background, capturedBackground)
+    }
+
+    // ── 系统深色跟随（E7）：isSystemInDarkTheme → resolveEffectiveThemeMode(systemDark) 接线 ──
+
+    @Test
+    @Config(qualifiers = "night")
+    fun themeHost_systemMode_systemDark_selectsDarkPalette() {
+        // 跟随系统模式 + 系统深色（Robolectric night qualifier）→ 深色色板
+        var capturedBackground: Color? = null
+
+        composeRule.setContent {
+            val lifecycleOwner = remember { TestLifecycleOwner() }
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                AppThemeHost(repository = FakeUserPreferencesRepository(themeMode = ThemeMode.SYSTEM)) {
+                    capturedBackground = MaterialTheme.colorScheme.background
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(darkPalette().colorScheme.background, capturedBackground)
+    }
+
+    @Test
+    @Config(qualifiers = "night")
+    fun themeHost_highContrastMode_systemDark_selectsHighContrastDarkPalette() {
+        // HIGH_CONTRAST 跟随系统明暗：系统深色 → 高对比深色色板
+        var capturedBackground: Color? = null
+
+        composeRule.setContent {
+            val lifecycleOwner = remember { TestLifecycleOwner() }
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                AppThemeHost(repository = FakeUserPreferencesRepository(themeMode = ThemeMode.HIGH_CONTRAST)) {
+                    capturedBackground = MaterialTheme.colorScheme.background
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(highContrastDarkPalette().colorScheme.background, capturedBackground)
+    }
+
+    @Test
+    @Config(qualifiers = "night")
+    fun themeHost_darkMode_systemDark_staysDarkPalette() {
+        // 强制 DARK 模式不受系统深色影响（跟随系统仅作用于 SYSTEM/HIGH_CONTRAST）
+        var capturedBackground: Color? = null
+
+        composeRule.setContent {
+            val lifecycleOwner = remember { TestLifecycleOwner() }
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                AppThemeHost(repository = FakeUserPreferencesRepository(themeMode = ThemeMode.DARK)) {
+                    capturedBackground = MaterialTheme.colorScheme.background
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(darkPalette().colorScheme.background, capturedBackground)
     }
 }
 

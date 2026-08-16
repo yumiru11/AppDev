@@ -84,7 +84,13 @@ class GraphQLIntegrationTest {
             // 共享 OkHttp 链：GraphQL POST 同样携带统一头与 Auth
             val recorded = server.takeRequest()
             assertEquals("Bearer gql-token", recorded.headers["Authorization"])
-            assertEquals("application/vnd.github+json", recorded.headers["Accept"])
+            // Apollo 引擎自带 GraphQL Accept（defer 多部分 + graphql-response+json），
+            // GitHubHeaderInterceptor 按设计保留显式 Accept 而非覆盖
+            val accept = recorded.headers["Accept"].orEmpty()
+            assertTrue(
+                "Accept 应含 Apollo 引擎默认 graphql-response+json，实际：$accept",
+                accept.contains("application/graphql-response+json"),
+            )
             assertEquals("2022-11-28", recorded.headers["X-GitHub-Api-Version"])
             // 请求体是 GraphQL 文档 + operationName
             val body = recorded.body?.utf8().orEmpty()

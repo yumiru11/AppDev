@@ -195,4 +195,148 @@ class ReadmeApiTest {
             // mode 有默认值 "gfm"，kotlinx.serialization 默认排除默认值字段
             assertTrue("请求体含 context", body.contains("\"context\":\"octocat/Hello-World\""))
         }
+
+    @Test
+    fun getReadmeMeta_nullContent_decodeReturnsNull() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        {
+                          "name": "README.md",
+                          "path": "README.md",
+                          "sha": "abc123"
+                        }
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val dto = readmeApi.getReadmeMeta("octocat", "Hello-World")
+
+            assertEquals("README.md", dto.name)
+            assertEquals("content 缺失时解码应为 null", null, dto.decodeContent())
+        }
+
+    @Test
+    fun getReadmeMeta_nonBase64Encoding_returnsContentRaw() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        {
+                          "name": "README.md",
+                          "path": "README.md",
+                          "sha": "abc123",
+                          "content": "plain text content",
+                          "encoding": "utf-8"
+                        }
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val dto = readmeApi.getReadmeMeta("octocat", "Hello-World")
+
+            assertEquals("非 base64 编码应原样返回", "plain text content", dto.decodeContent())
+        }
+
+    @Test
+    fun getReadmeMeta_invalidBase64_returnsNull() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        {
+                          "name": "README.md",
+                          "path": "README.md",
+                          "sha": "abc123",
+                          "content": "!!!not-base64!!!",
+                          "encoding": "base64"
+                        }
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val dto = readmeApi.getReadmeMeta("octocat", "Hello-World")
+
+            assertEquals("非法 base64 应容错返回 null", null, dto.decodeContent())
+        }
+
+    @Test
+    fun getReadmeMeta_contentWithNewlines_decodesCorrectly() =
+        runTest {
+            // "Hello,\nWorld!" base64：SGVsbG8sCldvcmxkIQ==（GitHub 返回的 content 常带 \n 分段）
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        {
+                          "name": "README.md",
+                          "path": "README.md",
+                          "sha": "abc123",
+                          "content": "SGVsbG8sCldvcmxkIQ==",
+                          "encoding": "base64"
+                        }
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val dto = readmeApi.getReadmeMeta("octocat", "Hello-World")
+
+            assertEquals("Hello,\nWorld!", dto.decodeContent())
+        }
+
+    @Test
+    fun getReadmeMeta_withRef_passesQueryParameter() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        {
+                          "name": "README.md",
+                          "path": "README.md",
+                          "sha": "abc123"
+                        }
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            readmeApi.getReadmeMeta("octocat", "Hello-World", ref = "develop")
+
+            val request = server.takeRequest()
+            assertEquals("develop", request.url.queryParameter("ref"))
+            assertEquals("application/json", request.headers["Accept"])
+        }
+
+    @Test
+    fun renderMarkdown_500Response_throwsHttpException() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 500 Internal Server Error")
+                    .body("""{"message":"Server Error"}""")
+                    .build(),
+            )
+
+            try {
+                readmeApi.renderMarkdown(MarkdownRenderRequest(text = "# Hi", mode = "gfm", context = null))
+                org.junit.Assert.fail("500 应抛 HttpException")
+            } catch (e: retrofit2.HttpException) {
+                assertEquals(500, e.code())
+            }
+        }
 }

@@ -1,3 +1,5 @@
+@file:Suppress("EmptyCatchBlock", "TooGenericExceptionCaught", "SwallowedException") // 偏好持久化失败静默降级（T24 补测修复）：catch 块仅注释说明意图，异常有意丢弃，不崩溃
+
 package com.yumiru11.githubapp.feature.settings
 
 import androidx.lifecycle.ViewModel
@@ -80,52 +82,52 @@ class SettingsViewModel
             )
 
         fun setThemeMode(mode: ThemeMode) {
-            viewModelScope.launch { preferences.setThemeMode(mode) }
+            persist { preferences.setThemeMode(mode) }
         }
 
         fun setDynamicColorEnabled(enabled: Boolean) {
-            viewModelScope.launch { preferences.setDynamicColorEnabled(enabled) }
+            persist { preferences.setDynamicColorEnabled(enabled) }
         }
 
         fun setSeedColor(color: Long) {
-            viewModelScope.launch { preferences.setSeedColor(color) }
+            persist { preferences.setSeedColor(color) }
         }
 
         fun setOledEnabled(enabled: Boolean) {
-            viewModelScope.launch { preferences.setOledEnabled(enabled) }
+            persist { preferences.setOledEnabled(enabled) }
         }
 
         fun setHighContrastEnabled(enabled: Boolean) {
-            viewModelScope.launch { preferences.setHighContrastEnabled(enabled) }
+            persist { preferences.setHighContrastEnabled(enabled) }
         }
 
         fun setCornerScale(scale: Float) {
-            viewModelScope.launch { preferences.setCornerScale(scale) }
+            persist { preferences.setCornerScale(scale) }
         }
 
         fun setMotionScale(scale: Float) {
-            viewModelScope.launch { preferences.setMotionScale(scale) }
+            persist { preferences.setMotionScale(scale) }
         }
 
         fun setIconStyle(style: IconStyle) {
-            viewModelScope.launch { preferences.setIconStyle(style) }
+            persist { preferences.setIconStyle(style) }
         }
 
         fun setCodeFont(font: CodeFont) {
-            viewModelScope.launch { preferences.setCodeFont(font) }
+            persist { preferences.setCodeFont(font) }
         }
 
         fun setCodeLineNumbers(enabled: Boolean) {
-            viewModelScope.launch { preferences.setCodeLineNumbers(enabled) }
+            persist { preferences.setCodeLineNumbers(enabled) }
         }
 
         fun setBlurEnabled(enabled: Boolean) {
-            viewModelScope.launch { preferences.setBlurEnabled(enabled) }
+            persist { preferences.setBlurEnabled(enabled) }
         }
 
         /** null 表示回退系统语言。 */
         fun setLanguageTag(tag: String?) {
-            viewModelScope.launch { preferences.setLanguageTag(tag) }
+            persist { preferences.setLanguageTag(tag) }
         }
 
         /** 开发者模式：保存 PAT（REST-only，ADR-0003）并刷新登录态为 PAT；空白输入忽略。 */
@@ -133,6 +135,22 @@ class SettingsViewModel
             if (pat.isBlank()) return
             tokenStorage.saveSession(SessionData(pat = pat, isRestOnly = true))
             viewModelScope.launch { sessionManager.refreshState() }
+        }
+
+        /**
+         * 偏好写入统一入口：持久化失败（DataStore 写失败/磁盘满）静默降级。
+         *
+         * 不吞异常会沿 viewModelScope 冒泡为未捕获异常导致应用崩溃（补测修复）；
+         * 静默后 Flow 不发新值，UI 保持旧值，下次成功写入自然恢复。
+         */
+        private fun persist(block: suspend () -> Unit) {
+            viewModelScope.launch {
+                try {
+                    block()
+                } catch (e: Exception) {
+                    // 持久化失败：UI 保持旧值（Flow 无新发射），不崩溃
+                }
+            }
         }
     }
 

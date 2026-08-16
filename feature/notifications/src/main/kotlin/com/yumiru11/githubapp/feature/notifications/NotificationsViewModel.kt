@@ -14,12 +14,15 @@ import com.yumiru11.githubapp.feature.notifications.data.NotificationRepository
 import com.yumiru11.githubapp.feature.notifications.model.NotificationFilter
 import com.yumiru11.githubapp.feature.notifications.model.NotificationItem
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
+import java.io.IOException
 import javax.inject.Inject
 
 /**
@@ -97,10 +100,25 @@ class NotificationsViewModel
             val notifications: Flow<PagingData<NotificationItem>> =
                 try {
                     notificationRepository.notifications(filter).cachedIn(viewModelScope)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    _uiState.value = NotificationsUiState.Error(errorType = NotificationsErrorType.UNKNOWN)
+                    _uiState.value = NotificationsUiState.Error(errorType = e.toNotificationsErrorType())
                     return
                 }
             _uiState.value = NotificationsUiState.Success(filter = filter, notifications = notifications)
         }
+    }
+
+/**
+ * 异常 → [NotificationsErrorType] 映射（T19 补全：401/403 凭据失效与网络错误区分，消除 UNAUTHORIZED/NETWORK 不可达）。
+ *
+ * 规则：401/403 → UNAUTHORIZED；其余 HttpException 与 IOException → NETWORK；其余 → UNKNOWN。
+ * ViewModel/UI 只产类型，不产英文文案（文案由 UI 层 stringResource 本地化）。
+ */
+internal fun Throwable.toNotificationsErrorType(): NotificationsErrorType =
+    when {
+        this is HttpException && (code() == 401 || code() == 403) -> NotificationsErrorType.UNAUTHORIZED
+        this is HttpException || this is IOException -> NotificationsErrorType.NETWORK
+        else -> NotificationsErrorType.UNKNOWN
     }

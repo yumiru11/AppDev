@@ -4,6 +4,7 @@ import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okio.Buffer
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -68,9 +69,11 @@ class GitHubHeaderInterceptorTest {
     }
 
     @Test
-    fun intercept_existingCustomAcceptHeader_isReplacedNotDuplicated() {
+    fun intercept_existingCustomAcceptHeader_isPreservedForApiOverride() {
         server.enqueue(MockResponse.Builder().body("{}").build())
 
+        // 显式 Accept（如 ReadmeApi 的 html+json、IssueApi 的 mockingbird preview）必须原样保留，
+        // 拦截器只在请求未设置 Accept 时注入默认值（GitHubHeaderInterceptor 注释语义）。
         client
             .newCall(
                 Request
@@ -83,7 +86,77 @@ class GitHubHeaderInterceptorTest {
 
         val recorded = server.takeRequest()
         assertEquals(1, recorded.headers.values("Accept").size)
+        assertEquals("application/json", recorded.headers["Accept"])
+    }
+
+    @Test
+    fun intercept_lowercaseAcceptHeader_isPreservedSingleValue() {
+        server.enqueue(MockResponse.Builder().body("{}").build())
+
+        // OkHttp 头查找大小写不敏感：小写 accept 同样命中“已设置”分支，不被默认值覆盖
+        client
+            .newCall(
+                Request
+                    .Builder()
+                    .url(server.url("/user"))
+                    .header("accept", "application/vnd.github.html+json")
+                    .build(),
+            ).execute()
+            .close()
+
+        val recorded = server.takeRequest()
+        assertEquals(1, recorded.headers.values("Accept").size)
+        assertEquals("application/vnd.github.html+json", recorded.headers["Accept"])
+    }
+
+    @Test
+    fun intercept_userAgent_isExactAppDevValue() {
+        server.enqueue(MockResponse.Builder().body("{}").build())
+
+        client.newCall(Request.Builder().url(server.url("/user")).build()).execute().close()
+
+        val recorded = server.takeRequest()
+        // GitHub 强制 User-Agent：断言精确值（同时验证覆盖 OkHttp 默认 UA 而非追加）
+        assertEquals("AppDev-GitHub-Client/0.1.0", recorded.headers["User-Agent"])
+        assertEquals(1, recorded.headers.values("User-Agent").size)
+    }
+
+    @Test
+    fun intercept_repeatedCalls_headersAppliedEveryTime() {
+        server.enqueue(MockResponse.Builder().body("{}").build())
+        server.enqueue(MockResponse.Builder().body("{}").build())
+
+        client.newCall(Request.Builder().url(server.url("/a")).build()).execute().close()
+        client.newCall(Request.Builder().url(server.url("/b")).build()).execute().close()
+
+        val first = server.takeRequest()
+        val second = server.takeRequest()
+        for (request in listOf(first, second)) {
+            assertEquals("application/vnd.github+json", request.headers["Accept"])
+            assertEquals("2022-11-28", request.headers["X-GitHub-Api-Version"])
+            assertEquals("AppDev-GitHub-Client/0.1.0", request.headers["User-Agent"])
+        }
+    }
+
+    @Test
+    fun intercept_postRequest_addsAllHeaders() {
+        server.enqueue(MockResponse.Builder().body("{}").build())
+
+        client
+            .newCall(
+                Request
+                    .Builder()
+                    .url(server.url("/markdown"))
+                    .post("".toRequestBody())
+                    .build(),
+            ).execute()
+            .close()
+
+        val recorded = server.takeRequest()
+        assertEquals("POST", recorded.method)
         assertEquals("application/vnd.github+json", recorded.headers["Accept"])
+        assertEquals("2022-11-28", recorded.headers["X-GitHub-Api-Version"])
+        assertEquals("AppDev-GitHub-Client/0.1.0", recorded.headers["User-Agent"])
     }
 
     @Test
