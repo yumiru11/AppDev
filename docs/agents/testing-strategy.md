@@ -71,7 +71,7 @@
 
 - **Phase A（下一步）**：根 build 接 JaCoCo 0.8.13+ → `enableUnitTestCoverage` → 每模块 verification rules（宽松起步：核心模块 70-80%）→ 本地 `./gradlew jacocoTestReport` 可看
 - **Phase B**：CI 加覆盖率任务 + PR 评论/报告上传 + diff coverage 门禁（新增代码 ≥80%）
-- **Phase C**：按 §5 质量清单补齐核心模块测试（对照方法论文档的覆盖清单逐层补）
+- **Phase C**：按 `docs/agents/testing-checklist.md` 分点清单补齐（A 纯逻辑 → B 数据层 → E ViewModel → G 可注入性，共 9 组 60+ 业务点）
 - **Phase D**：UI 自动化主流程（Compose UI Test 关键路径）+ Nightly 全量
 
 ## 8. 参考

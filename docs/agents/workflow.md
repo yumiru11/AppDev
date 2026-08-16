@@ -44,6 +44,7 @@
 ```
 
 - **覆盖率门禁**（Phase A 起）：`./gradlew jacocoTestReport`（或模块级）——覆盖率策略见 `docs/agents/testing-strategy.md`；CI PR 阶段加 diff coverage（新增代码 ≥80%）
+- **新功能票必补测试**：实现时对照 `docs/agents/testing-checklist.md` 为对应业务点补测试（每点至少 正常+边界+异常 三类；ViewModel 补 4 态）——Phase C 起强制
 
 - 违规修复：`./gradlew spotlessApply`；detekt 业务合理违规用 `@file:Suppress("RuleName")` + 理由注释
 - **只跑 compile/test 会漏 spotless/detekt → CI 必挂**（T4/T6/T7 三票 9 个违规的教训）
