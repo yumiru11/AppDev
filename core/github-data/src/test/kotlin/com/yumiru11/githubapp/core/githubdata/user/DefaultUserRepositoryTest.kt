@@ -12,6 +12,7 @@ import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.SerializationException
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -33,20 +34,25 @@ class DefaultUserRepositoryTest {
     private lateinit var repository: DefaultUserRepository
     private lateinit var apolloClient: ApolloClient
     private val responsesByPath = mutableMapOf<String, MockResponse>()
+    private val requestCountByPath = mutableMapOf<String, Int>()
 
     @Before
     fun setUp() {
         responsesByPath.clear()
+        requestCountByPath.clear()
         server = MockWebServer()
         server.dispatcher =
             object : Dispatcher() {
-                override fun dispatch(request: RecordedRequest): MockResponse =
-                    responsesByPath[request.url.encodedPath]
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    val path = request.url.encodedPath
+                    requestCountByPath[path] = (requestCountByPath[path] ?: 0) + 1
+                    return responsesByPath[path]
                         ?: MockResponse
                             .Builder()
                             .status("HTTP/1.1 404 Not Found")
                             .body("{}")
                             .build()
+                }
             }
         server.start()
 
@@ -242,5 +248,146 @@ class DefaultUserRepositoryTest {
 
             val networkError = assertIs<GitHubError.Network>(exception.error)
             assertEquals("network down", networkError.cause?.message)
+        }
+
+    @Test
+    fun getCurrentUser_graphqlFails_restUnauthorized_throwsUnauthorizedError() =
+        runTest {
+            // GraphQL 通道 5xx → REST 兜底返回 401（token 失效）→ 归一化为 Unauthorized
+            responsesByPath["/graphql"] =
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 500 Internal Server Error")
+                    .body("{}")
+                    .build()
+            responsesByPath["/user"] =
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 401 Unauthorized")
+                    .body("{}")
+                    .build()
+
+            val exception = assertFailsWith<GitHubRequestException> { repository.getCurrentUser() }
+
+            assertEquals(GitHubError.Unauthorized, exception.error)
+        }
+
+    @Test
+    fun getCurrentUser_restFallbackMissingLogin_wrapsAsUnknownError() =
+        runTest {
+            // REST 响应缺必需字段 login：反序列化失败 → 归一化为 Unknown（携带原始异常）
+            responsesByPath["/graphql"] =
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 500 Internal Server Error")
+                    .body("{}")
+                    .build()
+            responsesByPath["/user"] = MockResponse.Builder().body("""{"id":1}""").build()
+
+            val exception = assertFailsWith<GitHubRequestException> { repository.getCurrentUser() }
+
+            val unknownError = assertIs<GitHubError.Unknown>(exception.error)
+            assertIs<SerializationException>(unknownError.cause)
+        }
+
+    @Test
+    fun getCurrentUser_graphqlSuccess_nullableFields_mapToNull() =
+        runTest {
+            // GraphQL viewer 的可空字段为 null → 领域模型保留 null（login/avatarUrl/url 为 schema 非空字段）
+            responsesByPath["/graphql"] =
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        {"data":{"viewer":{
+                          "__typename":"User","login":"octocat",
+                          "name":null,"avatarUrl":"https://avatars.githubusercontent.com/u/1",
+                          "bio":null,"url":"https://github.com/octocat"
+                        }}}
+                        """.trimIndent(),
+                    ).build()
+
+            val user = repository.getCurrentUser()
+
+            assertEquals("octocat", user.login)
+            assertEquals(null, user.name)
+            assertEquals("https://avatars.githubusercontent.com/u/1", user.avatarUrl)
+            assertEquals(null, user.bio)
+            assertEquals("https://github.com/octocat", user.url)
+        }
+
+    @Test
+    fun getCurrentUser_graphqlNonNullFieldNull_dropsDataAndFallsBackToRest() =
+        runTest {
+            // avatarUrl 为 schema 非空字段（URI!）：响应为 null → GraphQL null 传播使整个 data 失效
+            // → viewer 判空 → REST 兜底（双通道优雅降级，不抛协议异常）
+            responsesByPath["/graphql"] =
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        {"data":{"viewer":{
+                          "__typename":"User","login":"octocat",
+                          "name":"The Octocat","avatarUrl":null,
+                          "bio":"GitHub mascot","url":"https://github.com/octocat"
+                        }}}
+                        """.trimIndent(),
+                    ).build()
+            responsesByPath["/user"] = MockResponse.Builder().body("""{"login":"octocat","id":1}""").build()
+
+            val user = repository.getCurrentUser()
+
+            assertEquals("octocat", user.login)
+            assertEquals(1, requestCountByPath["/user"])
+        }
+
+    @Test
+    fun getCurrentUser_restFallbackMinimalPayload_mapsNullableFieldsToNull() =
+        runTest {
+            // REST 兜底仅含必需字段（login/id）：可选字段缺省 → null，统计字段取默认 0
+            responsesByPath["/graphql"] =
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 500 Internal Server Error")
+                    .body("{}")
+                    .build()
+            responsesByPath["/user"] = MockResponse.Builder().body("""{"login":"octocat","id":1}""").build()
+
+            val user = repository.getCurrentUser()
+
+            assertEquals("octocat", user.login)
+            assertEquals(null, user.name)
+            assertEquals(null, user.avatarUrl)
+            assertEquals(null, user.bio)
+            assertEquals(null, user.url)
+            assertEquals(0, user.publicRepos)
+            assertEquals(0, user.followers)
+            assertEquals(0, user.following)
+        }
+
+    @Test
+    fun getCurrentUser_calledTwice_alwaysFetchesNetwork() =
+        runTest {
+            // NetworkOnly 刷新语义：连续两次调用都走 GraphQL 网络（不读缓存），REST 兜底不触发
+            responsesByPath["/graphql"] =
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        {"data":{"viewer":{
+                          "__typename":"User","login":"octocat",
+                          "name":"The Octocat","avatarUrl":"https://avatars.githubusercontent.com/u/1",
+                          "bio":"GitHub mascot","url":"https://github.com/octocat"
+                        }}}
+                        """.trimIndent(),
+                    ).build()
+
+            val first = repository.getCurrentUser()
+            val second = repository.getCurrentUser()
+
+            assertEquals("octocat", first.login)
+            assertEquals("octocat", second.login)
+            assertEquals(2, requestCountByPath["/graphql"])
+            assertEquals(null, requestCountByPath["/user"])
         }
 }
