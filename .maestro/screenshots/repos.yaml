@@ -1,0 +1,38 @@
+# Repos tab scene (light + dark) — visual regression evidence.
+#
+# In guest mode the 仓库 tab is a placeholder (MainActivity reposPage →
+# PlaceholderScreen "Coming soon", core/ui strings placeholder_content).
+# Selectors: bottom bar "Repos" (nav_repos), placeholder text "Coming soon".
+# Dark variant: same uimode technique as home.yaml.
+appId: com.yumiru11.githubapp
+---
+# --- Light ---
+- runScript: adb shell cmd uimode night no
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 20000
+- tapOn: "Repos"
+- extendedWaitUntil:
+    visible: "Coming soon"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: repos-light
+
+# --- Dark ---
+- stopApp
+- runScript: adb shell cmd uimode night yes
+- launchApp
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 20000
+- tapOn: "Repos"
+- extendedWaitUntil:
+    visible: "Coming soon"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: repos-dark
+
+- stopApp
+- runScript: adb shell cmd uimode night no

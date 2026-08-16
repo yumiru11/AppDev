@@ -1,0 +1,29 @@
+# Repo detail README scene — WEBVIEW fallback path (light).
+#
+# Same deep-link navigation as repo-readme.yaml. Default WEBVIEW_REPO =
+# mermaid-js/mermaid: its README contains 10 ```mermaid fences + inline <svg>,
+# so FeatureDetector routes it to WebView (server-rendered HTML; GitHub renders
+# the mermaid diagrams server-side). Verified against FeatureDetector rules.
+# Override from CI:
+#   maestro test -e WEBVIEW_REPO=owner/repo .maestro/screenshots/readme-webview.yaml
+#
+# Wait strategy: "README" header is native (visible to Maestro) and appears when
+# metadata loads; the WebView body renders asynchronously and is NOT part of
+# Maestro's native hierarchy — bounded sleep lets it draw before the screenshot.
+appId: com.yumiru11.githubapp
+env:
+  WEBVIEW_REPO: mermaid-js/mermaid
+---
+- runScript: adb shell cmd uimode night no
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 20000
+- openLink: https://github.com/${WEBVIEW_REPO}
+- extendedWaitUntil:
+    visible: "README"
+    timeout: 30000
+- waitForAnimationToEnd
+- runScript: sleep 5
+- takeScreenshot: readme-webview-light

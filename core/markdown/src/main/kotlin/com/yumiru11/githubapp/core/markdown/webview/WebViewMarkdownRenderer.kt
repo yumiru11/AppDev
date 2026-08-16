@@ -115,7 +115,12 @@ fun WebViewMarkdownRenderer(
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 // 防双重变暗：页面 CSS 已按 data-theme/prefers-color-scheme 出图，
                 // 关闭 WebView 的算法暗化并保留 web-theme 策略（androidx.webkit 1.12.1）。
-                WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false)
+                // 特性检查：API 30 模拟器/旧 WebView 不支持 AlgorithmicDarkening，
+                // 直接调用抛 UnsupportedOperationException 崩溃（2026-08-16 模拟器截图
+                // logcat 实证 FATAL EXCEPTION at WebViewMarkdownRenderer.kt:118）。
+                if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+                    WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false)
+                }
                 WebSettingsCompat.setForceDarkStrategy(
                     settings,
                     WebSettingsCompat.DARK_STRATEGY_WEB_THEME_DARKENING_ONLY,

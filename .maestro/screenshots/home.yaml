@@ -1,0 +1,40 @@
+# Home scene: guest-mode home (light + dark) — visual regression evidence.
+#
+# Guest mode: fresh install (no token) → authState Anonymous → startDestination HOME
+# (app/.../auth/AuthNavigation.kt maps Anonymous → HOME). HomeScreen shows
+# AppTopBar (search pill "Search GitHub…", bell, person) + "Sign in to see your feed"
+# + "Sign in" button + AppBottomBar (Home / Repos / Profile).
+#
+# Dark variant technique: app theme follows system (ThemeMode.SYSTEM default,
+# AppThemeHost uses isSystemInDarkTheme()). `cmd uimode night` flips the system
+# uiMode flag (API 31+, pixel_6 API 34 OK); app must be relaunched so Compose
+# re-reads the configuration — hence stopApp + launchApp.
+#
+# runScript executes on the Maestro host, where `adb` is on PATH (CI agent runs
+# Maestro on the emulator host). Every flow normalizes to light + clearState at
+# start, so flows are deterministic and order-independent.
+appId: com.yumiru11.githubapp
+---
+# --- Light ---
+- runScript: adb shell cmd uimode night no
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Sign in to see your feed"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot: home-light
+
+# --- Dark: system uiMode + fresh relaunch ---
+- stopApp
+- runScript: adb shell cmd uimode night yes
+- launchApp
+- extendedWaitUntil:
+    visible: "Sign in to see your feed"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot: home-dark
+
+# Restore light so later flows / manual inspection start clean.
+- stopApp
+- runScript: adb shell cmd uimode night no

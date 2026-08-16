@@ -49,7 +49,8 @@ jobs:
       # gradle.properties 中的 org.gradle.java.home 是开发机私有路径（本机红线配置，不入库改），
       # GitHub runner 上不存在会导致首个 Gradle 步骤硬失败；删除后回退到 setup-java 的 JAVA_HOME
       - name: Override local JDK path for CI
-        run: sed -i '/org.gradle.java.home/d' gradle.properties
+        # GNU sed（ubuntu）与 BSD sed（macos）的 -i 语法不兼容——python 跨平台
+        run: python3 -c "import re; p='gradle.properties'; s=open(p).read(); open(p,'w').write(re.sub(r'(?m)^org\.gradle\.java\.home.*\n?', '', s))"
 
       # 开发机有全局 ~/.gradle/init.d/mirror.gradle（阿里云优先，本机 Google Maven 不可达）；
       # GitHub runner 直连官方源即可（阿里云在 CI 上 502，2026-08-12 实测），不再注入镜像
@@ -209,3 +210,118 @@ jobs:
           print("\n".join(lines))
           PYEOF
           gh pr comment "$PR_NUMBER" --body-file /tmp/coverage-comment.md
+
+  # ── 截图回归（screenshot-automation.md 调研：自建 KVM 模拟器 + Maestro，$0）──────
+  # 依赖 quality 门禁（全绿才开模拟器）；KVM 由 android-emulator-runner 在 ubuntu-latest
+  # 上配置（runner 暴露 /dev/kvm）。Maestro 流契约：.maestro/screenshots/*.yaml
+  # （并行 agent 所有，本 job 只消费，详见契约注释在 Maestro 步骤）。
+  # PR 评论用 sticky comment（GitHub artifact URL 不能内联渲染 → 文本链接到 artifact）。
+  screenshots:
+    name: Screenshots (emulator + Maestro)
+    needs: quality
+    # release asset 上传需 contents: write（顶层只有 read——第 12 轮 release 创建
+    # 静默失败致评论图 404）
+    permissions:
+      contents: write
+      pull-requests: write
+    # ubuntu-latest 有 /dev/kvm（GitHub 2024-04-02 官方公告 + 2026 实证），
+    # 但需先启用 kvm 组权限（udev）——否则 action 报 'hardware acceleration
+    # is not available'（PR #60 第 1 轮根因）。macos-14 ARM 托管 runner 是 VM，
+    # 无嵌套虚拟化，arm64 模拟器无法 boot（第 3-6 轮根因，issue #375/#280）。
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # GitHub 官方 README：'Remember to enable KVM in your workflow'
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Override local JDK path for CI
+        # GNU sed（ubuntu）与 BSD sed（macos）的 -i 语法不兼容——python 跨平台
+        run: python3 -c "import re; p='gradle.properties'; s=open(p).read(); open(p,'w').write(re.sub(r'(?m)^org\.gradle\.java\.home.*\n?', '', s))"
+
+      # quality job 已跑完整构建（含 seed-plugins 兜底）；screenshots 只重打 APK。
+      # macos-14 上 seed-plugins.sh curl 失败（exit 56 网络接收错误）——macos 网络
+      # 通道不同，插件解析未验证是否需要 seed；若 assemble 因此失败再加回。
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Assemble debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      # 模拟器 boot 由 action 处理（KVM udev + 等待 sys.boot_completed）；adb 暴露在
+      # localhost:5554，Maestro 自动发现设备。Maestro CLI 在此脚本内安装（~/.maestro/bin）。
+      # 流契约（并行 agent 遵守）：.maestro/screenshots/*.yaml，launchApp appId 为
+      # com.yumiru11.githubapp；maestro test 会把截图自动拉到 ~/.maestro/tests/<flow-name>/。
+      - name: Run Maestro screenshot flows on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          # API 31：CI 上最稳的模拟器镜像（API 34 google_apis 在 GitHub runner
+          # 上 boot 卡死——PR #60 实测 8.5 分钟未完成，用户取消）。minSdk 26，
+          # README/导航/主题截图场景 API 31 完全够用。
+          api-level: 30
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          # KVM 硬件加速下无需软件渲染参数；-no-snapshot 防快照缓存干扰
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            # 轻量 adb 截图方案（Maestro 3 次安装翻车——见 docs/research/actions-emulator-feasibility.md Q5）；
+            # 脚本输出到 artifacts/screenshots/，供后续 Collect/Upload/评论步骤
+            bash .github/scripts/screenshots.sh
+
+      # 截图已由 screenshots.sh 直接输出到 artifacts/screenshots/；失败也保留供排查
+      - name: Verify screenshots collected
+        if: always()
+        run: |
+          mkdir -p artifacts/screenshots
+          echo "files: $(find artifacts/screenshots -name '*.png' | wc -l)" 
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshots
+          path: artifacts/screenshots/**
+          if-no-files-found: warn
+
+      # 评论永不染红 job（continue-on-error）；仅 PR 事件、job 未取消时发布
+      # marocchino 无 images 输入（action.yml 实证）——公开仓库 release asset
+      # URL 可直接内联进评论（docs/research/actions-emulator-feasibility.md Q5）
+      - name: Upload screenshots + post PR comment (images inlined)
+        if: github.event_name == 'pull_request' && !cancelled()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="screenshots-${{ github.run_id }}"
+          gh release create "$TAG" artifacts/screenshots/*.png --title "CI screenshots $TAG" --notes "Auto-generated by screenshots job" >/dev/null 2>&1 || true
+          {
+            echo "## Screenshot regression (emulator)"
+            echo ""
+            for f in artifacts/screenshots/*.png; do
+              name=$(basename "$f")
+              echo "### ${name%.png}"
+              echo "![$name](https://github.com/${{ github.repository }}/releases/download/$TAG/$name)"
+              echo ""
+            done
+          } > /tmp/screenshots-comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/screenshots-comment.md || true
+          # 清理历史截图 release（保留最新，避免 release 列表堆积）
+          gh release list --limit 20 --json tagName -q '.[].tagName' | grep '^screenshots-' | grep -v "$TAG" | while read -r old; do
+            gh release delete "$old" --yes --cleanup-tag >/dev/null 2>&1 || true
+          done
