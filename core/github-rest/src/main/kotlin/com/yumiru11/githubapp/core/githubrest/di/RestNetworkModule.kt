@@ -6,6 +6,7 @@ import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
 import com.yumiru11.githubapp.core.githubrest.api.IssueApi
 import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
+import com.yumiru11.githubapp.core.githubrest.api.SearchApi
 import com.yumiru11.githubapp.core.githubrest.api.UserApi
 import com.yumiru11.githubapp.core.githubrest.auth.TokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.EtagStore
@@ -78,4 +79,8 @@ object RestNetworkModule {
     @Provides
     @Singleton
     fun provideIssueApi(retrofit: Retrofit): IssueApi = retrofit.create(IssueApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideSearchApi(retrofit: Retrofit): SearchApi = retrofit.create(SearchApi::class.java)
 }

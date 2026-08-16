@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Search bar -->
+    <string name="search_hint">Search GitHub…</string>
+    <string name="search_back">Back</string>
+    <string name="search_clear_input">Clear search</string>
+
+    <!-- History -->
+    <string name="search_history">Recent searches</string>
+    <string name="search_history_clear">Clear all</string>
+    <string name="search_history_empty">No recent searches</string>
+
+    <!-- Qualifiers -->
+    <string name="search_qualifier_title">Suggestions</string>
+
+    <!-- Tabs -->
+    <string name="search_tab_repositories">Repos</string>
+    <string name="search_tab_users">Users</string>
+    <string name="search_tab_issues">Issues</string>
+    <string name="search_tab_pull_requests">PRs</string>
+    <string name="search_tab_code">Code</string>
+
+    <!-- States -->
+    <string name="search_empty">No results</string>
+    <string name="search_retry">Retry</string>
+    <string name="search_load_more_failed">Failed to load more</string>
+    <string name="search_error_network">Network error. Check your connection.</string>
+    <string name="search_error_rate_limited">Too many requests. Please try again later.</string>
+    <string name="search_error_unauthorized">Please sign in to search.</string>
+    <string name="search_error_unknown">Something went wrong</string>
+
+    <!-- Code search gate -->
+    <string name="search_code_require_login">Code search requires sign in</string>
+    <string name="search_login">Sign in</string>
+</resources>

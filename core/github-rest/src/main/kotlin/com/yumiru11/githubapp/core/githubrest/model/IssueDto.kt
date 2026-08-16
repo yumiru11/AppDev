@@ -29,6 +29,8 @@ data class IssueDto(
     val htmlUrl: String? = null,
     /** 存在字段说明该 issue 实则关联 PR（GET /issues 同时返回 PR） */
     val pullRequest: JsonObject? = null,
+    /** 归属仓库 API URL（搜索 items 特有：https://api.github.com/repos/{owner}/{repo}） */
+    val repositoryUrl: String? = null,
 )
 
 @Serializable
