@@ -2,6 +2,8 @@ package com.yumiru11.githubapp.core.githubdata.di
 
 import com.yumiru11.githubapp.core.githubdata.repository.DefaultRepositoryRepository
 import com.yumiru11.githubapp.core.githubdata.repository.RepositoryRepository
+import com.yumiru11.githubapp.core.githubdata.search.DefaultSearchRepository
+import com.yumiru11.githubapp.core.githubdata.search.SearchRepository
 import com.yumiru11.githubapp.core.githubdata.user.DefaultUserRepository
 import com.yumiru11.githubapp.core.githubdata.user.UserRepository
 import dagger.Binds
@@ -26,4 +28,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindRepositoryRepository(impl: DefaultRepositoryRepository): RepositoryRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSearchRepository(impl: DefaultSearchRepository): SearchRepository
 }

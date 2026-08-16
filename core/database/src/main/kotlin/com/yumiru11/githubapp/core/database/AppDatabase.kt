@@ -6,24 +6,29 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.yumiru11.githubapp.core.database.dao.CachedReadmeDao
 import com.yumiru11.githubapp.core.database.dao.CachedRepositoryDao
+import com.yumiru11.githubapp.core.database.dao.SearchHistoryDao
 import com.yumiru11.githubapp.core.database.entity.CachedReadmeEntity
 import com.yumiru11.githubapp.core.database.entity.CachedRepositoryEntity
+import com.yumiru11.githubapp.core.database.entity.SearchHistoryEntity
 
 /**
- * 应用本地数据库 v2。
+ * 应用本地数据库 v3。
  *
  * v1：仓库响应缓存（ETag 304）
  * v2：+ cached_readme 表（README 双 key 缓存：contentHash + themeVersion）
+ * v3：+ search_history 表（T18 搜索历史：query 主键 + 时间戳）
  */
 @Database(
-    entities = [CachedRepositoryEntity::class, CachedReadmeEntity::class],
-    version = 2,
+    entities = [CachedRepositoryEntity::class, CachedReadmeEntity::class, SearchHistoryEntity::class],
+    version = 3,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun cachedRepositoryDao(): CachedRepositoryDao
 
     abstract fun cachedReadmeDao(): CachedReadmeDao
+
+    abstract fun searchHistoryDao(): SearchHistoryDao
 
     companion object {
         /**
@@ -44,6 +49,24 @@ abstract class AppDatabase : RoomDatabase() {
                             `html` TEXT NOT NULL,
                             `updatedAt` INTEGER NOT NULL,
                             PRIMARY KEY(`owner`, `repo`)
+                        )
+                        """.trimIndent(),
+                    )
+                }
+            }
+
+        /**
+         * v2 → v3：新增 search_history 表（T18 搜索历史）。
+         */
+        val MIGRATION_2_3: Migration =
+            object : Migration(2, 3) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `search_history` (
+                            `query` TEXT NOT NULL,
+                            `updatedAt` INTEGER NOT NULL,
+                            PRIMARY KEY(`query`)
                         )
                         """.trimIndent(),
                     )
