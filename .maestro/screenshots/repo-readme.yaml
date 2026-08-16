@@ -1,0 +1,35 @@
+# Repo detail README scene — NATIVE rendering path (light).
+#
+# Guest-mode navigation path: deep link. The 仓库 tab is a placeholder in guest
+# mode and Search is a placeholder too — no in-app path to a repo exists without
+# login. MainActivity registers a VIEW intent-filter for https://github.com
+# (T3) → GitHubLinkParser → ParsedUrl.Repo → AppRoute.REPO → RepoDetailScreen.
+# AOSP emulator images ship no browser, so the app is the only VIEW handler
+# (no chooser dialog). openLink works even while the app is already running
+# (singleTop → onNewIntent → pendingDeepLink navigation).
+#
+# Default REPO renders natively (verified against FeatureDetector: 26 KB,
+# 740 lines, no mermaid/math/<svg → Native). Override from CI:
+#   maestro test -e REPO=owner/repo .maestro/screenshots/repo-readme.yaml
+#
+# Wait strategy: "README" (repo_readme_section) is the native section header and
+# appears as soon as repo metadata loads (it is rendered above the async README
+# body), then a bounded sleep lets the markdown body / hero images settle
+# (native MarkdownViewer uses verticalScroll, no virtualization).
+appId: com.yumiru11.githubapp
+env:
+  REPO: mikepenz/multiplatform-markdown-renderer
+---
+- runScript: adb shell cmd uimode night no
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 20000
+- openLink: https://github.com/${REPO}
+- extendedWaitUntil:
+    visible: "README"
+    timeout: 30000
+- waitForAnimationToEnd
+- runScript: sleep 4
+- takeScreenshot: readme-native-light

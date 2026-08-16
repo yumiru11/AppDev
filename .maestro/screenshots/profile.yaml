@@ -1,0 +1,22 @@
+# Profile scene (light) — guest-mode 我的 tab.
+#
+# Guest mode: ProfileScreen shows TopAppBar "Profile" + settings gear +
+# "Sign in to view your profile" (profile_login_guide_title) + "Sign in" button.
+# Selectors: bottom bar "Profile" (nav_profile). Note: the top-bar person icon
+# also exposes contentDescription "Profile" — both the label and the icon land
+# on the same destination (onProfileClick → mainTab = PROFILE), so the tap is
+# unambiguous in outcome.
+appId: com.yumiru11.githubapp
+---
+- runScript: adb shell cmd uimode night no
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 20000
+- tapOn: "Profile"
+- extendedWaitUntil:
+    visible: "Sign in to view your profile"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: profile-light
