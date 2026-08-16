@@ -208,4 +208,198 @@ class HtmlSanitizerTest {
         assertFalse(result.contains("expression"))
         assertTrue(result.contains("styled"))
     }
+
+    // ── A8 补强：标签大小写 / 未闭合变体 ──────────────────────────────
+
+    @Test
+    fun sanitize_uppercaseScriptTag_stripped() {
+        val html = "<SCRIPT>alert('xss')</SCRIPT><p>ok</p>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("uppercase script tag must be stripped", result.contains("<script", ignoreCase = true))
+        assertFalse(result.contains("alert"))
+        assertTrue(result.contains("<p>ok</p>"))
+    }
+
+    @Test
+    fun sanitize_unclosedIframeTag_stripped() {
+        // 无闭合标签的 iframe（浏览器自动补 </iframe> 并执行内容）
+        val html = "<p>before</p><iframe src=\"https://evil.com\">after"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("unclosed iframe must be stripped", result.contains("<iframe"))
+        assertFalse(result.contains("evil.com"))
+        assertTrue(result.contains("<p>before</p>"))
+        assertTrue("content after unclosed iframe must survive", result.contains("after"))
+    }
+
+    // ── A8 补强：svg 标签内载荷 ───────────────────────────────────────
+
+    @Test
+    fun sanitize_svgOnloadHandler_stripped() {
+        val html = "<svg onload=\"alert(1)\"><circle r=\"1\"/></svg>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("svg onload handler must be stripped", result.contains("onload"))
+        assertFalse(result.contains("alert"))
+        assertTrue("svg shape must survive", result.contains("<circle"))
+    }
+
+    @Test
+    fun sanitize_svgSmilAnimateHrefValues_stripped() {
+        // SMIL mXSS 向量：<animate attributeName="href" values="javascript:..."> 可注入 href
+        val html = "<svg><a><animate attributeName=\"href\" values=\"javascript:alert(1)\"/></a></svg>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("SMIL animate tag must be stripped", result.contains("<animate"))
+        assertFalse(result.contains("javascript:"))
+        assertFalse(result.contains("alert"))
+    }
+
+    @Test
+    fun sanitize_svgSmilSetAttributeNameEvent_stripped() {
+        // SMIL <set> 可把事件名写入 attributeName（onmouseover 经浏览器触发）
+        val html = "<svg><set attributeName=\"onmouseover\" to=\"alert(1)\"/></svg>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("SMIL set tag must be stripped", result.contains("<set"))
+        assertFalse(result.contains("onmouseover"))
+    }
+
+    // ── A8 补强：HTML 实体 / 编码绕过 ────────────────────────────────
+
+    @Test
+    fun sanitize_entityEncodedJavascriptHref_stripped() {
+        // 属性值字符引用在浏览器解析时先解码：jav&#x61;script: ≡ javascript:
+        val html = "<a href=\"jav&#x61;script:alert(1)\">x</a>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("entity-encoded javascript: href must be stripped", result.contains("jav"))
+        assertFalse(result.contains("alert"))
+    }
+
+    @Test
+    fun sanitize_entityEncodedJavascriptSrcUnquoted_stripped() {
+        val html = "<img src=&#106;avascript:alert(1)>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("entity-encoded unquoted src must be stripped", result.contains("avascript"))
+        assertFalse(result.contains("alert"))
+    }
+
+    @Test
+    fun sanitize_namedEntityColonHref_stripped() {
+        // &colon; 解码为 ':'：javascript&colon;alert(1) ≡ javascript:alert(1)
+        val html = "<a href=\"javascript&colon;alert(1)\">x</a>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("&colon; scheme bypass must be stripped", result.contains("javascript"))
+        assertFalse(result.contains("alert"))
+    }
+
+    @Test
+    fun sanitize_newlineInJavascriptScheme_stripped() {
+        // WHATWG URL 解析会先移除 tab/换行：java\nscript: ≡ javascript:
+        val html = "<a href=\"java\nscript:alert(1)\">x</a>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("newline-in-scheme bypass must be stripped", result.contains("script:"))
+        assertFalse(result.contains("alert"))
+    }
+
+    @Test
+    fun sanitize_encodedTabObfuscatedScheme_stripped() {
+        // &#x09; 解码为 tab，与换行同理可混淆 scheme 判定
+        val html = "<a href=\"java&#x09;script:alert(1)\">x</a>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("encoded-tab scheme bypass must be stripped", result.contains("script:"))
+        assertFalse(result.contains("alert"))
+    }
+
+    @Test
+    fun sanitize_encodedAmpersandSafeUrl_preserved() {
+        // 回归：合法查询串的实体转义不得被误剥
+        val html = "<a href=\"https://example.com/?a=1&amp;b=2\">x</a>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertTrue("safe url with entity ampersand must survive", result.contains("href=\"https://example.com/?a=1&amp;b=2\""))
+    }
+
+    // ── A8 补强：其余危险协议变体（vbscript/blob/file/data） ──────────
+
+    @Test
+    fun sanitize_vbscriptProtocol_stripped() {
+        val html = "<a href=\"vbscript:msgbox(1)\">x</a>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("vbscript: href must be stripped", result.contains("vbscript:"))
+    }
+
+    @Test
+    fun sanitize_blobUrlSrc_stripped() {
+        val html = "<img src=\"blob:https://evil.example/uuid\">"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("blob: src must be stripped", result.contains("blob:"))
+    }
+
+    @Test
+    fun sanitize_fileProtocolHref_stripped() {
+        val html = "<a href=\"file:///etc/passwd\">x</a>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("file: href must be stripped", result.contains("file:"))
+    }
+
+    @Test
+    fun sanitize_unquotedDataImgSrc_stripped() {
+        val html = "<img src=data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("unquoted data: src must be stripped", result.contains("data:"))
+    }
+
+    @Test
+    fun sanitize_singleQuotedJavascriptHref_stripped() {
+        val html = "<a href='javascript:alert(1)'>x</a>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertFalse("single-quoted javascript: href must be stripped", result.contains("javascript:"))
+    }
+
+    @Test
+    fun sanitize_mailtoHref_preserved() {
+        val html = "<a href=\"mailto:test@example.com\">mail</a>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertTrue("mailto: href must survive", result.contains("mailto:test@example.com"))
+    }
+
+    @Test
+    fun sanitize_relativeHrefWithColonPreserved() {
+        // 非危险 scheme（./docs:guide 的 scheme 判定为 "./docs"）不得误剥
+        val html = "<a href=\"./docs:guide\">x</a>"
+
+        val result = HtmlSanitizer.sanitize(html)
+
+        assertTrue("relative href with colon must survive", result.contains("./docs:guide"))
+    }
 }

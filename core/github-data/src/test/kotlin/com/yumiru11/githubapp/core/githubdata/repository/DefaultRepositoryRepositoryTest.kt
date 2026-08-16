@@ -8,6 +8,9 @@ import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.auth.TokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
+import io.mockk.coEvery
+import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
@@ -26,6 +29,7 @@ import kotlin.test.assertFailsWith
 class DefaultRepositoryRepositoryTest {
     private lateinit var server: MockWebServer
     private lateinit var repository: DefaultRepositoryRepository
+    private lateinit var apolloClient: ApolloClient
     private val responsesByPath = mutableMapOf<String, MockResponse>()
 
     @Before
@@ -55,6 +59,7 @@ class DefaultRepositoryRepositoryTest {
                 serverUrl = server.url("/graphql").toString(),
                 okHttpClient = OkHttpClient(),
             )
+        this.apolloClient = apolloClient
         val retrofit = GitHubRestClient.createRetrofit(server.url("/"), okHttpClient, GitHubRestClient.createJson())
         repository = DefaultRepositoryRepository(apolloClient, retrofit.create(RepositoryApi::class.java))
     }
@@ -136,5 +141,74 @@ class DefaultRepositoryRepositoryTest {
                 assertFailsWith<GitHubRequestException> { repository.getRepository("ghost", "missing") }
 
             assertEquals(GitHubError.NotFound, exception.error)
+        }
+
+    @Test
+    fun getRepository_graphqlServerError_fallsBackToRest() =
+        runTest {
+            // GraphQL 通道 HTTP 5xx（response.exception，非 errors 数组）同样走 REST 兜底
+            responsesByPath["/graphql"] =
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 500 Internal Server Error")
+                    .body("{}")
+                    .build()
+            responsesByPath["/repos/octocat/Hello-World"] =
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        {"id":1,"name":"Hello-World","full_name":"octocat/Hello-World","private":false,
+                         "owner":{"login":"octocat","id":1},
+                         "description":"first repo","stargazers_count":3,"forks_count":2,
+                         "language":"JavaScript","default_branch":"master"}
+                        """.trimIndent(),
+                    ).build()
+
+            val repo = repository.getRepository("octocat", "Hello-World")
+
+            assertEquals("octocat", repo.ownerLogin)
+            assertEquals("JavaScript", repo.language)
+        }
+
+    @Test
+    fun getRepository_restChannelUnauthorized_throwsUnauthorized() =
+        runTest {
+            // GraphQL data 为 null 且无 errors 数组（资源解析为空）→ REST 兜底 401
+            responsesByPath["/graphql"] =
+                MockResponse
+                    .Builder()
+                    .body("""{"data":{"repository":null}}""")
+                    .build()
+            responsesByPath["/repos/octocat/Hello-World"] =
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 401 Unauthorized")
+                    .body("{}")
+                    .build()
+
+            val exception =
+                assertFailsWith<GitHubRequestException> { repository.getRepository("octocat", "Hello-World") }
+
+            assertEquals(GitHubError.Unauthorized, exception.error)
+        }
+
+    @Test
+    fun getRepository_restFallbackCancelled_rethrowsCancellation() =
+        runTest {
+            responsesByPath["/graphql"] =
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 500 Internal Server Error")
+                    .body("{}")
+                    .build()
+            val restApi =
+                mockk<RepositoryApi> {
+                    coEvery { getRepository(any(), any()) } throws CancellationException("cancelled")
+                }
+            val repoUnderTest = DefaultRepositoryRepository(apolloClient, restApi)
+
+            // 取消异常必须原样上抛（不得包装为 GitHubRequestException）
+            assertFailsWith<CancellationException> { repoUnderTest.getRepository("octocat", "Hello-World") }
         }
 }

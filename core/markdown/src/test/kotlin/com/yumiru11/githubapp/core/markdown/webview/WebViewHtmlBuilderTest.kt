@@ -223,4 +223,315 @@ class WebViewHtmlBuilderTest {
         val darkSkeleton = darkHtml.replace(Regex("--md-sys-color-[a-z-]+: #[0-9A-F]{6};"), "").replace("data-theme=\"dark\"", "")
         assertEquals("structure must be identical modulo theme vars", lightSkeleton, darkSkeleton)
     }
+
+    // ── A9 补强：离线模式 assets/ 相对图片改写 ─────────────────────────
+
+    @Test
+    fun build_offlineMode_rewritesAssetsImageToAbsoluteUrl() {
+        val markdown = "![alt](assets/logo.png)"
+
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = markdown,
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+            )
+
+        assertTrue(
+            "assets/ image must be rewritten to absolute appassets URL",
+            html.contains("![alt](https://appassets.androidplatform.net/assets/logo.png)"),
+        )
+        assertFalse("relative assets/ path must not remain", html.contains("(assets/logo.png)"))
+    }
+
+    @Test
+    fun build_offlineMode_rewritesAssetsImageWithDotSlashAndNestedPaths() {
+        val markdown = "![a](assets/./img.png) ![b](assets/sub/dir/x.png)"
+
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = markdown,
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+            )
+
+        assertTrue(
+            "./ prefix must be removed in rewritten URL",
+            html.contains("![a](https://appassets.androidplatform.net/assets/img.png)"),
+        )
+        assertTrue("nested asset path must be preserved", html.contains("![b](https://appassets.androidplatform.net/assets/sub/dir/x.png)"))
+    }
+
+    @Test
+    fun build_offlineMode_keepsAbsoluteImageUrlUnchanged() {
+        val markdown = "![x](https://example.com/a.png)"
+
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = markdown,
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+            )
+
+        assertTrue("absolute image URL must stay untouched", html.contains("![x](https://example.com/a.png)"))
+    }
+
+    @Test
+    fun build_offlineMode_keepsNonAssetsRelativeImageUnchanged() {
+        val markdown = "![x](images/a.png)"
+
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = markdown,
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+            )
+
+        assertTrue("non-assets relative image must stay untouched", html.contains("![x](images/a.png)"))
+        assertFalse(
+            "non-assets image must not be rewritten to appassets",
+            html.contains("https://appassets.androidplatform.net/assets/images/a.png"),
+        )
+    }
+
+    // ── A9 补强：data-markdown-raw 特殊字符转义 ───────────────────────
+
+    @Test
+    fun build_offlineMode_escapesSpecialCharactersInDataMarkdownRaw() {
+        val markdown = "# T & < > \" ' `"
+
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = markdown,
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+            )
+
+        assertTrue("raw markdown must be wrapped in data-markdown-raw div", html.contains("<div id=\"markdown-raw\" data-markdown-raw=\""))
+        assertTrue(html.contains("&amp;"))
+        assertTrue(html.contains("&lt;"))
+        assertTrue(html.contains("&gt;"))
+        assertTrue(html.contains("&quot;"))
+        assertTrue(html.contains("&#39;"))
+        assertFalse("raw special chars must not leak unescaped", html.contains("# T & < >"))
+    }
+
+    @Test
+    fun build_offlineMode_escapesNewlinesAndCarriageReturns() {
+        val markdown = "line1\nline2\r\nline3"
+
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = markdown,
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+            )
+
+        assertTrue("newline must be escaped as &#10;", html.contains("line1&#10;line2"))
+        assertTrue("carriage return must be escaped as &#13;", html.contains("line2&#13;&#10;line3"))
+    }
+
+    // ── A9 补强：inline CSS 注入 ──────────────────────────────────────
+
+    @Test
+    fun build_inlineCss_injectsAppCssBlockAndOmitsLinks() {
+        val css =
+            mapOf(
+                "github-markdown.css" to "body{color:red}",
+                "markdown-you.css" to ".md-you{x:1}",
+                "highlight-theme.css" to ".hljs{y:2}",
+            )
+
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<p>x</p>",
+                themeVariables = "--md-sys-color-primary: #123456;",
+                isDark = false,
+                inlineCss = css,
+            )
+
+        assertTrue("inline css must be wrapped in app-css style block", html.contains("<style id=\"app-css\">"))
+        assertTrue(html.contains("body{color:red}"))
+        assertTrue(html.contains(".md-you{x:1}"))
+        assertTrue(html.contains(".hljs{y:2}"))
+        assertFalse("link tags must be omitted when inline css provided", html.contains("<link rel=\"stylesheet\""))
+    }
+
+    @Test
+    fun build_inlineCss_partialMapInjectsOnlyPresentStyles() {
+        val css = mapOf("github-markdown.css" to "body{color:red}")
+
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<p>x</p>",
+                themeVariables = "--md-sys-color-primary: #123456;",
+                isDark = false,
+                inlineCss = css,
+            )
+
+        assertTrue("present css must be injected", html.contains("body{color:red}"))
+        assertFalse("absent css contents must not appear", html.contains(".md-you"))
+        assertFalse("absent css must not fall back to link tags", html.contains("<link rel=\"stylesheet\""))
+    }
+
+    @Test
+    fun build_emptyInlineCss_usesStylesheetLinks() {
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<p>x</p>",
+                themeVariables = "--md-sys-color-primary: #123456;",
+                isDark = false,
+            )
+
+        assertTrue(
+            "default build must use link tags",
+            html.contains("<link rel=\"stylesheet\" href=\"https://appassets.androidplatform.net/assets/webview/github-markdown.css\""),
+        )
+        assertFalse(html.contains("app-css"))
+    }
+
+    // ── A9 补强：baseRepoUrl 相对路径改写 ─────────────────────────────
+
+    @Test
+    fun build_withBaseRepoUrl_rewritesRelativeImgSrcToRawUrl() {
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<img src=\"docs/logo.png\"><p>x</p>",
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                baseRepoUrl = "https://github.com/octo/hello",
+            )
+
+        assertTrue(
+            "relative img src must be rewritten to raw.githubusercontent.com",
+            html.contains("src=\"https://raw.githubusercontent.com/octo/hello/HEAD/docs/logo.png\""),
+        )
+    }
+
+    @Test
+    fun build_withBaseRepoUrl_rewritesRelativeAnchorHrefToBlobUrl() {
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<a href=\"docs/page.md\">page</a>",
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                baseRepoUrl = "https://github.com/octo/hello",
+            )
+
+        assertTrue(
+            "relative anchor href must be rewritten to github blob url",
+            html.contains("href=\"https://github.com/octo/hello/blob/HEAD/docs/page.md\""),
+        )
+    }
+
+    @Test
+    fun build_withBaseRepoUrl_keepsAbsoluteAndHashUrls() {
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<img src=\"https://cdn.example.com/x.png\"><a href=\"#section\">s</a>",
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                baseRepoUrl = "https://github.com/octo/hello",
+            )
+
+        assertTrue("absolute img src must stay untouched", html.contains("src=\"https://cdn.example.com/x.png\""))
+        assertTrue("hash anchor must stay untouched", html.contains("href=\"#section\""))
+    }
+
+    @Test
+    fun build_withBaseRepoUrl_rewritesAssetsImgSrcToAppassetsUrl() {
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<img src=\"assets/foo.png\">",
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                baseRepoUrl = "https://github.com/octo/hello",
+            )
+
+        assertTrue(
+            "assets/ img src must be rewritten to appassets url",
+            html.contains("src=\"https://appassets.androidplatform.net/assets/webview/foo.png\""),
+        )
+    }
+
+    @Test
+    fun build_withBaseRepoUrl_stripsDotAndRootSlashPrefixes() {
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<img src=\"./docs/x.png\"><img src=\"/docs/y.png\">",
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                baseRepoUrl = "https://github.com/octo/hello",
+            )
+
+        assertTrue("./ prefix must be stripped", html.contains("src=\"https://raw.githubusercontent.com/octo/hello/HEAD/docs/x.png\""))
+        assertTrue("/ prefix must be stripped", html.contains("src=\"https://raw.githubusercontent.com/octo/hello/HEAD/docs/y.png\""))
+        assertFalse(html.contains("./docs"))
+    }
+
+    @Test
+    fun build_baseRepoUrlNull_keepsRelativeUrls() {
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<img src=\"docs/logo.png\"><a href=\"docs/page.md\">p</a>",
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+            )
+
+        assertTrue("relative img src must stay untouched without baseRepoUrl", html.contains("src=\"docs/logo.png\""))
+        assertTrue("relative anchor href must stay untouched without baseRepoUrl", html.contains("href=\"docs/page.md\""))
+        assertFalse(html.contains("raw.githubusercontent.com"))
+    }
+
+    @Test
+    fun build_baseRepoUrlBlank_keepsRelativeUrls() {
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<img src=\"docs/logo.png\">",
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                baseRepoUrl = "",
+            )
+
+        assertTrue("blank baseRepoUrl must be treated as absent", html.contains("src=\"docs/logo.png\""))
+        assertFalse(html.contains("raw.githubusercontent.com"))
+    }
+
+    @Test
+    fun build_baseRepoUrlMalformed_keepsRelativeUrls() {
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<img src=\"docs/logo.png\">",
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                baseRepoUrl = "https://github.com/onlyowner",
+            )
+
+        assertTrue("malformed baseRepoUrl must be treated as absent", html.contains("src=\"docs/logo.png\""))
+        assertFalse(html.contains("raw.githubusercontent.com"))
+    }
+
+    @Test
+    fun build_baseRepoUrlWithTrailingSlash_rewrites() {
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<img src=\"docs/logo.png\">",
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                baseRepoUrl = "https://github.com/octo/hello/",
+            )
+
+        assertTrue(
+            "trailing slash must not break rewriting",
+            html.contains("src=\"https://raw.githubusercontent.com/octo/hello/HEAD/docs/logo.png\""),
+        )
+    }
+
+    @Test
+    fun build_offlineMode_withBaseRepoUrl_doesNotRewriteEscapedRawMarkdown() {
+        // 离线原始 markdown 已转义注入属性值，<img src="..."> 文本不得被 URL 改写正则误伤
+        val markdown = "```html\n<img src=\"docs/x.png\">\n```"
+
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = markdown,
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+                baseRepoUrl = "https://github.com/octo/hello",
+            )
+
+        assertTrue("escaped code fence must survive", html.contains("&lt;img src=&quot;docs/x.png&quot;&gt;"))
+        assertFalse("raw markdown must not be url-rewritten", html.contains("raw.githubusercontent.com"))
+    }
 }
