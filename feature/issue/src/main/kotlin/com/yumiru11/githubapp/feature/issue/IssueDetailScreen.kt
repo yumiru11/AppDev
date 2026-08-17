@@ -219,6 +219,9 @@ private fun SuccessContent(
                     onInternalLink = onInternalLink,
                     baseRepoUrl = baseRepoUrl,
                     modifier = Modifier.fillMaxWidth(),
+                    // LazyColumn item 内禁用内部滚动：item 测量约束为无限高，
+                    // verticalScroll 必崩（RoadWeaver 崩溃根因，2026-08-17）
+                    scrollable = false,
                 )
             }
         }
@@ -404,6 +407,7 @@ private fun CommentItem(
                     markdown = item.body,
                     onInternalLink = onInternalLink,
                     baseRepoUrl = baseRepoUrl,
+                    scrollable = false,
                 )
             }
         }

@@ -31,6 +31,11 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
  * @param onInternalLink 链接点击回调；Internal 类型（Repo/Issue/PR 等）由上层路由处理，
  *   External 类型默认打开 CustomTabs（上层处理）；默认空实现
  * @param modifier Modifier
+ * @param scrollable 是否自带纵向滚动。true（默认）：组件内部应用 verticalScroll；
+ *   false：内容全展开由外层滚动容器承担（IssueDetailScreen 等 LazyColumn item 内
+ *   使用——Lazy 列表 item 测量约束为无限高，内嵌 verticalScroll 会崩
+ *   「Vertically scrollable component was measured with an infinity maximum height
+ *   constraints」，RoadWeaver 崩溃根因 2026-08-17）
  */
 @Composable
 fun MarkdownViewer(
@@ -38,6 +43,7 @@ fun MarkdownViewer(
     onInternalLink: (ParsedUrl) -> Unit = {},
     baseRepoUrl: String? = null,
     modifier: Modifier = Modifier,
+    scrollable: Boolean = true,
 ) {
     val darkTheme = isSystemInDarkTheme()
     val state = rememberMarkdownState(markdown, immediate = true)
@@ -74,7 +80,7 @@ fun MarkdownViewer(
                     },
                     blockQuote = { model -> GitHubAlertOrQuote(model) },
                 ),
-            modifier = modifier.verticalScroll(rememberScrollState()),
+            modifier = if (scrollable) modifier.verticalScroll(rememberScrollState()) else modifier,
         )
     }
 }
