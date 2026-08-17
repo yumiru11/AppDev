@@ -50,7 +50,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.data.model.Repository
-import com.yumiru11.githubapp.core.markdown.MarkdownViewer
+import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
@@ -346,7 +346,8 @@ private fun ReadmeSection(
                 }
 
                 ReadmeRenderMode.NATIVE -> {
-                    MarkdownViewer(
+                    // ADR-0007 原生增强主渲染（P1 #64）：否则 keep 基础版 MarkdownViewer 效果（标题大/徽章大/边距旧）
+                    EnhancedMarkdownViewer(
                         markdown = readmeState.content,
                         onInternalLink = { parsed -> handleParsedUrl(parsed, actions) },
                         baseRepoUrl = baseRepoUrl,

@@ -166,4 +166,69 @@ class FeatureDetectorTest {
 
         assertEquals(FallbackDecision.Native, decision)
     }
+
+    // P1（#64）：MATH 误报修复——代码围栏内的 ${var}/$counter 不是数学公式（2026-08-17 真机
+    // 实证：mikepenz README 的代码块字符串模板导致误判 WebView）
+    @Test
+    fun shouldFallback_mathLookalikeInCodeFence_notMisdetectedAsWebView() {
+        val markdown =
+            """
+            # Releases
+
+            ```kotlin
+            val version = "\${'$'}{version}"
+            val counter = "\${'$'}counter"
+            println("\${'$'}it")
+            ```
+
+            ## Usage
+
+            ```bash
+            echo "${'$'}HOME"
+            ```
+            """.trimIndent()
+
+        val decision = FeatureDetector.shouldFallback(markdown)
+
+        assertEquals(
+            "代码围栏内的 ${'$'}{var} / ${'$'}counter 不得误判数学公式",
+            FallbackDecision.Native,
+            decision,
+        )
+    }
+
+    @Test
+    fun shouldFallback_blockMathFormula_returnsWebView() {
+        val markdown = "# Formula\n\n\$\$\nE = mc^2\n\$\$"
+
+        val decision = FeatureDetector.shouldFallback(markdown)
+
+        assertTrue("块级数学公式必须触发 WebView", decision is FallbackDecision.WebView)
+        assertEquals(FallbackReason.MATH, (decision as FallbackDecision.WebView).reason)
+    }
+
+    @Test
+    fun shouldFallback_inlineMathFormula_returnsWebView() {
+        val markdown = "Inline math \$x^2\$ is supported."
+
+        val decision = FeatureDetector.shouldFallback(markdown)
+
+        assertTrue("行内数学公式必须触发 WebView", decision is FallbackDecision.WebView)
+        assertEquals(FallbackReason.MATH, (decision as FallbackDecision.WebView).reason)
+    }
+
+    @Test
+    fun shouldFallback_codeFenceAndRealFormula_mixedStillDetectsMath() {
+        val markdown =
+            """
+            ```kotlin
+            val a = "${'$'}{value}"
+            ```
+            Real formula: ${'$'}${'$'}y = ax + b${'$'}${'$'}
+            """.trimIndent()
+
+        val decision = FeatureDetector.shouldFallback(markdown)
+
+        assertTrue("代码围栏外的真实公式仍须触发 WebView", decision is FallbackDecision.WebView)
+    }
 }

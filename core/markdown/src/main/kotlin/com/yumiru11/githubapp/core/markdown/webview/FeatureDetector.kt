@@ -70,6 +70,13 @@ object FeatureDetector {
     /** mermaid 围栏正则（大小写不敏感，宽松匹配 ```mermaid 后缀） */
     private val MERMAID_FENCE_REGEX = Regex("""```mermaid\b""", RegexOption.IGNORE_CASE)
 
+    /**
+     * 代码围栏块正则（``` 到闭合 ```，非贪婪、跨行）。MATH 判定前先剥离围栏内容：
+     * 代码块里的 \${'$'}{var} / \${'$'}counter 是字符串模板不是数学公式
+     * （2026-08-17 真机实证：mikepenz README 代码块导致误判 WebView，#64）。
+     */
+    private val FENCED_CODE_REGEX = Regex("""```[^\n]*\n.*?```""", RegexOption.DOT_MATCHES_ALL)
+
     /** 行内数学公式 $...$ 或块级 $$...$$（排除 $ 后跟数字如价格的误判） */
     private val MATH_REGEX = Regex("""\$\$[^\$]+\$\$|\$[^\$\d\s][^\$]*[^\$\s]\$""")
 
@@ -87,8 +94,9 @@ object FeatureDetector {
             return FallbackDecision.WebView(FallbackReason.MERMAID)
         }
 
-        // 1b. 数学公式 $...$ / $$...$$
-        if (MATH_REGEX.containsMatchIn(markdown)) {
+        // 1b. 数学公式 $...$ / $$...$$（先剔除代码围栏内容——代码块中的
+        //     ${'$'}{var}/${'$'}counter 非公式，P1 #64）
+        if (MATH_REGEX.containsMatchIn(stripFencedCodeBlocks(markdown))) {
             return FallbackDecision.WebView(FallbackReason.MATH)
         }
 
@@ -111,6 +119,9 @@ object FeatureDetector {
 
         return FallbackDecision.Native
     }
+
+    /** 剔除 ``` 围栏代码块（保留围栏外的正文），MATH 判定前调用。 */
+    private fun stripFencedCodeBlocks(markdown: String): String = FENCED_CODE_REGEX.replace(markdown, "")
 
     /** 大小写不敏感统计子串出现次数（split 法，避免正则元字符干扰） */
     private fun countOccurrences(
