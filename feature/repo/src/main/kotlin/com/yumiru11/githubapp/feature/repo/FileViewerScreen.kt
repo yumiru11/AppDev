@@ -50,7 +50,7 @@ import com.yumiru11.githubapp.core.editor.CodeEditorView
 import com.yumiru11.githubapp.core.editor.CodeLanguageDetector
 import com.yumiru11.githubapp.core.editor.EditorThemeTokens
 import com.yumiru11.githubapp.core.editor.rememberM3EditorThemeTokens
-import com.yumiru11.githubapp.core.markdown.MarkdownViewer
+import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
 
 /**
@@ -257,7 +257,7 @@ private fun MarkdownFileContent(
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            MarkdownViewer(
+            EnhancedMarkdownViewer(
                 markdown = data.text.orEmpty(),
                 onInternalLink = { parsed -> handleParsedUrl(parsed, actions) },
                 baseRepoUrl = baseRepoUrl,
