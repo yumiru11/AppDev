@@ -79,8 +79,10 @@ tap_text "Repos"
 sleep 3
 adb exec-out screencap -p > "$OUT/repos.png"
 
-# ── 4. README 原生渲染（深链进 mikepenz 仓库）────────────────
-adb shell am start -a android.intent.action.VIEW -d "https://github.com/mikepenz/multiplatform-markdown-renderer" -p "$PKG" >/dev/null
+# ── 4. README 原生渲染（深链进 EchoMusic——FeatureDetector 判 NATIVE 的仓库）
+# 注：mikepenz README 曾被 MATH 正则误判走 WebView（readme-native.png 名不副实）；
+# P1（#64）修复 MATH 误报后换回 mikepenz（其 README 展示更全）
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/hoowhoami/EchoMusic" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
 sleep 6
 adb exec-out screencap -p > "$OUT/readme-native.png"
@@ -107,6 +109,15 @@ adb shell am force-stop "$PKG"
 # 三张图显示桌面，疑似崩溃；无 logcat 无法定位）────────────────
 adb logcat -d > "$OUT/logcat.txt" 2>/dev/null || true
 grep -c "FATAL EXCEPTION" "$OUT/logcat.txt" >/dev/null 2>&1 && echo "::warning::FATAL EXCEPTION found in logcat" || true
+
+# ── 渲染通道判定留档：ReadmeRender 日志（native/webview 以日志为准，禁止视觉推断）
+grep "ReadmeRender" "$OUT/logcat.txt" > "$OUT/readme-render-log.txt" 2>/dev/null || true
+if [ -s "$OUT/readme-render-log.txt" ]; then
+  echo "ReadmeRender decisions:"
+  cat "$OUT/readme-render-log.txt"
+else
+  echo "::warning::no ReadmeRender log found"
+fi
 
 echo "screenshots:"
 ls -la "$OUT"
