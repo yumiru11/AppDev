@@ -2,6 +2,7 @@
 
 package com.yumiru11.githubapp.feature.repo
 
+import android.util.Log
 import com.yumiru11.githubapp.core.`data`.model.Repository
 import com.yumiru11.githubapp.core.database.dao.CachedReadmeDao
 import com.yumiru11.githubapp.core.database.entity.CachedReadmeEntity
@@ -134,6 +135,14 @@ class RepoRepository
                 val meta = readmeApi.getReadmeMeta(owner, repo)
                 val rawMarkdown = meta.decodeContent() ?: ""
                 val decision = FeatureDetector.shouldFallback(rawMarkdown)
+                // 渲染通道判定日志（Q7 复测锚点）：真机/CI logcat 过滤 ReadmeRender。
+                // 用 Log.i 而非 Log.d：真机 vivo [log.tag]=[I]，Debug 级日志被系统过滤（2026-08-17 实证）
+                Log.i(
+                    TAG,
+                    "repo=$owner/$repo decision=${decision::class.simpleName}" +
+                        (decision as? FallbackDecision.WebView)?.let { " reason=${it.reason}" }.orEmpty() +
+                        " lines=${rawMarkdown.count { it == '\n' } + 1} bytes=${rawMarkdown.length}",
+                )
                 if (decision is FallbackDecision.Native && rawMarkdown.isNotBlank()) {
                     // 普通 README → 原生渲染：相对链接按仓库上下文重写为绝对 URL（图片可加载、链接可解析）
                     val markdown = rewriteRelativeLinks(rawMarkdown, meta.downloadUrl)
@@ -260,6 +269,10 @@ class RepoRepository
                     Result.failure(e)
                 }
             }
+        }
+
+        private companion object {
+            const val TAG = "ReadmeRender"
         }
     }
 

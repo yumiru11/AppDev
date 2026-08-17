@@ -10,6 +10,9 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            // android.util.Log 等 Android 桩返回默认值而非抛 Stub 异常：
+            // RepoRepository 渲染判定日志（ReadmeRender tag）在纯 JVM MockK 测试中安全
+            isReturnDefaultValues = true
         }
     }
 }
