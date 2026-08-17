@@ -319,6 +319,14 @@ jobs:
               echo "![$name](https://github.com/${{ github.repository }}/releases/download/$TAG/$name)"
               echo ""
             done
+            # 渲染通道判定（native/webview 以 ReadmeRender 日志为准——禁止视觉推断）
+            if [ -f artifacts/screenshots/readme-render-log.txt ]; then
+              echo "## ReadmeRender decisions"
+              echo '```'
+              cat artifacts/screenshots/readme-render-log.txt
+              echo '```'
+              echo ""
+            fi
           } > /tmp/screenshots-comment.md
           gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/screenshots-comment.md || true
           # 清理历史截图 release（保留最新，避免 release 列表堆积）
