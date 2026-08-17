@@ -3,6 +3,7 @@ package com.yumiru11.githubapp.feature.repo
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,6 +56,8 @@ import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.LocalRepoDetailActions
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
+
+private const val TAG = "ReadmeRender"
 
 /**
  * 仓库详情页（T9 README 浏览 tracer bullet）。
@@ -330,6 +333,8 @@ private fun ReadmeSection(
         }
 
         is ReadmeState.Loaded -> {
+            // 渲染通道日志（Q7 复测锚点）：logcat 过滤 ReadmeRender；Log.i 因 vivo [log.tag]=[I] 过滤 Debug 级
+            Log.i(TAG, "renderMode=${readmeState.renderMode}")
             when (readmeState.renderMode) {
                 ReadmeRenderMode.WEBVIEW -> {
                     WebViewMarkdownRenderer(
