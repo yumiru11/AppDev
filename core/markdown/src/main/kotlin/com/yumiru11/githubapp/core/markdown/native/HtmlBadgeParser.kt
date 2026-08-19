@@ -20,24 +20,41 @@ data class HtmlBadgeData(
  */
 object HtmlBadgeParser {
     private val IMG_TAG_REGEX = Regex("""<img[^>]*\ssrc="([^"]+)"[^>]*>""", RegexOption.IGNORE_CASE)
-    private val ANCHOR_TAG_REGEX = Regex("""<a\s+[^>]*href="([^"]+)"[^>]*>""", RegexOption.IGNORE_CASE)
     private val ALIGN_REGEX = Regex("""align\s*=\s*["']?center["']?""", RegexOption.IGNORE_CASE)
 
-    fun parse(
+    fun parseAll(
         content: String,
         node: ASTNode,
-    ): HtmlBadgeData? {
-        if (node.type != MarkdownElementTypes.HTML_BLOCK) return null
+        baseRepoUrl: String? = null,
+    ): List<HtmlBadgeData> {
+        if (node.type != MarkdownElementTypes.HTML_BLOCK) return emptyList()
         val nodeText = content.substring(node.startOffset, node.endOffset)
-        // 多个 <img>（徽章组）时只处理第一个，其余留给后续（原型验证单徽章场景）
-        val img = IMG_TAG_REGEX.find(nodeText) ?: return null
-        val src = img.groupValues[1]
-        if (!src.startsWith("http")) return null
-        val anchor = ANCHOR_TAG_REGEX.find(nodeText)
-        return HtmlBadgeData(
-            imageSrc = src,
-            linkHref = anchor?.groupValues?.get(1),
-            alignCenter = ALIGN_REGEX.containsMatchIn(nodeText),
-        )
+        val imgs = IMG_TAG_REGEX.findAll(nodeText).map { it.groupValues[1] }.toList()
+        if (imgs.isEmpty()) return emptyList()
+        val alignCenter = ALIGN_REGEX.containsMatchIn(nodeText)
+        return imgs.mapNotNull { src ->
+            val resolved =
+                when {
+                    src.startsWith("http") -> src
+                    baseRepoUrl != null -> resolveRawUrl(baseRepoUrl, src)
+                    else -> null
+                }
+            resolved?.let { HtmlBadgeData(imageSrc = it, linkHref = null, alignCenter = alignCenter) }
+        }
     }
+
+    private fun resolveRawUrl(
+        baseRepoUrl: String,
+        path: String,
+    ): String = resolveRawImageUrl(baseRepoUrl, path)
+}
+
+/** 相对路径图片解析为 raw 域完整 URL（HTML 徽章 + Markdown 语法图共用）。 */
+internal fun resolveRawImageUrl(
+    baseRepoUrl: String,
+    path: String,
+): String {
+    val stripped = baseRepoUrl.removePrefix("https://github.com/").trim('/')
+    val cleanPath = path.trimStart('/')
+    return "https://raw.githubusercontent.com/$stripped/HEAD/$cleanPath"
 }

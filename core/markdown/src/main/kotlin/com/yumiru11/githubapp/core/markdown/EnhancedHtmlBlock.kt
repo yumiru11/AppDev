@@ -3,6 +3,7 @@ package com.yumiru11.githubapp.core.markdown
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,33 +35,54 @@ import com.yumiru11.githubapp.core.markdown.native.HtmlBadgeParser
 import com.yumiru11.githubapp.core.markdown.native.HtmlDetailsParser
 
 /**
- * HTML_BLOCK 原生处理：识别 `<details>` 时自研折叠；其余类型降级为文本。
+ * HTML_BLOCK 原生处理：识别 `<details>` 时自研折叠；徽章组（含相对路径 img）渲染为
+ * 20dp 徽章 Row；其余 HTML 降级为去标签纯文本（不展示源码）。
  *
  * 这是 mikepenz 0.38.1 无 details 槽的 spike；若 future 版本提供 details 槽应替换本组件。
  */
 @Composable
-fun EnhancedHtmlBlock(model: MarkdownComponentModel) {
+fun EnhancedHtmlBlock(
+    model: MarkdownComponentModel,
+    baseRepoUrl: String? = null,
+) {
     val details = remember(model.content, model.node) { HtmlDetailsParser.parse(model.content, model.node) }
-    val badge = remember(model.content, model.node) { HtmlBadgeParser.parse(model.content, model.node) }
+    val badges =
+        remember(model.content, model.node, baseRepoUrl) {
+            HtmlBadgeParser.parseAll(model.content, model.node, baseRepoUrl)
+        }
     when {
         details != null -> {
             NativeDetailsCard(summary = details.summary, body = details.body)
         }
 
-        badge != null -> {
-            NativeBadgeCard(badge = badge)
+        badges.isNotEmpty() -> {
+            NativeBadgeRow(badges = badges)
         }
 
         !isClosingDetailsOnly(model) -> {
-            // HTML_BLOCK 无 details/徽章时：MarkdownText 对 HTML_BLOCK 提取为空（探针验证），
-            // 降级为直接渲染源码文本——用户可感知有未渲染的 HTML（2026-08-16）。
+            // HTML_BLOCK 无 details/徽章时：不展示源码（用户可见「未渲染 HTML 标签」），
+            // 降级为去标签纯文本——保留内容可读性（2026-08-17 真机：EchoMusic/mikepenz
+            // HTML 段直接展示源码，要求修复）。
+            val htmlText = model.content.substring(model.node.startOffset, model.node.endOffset)
             Text(
-                text = model.content.substring(model.node.startOffset, model.node.endOffset),
-                style = model.typography.text.copy(color = MaterialTheme.colorScheme.outline),
+                text = stripHtmlTags(htmlText),
+                style = model.typography.text.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
             )
         }
     }
 }
+
+/** 去除 HTML 标签并解码常见实体（保留换行），HTML 块降级文本化用。 */
+internal fun stripHtmlTags(html: String): String =
+    html
+        .replace(Regex("""<[^>]+>"""), "")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&nbsp;", " ")
+        .replace(Regex("""\n{3,}"""), "\n\n")
+        .trim()
 
 private fun isClosingDetailsOnly(model: MarkdownComponentModel): Boolean {
     val text = model.content.substring(model.node.startOffset, model.node.endOffset).trim()
@@ -112,30 +134,37 @@ private fun NativeDetailsCard(
 }
 
 /**
- * HTML 徽章渲染：图片（20dp 高）+ 可选链接 + 居中。
+ * HTML 徽章组渲染：多个 20dp 徽章 Row 平铺（可居中）。相对路径 img 已在
+ * [HtmlBadgeParser.parseAll] 解析为 raw 域完整 URL。
  */
 @Composable
-private fun NativeBadgeCard(badge: com.yumiru11.githubapp.core.markdown.native.HtmlBadgeData) {
+private fun NativeBadgeRow(badges: List<com.yumiru11.githubapp.core.markdown.native.HtmlBadgeData>) {
     val shape = MaterialTheme.shapes.medium
-    val badgeImage: @Composable () -> Unit = {
-        Box(
-            modifier =
-                Modifier
-                    .padding(vertical = 4.dp)
-                    .shadow(8.dp, shape)
-                    .clip(shape),
+    val rowContent: @Composable () -> Unit = {
+        Row(
+            modifier = Modifier.padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            coil3.compose.AsyncImage(
-                model = badge.imageSrc,
-                contentDescription = null,
-                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-                modifier = Modifier.height(20.dp),
-            )
+            badges.forEach { badge ->
+                Box(
+                    modifier =
+                        Modifier
+                            .shadow(8.dp, shape)
+                            .clip(shape),
+                ) {
+                    coil3.compose.AsyncImage(
+                        model = badge.imageSrc,
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                        modifier = Modifier.height(20.dp),
+                    )
+                }
+            }
         }
     }
-    if (badge.alignCenter) {
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { badgeImage() }
+    if (badges.first().alignCenter) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { rowContent() }
     } else {
-        badgeImage()
+        rowContent()
     }
 }

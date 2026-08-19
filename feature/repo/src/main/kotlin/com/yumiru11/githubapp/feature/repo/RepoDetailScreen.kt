@@ -171,23 +171,29 @@ private fun RepoDetailContent(
         modifier =
             modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                // 水平 padding 移到各子段：README 段由 EnhancedMarkdownViewer 自带 37dp
+                // （用户实测目标边距）接管——全局 16 + 内层 37 = 53dp 太宽（2026-08-17 真机）
+                .padding(top = 16.dp),
     ) {
-        RepoHeader(repo = repo)
+        Box(Modifier.padding(horizontal = 16.dp)) {
+            RepoHeader(repo = repo)
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        TabRow(selectedTabIndex = tab) {
-            Tab(
-                selected = tab == 0,
-                onClick = { tab = 0 },
-                text = { Text(text = stringResource(R.string.repo_tab_readme)) },
-            )
-            Tab(
-                selected = tab == 1,
-                onClick = { tab = 1 },
-                text = { Text(text = stringResource(R.string.repo_tab_files)) },
-            )
+        Box(Modifier.padding(horizontal = 16.dp)) {
+            TabRow(selectedTabIndex = tab) {
+                Tab(
+                    selected = tab == 0,
+                    onClick = { tab = 0 },
+                    text = { Text(text = stringResource(R.string.repo_tab_readme)) },
+                )
+                Tab(
+                    selected = tab == 1,
+                    onClick = { tab = 1 },
+                    text = { Text(text = stringResource(R.string.repo_tab_files)) },
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -203,11 +209,13 @@ private fun RepoDetailContent(
             }
 
             else -> {
-                FileTreeSection(
-                    treeState = filesState.treeState,
-                    defaultBranch = repo.defaultBranch,
-                    viewModel = filesViewModel,
-                )
+                Box(Modifier.padding(horizontal = 16.dp)) {
+                    FileTreeSection(
+                        treeState = filesState.treeState,
+                        defaultBranch = repo.defaultBranch,
+                        viewModel = filesViewModel,
+                    )
+                }
             }
         }
     }
@@ -299,12 +307,6 @@ private fun ReadmeSection(
     onRetryReadme: () -> Unit,
     baseRepoUrl: String,
 ) {
-    Text(
-        text = stringResource(R.string.repo_readme_section),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(bottom = 8.dp),
-    )
-
     when (readmeState) {
         is ReadmeState.Loading -> {
             Box(
