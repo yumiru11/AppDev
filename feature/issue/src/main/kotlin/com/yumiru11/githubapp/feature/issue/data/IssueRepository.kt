@@ -55,7 +55,7 @@ class IssueRepository
             owner: String,
             repo: String,
             number: Int,
-        ): List<IssueTimelineItem> = issueApi.listTimeline(owner, repo, number).map { it.toTimelineItem() }
+        ): List<IssueTimelineItem> = issueApi.listTimeline(owner, repo, number).mapIndexed { index, dto -> dto.toTimelineItem(index) }
 
         private companion object {
             const val PAGE_SIZE = 30
@@ -87,9 +87,13 @@ internal fun IssueDto.toDomain(): Issue =
  *
  * 评论项（commented）→ [IssueTimelineItem.Comment]；其余 → [IssueTimelineItem.Event]。
  * cross-referenced → [Event.sourceIssue]；connected/linked → [linkedPullRequest]。
+ *
+ * @param ordinal 时间线中的下标；GitHub 对部分事件（如 cross-referenced）返回 id=null，
+ *   此时用负数合成稳定且唯一的 key（真实 id 均为正数）。
  */
-internal fun IssueEventDto.toTimelineItem(): IssueTimelineItem {
+internal fun IssueEventDto.toTimelineItem(ordinal: Int): IssueTimelineItem {
     val type = IssueTimelineEventType.fromRaw(event)
+    val id = this.id ?: -(ordinal + 1).toLong()
     return if (type == IssueTimelineEventType.COMMENTED) {
         IssueTimelineItem.Comment(
             id = id,
