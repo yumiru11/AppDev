@@ -55,6 +55,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
+import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
+import com.yumiru11.githubapp.core.markdown.webview.RenderMode
+import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueLabel
@@ -70,8 +73,9 @@ import java.util.Locale
 /**
  * Issue 详情页（T13）：header + 正文 + 时间线（评论/事件）+ TopAppBar 更多菜单（分享/浏览器/复制链接）。
  *
- * 状态由 [IssueDetailViewModel] 驱动；评论正文与 Issue 正文经 [MarkdownViewer] 原生渲染，
- * 事件以单行次要文本呈现，交叉引用/关联 PR 带目标编号。所有文案经 stringResource 本地化。
+ * 状态由 [IssueDetailViewModel] 驱动；Issue 正文经 [WebViewMarkdownRenderer]（离线 GFM）渲染，
+ * 评论正文保持 [MarkdownViewer] 原生渲染，事件以单行次要文本呈现。
+ * 所有文案经 stringResource 本地化。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -214,14 +218,14 @@ private fun SuccessContent(
 
         if (!issue.body.isNullOrBlank()) {
             item(key = "body") {
-                MarkdownViewer(
-                    markdown = issue.body,
-                    onInternalLink = onInternalLink,
+                WebViewMarkdownRenderer(
+                    sanitizedHtml = issue.body,
+                    tokenProvider = { null },
+                    bridgeCallback = createIssueBridgeCallback(onInternalLink),
                     baseRepoUrl = baseRepoUrl,
+                    // Issue 无服务端 HTML API → 离线 GFM + 融合样式（WebView 内 markdown-it 渲染）
+                    renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
                     modifier = Modifier.fillMaxWidth(),
-                    // LazyColumn item 内禁用内部滚动：item 测量约束为无限高，
-                    // verticalScroll 必崩（RoadWeaver 崩溃根因，2026-08-17）
-                    scrollable = false,
                 )
             }
         }
@@ -243,6 +247,35 @@ private fun SuccessContent(
                 }
             }
         }
+    }
+}
+
+/** WebView 正文 bridge：内部链接 → 应用内导航；外部链接 → 浏览器；纯锚点忽略。 */
+@Suppress("EmptyFunctionBlock") // onCodeCopy/onImageClick/onCheckboxClick/onHeightChanged 为预留/T14 占位
+@Composable
+private fun createIssueBridgeCallback(onInternalLink: (ParsedUrl) -> Unit): MarkdownBridgeCallback {
+    val context = LocalContext.current
+    return object : MarkdownBridgeCallback {
+        override fun onExternalLink(url: String) {
+            // 纯锚点（#xxx）由页面自身处理，不拦截
+            if (url.startsWith("#")) return
+            openInBrowser(context, url)
+        }
+
+        override fun onInternalLink(parsed: ParsedUrl) {
+            onInternalLink(parsed)
+        }
+
+        override fun onCodeCopy(code: String) {}
+
+        override fun onImageClick(src: String) {}
+
+        override fun onCheckboxClick(
+            index: Int,
+            checked: Boolean,
+        ) {}
+
+        override fun onHeightChanged(heightPx: Int) {}
     }
 }
 
@@ -537,7 +570,7 @@ private fun openInBrowser(
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     } catch (e: ActivityNotFoundException) {
         // 无浏览器可处理时静默忽略
-        Log.d(TAG, "No browser available to open: $url", e)
+        Log.i(TAG, "No browser available to open: $url", e)
     }
 }
 

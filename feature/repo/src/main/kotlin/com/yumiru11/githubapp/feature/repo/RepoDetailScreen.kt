@@ -50,7 +50,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.data.model.Repository
-import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
@@ -63,9 +62,9 @@ private const val TAG = "ReadmeRender"
  * 仓库详情页（T9 README 浏览 tracer bullet）。
  *
  * 顶部：仓库元数据（名称/描述/星/分叉/语言）
- * 下方：README 内容（FeatureDetector 判定：复杂 → WebView 服务端 HTML；普通 → 原生 MarkdownViewer）
+ * 下方：README 内容（Task B 后一律 WebView 渲染：服务端 HTML 优先，离线 GFM 降级）
  *
- * 链接分发（T9 验收第 3 条）：WebView bridge 与原生 MarkdownViewer 的链接统一经
+ * 链接分发（T9 验收第 3 条）：WebView bridge 的链接统一经
  * [RepoDetailActions] 处理——内部链接应用内导航，外部链接 CustomTabs，纯锚点忽略。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -337,25 +336,13 @@ private fun ReadmeSection(
         is ReadmeState.Loaded -> {
             // 渲染通道日志（Q7 复测锚点）：logcat 过滤 ReadmeRender；Log.i 因 vivo [log.tag]=[I] 过滤 Debug 级
             Log.i(TAG, "renderMode=${readmeState.renderMode}")
-            when (readmeState.renderMode) {
-                ReadmeRenderMode.WEBVIEW -> {
-                    WebViewMarkdownRenderer(
-                        sanitizedHtml = readmeState.content,
-                        tokenProvider = { null },
-                        bridgeCallback = createBridgeCallback(actions),
-                        baseRepoUrl = baseRepoUrl,
-                    )
-                }
-
-                ReadmeRenderMode.NATIVE -> {
-                    // ADR-0007 原生增强主渲染（P1 #64）：否则 keep 基础版 MarkdownViewer 效果（标题大/徽章大/边距旧）
-                    EnhancedMarkdownViewer(
-                        markdown = readmeState.content,
-                        onInternalLink = { parsed -> handleParsedUrl(parsed, actions) },
-                        baseRepoUrl = baseRepoUrl,
-                    )
-                }
-            }
+            WebViewMarkdownRenderer(
+                sanitizedHtml = readmeState.content,
+                tokenProvider = { null },
+                bridgeCallback = createBridgeCallback(actions),
+                baseRepoUrl = baseRepoUrl,
+                renderMode = readmeState.webViewRenderMode,
+            )
         }
 
         is ReadmeState.Error -> {

@@ -1,4 +1,4 @@
-# AppDev 项目状态（2026-08-15）
+# AppDev 项目状态（2026-08-19）
 
 > 本文件是当前进度的**权威快照**。每张票合并/关闭后更新。配合 `docs/agents/workflow.md`（流程）与 `AGENTS.md`（环境）阅读。
 
@@ -65,7 +65,7 @@
 
 | 任务 | 分支 | 执行方式 | 说明 |
 |---|---|---|---|
-| README 渲染原型 | `prototype/readme-comparison` | DSH × V4 Pro（见 dsh-guide.md） | 双版本对照（WebView 融合 vs 原生增强），产出对比报告后用户拍板路线 A/B/C |
+| Task B 渲染架构切换 | `main`（工作树未提交） | 主代理 | WebView 主渲染切换完成（README/Issue 正文——服务端 HTML + 离线 GFM 两级；评论/通知短文本保持原生）；ADR-0007 已修订；待真机验收 + CI 截图验证 |
 
 ## 5. 遗留事项（未闭环）
 

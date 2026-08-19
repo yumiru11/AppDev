@@ -10,6 +10,7 @@ import com.yumiru11.githubapp.core.githubrest.model.FileContentDto
 import com.yumiru11.githubapp.core.githubrest.model.GitTreeResponseDto
 import com.yumiru11.githubapp.core.githubrest.model.ReadmeDto
 import com.yumiru11.githubapp.core.githubrest.model.TreeItemDto
+import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -28,7 +29,7 @@ import java.util.Base64
 /**
  * RepoRepository 单测（纯 JVM，MockK 桩 REST API 与缓存 DAO）。
  *
- * 覆盖：FeatureDetector 接线（普通 → NATIVE 且相对链接重写、复杂 → WEBVIEW）；
+ * 覆盖：README 一律 WEBVIEW（服务端 HTML）；服务端失败降级离线 GFM；
  * 空白内容 → WEBVIEW；404 → failure；双 key 缓存（命中跳过网络、contentHash 相同仅更新主题版本）。
  */
 class RepoRepositoryTest {
@@ -75,23 +76,24 @@ class RepoRepositoryTest {
         )
 
     @Test
-    fun getReadme_simpleMarkdown_returnsNativeWithRewrittenLinks() =
+    fun getReadme_simpleMarkdown_alwaysReturnsWebViewHtml() =
         runTest {
             val markdown = "# Hello\n\nSee [guide](./docs/guide.md) and ![logo](assets/logo.png)"
             coEvery { readmeApi.getReadmeMeta("octocat", "Hello-World") } returns readmeDto(markdown)
             coEvery { cachedReadmeDao.getByOwnerAndRepo(any(), any()) } returns null
+            coEvery { cachedReadmeDao.upsert(any()) } returns Unit
+            coEvery { readmeApi.getReadmeHtml(any(), any()) } returns
+                "<div>server html</div>".toResponseBody("text/html".toMediaType())
 
             val result = repository.getReadme("octocat", "Hello-World", "th-v1")
 
             assertTrue(result.isSuccess)
             val content = result.getOrThrow()
-            assertEquals(ReadmeRenderMode.NATIVE, content.renderMode)
-            assertNull(content.html)
-            // 相对链接已按 raw 基准重写为绝对 URL
-            assertTrue(content.markdown.contains("https://raw.githubusercontent.com/octocat/Hello-World/main/docs/guide.md"))
-            assertTrue(content.markdown.contains("https://raw.githubusercontent.com/octocat/Hello-World/main/assets/logo.png"))
-            // 原生路径不触碰 HTML 获取
-            coVerify(exactly = 0) { readmeApi.getReadmeHtml(any(), any()) }
+            assertEquals(ReadmeRenderMode.WEBVIEW, content.renderMode)
+            assertEquals("<div>server html</div>", content.html)
+            assertEquals(RenderMode.SERVER_HTML, content.webViewRenderMode)
+            // 无论内容是否简单，一律请求服务端 HTML
+            coVerify(exactly = 1) { readmeApi.getReadmeHtml("octocat", "Hello-World") }
         }
 
     @Test
@@ -237,7 +239,7 @@ class RepoRepositoryTest {
             coEvery { readmeApi.getReadmeHtml(any(), any()) } returns
                 "<p>fresh html</p>".toResponseBody("text/html".toMediaType())
 
-            val result = repository.getReadmeHtml("octocat", "Hello-World", "th-v1")
+            val result = repository.getReadmeHtml("octocat", "Hello-World", "th-v1", readmeDto(markdown, sha = "newsha"))
 
             assertTrue(result.isSuccess)
             assertEquals("<p>fresh html</p>", result.getOrThrow())
@@ -262,7 +264,7 @@ class RepoRepositoryTest {
             coEvery { cachedReadmeDao.getByOwnerAndRepo("octocat", "Hello-World") } returns cachedEntity(themeVersion = "th-old")
             coEvery { readmeApi.getReadmeHtml(any(), any()) } throws IOException("network down")
 
-            val result = repository.getReadmeHtml("octocat", "Hello-World", "th-v1")
+            val result = repository.getReadmeHtml("octocat", "Hello-World", "th-v1", readmeDto(markdown, sha = "newsha"))
 
             assertTrue(result.isSuccess)
             assertEquals("<p>cached html</p>", result.getOrThrow())
@@ -277,26 +279,28 @@ class RepoRepositoryTest {
             coEvery { cachedReadmeDao.getByOwnerAndRepo(any(), any()) } returns null
             coEvery { readmeApi.getReadmeHtml(any(), any()) } throws IOException("network down")
 
-            val result = repository.getReadmeHtml("octocat", "Hello-World", "th-v1")
+            val result = repository.getReadmeHtml("octocat", "Hello-World", "th-v1", readmeDto(markdown, sha = "newsha"))
 
             assertTrue(result.isFailure)
         }
 
     @Test
-    fun getReadme_simpleMarkdownWithoutDownloadUrl_returnsMarkdownUnrewritten() =
+    fun getReadme_htmlFetchFailure_returnsOfflineMarkdownFallback() =
         runTest {
-            // 原生路径：downloadUrl 缺失（空串）→ 相对链接保持原样（不重写、不崩溃，由解析器兜底）
+            // Task B 降级：服务端 HTML 获取失败 → 返回原始 markdown，renderMode 仍 WEBVIEW，
+            // 由 WebView 离线 markdown-it 渲染（WebViewHtmlBuilder.build(rawMarkdown)）
             val markdown = "# Hello\n\nSee [guide](./docs/guide.md)"
-            coEvery { readmeApi.getReadmeMeta(any(), any()) } returns readmeDto(markdown, downloadUrl = "")
+            coEvery { readmeApi.getReadmeMeta(any(), any()) } returns readmeDto(markdown)
             coEvery { cachedReadmeDao.getByOwnerAndRepo(any(), any()) } returns null
+            coEvery { readmeApi.getReadmeHtml(any(), any()) } throws IOException("network down")
 
             val result = repository.getReadme("octocat", "Hello-World", "th-v1")
 
             assertTrue(result.isSuccess)
             val content = result.getOrThrow()
-            assertEquals(ReadmeRenderMode.NATIVE, content.renderMode)
-            assertEquals(markdown, content.markdown)
-            coVerify(exactly = 0) { readmeApi.getReadmeHtml(any(), any()) }
+            assertEquals(ReadmeRenderMode.WEBVIEW, content.renderMode)
+            assertEquals(markdown, content.html)
+            assertEquals(RenderMode.OFFLINE_MARKDOWN_IT, content.webViewRenderMode)
         }
 
     @Test

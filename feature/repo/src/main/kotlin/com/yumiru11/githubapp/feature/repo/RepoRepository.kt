@@ -11,9 +11,8 @@ import com.yumiru11.githubapp.core.githubrest.api.GitTreeApi
 import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.model.MarkdownRenderRequest
-import com.yumiru11.githubapp.core.githubrest.util.RelativeLinkRewriter
-import com.yumiru11.githubapp.core.markdown.webview.FallbackDecision
-import com.yumiru11.githubapp.core.markdown.webview.FeatureDetector
+import com.yumiru11.githubapp.core.githubrest.model.ReadmeDto
+import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -117,12 +116,12 @@ class RepoRepository
             }
 
         /**
-         * 获取 README 内容（T9 验收第 2 条：普通 README 原生渲染，复杂自动走兜底）。
+         * 获取 README 内容（Task B：README 一律 WebView 渲染）。
          *
          * 数据流：
-         * 1. GET README 元数据 → base64 原文（markdown）+ downloadUrl（相对链接基准）
-         * 2. [FeatureDetector] 判定：普通 → NATIVE（markdown 原文，相对链接已重写为绝对 URL）；
-         *    复杂（mermaid/重型 HTML/超长）→ WEBVIEW（服务端 HTML，三级降级 + 双 key 缓存）
+         * 1. GET README 元数据 → base64 原文（markdown）
+         * 2. 一律走服务端 HTML 路径（getReadmeHtml，三级降级 + 双 key 缓存）；
+         *    服务端 HTML 获取失败时降级离线 GFM（renderMode 仍 WEBVIEW，WebView 内 markdown-it 渲染）
          *
          * @param themeVersion 当前主题版本，用于缓存失效
          */
@@ -134,58 +133,56 @@ class RepoRepository
             try {
                 val meta = readmeApi.getReadmeMeta(owner, repo)
                 val rawMarkdown = meta.decodeContent() ?: ""
-                val decision = FeatureDetector.shouldFallback(rawMarkdown)
                 // 渲染通道判定日志（Q7 复测锚点）：真机/CI logcat 过滤 ReadmeRender。
-                // 用 Log.i 而非 Log.d：真机 vivo [log.tag]=[I]，Debug 级日志被系统过滤（2026-08-17 实证）
+                // 用 Log.i 而非 Log.d：真机 vivo [log.tag]=[I]，Debug 级日志被系统过滤（2026-08-17 实证）。
+                // Task B 后 README 恒走 WebView，renderMode 恒 WEBVIEW。
                 Log.i(
                     TAG,
-                    "repo=$owner/$repo decision=${decision::class.simpleName}" +
-                        (decision as? FallbackDecision.WebView)?.let { " reason=${it.reason}" }.orEmpty() +
+                    "repo=$owner/$repo renderMode=${ReadmeRenderMode.WEBVIEW}" +
                         " lines=${rawMarkdown.count { it == '\n' } + 1} bytes=${rawMarkdown.length}",
                 )
-                if (decision is FallbackDecision.Native && rawMarkdown.isNotBlank()) {
-                    // 普通 README → 原生渲染：相对链接按仓库上下文重写为绝对 URL（图片可加载、链接可解析）
-                    val markdown = rewriteRelativeLinks(rawMarkdown, meta.downloadUrl)
-                    Result.success(
-                        ReadmeContent(
-                            markdown = markdown,
-                            html = null,
-                            renderMode = ReadmeRenderMode.NATIVE,
-                        ),
+                val htmlResult = getReadmeHtml(owner, repo, themeVersion, meta)
+                val content =
+                    htmlResult.fold(
+                        onSuccess = { html ->
+                            ReadmeContent(
+                                markdown = rawMarkdown,
+                                html = html,
+                                renderMode = ReadmeRenderMode.WEBVIEW,
+                                webViewRenderMode = RenderMode.SERVER_HTML,
+                            )
+                        },
+                        onFailure = { failure ->
+                            // 服务端 HTML 获取失败 → 降级离线 GFM（WebView 内 markdown-it 渲染），renderMode 仍 WEBVIEW
+                            if (rawMarkdown.isNotBlank()) {
+                                ReadmeContent(
+                                    markdown = rawMarkdown,
+                                    html = rawMarkdown,
+                                    renderMode = ReadmeRenderMode.WEBVIEW,
+                                    webViewRenderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+                                )
+                            } else {
+                                throw failure
+                            }
+                        },
                     )
-                } else {
-                    // 复杂 README（或原文不可得）→ WebView 兜底：服务端 HTML（三级降级 + 缓存）
-                    val html = getReadmeHtml(owner, repo, themeVersion).getOrThrow()
-                    Result.success(
-                        ReadmeContent(
-                            markdown = rawMarkdown,
-                            html = html,
-                            renderMode = ReadmeRenderMode.WEBVIEW,
-                        ),
-                    )
-                }
+                Result.success(content)
             } catch (e: Exception) {
                 Result.failure(e)
             }
 
-        /** 相对链接重写（baseUrl 缺失时原样返回，链接保持相对由解析器兜底） */
-        private fun rewriteRelativeLinks(
-            markdown: String,
-            baseUrl: String?,
-        ): String {
-            if (baseUrl.isNullOrBlank()) return markdown
-            return RelativeLinkRewriter.rewrite(markdown, baseUrl)
-        }
-
         /**
          * 获取 README HTML（三级降级 + 双 key 缓存）。
+         *
          * @param themeVersion 当前主题版本，用于缓存失效
+         * @param meta README 元数据（由 [getReadme] 传入，避免 double getReadmeMeta 网络请求）
          */
         @Suppress("NestedBlockDepth") // JSON 回退判定（try→content-type/首字符→markdown 三级降级）结构固有，拆散反损可读性（T3 先例）
         suspend fun getReadmeHtml(
             owner: String,
             repo: String,
             themeVersion: String,
+            meta: ReadmeDto,
         ): Result<String> {
             // 1. 查缓存
             val cached = cachedReadmeDao.getByOwnerAndRepo(owner, repo)
@@ -194,8 +191,7 @@ class RepoRepository
             }
 
             return try {
-                // 2. GET README 元数据（含 sha 用于 contentHash）
-                val meta = readmeApi.getReadmeMeta(owner, repo)
+                // 2. contentHash = README 元数据 sha（由调用方传入，避免重复拉取 meta）
                 val contentHash = meta.sha
 
                 // 缓存命中但 contentHash 相同 → 更新 themeVersion 即可
@@ -279,12 +275,14 @@ class RepoRepository
 /**
  * README 内容（渲染通道判定结果）。
  *
- * @param markdown 原始 Markdown 文本（NATIVE 模式已重写相对链接为绝对 URL）
- * @param html 服务端渲染 HTML（WEBVIEW 模式；NATIVE 模式为 null）
- * @param renderMode 渲染通道（FeatureDetector 判定结果）
+ * @param markdown 原始 Markdown 文本
+ * @param html 渲染内容：服务端 HTML 时为 HTML；离线 GFM 降级时为原始 Markdown
+ * @param renderMode 渲染通道（Task B 后恒为 [ReadmeRenderMode.WEBVIEW]）
+ * @param webViewRenderMode WebView 子模式：服务端 HTML 或离线 markdown-it（降级时）
  */
 data class ReadmeContent(
     val markdown: String,
     val html: String?,
     val renderMode: ReadmeRenderMode,
+    val webViewRenderMode: RenderMode = RenderMode.SERVER_HTML,
 )

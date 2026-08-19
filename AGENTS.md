@@ -7,13 +7,13 @@
 
 开发一个**功能全面的 Android GitHub 客户端**（轻量、流畅、全 Material You）。技术规划 = `plan.md`（41KB，必读），需求来源 = `request.txt`。应用名/包名仍为占位符：applicationId 与 namespace = `com.yumiru11.githubapp`（模块 namespace 用 `core.github_xxx` 下划线写法），产品定名后统一改。
 
-**当前状态（2026-08-16）**：T1-T10 + T13 + T19/T20/T24 + T26 共 **15 票已完成并合入 main**。**README 渲染原型已完成并合入**（prototype/readme-comparison → main `97dfef8`）：原生主渲染 + WebView 兜底拍板（ADR-0007），FeatureDetector 已收紧（details/table 原生渲染）。剩余 11 票见 `docs/agents/project-status.md`。
+**当前状态（2026-08-19）**：T1-T10 + T13 + T19/T20/T24 + T26 共 **15 票已完成并合入 main**。**Task B 渲染架构切换已完成（工作树未提交）**：README/Issue 正文改 WebView 主渲染（服务端 HTML + 离线 GFM 两级），评论/通知短文本保持原生（ADR-0007 已修订）。剩余 11 票见 `docs/agents/project-status.md`。
 
 ## 核心决策（来自 plan.md，勿偏离）
 
 - **无 Kotlin Multiplatform**、**无 Waydroid/虚拟机**：测试与截图全跑 Linux 纯 JVM（Robolectric + Roborazzi）
 - **GraphQL 读优先（Apollo Kotlin 5）、REST 写优先（Retrofit 3/OkHttp 5）**；认证用 OAuth PKCE（AppAuth），PAT 仅开发者模式（fine-grained PAT 不支持 GraphQL → 自动降级 REST-only）
-- **Markdown 分层渲染**：原生渲染器 mikepenz `multiplatform-markdown-renderer` **0.38.1** + KotlinTextMate 0.2.0 高亮（**主渲染，ADR-0007 拍板**；增强组件 EnhancedList/Paragraph/MarkdownImage/HtmlBlock/Table）；WebView 兜底（github-markdown-css + DOMPurify + markdown-it + highlight.js，Material You 变量注入——**真机 WebView 不支持 CSS color-mix，混色必须 Kotlin 预计算**）；shields 徽章需 **coil-svg + SvgDecoder**（Coil 默认无 SVG；SvgDecoder intrinsic 放大 ~10 倍，徽章固定高 20dp）；FeatureDetector 分流仅限 mermaid/数学/`<svg>/<canvas>/<iframe>/<math>`/超长
+- **Markdown 分层渲染**：**WebView 主渲染**（README/Issue 正文——服务端 HTML 优先 + 离线 GFM markdown-it 降级两级，ADR-0007 拍板；github-markdown-css + DOMPurify + markdown-it + highlight.js，Material You 变量注入——**真机 WebView 不支持 CSS color-mix，混色必须 Kotlin 预计算**）；评论列表/通知短文本保持原生（**铁律「评论列表绝不用 WebView」不变**）；FeatureDetector 保留但 README 分流判定不再使用；增强组件链（EnhancedMarkdownViewer 等）继续服务短文本；shields 徽章需 **coil-svg + SvgDecoder**（Coil 默认无 SVG；SvgDecoder intrinsic 放大 ~10 倍，徽章固定高 20dp）
 - **评论列表绝不用 WebView**；**token 绝不注入 WebView**；代码浏览/编辑用 Rosemoe Sora Editor
 - i18n 从第一天落实：Compose 一律 `stringResource()`，禁止硬编码字符串（GitLight 教训）
 - 版本目录（`gradle/libs.versions.toml`）单一事实来源；设计令牌、Konsist 架构测试从第一行代码开始
