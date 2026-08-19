@@ -1,6 +1,7 @@
 package com.yumiru11.githubapp.feature.repo
 
 import com.yumiru11.githubapp.core.data.model.Repository
+import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 
 /**
  * 仓库详情页 UI 状态。
@@ -30,12 +31,14 @@ sealed interface ReadmeState {
     data object Empty : ReadmeState
 
     /**
-     * @param content 渲染内容：WEBVIEW 模式为服务端渲染 HTML，NATIVE 模式为原始 Markdown 文本
-     * @param renderMode 渲染通道：WEBVIEW 走 T8 WebViewMarkdownRenderer，NATIVE 走 MarkdownViewer
+     * @param content 渲染内容：服务端 HTML 或离线 GFM 降级时的原始 Markdown
+     * @param renderMode 渲染通道（Task B 后恒为 WebView）
+     * @param webViewRenderMode WebView 子模式：服务端 HTML 或离线 markdown-it（降级时）
      */
     data class Loaded(
         val content: String,
         val renderMode: ReadmeRenderMode = ReadmeRenderMode.WEBVIEW,
+        val webViewRenderMode: RenderMode = RenderMode.SERVER_HTML,
     ) : ReadmeState
 
     /** 加载失败（错误类型驱动文案，UI 层 stringResource 映射） */
@@ -45,14 +48,11 @@ sealed interface ReadmeState {
 }
 
 /**
- * README 渲染通道选择。
+ * README 渲染通道选择（Task B 后仅剩 WebView）。
  */
 enum class ReadmeRenderMode {
-    /** 服务端 HTML → WebView 兜底通道（FeatureDetector 判定复杂或内容为 HTML） */
+    /** WebView 渲染通道（服务端 HTML 或离线 GFM 降级） */
     WEBVIEW,
-
-    /** 原生 Markdown 文本 → MarkdownViewer（简单 Markdown） */
-    NATIVE,
 }
 
 /**

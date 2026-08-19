@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.feature.repo
 
 import androidx.lifecycle.SavedStateHandle
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownThemeTokens
+import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.core.testing.fake.GitHubFakes
 import io.mockk.coEvery
@@ -21,7 +22,7 @@ import java.io.IOException
 /**
  * RepoDetailViewModel 单测（纯 JVM，MockK 桩 RepoRepository）。
  *
- * 覆盖：成功/404/网络错误 → UiState；FeatureDetector 接线（NATIVE/WEBVIEW 透传）；
+ * 覆盖：成功/404/网络错误 → UiState；README 一律 WEBVIEW（服务端 HTML / 离线 GFM 降级透传）；
  * README 404 → 空态；retry 重新加载。
  */
 class RepoDetailViewModelTest {
@@ -50,8 +51,8 @@ class RepoDetailViewModelTest {
                         Result.success(
                             ReadmeContent(
                                 markdown = "# Hello",
-                                html = null,
-                                renderMode = ReadmeRenderMode.NATIVE,
+                                html = "<p>server html</p>",
+                                renderMode = ReadmeRenderMode.WEBVIEW,
                             ),
                         )
                 }
@@ -63,7 +64,7 @@ class RepoDetailViewModelTest {
             assertEquals("octocat", success.repo.ownerLogin)
             assertEquals("Hello-World", success.repo.name)
             assertEquals(
-                ReadmeState.Loaded("# Hello", ReadmeRenderMode.NATIVE),
+                ReadmeState.Loaded("<p>server html</p>", ReadmeRenderMode.WEBVIEW),
                 success.readmeState,
             )
         }
@@ -95,7 +96,7 @@ class RepoDetailViewModelTest {
         }
 
     @Test
-    fun loadReadme_nativeMarkdown_emitsLoadedNative() =
+    fun loadReadme_webViewHtml_emitsLoadedWebView() =
         runTest {
             val repoRepository =
                 mockk<RepoRepository> {
@@ -104,31 +105,6 @@ class RepoDetailViewModelTest {
                         Result.success(
                             ReadmeContent(
                                 markdown = "# Hello\n\nSimple README.",
-                                html = null,
-                                renderMode = ReadmeRenderMode.NATIVE,
-                            ),
-                        )
-                }
-
-            val state = viewModel(repoRepository).uiState.value
-
-            val readmeState = (state as RepoDetailUiState.Success).readmeState
-            assertEquals(
-                ReadmeState.Loaded("# Hello\n\nSimple README.", ReadmeRenderMode.NATIVE),
-                readmeState,
-            )
-        }
-
-    @Test
-    fun loadReadme_complexMarkdown_emitsLoadedWebView() =
-        runTest {
-            val repoRepository =
-                mockk<RepoRepository> {
-                    coEvery { getRepository(any(), any()) } returns GitHubFakes.fakeRepository()
-                    coEvery { getReadme(any(), any(), any<String>()) } returns
-                        Result.success(
-                            ReadmeContent(
-                                markdown = "```mermaid\ngraph TD; A-->B;\n```",
                                 html = "<p>server html</p>",
                                 renderMode = ReadmeRenderMode.WEBVIEW,
                             ),
@@ -142,6 +118,60 @@ class RepoDetailViewModelTest {
                 ReadmeState.Loaded("<p>server html</p>", ReadmeRenderMode.WEBVIEW),
                 readmeState,
             )
+        }
+
+    @Test
+    fun loadReadme_offlineMarkdownFallback_emitsLoadedWebViewOffline() =
+        runTest {
+            // Task B 降级：README 拿不到服务端 HTML → html 字段为原始 markdown，
+            // webViewRenderMode = OFFLINE_MARKDOWN_IT，UI 据此走 WebView 离线 GFM。
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getRepository(any(), any()) } returns GitHubFakes.fakeRepository()
+                    coEvery { getReadme(any(), any(), any<String>()) } returns
+                        Result.success(
+                            ReadmeContent(
+                                markdown = "# Hello",
+                                html = "# Hello",
+                                renderMode = ReadmeRenderMode.WEBVIEW,
+                                webViewRenderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+                            ),
+                        )
+                }
+
+            val state = viewModel(repoRepository).uiState.value
+
+            val readmeState = (state as RepoDetailUiState.Success).readmeState
+            assertEquals(
+                ReadmeState.Loaded(
+                    content = "# Hello",
+                    renderMode = ReadmeRenderMode.WEBVIEW,
+                    webViewRenderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+                ),
+                readmeState,
+            )
+        }
+
+    @Test
+    fun loadReadme_blankHtml_emitsEmpty() =
+        runTest {
+            // README 渲染通道恒 WEBVIEW，但 HTML 缺失/为空 → 空态
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getRepository(any(), any()) } returns GitHubFakes.fakeRepository()
+                    coEvery { getReadme(any(), any(), any<String>()) } returns
+                        Result.success(
+                            ReadmeContent(
+                                markdown = "# Hello",
+                                html = null,
+                                renderMode = ReadmeRenderMode.WEBVIEW,
+                            ),
+                        )
+                }
+
+            val state = viewModel(repoRepository).uiState.value
+
+            assertEquals(ReadmeState.Empty, (state as RepoDetailUiState.Success).readmeState)
         }
 
     @Test
@@ -176,7 +206,7 @@ class RepoDetailViewModelTest {
         }
 
     @Test
-    fun retry_afterError_reloadsAndSucceeds() =
+    fun retry_afterRepoError_reloadsAndSucceeds() =
         runTest {
             val repoRepository =
                 mockk<RepoRepository> {
@@ -191,8 +221,8 @@ class RepoDetailViewModelTest {
                 Result.success(
                     ReadmeContent(
                         markdown = "# Hello",
-                        html = null,
-                        renderMode = ReadmeRenderMode.NATIVE,
+                        html = "<p>server html</p>",
+                        renderMode = ReadmeRenderMode.WEBVIEW,
                     ),
                 )
 
@@ -201,7 +231,7 @@ class RepoDetailViewModelTest {
             val state = viewModel.uiState.value
             assertTrue(state is RepoDetailUiState.Success)
             assertEquals(
-                ReadmeState.Loaded("# Hello", ReadmeRenderMode.NATIVE),
+                ReadmeState.Loaded("<p>server html</p>", ReadmeRenderMode.WEBVIEW),
                 (state as RepoDetailUiState.Success).readmeState,
             )
         }
@@ -217,54 +247,6 @@ class RepoDetailViewModelTest {
             val state = viewModel(repoRepository).uiState.value
 
             assertEquals(RepoDetailUiState.Error(RepoErrorType.UNKNOWN), state)
-        }
-
-    @Test
-    fun loadReadme_webViewModeBlankHtml_emitsEmpty() =
-        runTest {
-            // 渲染通道判定为 WEBVIEW 但服务端 HTML 缺失/为空 → 空态（VM 分支 html.isNullOrBlank）
-            val repoRepository =
-                mockk<RepoRepository> {
-                    coEvery { getRepository(any(), any()) } returns GitHubFakes.fakeRepository()
-                    coEvery { getReadme(any(), any(), any<String>()) } returns
-                        Result.success(
-                            ReadmeContent(
-                                markdown = "```mermaid\ngraph TD; A-->B;\n```",
-                                html = null,
-                                renderMode = ReadmeRenderMode.WEBVIEW,
-                            ),
-                        )
-                }
-
-            val state = viewModel(repoRepository).uiState.value
-
-            assertEquals(ReadmeState.Empty, (state as RepoDetailUiState.Success).readmeState)
-        }
-
-    @Test
-    fun loadReadme_nativeModeWithHtmlPresent_emitsLoadedNative() =
-        runTest {
-            // FeatureDetector 判 NATIVE 时渲染通道优先：即使 html 非空也走原生 Markdown，不用服务端 HTML
-            val repoRepository =
-                mockk<RepoRepository> {
-                    coEvery { getRepository(any(), any()) } returns GitHubFakes.fakeRepository()
-                    coEvery { getReadme(any(), any(), any<String>()) } returns
-                        Result.success(
-                            ReadmeContent(
-                                markdown = "# Hello",
-                                html = "<p>ignored server html</p>",
-                                renderMode = ReadmeRenderMode.NATIVE,
-                            ),
-                        )
-                }
-
-            val state = viewModel(repoRepository).uiState.value
-
-            val readmeState = (state as RepoDetailUiState.Success).readmeState
-            assertEquals(
-                ReadmeState.Loaded("# Hello", ReadmeRenderMode.NATIVE),
-                readmeState,
-            )
         }
 
     @Test
@@ -286,8 +268,8 @@ class RepoDetailViewModelTest {
                 Result.success(
                     ReadmeContent(
                         markdown = "# Hello",
-                        html = null,
-                        renderMode = ReadmeRenderMode.NATIVE,
+                        html = "<p>server html</p>",
+                        renderMode = ReadmeRenderMode.WEBVIEW,
                     ),
                 )
 
@@ -296,7 +278,7 @@ class RepoDetailViewModelTest {
             val state = viewModel.uiState.value
             assertTrue(state is RepoDetailUiState.Success)
             assertEquals(
-                ReadmeState.Loaded("# Hello", ReadmeRenderMode.NATIVE),
+                ReadmeState.Loaded("<p>server html</p>", ReadmeRenderMode.WEBVIEW),
                 (state as RepoDetailUiState.Success).readmeState,
             )
             coVerify(exactly = 2) { repoRepository.getRepository(any(), any()) }
@@ -314,8 +296,8 @@ class RepoDetailViewModelTest {
                         Result.success(
                             ReadmeContent(
                                 markdown = "# Hello",
-                                html = null,
-                                renderMode = ReadmeRenderMode.NATIVE,
+                                html = "<p>server html</p>",
+                                renderMode = ReadmeRenderMode.WEBVIEW,
                             ),
                         )
                 }

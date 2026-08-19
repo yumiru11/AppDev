@@ -69,24 +69,14 @@ class RepoDetailViewModel
             val newReadmeState =
                 result.fold(
                     onSuccess = { content ->
-                        when {
-                            content.renderMode == ReadmeRenderMode.NATIVE -> {
-                                ReadmeState.Loaded(
-                                    content = content.markdown,
-                                    renderMode = ReadmeRenderMode.NATIVE,
-                                )
-                            }
-
-                            content.html.isNullOrBlank() -> {
-                                ReadmeState.Empty
-                            }
-
-                            else -> {
-                                ReadmeState.Loaded(
-                                    content = content.html,
-                                    renderMode = ReadmeRenderMode.WEBVIEW,
-                                )
-                            }
+                        if (content.html.isNullOrBlank()) {
+                            ReadmeState.Empty
+                        } else {
+                            ReadmeState.Loaded(
+                                content = content.html,
+                                renderMode = ReadmeRenderMode.WEBVIEW,
+                                webViewRenderMode = content.webViewRenderMode,
+                            )
                         }
                     },
                     onFailure = { e ->

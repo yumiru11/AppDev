@@ -181,7 +181,7 @@
 
 - **布局**：顶栏（返回 + 仓库名 + 更多菜单）+ 仓库头（名称/描述/Star/Fork/Watch 按钮 + 语言栏）+ 分区 Tab（README / 文件 / Releases）
 - **README 交互（用户新想法）**：详情页顶部功能栏左右 Tab（默认 About）；README 下滑时头部信息**收起动画**（用户构思中，实现时给两版效果对比）
-- **README Tab**：Markdown 渲染方向**待 prototype 拍板**（§3.11）
+- **README Tab**：Markdown 渲染方向已拍板——WebView 主渲染（§3.11）
 - **文件 Tab**：文件树（可展开）+ 代码浏览（Sora read-only）；文件列表：路径 + 分支选择 + 文件/文件夹显示修改时间
 - **动效**：Tab 切换 Fade-through；Star 按钮微缩放+填充动画；文件树展开/收起（AnimatedVisibility + 高度动画）
 - **状态**：加载骨架（AppLoadingState）；错误 AppErrorState（重试）
@@ -203,10 +203,12 @@
 
 ### 3.11 Markdown 渲染方向（README/正文）
 
-- **✅ 已拍板（2026-08-16 prototype 真机验证后）**：**原生主渲染 + WebView 兜底**（用户拍板：原生值得选，不放弃 WebView，遇到原生解决不了的问题再考虑）
-  - 原生能力（prototype 全部真机验证通过）：表格（换行/横滚）、列表（基线对齐/嵌套缩进）、任务列表、Alert 卡片（M3 容器色）、shields 徽章（Markdown + HTML 两种形态）、details 折叠、代码高亮（KotlinTextMate 半融合）、行内代码（圆角/居中）、标题分割线、图片（圆角阴影/点击预览）
-  - WebView 兜底保留：mermaid/数学公式/`<svg>/<canvas>/<iframe>/<math>`/超长文档（FeatureDetector 已收紧，details/table 不再触发兜底）
-- **历史**：用户拍板（C3-1）先做 prototype 双版本对照；路线候选 A/B/C 已由真机验证收敛为「原生主 + WebView 兜底」
+- **✅ 已拍板（2026-08-19 Task B 修订）**：**WebView 主渲染**（README/Issue 正文）+ **原生短文本**（评论/通知）（ADR-0007 修订版）
+  - README：服务端 HTML 优先（`getReadmeHtml` 三级降级 + 双 key 缓存）；服务端异常 → 离线 GFM markdown-it 降级，renderMode 仍 WEBVIEW
+  - Issue 正文：无服务端 HTML API → 离线 GFM（WebView 内 markdown-it）+ 融合样式
+  - 渲染基建：github-markdown-css + markdown-it + highlight.js + DOMPurify；Material You 融合（MaterialYouFusionMapper 注入，Kotlin 预计算混色变量，深色 data-theme 翻转 + 首帧注入）
+  - 评论列表/通知短文本保持原生（MarkdownViewer / EnhancedMarkdownViewer），铁律「评论列表绝不用 WebView」不变
+- **历史**：2026-08-16 prototype 真机验证曾拍板「原生主 + WebView 兜底」；Task B（2026-08-19）因原生增强链 4 轮真机问题切换为 WebView 主渲染
 - **已定渲染细节**（无论哪条路线都适用）：
   - 代码高亮配色：**C 半融合**——容器/工具条随主题 + 语法色保留 GitHub 原色（用户拍板）
   - Alert 卡片：**GitHub 网页样式（带左侧色条）** + 图标用 **Octicons**（禁 emoji，用户硬性要求）
@@ -406,7 +408,7 @@
 |---|---|
 | T3 导航（已合入） | 骨架已建；**需按两层导航重构**：底部 3 Tab + 首页内分区条 + Home 长条按钮（新 UI 票） |
 | T6 主题（已合入） | 6 套主题 + 动态色 + 令牌族已落地；**补：玻璃总开关 + 逐项开关、背景图设置、图标风格消费点**（新 UI 票） |
-| T9 README（已合入） | WebView 兜底已建；方向待 prototype 拍板（§3.11） |
+| T9 README（已合入） | WebView 主渲染已切换（Task B）；服务端 HTML + 离线 GFM 两级（§3.11） |
 | T19 通知（已合入） | 按仓库分组 + 时间排序重构、面板样式调整（新 UI 票） |
 | T20 我的（已合入） | 布局微调（Stars 入口已有） |
 | T24 设置（已合入） | 补：玻璃开关组、背景图选项、布局视图切换 |
@@ -419,10 +421,9 @@
 
 ## 11. 待确认决策点（当前剩余）
 
-1. README 渲染方向（A/B/C）——**用户钦定 prototype 后拍板**（§3.11）⏳
-2. 图标候选清单——**用户要求选出来验证批准**（§5.1）⏳
-3. 仓库详情页 README 头部收起动画——用户构思中，实现时给两版效果对比 ⏳
-4. 卡片 PiliPlus 风格细节——实现时参照 PiliPlus 首页卡片提取配色后给两版对比 ⏳
+1. 图标候选清单——**用户要求选出来验证批准**（§5.1）⏳
+2. 仓库详情页 README 头部收起动画——用户构思中，实现时给两版效果对比 ⏳
+3. 卡片 PiliPlus 风格细节——实现时参照 PiliPlus 首页卡片提取配色后给两版对比 ⏳
 
 ---
 
