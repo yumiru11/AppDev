@@ -13,8 +13,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.textmate.compose.rememberHighlightedCode
 import dev.textmate.grammar.Grammar
@@ -117,10 +119,14 @@ private fun CodeBlockContainer(annotated: androidx.compose.ui.text.AnnotatedStri
         modifier = Modifier.fillMaxWidth(),
     ) {
         val scrollState = rememberScrollState()
+        // 父级无限宽（mikepenz codeFence wrapper 自带 horizontalScroll 会给子级无限宽）时
+        // 兜底为视口宽：否则 width(Infinity) 内容溢出屏幕（2026-08-17 真机：EchoMusic
+        // 列表内代码块右侧漏背景色 + 只可见尾部字符）
+        val boundedWidth = if (maxWidth != Dp.Infinity) maxWidth else LocalConfiguration.current.screenWidthDp.dp
         androidx.compose.foundation.layout.Box(
             modifier =
                 Modifier
-                    .width(maxWidth)
+                    .width(boundedWidth)
                     .horizontalScroll(scrollState),
         ) {
             Text(

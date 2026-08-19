@@ -153,7 +153,7 @@ fun EnhancedMarkdownViewer(
                             }
                         },
                         horizontalRule = { EnhancedHorizontalRule() },
-                        paragraph = { model -> EnhancedParagraph(model) },
+                        paragraph = { model -> EnhancedParagraph(model, baseRepoUrl) },
                         heading1 = { model ->
                             MarkdownHeadingWithDivider(
                                 model,
@@ -179,7 +179,7 @@ fun EnhancedMarkdownViewer(
                         },
                         custom = { type, model ->
                             if (type == MarkdownElementTypes.HTML_BLOCK) {
-                                EnhancedHtmlBlock(model)
+                                EnhancedHtmlBlock(model, baseRepoUrl)
                             } else {
                                 MarkdownText(content = model.content, node = model.node, style = model.typography.text)
                             }

@@ -84,6 +84,7 @@ private fun ListItemColumn(
             it.type == MarkdownElementTypes.UNORDERED_LIST || it.type == MarkdownElementTypes.ORDERED_LIST
         }
     // 非段落/非嵌套列表/非 bullet 的零散子节点（如直接文本）
+    // 非段落/非嵌套列表/非 bullet 的零散子节点（如直接文本）
     val others =
         node.children.filter {
             it.type != MarkdownElementTypes.PARAGRAPH &&
@@ -93,6 +94,11 @@ private fun ListItemColumn(
                 it.type != MarkdownTokenTypes.LIST_NUMBER &&
                 it.type != GFMTokenTypes.CHECK_BOX
         }
+    // 块级元素（代码块/HTML/表格/引用）绝不能放 marker Row 内：fillMaxWidth 与
+    // marker+段落同排互相挤压 → 代码块紧跟文字/溢出屏幕（2026-08-17 真机：
+    // EchoMusic「本地开发」缩进围栏代码块紧跟文字 + 右侧漏出背景色）。换行全宽渲染。
+    val blockOthers = others.filter { it.type in BLOCK_LEVEL_TYPES }
+    val inlineOthers = others.filter { it.type !in BLOCK_LEVEL_TYPES }
 
     Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Row(Modifier.fillMaxWidth()) {
@@ -120,8 +126,15 @@ private fun ListItemColumn(
                     modifier = Modifier.alignByBaseline(),
                 )
             }
-            others.forEach { other ->
+            inlineOthers.forEach { other ->
                 MarkdownElement(other, components, model.content, includeSpacer = false)
+            }
+        }
+        // 块级元素换行全宽渲染（marker Row 之外）
+        blockOthers.forEach { block ->
+            // 列表内代码块与上文间距（wrapper 自带间距在列表项内失效，2026-08-17 真机）
+            Box(Modifier.padding(vertical = 4.dp).fillMaxWidth()) {
+                MarkdownElement(block, components, model.content, includeSpacer = false)
             }
         }
         // 嵌套列表：换行 + 缩进（不是塞进父 Row）
@@ -132,3 +145,15 @@ private fun ListItemColumn(
         }
     }
 }
+
+/**
+ * 列表项直接子节点中的块级元素类型：必须在 marker Row 外换行全宽渲染
+ * （Row 内 fillMaxWidth 与 marker/段落同排会互相挤压导致溢出）。
+ */
+private val BLOCK_LEVEL_TYPES =
+    setOf(
+        MarkdownElementTypes.CODE_FENCE,
+        MarkdownElementTypes.HTML_BLOCK,
+        org.intellij.markdown.flavours.gfm.GFMElementTypes.TABLE,
+        MarkdownElementTypes.BLOCK_QUOTE,
+    )
