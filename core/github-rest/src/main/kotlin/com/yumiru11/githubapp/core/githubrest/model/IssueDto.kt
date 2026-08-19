@@ -61,7 +61,8 @@ data class ReactionsDto(
  */
 @Serializable
 data class IssueEventDto(
-    val id: Long,
+    /** 交叉引用等部分 timeline 事件 GitHub 返回 id=null（2026-08-19 实测 #71） */
+    val id: Long? = null,
     val event: String,
     val actor: UserDto? = null,
     val body: String? = null,

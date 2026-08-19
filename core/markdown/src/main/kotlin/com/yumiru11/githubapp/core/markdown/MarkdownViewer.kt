@@ -1,3 +1,5 @@
+@file:Suppress("LongMethod") // MarkdownViewer 视觉装配集中（typography/colors/components），拆分反损可读性（EnhancedMarkdownViewer 同款先例）
+
 package com.yumiru11.githubapp.core.markdown
 
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -9,23 +11,35 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.sp
 import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.MarkdownCheckBox
 import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
+import com.mikepenz.markdown.compose.extendedspans.ExtendedSpans
+import com.mikepenz.markdown.compose.extendedspans.RoundedCornerSpanPainter
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
+import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.model.markdownExtendedSpans
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 
 /**
- * Markdown 渲染组件。
+ * Markdown 渲染组件（原生短文本专用：Issue 评论/通知）。
  *
  * 基于 mikepenz multiplatform-markdown-renderer 0.38.1 + KotlinTextMate 高亮。
+ * 视觉策略与 [EnhancedMarkdownViewer] 对齐（WebView github-markdown-css 观感）：
+ * 行内代码主题色+圆角、代码块卡片背景、列表缩进、任务列表 checkbox、主题色引用块左条。
  *
  * @param markdown Markdown 原文
  * @param onInternalLink 链接点击回调；Internal 类型（Repo/Issue/PR 等）由上层路由处理，
@@ -47,6 +61,7 @@ fun MarkdownViewer(
 ) {
     val darkTheme = isSystemInDarkTheme()
     val state = rememberMarkdownState(markdown, immediate = true)
+    val scheme = MaterialTheme.colorScheme
 
     // 链接点击接线：renderer 0.38.1 无 link 槽位，所有链接统一走 LocalUriHandler
     // （annotatorSettings 内部唯一消费点，构建 LinkAnnotation.Url 后经 openUri 分发）。
@@ -63,22 +78,73 @@ fun MarkdownViewer(
             }
         }
 
+    val colors =
+        markdownColor(
+            text = scheme.onSurface,
+            codeBackground = if (darkTheme) scheme.surfaceContainerLowest else scheme.surfaceContainer,
+            inlineCodeBackground = scheme.primary.copy(alpha = 0.10f),
+            dividerColor = scheme.outlineVariant,
+            tableBackground = scheme.surfaceContainerLow,
+        )
+
+    val typography =
+        markdownTypography(
+            h1 = TextStyle(fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.Medium, color = scheme.onSurface),
+            h2 = TextStyle(fontSize = 24.sp, lineHeight = 32.sp, fontWeight = FontWeight.Medium, color = scheme.onSurface),
+            h3 = TextStyle(fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.Medium, color = scheme.onSurface),
+            h4 = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium, color = scheme.onSurface),
+            h5 = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, color = scheme.onSurface),
+            h6 = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, color = scheme.onSurfaceVariant),
+            text = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
+            code = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 14.sp, lineHeight = 20.sp, color = scheme.onSurface),
+            inlineCode = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 14.sp, lineHeight = 20.sp, color = scheme.primary),
+            quote = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
+            paragraph = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
+            ordered = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
+            bullet = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
+            list = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
+            textLink =
+                TextLinkStyles(
+                    style =
+                        androidx.compose.ui.text
+                            .SpanStyle(color = scheme.primary, textDecoration = TextDecoration.Underline),
+                ),
+            table = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, color = scheme.onSurface),
+        )
+
     CompositionLocalProvider(LocalUriHandler provides linkUriHandler) {
         Markdown(
             state,
             imageTransformer = Coil3ImageTransformerImpl,
-            colors =
-                markdownColor(
-                    inlineCodeBackground = MaterialTheme.colorScheme.surfaceContainerHighest,
-                ),
+            colors = colors,
+            typography = typography,
+            extendedSpans =
+                markdownExtendedSpans {
+                    remember {
+                        ExtendedSpans(
+                            RoundedCornerSpanPainter(
+                                cornerRadius = 4.sp,
+                                padding =
+                                    com.mikepenz.markdown.compose.extendedspans
+                                        .RoundedCornerSpanPainter
+                                        .TextPaddingValues(horizontal = 4.sp, vertical = 2.sp),
+                                topMargin = 8.sp,
+                                bottomMargin = 4.sp,
+                            ),
+                        )
+                    }
+                },
             components =
                 markdownComponents(
                     codeFence = { model ->
                         MarkdownCodeFence(model.content, model.node, model.typography.code) { code, language, _ ->
-                            TextMateCodeBlock(code, language, darkTheme)
+                            EnhancedCodeBlock(code, language, darkTheme)
                         }
                     },
                     blockQuote = { model -> GitHubAlertOrQuote(model) },
+                    unorderedList = { model -> EnhancedUnorderedList(model) },
+                    orderedList = { model -> EnhancedOrderedList(model) },
+                    checkbox = { model -> MarkdownCheckBox(model.content, model.node, model.typography.text) },
                 ),
             modifier = if (scrollable) modifier.verticalScroll(rememberScrollState()) else modifier,
         )

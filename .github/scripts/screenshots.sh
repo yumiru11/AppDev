@@ -79,17 +79,32 @@ tap_text "Repos"
 sleep 3
 adb exec-out screencap -p > "$OUT/repos.png"
 
-# ── 4. README 原生渲染（深链 mikepenz——MATH 误报已修复（#66）现判 NATIVE）
-# 注：README 展示最全的验收样例（表格/代码/图片/徽章全都有）
+# ── 4. 普通 README（WebView 主渲染——mikepenz 样例：表格/代码/图片/徽章齐全）
+# Task B 后 README 一律 WebView（ADR-0007）；renderMode 判定以 ReadmeRender 日志为准
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/mikepenz/multiplatform-markdown-renderer" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
 sleep 6
-adb exec-out screencap -p > "$OUT/readme-native.png"
+adb exec-out screencap -p > "$OUT/readme-regular.png"
 
-# ── 5. README WebView 兜底（mermaid 仓库 → FeatureDetector 分流）─
+# ── 5. mermaid 仓库 README（WebView——mermaid 代码块特殊内容路径）─
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/mermaid-js/mermaid" -p "$PKG" >/dev/null
 sleep 8
-adb exec-out screencap -p > "$OUT/readme-webview.png"
+adb exec-out screencap -p > "$OUT/readme-mermaid.png"
+
+# ── 5.5 Issue 正文（WebView 渲染——测试面板 #71 覆盖全 md 格式）─
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues/71" -p "$PKG" >/dev/null
+wait_for_activity "$PKG" || true
+sleep 8
+adb exec-out screencap -p > "$OUT/issue-body.png"
+
+# ── 5.6 Issue 评论（原生短文本渲染——正文 WebView 很高，滑到评论区）─
+adb shell input swipe 540 1800 540 400 500
+sleep 2
+adb shell input swipe 540 1800 540 400 500
+sleep 2
+adb shell input swipe 540 1800 540 400 500
+sleep 4
+adb exec-out screencap -p > "$OUT/issue-comments.png"
 
 # ── 6. 我的 tab（force-stop 冷启动回首页——am start 对已在前台 app 不重置
 # 导航栈，深链页仍在前台导致 uiautomator 拿不到底栏）──────────
