@@ -79,10 +79,9 @@ tap_text "Repos"
 sleep 3
 adb exec-out screencap -p > "$OUT/repos.png"
 
-# ── 4. README 原生渲染（深链进 EchoMusic——FeatureDetector 判 NATIVE 的仓库）
-# 注：mikepenz README 曾被 MATH 正则误判走 WebView（readme-native.png 名不副实）；
-# P1（#64）修复 MATH 误报后换回 mikepenz（其 README 展示更全）
-adb shell am start -a android.intent.action.VIEW -d "https://github.com/hoowhoami/EchoMusic" -p "$PKG" >/dev/null
+# ── 4. README 原生渲染（深链 mikepenz——MATH 误报已修复（#66）现判 NATIVE）
+# 注：README 展示最全的验收样例（表格/代码/图片/徽章全都有）
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/mikepenz/multiplatform-markdown-renderer" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
 sleep 6
 adb exec-out screencap -p > "$OUT/readme-native.png"
