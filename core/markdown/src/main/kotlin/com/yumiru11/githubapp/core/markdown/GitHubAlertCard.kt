@@ -24,7 +24,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
-import com.mikepenz.markdown.compose.elements.MarkdownBlockQuote
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.utils.getUnescapedTextInNode
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
@@ -126,7 +125,46 @@ fun GitHubAlertOrQuote(model: MarkdownComponentModel) {
             body = parsed.body,
         )
     } else {
-        MarkdownBlockQuote(content = model.content, node = model.node)
+        StyledBlockQuote(nodeText)
+    }
+}
+
+/**
+ * 普通引用块：WebView github-markdown-css 同款观感——左侧主题色竖条 + 淡底 + 圆角。
+ * 逐行渲染以保留「> 第一行 / > 第二行」的换行（mikepenz 默认会合并为一段）。
+ */
+@Composable
+private fun StyledBlockQuote(text: String) {
+    val shape = RoundedCornerShape(8.dp)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .width(3.dp)
+                    .fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.primary),
+        )
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            text
+                .lineSequence()
+                .map { it.trimStart().removePrefix(">").removePrefix(" ") }
+                .filter { it.isNotBlank() }
+                .forEach { line ->
+                    Markdown(content = line, modifier = Modifier.fillMaxWidth())
+                }
+        }
     }
 }
 

@@ -34,7 +34,7 @@ private const val LIST_INDENT_DP = 20
 @Composable
 fun EnhancedUnorderedList(model: MarkdownComponentModel) {
     val components = LocalMarkdownComponents.current
-    Column {
+    Column(Modifier.padding(start = LIST_INDENT_DP.dp)) {
         model.node.children
             .filter { it.type == MarkdownElementTypes.LIST_ITEM }
             .forEach { item ->
@@ -52,7 +52,7 @@ fun EnhancedUnorderedList(model: MarkdownComponentModel) {
 fun EnhancedOrderedList(model: MarkdownComponentModel) {
     val components = LocalMarkdownComponents.current
     var counter = 0
-    Column {
+    Column(Modifier.padding(start = LIST_INDENT_DP.dp)) {
         model.node.children
             .filter { it.type == MarkdownElementTypes.LIST_ITEM }
             .forEach { item ->
