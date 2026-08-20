@@ -33,6 +33,48 @@
     <string name="issue_copy_link">Copy link</string>
     <string name="issue_link_copied">Link copied</string>
 
+    <!-- T14 写操作：关闭/重开/编辑 -->
+    <string name="issue_close">Close</string>
+    <string name="issue_reopen">Reopen</string>
+    <string name="issue_edit">Edit</string>
+    <string name="issue_edit_title">Edit issue</string>
+    <string name="issue_edit_title_label">Title</string>
+    <string name="issue_edit_body_label">Body</string>
+    <string name="issue_edit_comment_title">Edit comment</string>
+    <string name="issue_save">Save</string>
+    <string name="issue_cancel">Cancel</string>
+    <string name="issue_delete">Delete</string>
+    <string name="issue_delete_comment_title">Delete comment</string>
+    <string name="issue_delete_comment_message">This comment will be permanently removed.</string>
+    <string name="issue_comment_menu">Comment actions</string>
+
+    <!-- T14 写操作：评论/反应/任务列表 -->
+    <string name="issue_comment">Comment</string>
+    <string name="issue_comment_hint">Write a comment…</string>
+    <string name="issue_comment_submit">Comment</string>
+    <string name="issue_comment_added">Comment added</string>
+    <string name="issue_comment_updated">Comment updated</string>
+    <string name="issue_comment_deleted">Comment deleted</string>
+    <string name="issue_reaction_added">Reaction added</string>
+    <string name="issue_reaction_removed">Reaction removed</string>
+    <string name="issue_closed_snackbar">Issue closed</string>
+    <string name="issue_reopened_snackbar">Issue reopened</string>
+    <string name="issue_updated">Issue updated</string>
+    <string name="issue_task_list_updated">Task list updated</string>
+
+    <!-- T14 写失败 Snackbar 错误规整 -->
+    <string name="issue_error_forbidden">You don\'t have permission to do that</string>
+    <string name="issue_error_validation">Request rejected by GitHub</string>
+
+    <!-- T14 创建 Issue -->
+    <string name="issue_create">New issue</string>
+    <string name="issue_create_title">New issue</string>
+    <string name="issue_create_title_label">Title</string>
+    <string name="issue_create_body_label">Body</string>
+    <string name="issue_create_labels_label">Labels</string>
+    <string name="issue_create_labels_hint">Comma-separated label names (optional)</string>
+    <string name="issue_create_submit">Create issue</string>
+
     <!-- 相对时间 -->
     <string name="time_just_now">just now</string>
     <plurals name="time_minutes">
