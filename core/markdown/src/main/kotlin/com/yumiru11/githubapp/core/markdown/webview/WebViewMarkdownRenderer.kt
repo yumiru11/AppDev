@@ -99,8 +99,11 @@ fun WebViewMarkdownRenderer(
 
     val heightDp =
         if (measuredHeight > 0) {
-            val density = context.resources.displayMetrics.density
-            (measuredHeight / density).toInt().dp
+            // renderer.js 的 ResizeObserver.contentRect.height 是 WebView 的 CSS px，
+            // 而 WebView 的 CSS px 即 dp（不随屏幕 density 缩放）。不能除以 density，
+            // 否则容器高度缩到约 1/density，正文下半截（任务列表第二项往后）被裁在
+            // WebView 底边之外、评论区紧跟其上（CI issue-long.png-02 实测）。
+            measuredHeight.dp
         } else {
             200.dp
         }
