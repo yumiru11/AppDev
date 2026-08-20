@@ -1,5 +1,6 @@
-@file:Suppress("LongMethod")
-// NavHost 的 composable 注册样板天然较长（每个 destination 一段），拆散反损可读性；精准抑制。
+@file:Suppress("LongMethod", "CyclomaticComplexMethod")
+// NavHost 的 composable 注册样板天然较长（每个 destination 一段），拆散反损可读性；
+// 路由数随 feature（T12/T14/T15/T21）增长，圈复杂度随之略超阈值，精准抑制。
 
 package com.yumiru11.githubapp.core.ui
 import android.net.Uri
@@ -61,6 +62,12 @@ fun AppNavHost(
         onIssueClick: (owner: String, repo: String, number: Int, isPullRequest: Boolean) -> Unit,
     ) -> Unit = { _, _, _ -> },
     issueDetailScreen: @Composable (owner: String, repo: String, number: Int) -> Unit = { _, _, _ -> },
+    pullRequestListScreen: @Composable (
+        owner: String,
+        repo: String,
+        onPullRequestClick: (owner: String, repo: String, number: Int) -> Unit,
+    ) -> Unit = { _, _, _ -> },
+    pullRequestDetailScreen: @Composable (owner: String, repo: String, number: Int) -> Unit = { _, _, _ -> },
     editorScreen: @Composable (initialContent: String, onClose: () -> Unit) -> Unit = { _, _ -> },
     createIssueScreen: @Composable (owner: String, repo: String) -> Unit = { _, _ -> },
 ) {
@@ -168,6 +175,27 @@ fun AppNavHost(
         }
 
         composable(
+            route = AppRoute.PULLS,
+            arguments =
+                listOf(
+                    navArgument("owner") { type = NavType.StringType },
+                    navArgument("repo") { type = NavType.StringType },
+                ),
+        ) { backStackEntry ->
+            val owner = backStackEntry.arguments?.getString("owner") ?: ""
+            val repo = backStackEntry.arguments?.getString("repo") ?: ""
+            // T15：PR 列表页；点击项 → PR 详情路由
+            pullRequestListScreen(owner, repo) { o, r, number ->
+                navController.navigate(
+                    AppRoute.PR
+                        .replace("{owner}", o)
+                        .replace("{repo}", r)
+                        .replace("{number}", number.toString()),
+                )
+            }
+        }
+
+        composable(
             route = AppRoute.ISSUE_CREATE,
             arguments =
                 listOf(
@@ -189,9 +217,12 @@ fun AppNavHost(
                     navArgument("repo") { type = NavType.StringType },
                     navArgument("number") { type = NavType.IntType },
                 ),
-        ) {
-            // T5+ PR 详情页
-            SearchScreen()
+        ) { backStackEntry ->
+            val owner = backStackEntry.arguments?.getString("owner") ?: ""
+            val repo = backStackEntry.arguments?.getString("repo") ?: ""
+            val number = backStackEntry.arguments?.getInt("number") ?: 0
+            // T15：PR 详情页（四 Tab）
+            pullRequestDetailScreen(owner, repo, number)
         }
 
         composable(

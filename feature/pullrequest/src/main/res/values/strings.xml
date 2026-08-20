@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 列表页 -->
+    <string name="pull_request_filter_open">Open</string>
+    <string name="pull_request_filter_closed">Closed</string>
+    <string name="pull_request_filter_all">All</string>
+    <string name="pull_request_list_empty">No pull requests</string>
+    <string name="pull_request_retry">Retry</string>
+    <string name="pull_request_error_network">Network error. Check your connection.</string>
+    <string name="pull_request_error_unknown">Something went wrong</string>
+    <string name="pull_request_error_not_found">Not found</string>
+    <string name="pull_request_back">Back</string>
+
+    <!-- 列表行元素 -->
+    <string name="pull_request_author">%1$s opened</string>
+    <plurals name="pull_request_comment_count">
+        <item quantity="one">%1$d comment</item>
+        <item quantity="other">%1$d comments</item>
+    </plurals>
+
+    <!-- 详情页 -->
+    <string name="pull_request_state_open">Open</string>
+    <string name="pull_request_state_closed">Closed</string>
+    <string name="pull_request_state_merged">Merged</string>
+    <string name="pull_request_state_draft">Draft</string>
+    <string name="pull_request_loading">Loading…</string>
+    <string name="pull_request_author_opened">%1$s opened %2$s</string>
+
+    <!-- 四 Tab -->
+    <string name="pull_request_tab_conversation">Conversation</string>
+    <string name="pull_request_tab_commits">Commits</string>
+    <string name="pull_request_tab_checks">Checks</string>
+    <string name="pull_request_tab_files">Files changed</string>
+
+    <!-- PrHeader：分支/审查者/Checks 摘要/Mergeable -->
+    <string name="pull_request_branch_base_head">%1$s ← %2$s</string>
+    <string name="pull_request_reviewers">Reviewers</string>
+    <string name="pull_request_reviewers_empty">No reviewers</string>
+    <string name="pull_request_mergeable">Mergeable</string>
+    <string name="pull_request_conflicting">Conflicting</string>
+    <string name="pull_request_mergeable_pending">Checking mergeability…</string>
+    <string name="pull_request_checks_summary">Checks</string>
+    <string name="pull_request_checks_passing">%1$d passing</string>
+    <string name="pull_request_checks_failing">%1$d failing</string>
+    <string name="pull_request_checks_pending">%1$d pending</string>
+    <string name="pull_request_checks_state_success">Checks passing</string>
+    <string name="pull_request_checks_state_failure">Checks failing</string>
+    <string name="pull_request_checks_state_pending">Checks pending</string>
+
+    <!-- Conversation：时间线 -->
+    <string name="pull_request_timeline_empty">No activity yet</string>
+    <string name="pull_request_review_approved">approved these changes</string>
+    <string name="pull_request_review_changes_requested">requested changes</string>
+    <string name="pull_request_review_commented">reviewed</string>
+    <string name="pull_request_review_dismissed">dismissed review</string>
+    <string name="pull_request_review_unknown">reviewed</string>
+    <string name="pull_request_review_comment_at">%1$s:%2$d</string>
+    <string name="pull_request_event_closed">%1$s closed this</string>
+    <string name="pull_request_event_reopened">%1$s reopened this</string>
+    <string name="pull_request_event_merged">%1$s merged this</string>
+    <string name="pull_request_event_labeled">%1$s added label</string>
+    <string name="pull_request_event_unlabeled">%1$s removed label</string>
+    <string name="pull_request_event_assigned">%1$s assigned this</string>
+    <string name="pull_request_event_locked">%1$s locked this</string>
+    <string name="pull_request_event_cross_referenced">%1$s mentioned this pull request</string>
+    <string name="pull_request_event_cross_referenced_number">%1$s mentioned this pull request in #%2$d</string>
+    <string name="pull_request_event_connected">%1$s linked a pull request</string>
+    <string name="pull_request_event_linked">%1$s linked a pull request</string>
+    <string name="pull_request_event_linked_number">%1$s linked pull request #%2$d</string>
+    <string name="pull_request_event_committed">%1$s committed %2$s</string>
+    <string name="pull_request_event_review_requested">%1$s requested review</string>
+    <string name="pull_request_event_review_request_removed">%1$s removed review request</string>
+    <string name="pull_request_event_head_ref_force_pushed">%1$s force-pushed to %2$s</string>
+    <string name="pull_request_event_head_ref_deleted">%1$s deleted the %2$s branch</string>
+    <string name="pull_request_event_base_ref_changed">%1$s changed the base branch</string>
+    <string name="pull_request_event_ready_for_review">%1$s marked this as ready for review</string>
+    <string name="pull_request_event_converted_to_draft">%1$s converted this to draft</string>
+    <string name="pull_request_event_default">%1$s %2$s this pull request</string>
+
+    <!-- Commits Tab -->
+    <plurals name="pull_request_commit_count">
+        <item quantity="one">%1$d commit</item>
+        <item quantity="other">%1$d commits</item>
+    </plurals>
+    <string name="pull_request_commits_empty">No commits</string>
+    <string name="pull_request_commit_expand">Show diff summary</string>
+    <string name="pull_request_commit_collapse">Hide diff summary</string>
+
+    <!-- Checks Tab -->
+    <string name="pull_request_checks_empty">No checks</string>
+    <string name="pull_request_check_status_queued">Queued</string>
+    <string name="pull_request_check_status_in_progress">In progress</string>
+    <string name="pull_request_check_status_completed">Completed</string>
+    <string name="pull_request_check_status_unknown">Unknown</string>
+    <string name="pull_request_check_conclusion_success">Success</string>
+    <string name="pull_request_check_conclusion_failure">Failure</string>
+    <string name="pull_request_check_conclusion_neutral">Neutral</string>
+    <string name="pull_request_check_conclusion_cancelled">Cancelled</string>
+    <string name="pull_request_check_conclusion_skipped">Skipped</string>
+    <string name="pull_request_check_conclusion_timed_out">Timed out</string>
+    <string name="pull_request_check_conclusion_action_required">Action required</string>
+    <string name="pull_request_check_conclusion_unknown">Unknown</string>
+    <string name="pull_request_check_expand">Show details</string>
+    <string name="pull_request_check_collapse">Hide details</string>
+    <string name="pull_request_check_no_output">No details available</string>
+
+    <!-- Files changed Tab -->
+    <string name="pull_request_files_empty">No files changed</string>
+    <string name="pull_request_file_status_added">Added</string>
+    <string name="pull_request_file_status_modified">Modified</string>
+    <string name="pull_request_file_status_removed">Removed</string>
+    <string name="pull_request_file_status_renamed">Renamed</string>
+    <string name="pull_request_file_status_copied">Copied</string>
+    <string name="pull_request_file_status_changed">Changed</string>
+    <string name="pull_request_file_status_unknown">Changed</string>
+    <string name="pull_request_additions">+%1$d</string>
+    <string name="pull_request_deletions">−%1$d</string>
+    <string name="pull_request_file_expand">Show patch</string>
+    <string name="pull_request_file_collapse">Hide patch</string>
+    <string name="pull_request_file_no_patch">No patch available</string>
+
+    <!-- 更多操作菜单（分享/浏览器/复制链接） -->
+    <string name="pull_request_menu_more">More</string>
+    <string name="pull_request_share">Share</string>
+    <string name="pull_request_open_in_browser">Open in browser</string>
+    <string name="pull_request_copy_link">Copy link</string>
+    <string name="pull_request_link_copied">Link copied</string>
+
+    <!-- 相对时间 -->
+    <string name="time_just_now">just now</string>
+    <plurals name="time_minutes">
+        <item quantity="one">%1$d minute ago</item>
+        <item quantity="other">%1$d minutes ago</item>
+    </plurals>
+    <plurals name="time_hours">
+        <item quantity="one">%1$d hour ago</item>
+        <item quantity="other">%1$d hours ago</item>
+    </plurals>
+    <plurals name="time_days">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
+    <plurals name="time_weeks">
+        <item quantity="one">%1$d week ago</item>
+        <item quantity="other">%1$d weeks ago</item>
+    </plurals>
+    <plurals name="time_months">
+        <item quantity="one">%1$d month ago</item>
+        <item quantity="other">%1$d months ago</item>
+    </plurals>
+    <plurals name="time_years">
+        <item quantity="one">%1$d year ago</item>
+        <item quantity="other">%1$d years ago</item>
+    </plurals>
+</resources>

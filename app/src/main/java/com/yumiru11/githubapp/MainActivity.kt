@@ -52,6 +52,8 @@ import com.yumiru11.githubapp.feature.issue.IssueListScreen
 import com.yumiru11.githubapp.feature.notifications.NotificationsScreen
 import com.yumiru11.githubapp.feature.profile.ProfileScreen
 import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
+import com.yumiru11.githubapp.feature.pullrequest.PullRequestListScreen
+import com.yumiru11.githubapp.feature.pullrequest.PullRequestDetailScreen
 import com.yumiru11.githubapp.feature.settings.SettingsScreen
 import com.yumiru11.githubapp.feature.settings.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -237,6 +239,23 @@ class MainActivity : ComponentActivity() {
                             onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
                         )
                     },
+                    pullRequestListScreen = { owner, repo, onPullRequestClick ->
+                        PullRequestListScreen(
+                            owner = owner,
+                            repo = repo,
+                            onBackClick = { navController.popBackStack() },
+                            onPullRequestClick = onPullRequestClick,
+                        )
+                    },
+                    pullRequestDetailScreen = { owner, repo, number ->
+                        PullRequestDetailScreen(
+                            owner = owner,
+                            repo = repo,
+                            number = number,
+                            onBackClick = { navController.popBackStack() },
+                            onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
+                        )
+                    },
                     editorScreen = { initialContent, onClose ->
                         MarkdownEditorScreen(
                             initialContent = initialContent,
@@ -253,8 +272,6 @@ class MainActivity : ComponentActivity() {
                             repo = repo,
                             onBackClick = { navController.popBackStack() },
                             onCreated = { navController.popBackStack() },
-                        )
-                    },
                         )
                     },
                 )

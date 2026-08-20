@@ -137,6 +137,17 @@ adb shell input swipe 540 1800 540 400 500
 sleep 4
 adb exec-out screencap -p > "$OUT/issue-comments.png"
 
+# ── 5.7 PR 详情 Conversation（T15）──
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/pull/74" -p "$PKG" >/dev/null
+wait_for_activity "$PKG" || true
+sleep 8
+adb exec-out screencap -p > "$OUT/pr-conversation.png"
+
+# ── 5.8 PR Commits Tab（T15）──
+tap_text "Commits"
+sleep 4
+adb exec-out screencap -p > "$OUT/pr-commits.png"
+
 # ── 5.7 仓库操作区（T12：语言栏 Linguist + Star/Watch 游客只读）──
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/hoowhoami/EchoMusic" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
