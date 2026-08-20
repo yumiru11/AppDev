@@ -161,7 +161,7 @@ if [ -n "${SCREENSHOT_TOKEN:-}" ]; then
 fi
 
 # ── 8. 长截图（滚动 + 拼接，docs/research/actions-scroll-screenshot.md 方案 A）──
-long_shot "readme-long.png" "https://github.com/yumiru11/AppDev"
+long_shot "readme-long.png" "https://github.com/mikepenz/multiplatform-markdown-renderer"
 long_shot "issue-long.png" "https://github.com/yumiru11/AppDev/issues/71"
 
 # ── 清理：恢复浅色 + 回首页 ─────────────────────────────────
