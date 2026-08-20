@@ -255,13 +255,16 @@ fun Project.registerCoverageTasks() {
     // 各模块 exec 的并集（app/feature 测试会执行下层模块的类 → 跨模块覆盖），与根 coverageReport
     // 聚合口径一致（coverageVerify 契约：对同一份聚合数据做验证）。provider 惰性求值，执行时
     // 所有模块回调已完成，与子模块求值顺序无关。
-    val mergedExecData =
-        rootProject.provider {
-            rootProject.tasks
-                .named("coverageReport", JacocoReport::class.java)
-                .get()
-                .executionData.files
-        }
+    // 聚合 exec 数据：惰性持有 coverageReport 的 executionData 文件集合引用。
+    // 禁止用 rootProject.provider { coverageReport.executionData.files } 的【急切】写法——
+    // 它会在首个模块验证任务（如 :core:datastore）解析自身 executionData 时【重入】解析
+    // coverageReport 的 ConfigurableFileCollection，而此刻该集合常处 finalize 中途，偶发
+    // ValuedObjectStateException（“Valued object is in an unexpected state”），使 coverageVerify
+    // 非确定性红（gradle/gradle#8794/#12962 同款坑）。改用 map { it.executionData } 惰性持有
+    // 引用、执行期再解析，规避重入竞态。
+    val coverageReportProvider =
+        rootProject.tasks.named("coverageReport", JacocoReport::class.java)
+    val mergedExecData = coverageReportProvider.map { it.executionData }
 
     tasks.register<JacocoReport>("jacocoTestReport") {
         group = "verification"
