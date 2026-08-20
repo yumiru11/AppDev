@@ -58,6 +58,12 @@ fun AppNavHost(
         onIssueClick: (owner: String, repo: String, number: Int, isPullRequest: Boolean) -> Unit,
     ) -> Unit = { _, _, _ -> },
     issueDetailScreen: @Composable (owner: String, repo: String, number: Int) -> Unit = { _, _, _ -> },
+    pullRequestListScreen: @Composable (
+        owner: String,
+        repo: String,
+        onPullRequestClick: (owner: String, repo: String, number: Int) -> Unit,
+    ) -> Unit = { _, _, _ -> },
+    pullRequestDetailScreen: @Composable (owner: String, repo: String, number: Int) -> Unit = { _, _, _ -> },
 ) {
     NavHost(
         navController = navController,
@@ -155,6 +161,27 @@ fun AppNavHost(
         }
 
         composable(
+            route = AppRoute.PULLS,
+            arguments =
+                listOf(
+                    navArgument("owner") { type = NavType.StringType },
+                    navArgument("repo") { type = NavType.StringType },
+                ),
+        ) { backStackEntry ->
+            val owner = backStackEntry.arguments?.getString("owner") ?: ""
+            val repo = backStackEntry.arguments?.getString("repo") ?: ""
+            // T15：PR 列表页；点击项 → PR 详情路由
+            pullRequestListScreen(owner, repo) { o, r, number ->
+                navController.navigate(
+                    AppRoute.PR
+                        .replace("{owner}", o)
+                        .replace("{repo}", r)
+                        .replace("{number}", number.toString()),
+                )
+            }
+        }
+
+        composable(
             route = AppRoute.PR,
             arguments =
                 listOf(
@@ -162,9 +189,12 @@ fun AppNavHost(
                     navArgument("repo") { type = NavType.StringType },
                     navArgument("number") { type = NavType.IntType },
                 ),
-        ) {
-            // T5+ PR 详情页
-            SearchScreen()
+        ) { backStackEntry ->
+            val owner = backStackEntry.arguments?.getString("owner") ?: ""
+            val repo = backStackEntry.arguments?.getString("repo") ?: ""
+            val number = backStackEntry.arguments?.getInt("number") ?: 0
+            // T15：PR 详情页（四 Tab）
+            pullRequestDetailScreen(owner, repo, number)
         }
 
         composable(

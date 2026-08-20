@@ -6,6 +6,7 @@ import com.yumiru11.githubapp.core.githubrest.api.ContentApi
 import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
 import com.yumiru11.githubapp.core.githubrest.api.GitTreeApi
 import com.yumiru11.githubapp.core.githubrest.api.IssueApi
+import com.yumiru11.githubapp.core.githubrest.api.PullRequestApi
 import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.api.SearchApi
@@ -81,6 +82,10 @@ object RestNetworkModule {
     @Provides
     @Singleton
     fun provideIssueApi(retrofit: Retrofit): IssueApi = retrofit.create(IssueApi::class.java)
+
+    @Provides
+    @Singleton
+    fun providePullRequestApi(retrofit: Retrofit): PullRequestApi = retrofit.create(PullRequestApi::class.java)
 
     @Provides
     @Singleton

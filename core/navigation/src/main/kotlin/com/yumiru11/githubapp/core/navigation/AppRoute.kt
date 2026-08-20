@@ -17,6 +17,7 @@ object AppRoute {
     const val REPO = "repo/{owner}/{repo}"
     const val ISSUE = "issue/{owner}/{repo}/{number}"
     const val ISSUES = "issues/{owner}/{repo}"
+    const val PULLS = "pulls/{owner}/{repo}"
     const val PR = "pr/{owner}/{repo}/{number}"
     const val COMMIT = "commit/{owner}/{repo}/{sha}"
     const val DISCUSSION = "discussion/{owner}/{repo}/{number}"

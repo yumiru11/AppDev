@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 列表页 -->
+    <string name="pull_request_filter_open">打开</string>
+    <string name="pull_request_filter_closed">已关闭</string>
+    <string name="pull_request_filter_all">全部</string>
+    <string name="pull_request_list_empty">暂无 Pull Request</string>
+    <string name="pull_request_retry">重试</string>
+    <string name="pull_request_error_network">网络错误，请检查网络连接</string>
+    <string name="pull_request_error_unknown">出错了，请重试</string>
+    <string name="pull_request_error_not_found">未找到</string>
+    <string name="pull_request_back">返回</string>
+
+    <!-- 列表行元素 -->
+    <string name="pull_request_author">%1$s 发起</string>
+    <plurals name="pull_request_comment_count">
+        <item quantity="one">%1$d 条评论</item>
+        <item quantity="other">%1$d 条评论</item>
+    </plurals>
+
+    <!-- 详情页 -->
+    <string name="pull_request_state_open">打开</string>
+    <string name="pull_request_state_closed">已关闭</string>
+    <string name="pull_request_state_merged">已合并</string>
+    <string name="pull_request_state_draft">草稿</string>
+    <string name="pull_request_loading">加载中…</string>
+    <string name="pull_request_author_opened">%1$s 于 %2$s 发起</string>
+
+    <!-- 四 Tab -->
+    <string name="pull_request_tab_conversation">对话</string>
+    <string name="pull_request_tab_commits">提交</string>
+    <string name="pull_request_tab_checks">检查</string>
+    <string name="pull_request_tab_files">文件变更</string>
+
+    <!-- PrHeader：分支/审查者/Checks 摘要/Mergeable -->
+    <string name="pull_request_branch_base_head">%1$s ← %2$s</string>
+    <string name="pull_request_reviewers">审查者</string>
+    <string name="pull_request_reviewers_empty">暂无审查者</string>
+    <string name="pull_request_mergeable">可合并</string>
+    <string name="pull_request_conflicting">有冲突</string>
+    <string name="pull_request_mergeable_pending">正在检查可合并性…</string>
+    <string name="pull_request_checks_summary">检查</string>
+    <string name="pull_request_checks_passing">%1$d 通过</string>
+    <string name="pull_request_checks_failing">%1$d 失败</string>
+    <string name="pull_request_checks_pending">%1$d 待处理</string>
+    <string name="pull_request_checks_state_success">检查通过</string>
+    <string name="pull_request_checks_state_failure">检查失败</string>
+    <string name="pull_request_checks_state_pending">检查进行中</string>
+
+    <!-- Conversation：时间线 -->
+    <string name="pull_request_timeline_empty">暂无动态</string>
+    <string name="pull_request_review_approved">批准了这些更改</string>
+    <string name="pull_request_review_changes_requested">请求更改</string>
+    <string name="pull_request_review_commented">已审查</string>
+    <string name="pull_request_review_dismissed">已驳回审查</string>
+    <string name="pull_request_review_unknown">已审查</string>
+    <string name="pull_request_review_comment_at">%1$s:%2$d</string>
+    <string name="pull_request_event_closed">%1$s 关闭了此 PR</string>
+    <string name="pull_request_event_reopened">%1$s 重新打开了此 PR</string>
+    <string name="pull_request_event_merged">%1$s 合并了此 PR</string>
+    <string name="pull_request_event_labeled">%1$s 添加了标签</string>
+    <string name="pull_request_event_unlabeled">%1$s 移除了标签</string>
+    <string name="pull_request_event_assigned">%1$s 指派了此 PR</string>
+    <string name="pull_request_event_locked">%1$s 锁定了此 PR</string>
+    <string name="pull_request_event_cross_referenced">%1$s 提及了此 PR</string>
+    <string name="pull_request_event_cross_referenced_number">%1$s 在 #%2$d 中提及了此 PR</string>
+    <string name="pull_request_event_connected">%1$s 关联了一个 PR</string>
+    <string name="pull_request_event_linked">%1$s 关联了一个 PR</string>
+    <string name="pull_request_event_linked_number">%1$s 关联了 PR #%2$d</string>
+    <string name="pull_request_event_committed">%1$s 提交了 %2$s</string>
+    <string name="pull_request_event_review_requested">%1$s 请求审查</string>
+    <string name="pull_request_event_review_request_removed">%1$s 移除了审查请求</string>
+    <string name="pull_request_event_head_ref_force_pushed">%1$s 强制推送至 %2$s</string>
+    <string name="pull_request_event_head_ref_deleted">%1$s 删除了 %2$s 分支</string>
+    <string name="pull_request_event_base_ref_changed">%1$s 更改了基础分支</string>
+    <string name="pull_request_event_ready_for_review">%1$s 标记为可审查</string>
+    <string name="pull_request_event_converted_to_draft">%1$s 转为草稿</string>
+    <string name="pull_request_event_default">%1$s %2$s 此 PR</string>
+
+    <!-- Commits Tab -->
+    <plurals name="pull_request_commit_count">
+        <item quantity="one">%1$d 次提交</item>
+        <item quantity="other">%1$d 次提交</item>
+    </plurals>
+    <string name="pull_request_commits_empty">暂无提交</string>
+    <string name="pull_request_commit_expand">显示变更摘要</string>
+    <string name="pull_request_commit_collapse">隐藏变更摘要</string>
+
+    <!-- Checks Tab -->
+    <string name="pull_request_checks_empty">暂无检查</string>
+    <string name="pull_request_check_status_queued">排队中</string>
+    <string name="pull_request_check_status_in_progress">进行中</string>
+    <string name="pull_request_check_status_completed">已完成</string>
+    <string name="pull_request_check_status_unknown">未知</string>
+    <string name="pull_request_check_conclusion_success">成功</string>
+    <string name="pull_request_check_conclusion_failure">失败</string>
+    <string name="pull_request_check_conclusion_neutral">中性</string>
+    <string name="pull_request_check_conclusion_cancelled">已取消</string>
+    <string name="pull_request_check_conclusion_skipped">已跳过</string>
+    <string name="pull_request_check_conclusion_timed_out">超时</string>
+    <string name="pull_request_check_conclusion_action_required">需要操作</string>
+    <string name="pull_request_check_conclusion_unknown">未知</string>
+    <string name="pull_request_check_expand">显示详情</string>
+    <string name="pull_request_check_collapse">隐藏详情</string>
+    <string name="pull_request_check_no_output">暂无详情</string>
+
+    <!-- Files changed Tab -->
+    <string name="pull_request_files_empty">暂无文件变更</string>
+    <string name="pull_request_file_status_added">新增</string>
+    <string name="pull_request_file_status_modified">修改</string>
+    <string name="pull_request_file_status_removed">删除</string>
+    <string name="pull_request_file_status_renamed">重命名</string>
+    <string name="pull_request_file_status_copied">复制</string>
+    <string name="pull_request_file_status_changed">变更</string>
+    <string name="pull_request_file_status_unknown">变更</string>
+    <string name="pull_request_additions">+%1$d</string>
+    <string name="pull_request_deletions">−%1$d</string>
+    <string name="pull_request_file_expand">显示补丁</string>
+    <string name="pull_request_file_collapse">隐藏补丁</string>
+    <string name="pull_request_file_no_patch">暂无补丁</string>
+
+    <!-- 更多操作菜单（分享/浏览器/复制链接） -->
+    <string name="pull_request_menu_more">更多</string>
+    <string name="pull_request_share">分享</string>
+    <string name="pull_request_open_in_browser">在浏览器中打开</string>
+    <string name="pull_request_copy_link">复制链接</string>
+    <string name="pull_request_link_copied">链接已复制</string>
+
+    <!-- 相对时间 -->
+    <string name="time_just_now">刚刚</string>
+    <plurals name="time_minutes">
+        <item quantity="one">%1$d 分钟前</item>
+        <item quantity="other">%1$d 分钟前</item>
+    </plurals>
+    <plurals name="time_hours">
+        <item quantity="one">%1$d 小时前</item>
+        <item quantity="other">%1$d 小时前</item>
+    </plurals>
+    <plurals name="time_days">
+        <item quantity="one">%1$d 天前</item>
+        <item quantity="other">%1$d 天前</item>
+    </plurals>
+    <plurals name="time_weeks">
+        <item quantity="one">%1$d 周前</item>
+        <item quantity="other">%1$d 周前</item>
+    </plurals>
+    <plurals name="time_months">
+        <item quantity="one">%1$d 个月前</item>
+        <item quantity="other">%1$d 个月前</item>
+    </plurals>
+    <plurals name="time_years">
+        <item quantity="one">%1$d 年前</item>
+        <item quantity="other">%1$d 年前</item>
+    </plurals>
+</resources>

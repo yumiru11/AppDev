@@ -139,6 +139,8 @@ dependencies {
     implementation(project(":feature:settings"))
     // Issue 列表/详情（T13）
     implementation(project(":feature:issue"))
+    // PR 列表/详情（T15）
+    implementation(project(":feature:pullrequest"))
     // 原型入口（仅 debug）：README 双版本对照（prototype/readme-comparison 分支产物）
     debugImplementation(project(":prototype:readme-comparison"))
 

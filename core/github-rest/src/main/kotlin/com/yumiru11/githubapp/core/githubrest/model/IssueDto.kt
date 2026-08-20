@@ -73,6 +73,20 @@ data class IssueEventDto(
     val label: LabelDto? = null,
     val milestone: MilestoneDto? = null,
     val source: CrossReferenceSourceDto? = null,
+    /** Review 状态（reviewed 事件：APPROVED/CHANGES_REQUESTED/COMMENTED/DISMISSED） */
+    val state: String? = null,
+    /** 行内评论文件路径（commented 事件含 path 时判为行内评论） */
+    val path: String? = null,
+    /** 行内评论行号 */
+    val line: Int? = null,
+    /** 行内评论位置（diff 内偏移） */
+    val position: Int? = null,
+    /** 提交 SHA（committed 事件） */
+    val sha: String? = null,
+    /** 提交消息（committed 事件） */
+    val message: String? = null,
+    /** 分支引用（head_ref_force_pushed/head_ref_deleted 事件） */
+    val ref: String? = null,
 )
 
 @Serializable
