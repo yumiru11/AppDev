@@ -28,4 +28,5 @@
     <string name="repo_file_line_number">行号</string>
     <string name="repo_file_go">跳转</string>
     <string name="repo_file_cancel">取消</string>
+    <string name="repo_file_edit">编辑</string>
 </resources>

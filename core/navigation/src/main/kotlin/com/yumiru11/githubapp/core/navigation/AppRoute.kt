@@ -27,6 +27,7 @@ object AppRoute {
     const val PROFILE = "profile"
     const val SETTINGS = "settings"
     const val EXTERNAL = "external"
+    const val EDITOR = "editor"
 
     /**
      * 将 [ParsedUrl] 映射为具体 route 字符串。

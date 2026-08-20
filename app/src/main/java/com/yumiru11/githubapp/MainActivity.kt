@@ -44,6 +44,7 @@ import com.yumiru11.githubapp.core.ui.navigateToParsedUrl
 import com.yumiru11.githubapp.feature.auth.AuthNavigation
 import com.yumiru11.githubapp.feature.auth.AuthViewModel
 import com.yumiru11.githubapp.feature.auth.LoginScreen
+import com.yumiru11.githubapp.feature.editor.MarkdownEditorScreen
 import com.yumiru11.githubapp.feature.home.HomeScreen
 import com.yumiru11.githubapp.feature.issue.IssueDetailScreen
 import com.yumiru11.githubapp.feature.issue.IssueListScreen
@@ -226,6 +227,16 @@ class MainActivity : ComponentActivity() {
                             number = number,
                             onBackClick = { navController.popBackStack() },
                             onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
+                        )
+                    },
+                    editorScreen = { initialContent, onClose ->
+                        MarkdownEditorScreen(
+                            initialContent = initialContent,
+                            onClose = onClose,
+                            onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
+                            onExternalLink = { url ->
+                                CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+                            },
                         )
                     },
                 )
