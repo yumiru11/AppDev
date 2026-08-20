@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Data_object
+import com.composables.icons.materialsymbols.rounded.Edit
 import com.composables.icons.materialsymbols.rounded.Format_list_numbered
 import com.composables.icons.materialsymbols.rounded.Search
 import com.yumiru11.githubapp.core.editor.CodeEditorController
@@ -51,6 +52,7 @@ import com.yumiru11.githubapp.core.editor.CodeLanguageDetector
 import com.yumiru11.githubapp.core.editor.EditorThemeTokens
 import com.yumiru11.githubapp.core.editor.rememberM3EditorThemeTokens
 import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
+import com.yumiru11.githubapp.core.ui.LocalRepoDetailActions
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
 
 /**
@@ -113,6 +115,19 @@ fun FileViewerScreen(
                                     imageVector = MaterialSymbols.Rounded.Format_list_numbered,
                                     contentDescription = stringResource(R.string.repo_file_jump_to_line),
                                 )
+                            }
+                        }
+
+                        FileKind.MARKDOWN -> {
+                            // T21 编辑入口：onEditMarkdown 未接线（null）时隐藏编辑按钮
+                            val editMarkdown = LocalRepoDetailActions.current.onEditMarkdown
+                            if (editMarkdown != null) {
+                                IconButton(onClick = { editMarkdown(loaded?.text.orEmpty()) }) {
+                                    Icon(
+                                        imageVector = MaterialSymbols.Rounded.Edit,
+                                        contentDescription = stringResource(R.string.repo_file_edit),
+                                    )
+                                }
                             }
                         }
 

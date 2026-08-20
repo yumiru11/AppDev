@@ -44,6 +44,7 @@ import com.yumiru11.githubapp.core.ui.navigateToParsedUrl
 import com.yumiru11.githubapp.feature.auth.AuthNavigation
 import com.yumiru11.githubapp.feature.auth.AuthViewModel
 import com.yumiru11.githubapp.feature.auth.LoginScreen
+import com.yumiru11.githubapp.feature.editor.MarkdownEditorScreen
 import com.yumiru11.githubapp.feature.home.HomeScreen
 import com.yumiru11.githubapp.feature.issue.CreateIssueScreen
 import com.yumiru11.githubapp.feature.issue.IssueDetailScreen
@@ -236,12 +237,24 @@ class MainActivity : ComponentActivity() {
                             onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
                         )
                     },
+                    editorScreen = { initialContent, onClose ->
+                        MarkdownEditorScreen(
+                            initialContent = initialContent,
+                            onClose = onClose,
+                            onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
+                            onExternalLink = { url ->
+                                CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+                            },
+                        )
+                    },
                     createIssueScreen = { owner, repo ->
                         CreateIssueScreen(
                             owner = owner,
                             repo = repo,
                             onBackClick = { navController.popBackStack() },
                             onCreated = { navController.popBackStack() },
+                        )
+                    },
                         )
                     },
                 )

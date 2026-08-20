@@ -19,6 +19,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.yumiru11.githubapp.core.navigation.AppRoute
+import com.yumiru11.githubapp.core.navigation.EditorContentHolder
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.screens.NotificationScreen
 import com.yumiru11.githubapp.core.ui.screens.ProfileScreen
@@ -40,6 +41,8 @@ import com.yumiru11.githubapp.core.ui.screens.SearchScreen
  * - [profileScreen]：个人主页 Composable（宿主注入，避免 core:ui 依赖 feature:profile；
  *   onLoginClick 由宿主接线到 LOGIN 路由）
  * - [settingsScreen]：设置页 Composable（宿主注入，避免 core:ui 依赖 feature:settings）
+ * - [editorScreen]：Markdown 编辑器页 Composable（宿主注入，避免 core:ui 依赖 feature:editor；
+ *   initialContent 由 [EditorContentHolder] 传递，onClose 由宿主接线返回）
  */
 @Composable
 fun AppNavHost(
@@ -58,6 +61,7 @@ fun AppNavHost(
         onIssueClick: (owner: String, repo: String, number: Int, isPullRequest: Boolean) -> Unit,
     ) -> Unit = { _, _, _ -> },
     issueDetailScreen: @Composable (owner: String, repo: String, number: Int) -> Unit = { _, _, _ -> },
+    editorScreen: @Composable (initialContent: String, onClose: () -> Unit) -> Unit = { _, _ -> },
     createIssueScreen: @Composable (owner: String, repo: String) -> Unit = { _, _ -> },
 ) {
     NavHost(
@@ -111,10 +115,18 @@ fun AppNavHost(
                         onOpenExternal = { url ->
                             CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
                         },
+                        onEditMarkdown = { content ->
+                            EditorContentHolder.initialContent = content
+                            navController.navigate(AppRoute.EDITOR)
+                        },
                     ),
             ) {
                 repoDetailScreen(owner, repo)
             }
+        }
+
+        composable(AppRoute.EDITOR) {
+            editorScreen(EditorContentHolder.initialContent) { navController.popBackStack() }
         }
 
         composable(

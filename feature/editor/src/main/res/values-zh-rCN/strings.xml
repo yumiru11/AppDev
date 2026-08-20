@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- T21 Markdown 编辑器 -->
+    <string name="editor_title">Markdown 编辑器</string>
+    <string name="editor_tab_edit">编辑</string>
+    <string name="editor_tab_preview">预览</string>
+    <string name="editor_back">返回</string>
+    <string name="editor_undo">撤销</string>
+    <string name="editor_redo">重做</string>
+    <string name="editor_bold">加粗</string>
+    <string name="editor_italic">斜体</string>
+    <string name="editor_inline_code">行内代码</string>
+    <string name="editor_code_block">代码块</string>
+    <string name="editor_heading">标题</string>
+    <string name="editor_unordered_list">无序列表</string>
+    <string name="editor_ordered_list">有序列表</string>
+    <string name="editor_task_list">任务列表</string>
+    <string name="editor_link">链接</string>
+    <string name="editor_image">图片</string>
+    <string name="editor_quote">引用</string>
+</resources>

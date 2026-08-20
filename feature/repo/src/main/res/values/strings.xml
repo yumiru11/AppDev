@@ -28,6 +28,9 @@
     <string name="repo_file_line_number">Line number</string>
     <string name="repo_file_go">Go</string>
     <string name="repo_file_cancel">Cancel</string>
+    <string name="repo_file_edit">Edit</string>
+
+    <!-- T12 仓库管理：Star/Watch/Fork + Releases/Tags + 语言栏 -->
 
     <!-- T12 仓库管理：Star/Watch/Fork + Releases/Tags + 语言栏 -->
     <string name="repo_tab_releases">Releases</string>

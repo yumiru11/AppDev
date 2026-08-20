@@ -10,6 +10,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +50,8 @@ import okhttp3.OkHttpClient
  * @param renderMode 渲染模式（默认 SERVER_HTML）
  * @param modifier Modifier
  * @param httpClient 复用 OkHttp（私有图床代理请求用；默认 null 表示不代理，图直通）
+ * @param fillAvailableHeight 占满可用高度（WebView 内部滚动，浏览器式预览；默认 false =
+ *   内容高度自适应，宿主滚动）。编辑器预览（T21）用 true。
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Suppress("DEPRECATION") // WebSettingsCompat darkening APIs are deprecated upstream but required by the pre-approved darkening policy.
@@ -61,6 +64,7 @@ fun WebViewMarkdownRenderer(
     httpClient: OkHttpClient? = null,
     renderMode: RenderMode = RenderMode.SERVER_HTML,
     baseRepoUrl: String? = null,
+    fillAvailableHeight: Boolean = false,
 ) {
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
@@ -109,7 +113,12 @@ fun WebViewMarkdownRenderer(
         }
 
     AndroidView(
-        modifier = modifier.fillMaxWidth().height(heightDp),
+        modifier =
+            if (fillAvailableHeight) {
+                modifier.fillMaxSize()
+            } else {
+                modifier.fillMaxWidth().height(heightDp)
+            },
         factory = { ctx ->
             WebView(ctx).apply {
                 WebViewSecurity.apply(this)
