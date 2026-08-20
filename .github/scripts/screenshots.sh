@@ -137,6 +137,14 @@ adb shell input swipe 540 1800 540 400 500
 sleep 4
 adb exec-out screencap -p > "$OUT/issue-comments.png"
 
+# ── 5.7 Markdown 编辑器（T21：blob 深链 → FileViewer Rendered → Edit）──
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/README.md" -p "$PKG" >/dev/null
+wait_for_activity "$PKG" || true
+sleep 6
+tap_text "Edit"
+sleep 5
+adb exec-out screencap -p > "$OUT/editor.png"
+
 # ── 6. 我的 tab（force-stop 冷启动回首页——am start 对已在前台 app 不重置
 # 导航栈，深链页仍在前台导致 uiautomator 拿不到底栏）──────────
 adb shell cmd uimode night no
