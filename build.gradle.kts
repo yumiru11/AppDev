@@ -82,31 +82,37 @@ tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
 //      比单任务按包名前缀 includes 拆规则更稳）。
 //   T4 diff coverage：diffCoverageCheck（见文件底部，git diff 行级比对聚合 XML）。
 
-// 每模块覆盖率基线阈值（LINE COVEREDRATIO，0~1）。规则（2026-08-16 实测后定稿）：
-//   - 逻辑模块（UseCase/Repository/ViewModel 为主）：地板 50~80，视实测收紧
-//   - UI/渲染模块：地板 25（Composable 主要靠 Roborazzi 截图兜底，不设高单测门禁）
-//   - 网络 DTO 模块：地板 15（DTO 反序列化样板占比高）
+// 每模块覆盖率基线阈值（LINE COVEREDRATIO，0~1）。
+// 规则（2026-08-16 定稿，2026-08-20 v2 因 UI 排除口径修订）：
+//   - 逻辑模块（UseCase/Repository/ViewModel/模型/DTO/解析器为主）：地板 50~80
+//   - UI/渲染模块（markdown/designsystem）：地板 25~70（Composable 主要靠 Roborazzi 截图兜底）
+//   - 网络 DTO 模块（github-rest）：地板 15
 //   - app / feature/auth：豁免（纯 UI 装配，无规则，只进聚合报告）
-//   - 阈值 = max(地板, 实测 - 2pt)，保证 CI 今天能过；实测 < 地板的模块（feature/repo、profile、
-//     notifications、home、issue、settings）取实测 - 2pt，地板作为 Phase C 目标（testing-strategy.md §4）
-//   - 实测口径：coverageReport 聚合数据（全部模块 exec 合并，含 app/feature 测试对下层模块的
-//     跨模块执行；全量非 synthetic 生产类分母，Hilt 生成代码已排除）
+//   - 阈值 = max(地板, 实测 - 2pt)，保证 CI 今天能过；地板作为 Phase C 目标（testing-strategy.md §4）
+//   - 实测口径：coverageReport 聚合数据（全部模块 exec 合并，含跨模块执行；全量非 synthetic 生产类
+//     分母，Hilt 生成代码与 UI 层已排除——见 coverageExcludes 的 2026-08-20 v2 收紧说明）
+//   - 2026-08-20 v2 实测（UI 排除后逻辑口径，根 coverageReport XML 按包前缀归模块汇总）：
+//     导航 96.1 / github-data 97.5 / datastore 84.8 / github-graphql 93.5 / github-auth 72.4 /
+//     github-rest 82.3 / markdown 46.9 / designsystem 71.2 / repo 93.9 / profile 91.1 /
+//     notifications 91.5 / home 83.5 / issue 70.2 / settings 100.0。
+//     多数逻辑模块达 85%+；github-auth/issue 受未补分支测试影响偏低，markdown 受渲染 Composable
+//     （非 Card/Section 命名的 UI）拖累，均为 Phase C 补齐目标，不强行抬阈（否则 CI 红）。
 val coverageThresholds =
     mapOf(
         ":core:navigation" to 0.94, // 实测 96.1%
-        ":core:github-data" to 0.94, // 实测 96.1%
-        ":core:datastore" to 0.84, // 实测 86.7%
-        ":feature:repo" to 0.37, // 实测 39.0%（地板 70，Phase C 目标）
-        ":feature:profile" to 0.29, // 实测 30.9%（地板 60，Phase C 目标）
-        ":feature:notifications" to 0.28, // 实测 30.2%（地板 60，Phase C 目标）
-        ":feature:home" to 0.28, // 实测 30.7%（地板 60，Phase C 目标）
-        ":core:github-graphql" to 0.90, // 实测 92.5%
-        ":core:github-auth" to 0.70, // 实测 72.5%
-        ":feature:issue" to 0.21, // 实测 23.7%（地板 50，Phase C 目标）
-        ":core:markdown" to 0.42, // 实测 44.2%
-        ":core:designsystem" to 0.64, // 实测 66.7%
-        ":feature:settings" to 0.17, // 实测 19.6%（地板 25，Phase C 目标）
-        ":core:github-rest" to 0.76, // 实测 78.2%
+        ":core:github-data" to 0.95, // 实测 97.5%
+        ":core:datastore" to 0.83, // 实测 84.8%（地板 80，Phase C 目标）
+        ":feature:repo" to 0.92, // 实测 93.9%（地板 70，Phase C 目标）
+        ":feature:profile" to 0.89, // 实测 91.1%（地板 60，Phase C 目标）
+        ":feature:notifications" to 0.89, // 实测 91.5%（地板 60，Phase C 目标）
+        ":feature:home" to 0.81, // 实测 83.5%（地板 60，Phase C 目标）
+        ":core:github-graphql" to 0.91, // 实测 93.5%
+        ":core:github-auth" to 0.70, // 实测 72.4%（地板 50~80，Phase C 目标）
+        ":feature:issue" to 0.68, // 实测 70.2%（地板 50，Phase C 目标）
+        ":core:markdown" to 0.45, // 实测 46.9%（UI/渲染，地板 70，Phase C 目标）
+        ":core:designsystem" to 0.69, // 实测 71.2%（UI/渲染，地板 66.7）
+        ":feature:settings" to 0.98, // 实测 100.0%
+        ":core:github-rest" to 0.80, // 实测 82.3%（v1 误将 ContentApi/FileContentDto 排除致 0.75，v2 回正）
     )
 
 // JaCoCo 分析排除：生成代码/样板（R/BuildConfig/Manifest/Hilt 产物），不计入分母
@@ -123,6 +129,25 @@ val coverageExcludes =
         "**/*_HiltComponents*.class",
         "**/Dagger*Component*.class",
         "**/*_Factory.class",
+        // UI 层排除（2026-08-20 v2 收紧：单测门禁只查逻辑，Composable 由真机/截图管线兑底）。
+        // 仅保留无歧义的 UI 标记；v1 的宽模式误伤逻辑类，已回退：
+        //   *Tab* 误伤 AppDatabase/DatabaseModule/MarkdownTableData/MarkdownTableParser
+        //     （"tab" 命中 data·tab·ase 与 ·Tab·le）；
+        //   *Item* 误伤 FeedItem/NotificationItem/SearchCodeItem/CodeSearchItemDto/
+        //     TreeItemDto/IssueTimelineItem（逻辑模型 / DTO）；
+        //   *Content* 误伤 ReadmeContent/FileContentData/FileContentDto/ContentApi
+        //     （逻辑模型 / REST API）；
+        //   *Component*/*Controller* 无逻辑命中或仅编辑器控制器（core:editor 无阈值），一并移除。
+        // 保留的标记均只命中 UI：Screen/Dialog/Composable/Card(仅 GitHubAlertCard)/
+        //   Section(仅设置段与文件树段)，及 ui/composable 包目录。
+        "**/*Screen*.class",
+        "**/*Screen\$*.class",
+        "**/*Dialog*.class",
+        "**/*Composable*.class",
+        "**/*Card*.class",
+        "**/*Section*.class",
+        "**/ui/**",
+        "**/composable/**",
     )
 
 // 根聚合报告：先注册，子模块回调里填充（dependsOn + classDirs + exec + sources）
