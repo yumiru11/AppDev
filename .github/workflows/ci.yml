@@ -218,7 +218,8 @@ jobs:
   # PR 评论用 sticky comment（GitHub artifact URL 不能内联渲染 → 文本链接到 artifact）。
   screenshots:
     name: Screenshots (emulator + Maestro)
-    needs: quality
+    # TEMP: 单独跑截图验证长截图方案，临时跳过 quality 门禁（验证后恢复 needs: quality）
+    needs: []
     # release asset 上传需 contents: write（顶层只有 read——第 12 轮 release 创建
     # 静默失败致评论图 404）
     permissions:
