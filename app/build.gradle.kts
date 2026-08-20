@@ -141,6 +141,8 @@ dependencies {
     implementation(project(":feature:issue"))
     // PR 列表/详情（T15）
     implementation(project(":feature:pullrequest"))
+    // Markdown 编辑器（T21）：MarkdownEditorScreen 装配进 app 导航
+    implementation(project(":feature:editor"))
     // 原型入口（仅 debug）：README 双版本对照（prototype/readme-comparison 分支产物）
     debugImplementation(project(":prototype:readme-comparison"))
 

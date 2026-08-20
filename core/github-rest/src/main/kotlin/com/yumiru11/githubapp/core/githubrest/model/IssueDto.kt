@@ -1,5 +1,6 @@
 package com.yumiru11.githubapp.core.githubrest.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -49,6 +50,15 @@ data class MilestoneDto(
 @Serializable
 data class ReactionsDto(
     val totalCount: Int = 0,
+    /** 各反应类型计数（GitHub 返回 summary 对象；@SerialName 覆盖 snake_case 策略） */
+    @SerialName("+1") val plusOne: Int = 0,
+    @SerialName("-1") val minusOne: Int = 0,
+    val laugh: Int = 0,
+    val hooray: Int = 0,
+    val confused: Int = 0,
+    val heart: Int = 0,
+    val rocket: Int = 0,
+    val eyes: Int = 0,
 )
 
 /**
@@ -87,6 +97,8 @@ data class IssueEventDto(
     val message: String? = null,
     /** 分支引用（head_ref_force_pushed/head_ref_deleted 事件） */
     val ref: String? = null,
+    /** 评论项反应计数（timeline 评论含 reactions summary） */
+    val reactions: ReactionsDto? = null,
 )
 
 @Serializable

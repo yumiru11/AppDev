@@ -44,14 +44,16 @@ import com.yumiru11.githubapp.core.ui.navigateToParsedUrl
 import com.yumiru11.githubapp.feature.auth.AuthNavigation
 import com.yumiru11.githubapp.feature.auth.AuthViewModel
 import com.yumiru11.githubapp.feature.auth.LoginScreen
+import com.yumiru11.githubapp.feature.editor.MarkdownEditorScreen
 import com.yumiru11.githubapp.feature.home.HomeScreen
+import com.yumiru11.githubapp.feature.issue.CreateIssueScreen
 import com.yumiru11.githubapp.feature.issue.IssueDetailScreen
 import com.yumiru11.githubapp.feature.issue.IssueListScreen
 import com.yumiru11.githubapp.feature.notifications.NotificationsScreen
 import com.yumiru11.githubapp.feature.profile.ProfileScreen
-import com.yumiru11.githubapp.feature.pullrequest.PullRequestDetailScreen
-import com.yumiru11.githubapp.feature.pullrequest.PullRequestListScreen
 import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
+import com.yumiru11.githubapp.feature.pullrequest.PullRequestListScreen
+import com.yumiru11.githubapp.feature.pullrequest.PullRequestDetailScreen
 import com.yumiru11.githubapp.feature.settings.SettingsScreen
 import com.yumiru11.githubapp.feature.settings.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -219,6 +221,13 @@ class MainActivity : ComponentActivity() {
                             repo = repo,
                             onBackClick = { navController.popBackStack() },
                             onIssueClick = onIssueClick,
+                            onCreateIssue = {
+                                navController.navigate(
+                                    AppRoute.ISSUE_CREATE
+                                        .replace("{owner}", owner)
+                                        .replace("{repo}", repo),
+                                )
+                            },
                         )
                     },
                     issueDetailScreen = { owner, repo, number ->
@@ -245,6 +254,24 @@ class MainActivity : ComponentActivity() {
                             number = number,
                             onBackClick = { navController.popBackStack() },
                             onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
+                        )
+                    },
+                    editorScreen = { initialContent, onClose ->
+                        MarkdownEditorScreen(
+                            initialContent = initialContent,
+                            onClose = onClose,
+                            onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
+                            onExternalLink = { url ->
+                                CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+                            },
+                        )
+                    },
+                    createIssueScreen = { owner, repo ->
+                        CreateIssueScreen(
+                            owner = owner,
+                            repo = repo,
+                            onBackClick = { navController.popBackStack() },
+                            onCreated = { navController.popBackStack() },
                         )
                     },
                 )

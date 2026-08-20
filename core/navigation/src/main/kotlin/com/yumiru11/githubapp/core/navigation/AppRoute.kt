@@ -18,6 +18,7 @@ object AppRoute {
     const val ISSUE = "issue/{owner}/{repo}/{number}"
     const val ISSUES = "issues/{owner}/{repo}"
     const val PULLS = "pulls/{owner}/{repo}"
+    const val ISSUE_CREATE = "issue_create/{owner}/{repo}"
     const val PR = "pr/{owner}/{repo}/{number}"
     const val COMMIT = "commit/{owner}/{repo}/{sha}"
     const val DISCUSSION = "discussion/{owner}/{repo}/{number}"
@@ -28,6 +29,7 @@ object AppRoute {
     const val PROFILE = "profile"
     const val SETTINGS = "settings"
     const val EXTERNAL = "external"
+    const val EDITOR = "editor"
 
     /**
      * 将 [ParsedUrl] 映射为具体 route 字符串。

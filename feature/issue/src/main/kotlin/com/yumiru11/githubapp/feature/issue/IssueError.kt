@@ -16,3 +16,17 @@ internal fun Throwable.toIssueErrorType(): IssueErrorType =
         this is HttpException || this is IOException -> IssueErrorType.NETWORK
         else -> IssueErrorType.UNKNOWN
     }
+
+/**
+ * 写操作失败异常 → [IssueSnackbarMessage]（T14 写失败 Snackbar 规整）。
+ *
+ * 规则：403 → FORBIDDEN；404 → NOT_FOUND；422 → VALIDATION；其余 HttpException/IOException → NETWORK；其余 → UNKNOWN。
+ */
+internal fun Throwable.toIssueSnackbarMessage(): IssueSnackbarMessage =
+    when {
+        this is HttpException && code() == 403 -> IssueSnackbarMessage.ERROR_FORBIDDEN
+        this is HttpException && code() == 404 -> IssueSnackbarMessage.ERROR_NOT_FOUND
+        this is HttpException && code() == 422 -> IssueSnackbarMessage.ERROR_VALIDATION
+        this is HttpException || this is IOException -> IssueSnackbarMessage.ERROR_NETWORK
+        else -> IssueSnackbarMessage.ERROR_UNKNOWN
+    }

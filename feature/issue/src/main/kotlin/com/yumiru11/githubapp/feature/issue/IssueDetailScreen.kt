@@ -1,3 +1,14 @@
+@file:Suppress(
+    "LongMethod",
+    "CyclomaticComplexMethod",
+    "TooManyFunctions",
+    "LongParameterList",
+)
+// - LongMethod/CyclomaticComplexMethod：IssueDetailScreen 聚合写操作 UI 装配（对话框/Sheet/事件收集），
+//   拆分收益低于装配强内聚（同 MainActivity 先例）
+// - TooManyFunctions：文件含 24 个 UI 组件（header/评论/反应/事件分发），均为独立可组合单元
+// - LongParameterList：SuccessContent/IssueHeader/CommentItem 为 UI 装配回调透传，默认参数豁免不适用
+
 package com.yumiru11.githubapp.feature.issue
 
 import android.content.ActivityNotFoundException
@@ -16,6 +27,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,20 +36,31 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +84,7 @@ import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueLabel
+import com.yumiru11.githubapp.feature.issue.model.IssueReactions
 import com.yumiru11.githubapp.feature.issue.model.IssueState
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineEventType
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineItem
@@ -71,11 +95,12 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 /**
- * Issue 详情页（T13）：header + 正文 + 时间线（评论/事件）+ TopAppBar 更多菜单（分享/浏览器/复制链接）。
+ * Issue 详情页（T13 读 + T14 写）。
  *
- * 状态由 [IssueDetailViewModel] 驱动；Issue 正文经 [WebViewMarkdownRenderer]（离线 GFM）渲染，
- * 评论正文保持 [MarkdownViewer] 原生渲染，事件以单行次要文本呈现。
- * 所有文案经 stringResource 本地化。
+ * 写操作（T14）：关闭/重开、编辑标题正文、评论增改删、反应 toggle、任务列表 checkbox
+ * 反向同步（WebView bridge → ViewModel）。操作可见性按 viewerPermission 决定
+ * （[IssueDetailUiState.Success.canEditIssue]/[canCloseReopen]/[canComment]）。
+ * 写失败经事件通道 Snackbar 提示（乐观更新 + 回滚在 ViewModel）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,7 +116,24 @@ fun IssueDetailScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val currentUrl = (uiState as? IssueDetailUiState.Success)?.issue?.htmlUrl
+
+    var showCommentSheet by remember { mutableStateOf(false) }
+    var editingIssue by remember { mutableStateOf(false) }
+    var editingComment by remember { mutableStateOf<IssueTimelineItem.Comment?>(null) }
+    var deletingComment by remember { mutableStateOf<IssueTimelineItem.Comment?>(null) }
+
+    // 写操作事件通道 → Snackbar（ViewModel 只产类型，文案本地化）
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                is IssueDetailEvent.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(context.getString(event.message.toRes()))
+                }
+            }
+        }
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -118,6 +160,21 @@ fun IssueDetailScreen(
                 },
             )
         },
+        floatingActionButton = {
+            val state = uiState as? IssueDetailUiState.Success
+            if (state?.canComment == true) {
+                ExtendedFloatingActionButton(
+                    onClick = { showCommentSheet = true },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.Create,
+                            contentDescription = null,
+                        )
+                    },
+                    text = { Text(text = stringResource(R.string.issue_comment)) },
+                )
+            }
+        },
     ) { paddingValues ->
         Box(
             modifier =
@@ -140,14 +197,84 @@ fun IssueDetailScreen(
 
                 is IssueDetailUiState.Success -> {
                     SuccessContent(
-                        issue = state.issue,
-                        timeline = state.timeline,
+                        state = state,
                         onInternalLink = onInternalLink,
                         baseRepoUrl = "https://github.com/$owner/$repo",
+                        onCloseReopen = { if (state.issue.state == IssueState.OPEN) viewModel.closeIssue() else viewModel.reopenIssue() },
+                        onEditIssue = { editingIssue = true },
+                        onToggleIssueReaction = viewModel::toggleIssueReaction,
+                        onToggleCommentReaction = viewModel::toggleCommentReaction,
+                        onEditComment = { editingComment = it },
+                        onDeleteComment = { deletingComment = it },
+                        onCheckboxClick = viewModel::toggleTaskListItem,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
             }
+        }
+    }
+
+    // 评论输入 BottomSheet（ui-design §3.9：评论按钮 → 上滑输入框）
+    val state = uiState as? IssueDetailUiState.Success
+    if (showCommentSheet && state?.canComment == true) {
+        CommentInputSheet(
+            onDismiss = { showCommentSheet = false },
+            onSubmit = { body ->
+                showCommentSheet = false
+                viewModel.addComment(body)
+            },
+        )
+    }
+
+    // 编辑 Issue 对话框
+    if (editingIssue && state?.canEditIssue == true) {
+        EditIssueDialog(
+            issue = state.issue,
+            onDismiss = { editingIssue = false },
+            onSubmit = { title, body ->
+                editingIssue = false
+                viewModel.updateIssue(title, body)
+            },
+        )
+    }
+
+    // 编辑评论对话框
+    editingComment?.let { comment ->
+        if (state?.canEditComment(comment) == true) {
+            EditCommentDialog(
+                comment = comment,
+                onDismiss = { editingComment = null },
+                onSubmit = { body ->
+                    editingComment = null
+                    viewModel.updateComment(comment.id, body)
+                },
+            )
+        }
+    }
+
+    // 删除评论确认
+    deletingComment?.let { comment ->
+        if (state?.canEditComment(comment) == true) {
+            AlertDialog(
+                onDismissRequest = { deletingComment = null },
+                title = { Text(text = stringResource(R.string.issue_delete_comment_title)) },
+                text = { Text(text = stringResource(R.string.issue_delete_comment_message)) },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            deletingComment = null
+                            viewModel.deleteComment(comment.id)
+                        },
+                    ) {
+                        Text(text = stringResource(R.string.issue_delete))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { deletingComment = null }) {
+                        Text(text = stringResource(R.string.issue_cancel))
+                    }
+                },
+            )
         }
     }
 }
@@ -198,12 +325,19 @@ private fun IssueMoreMenu(
 
 @Composable
 private fun SuccessContent(
-    issue: Issue,
-    timeline: List<IssueTimelineItem>,
+    state: IssueDetailUiState.Success,
     onInternalLink: (ParsedUrl) -> Unit,
     baseRepoUrl: String,
+    onCloseReopen: () -> Unit,
+    onEditIssue: () -> Unit,
+    onToggleIssueReaction: (String) -> Unit,
+    onToggleCommentReaction: (Long, String) -> Unit,
+    onEditComment: (IssueTimelineItem.Comment) -> Unit,
+    onDeleteComment: (IssueTimelineItem.Comment) -> Unit,
+    onCheckboxClick: (Int, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val issue = state.issue
     LazyColumn(
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -212,6 +346,13 @@ private fun SuccessContent(
         item(key = "header") {
             IssueHeader(
                 issue = issue,
+                canCloseReopen = state.canCloseReopen,
+                canEditIssue = state.canEditIssue,
+                canReact = state.canComment,
+                myReactions = state.myReactions[issue.id].orEmpty(),
+                onCloseReopen = onCloseReopen,
+                onEditIssue = onEditIssue,
+                onToggleReaction = onToggleIssueReaction,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -221,7 +362,7 @@ private fun SuccessContent(
                 WebViewMarkdownRenderer(
                     sanitizedHtml = issue.body,
                     tokenProvider = { null },
-                    bridgeCallback = createIssueBridgeCallback(onInternalLink),
+                    bridgeCallback = createIssueBridgeCallback(onInternalLink, onCheckboxClick),
                     baseRepoUrl = baseRepoUrl,
                     // Issue 无服务端 HTML API → 离线 GFM + 融合样式（WebView 内 markdown-it 渲染）
                     renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
@@ -230,7 +371,7 @@ private fun SuccessContent(
             }
         }
 
-        if (timeline.isEmpty()) {
+        if (state.timeline.isEmpty()) {
             item(key = "timeline_empty") {
                 Text(
                     text = stringResource(R.string.issue_timeline_empty),
@@ -240,20 +381,38 @@ private fun SuccessContent(
                 )
             }
         } else {
-            items(items = timeline, key = { it.id.toString() }) { item ->
+            items(items = state.timeline, key = { it.id.toString() }) { item ->
                 when (item) {
-                    is IssueTimelineItem.Comment -> CommentItem(item = item, onInternalLink = onInternalLink, baseRepoUrl = baseRepoUrl)
-                    is IssueTimelineItem.Event -> EventItem(event = item)
+                    is IssueTimelineItem.Comment -> {
+                        CommentItem(
+                            item = item,
+                            canReact = state.canComment,
+                            canEdit = state.canEditComment(item),
+                            myReactions = state.myReactions[item.id].orEmpty(),
+                            onInternalLink = onInternalLink,
+                            baseRepoUrl = baseRepoUrl,
+                            onToggleReaction = { content -> onToggleCommentReaction(item.id, content) },
+                            onEdit = { onEditComment(item) },
+                            onDelete = { onDeleteComment(item) },
+                        )
+                    }
+
+                    is IssueTimelineItem.Event -> {
+                        EventItem(event = item)
+                    }
                 }
             }
         }
     }
 }
 
-/** WebView 正文 bridge：内部链接 → 应用内导航；外部链接 → 浏览器；纯锚点忽略。 */
-@Suppress("EmptyFunctionBlock") // onCodeCopy/onImageClick/onCheckboxClick/onHeightChanged 为预留/T14 占位
+/** WebView 正文 bridge：内部链接 → 应用内导航；外部链接 → 浏览器；checkbox → 任务列表反向同步。 */
+@Suppress("EmptyFunctionBlock") // onCodeCopy/onImageClick/onHeightChanged 为预留占位
 @Composable
-private fun createIssueBridgeCallback(onInternalLink: (ParsedUrl) -> Unit): MarkdownBridgeCallback {
+private fun createIssueBridgeCallback(
+    onInternalLink: (ParsedUrl) -> Unit,
+    onCheckboxClick: (Int, Boolean) -> Unit,
+): MarkdownBridgeCallback {
     val context = LocalContext.current
     return object : MarkdownBridgeCallback {
         override fun onExternalLink(url: String) {
@@ -273,7 +432,9 @@ private fun createIssueBridgeCallback(onInternalLink: (ParsedUrl) -> Unit): Mark
         override fun onCheckboxClick(
             index: Int,
             checked: Boolean,
-        ) {}
+        ) {
+            onCheckboxClick(index, checked)
+        }
 
         override fun onHeightChanged(heightPx: Int) {}
     }
@@ -282,10 +443,44 @@ private fun createIssueBridgeCallback(onInternalLink: (ParsedUrl) -> Unit): Mark
 @Composable
 private fun IssueHeader(
     issue: Issue,
+    canCloseReopen: Boolean,
+    canEditIssue: Boolean,
+    canReact: Boolean,
+    myReactions: Map<String, Long>,
+    onCloseReopen: () -> Unit,
+    onEditIssue: () -> Unit,
+    onToggleReaction: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
-        StatusChip(state = issue.state)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StatusChip(state = issue.state)
+            if (canCloseReopen) {
+                Spacer(modifier = Modifier.width(8.dp))
+                OutlinedButton(onClick = onCloseReopen) {
+                    Text(
+                        text =
+                            if (issue.state == IssueState.OPEN) {
+                                stringResource(R.string.issue_close)
+                            } else {
+                                stringResource(R.string.issue_reopen)
+                            },
+                    )
+                }
+            }
+            if (canEditIssue) {
+                Spacer(modifier = Modifier.width(8.dp))
+                OutlinedButton(onClick = onEditIssue) {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = stringResource(R.string.issue_edit))
+                }
+            }
+        }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = issue.title,
@@ -322,12 +517,12 @@ private fun IssueHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (issue.reactions.totalCount > 0) {
+        if (canReact) {
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.issue_reactions, issue.reactions.totalCount),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            ReactionBar(
+                reactions = issue.reactions,
+                myReactions = myReactions,
+                onToggle = onToggleReaction,
             )
         }
     }
@@ -397,12 +592,81 @@ private fun AssigneeRow(assignees: List<IssueUser>) {
     }
 }
 
-/** 评论条目：列表项风格（非重卡片），作者头像 + 登录名 + 相对时间 + Markdown 正文 */
+/**
+ * 反应条：8 种 GitHub 反应（+1/-1/laugh/hooray/confused/heart/rocket/eyes）文本 chip + 计数。
+ * 已反应（viewer 添加过）→ primary 容器；点击 toggle 增删。
+ */
+@Composable
+private fun ReactionBar(
+    reactions: IssueReactions,
+    myReactions: Map<String, Long>,
+    onToggle: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val visible = REACTION_CONTENTS.filter { reactions.counts[it] ?: 0 > 0 || myReactions.containsKey(it) }
+    if (visible.isEmpty()) return
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        visible.forEach { content ->
+            val count = reactions.counts[content] ?: 0
+            val reacted = myReactions.containsKey(content)
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color =
+                    if (reacted) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                onClick = { onToggle(content) },
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = content,
+                        style = MaterialTheme.typography.labelMedium,
+                        color =
+                            if (reacted) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                    )
+                    if (count > 0) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = count.toString(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color =
+                                if (reacted) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 评论条目：列表项风格（非重卡片），作者头像 + 登录名 + 相对时间 + Markdown 正文 + 反应/编辑删除 */
 @Composable
 private fun CommentItem(
     item: IssueTimelineItem.Comment,
+    canReact: Boolean,
+    canEdit: Boolean,
+    myReactions: Map<String, Long>,
     onInternalLink: (ParsedUrl) -> Unit,
     baseRepoUrl: String,
+    onToggleReaction: (String) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -420,7 +684,7 @@ private fun CommentItem(
                             .clip(CircleShape),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.author?.login.orEmpty(),
                         style = MaterialTheme.typography.titleSmall,
@@ -433,6 +697,9 @@ private fun CommentItem(
                         )
                     }
                 }
+                if (canEdit) {
+                    CommentMenu(onEdit = onEdit, onDelete = onDelete)
+                }
             }
             if (!item.body.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -443,8 +710,167 @@ private fun CommentItem(
                     scrollable = false,
                 )
             }
+            if (canReact) {
+                Spacer(modifier = Modifier.height(8.dp))
+                ReactionBar(
+                    reactions = item.reactions,
+                    myReactions = myReactions,
+                    onToggle = onToggleReaction,
+                )
+            }
         }
     }
+}
+
+/** 评论操作菜单（编辑/删除，仅评论作者可见） */
+@Composable
+private fun CommentMenu(
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                imageVector = Icons.Filled.MoreVert,
+                contentDescription = stringResource(R.string.issue_comment_menu),
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.issue_edit)) },
+                onClick = {
+                    expanded = false
+                    onEdit()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.issue_delete)) },
+                onClick = {
+                    expanded = false
+                    onDelete()
+                },
+            )
+        }
+    }
+}
+
+/** 评论输入 BottomSheet（ui-design §3.9：圆角 + 输入区 + 提交） */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CommentInputSheet(
+    onDismiss: () -> Unit,
+    onSubmit: (String) -> Unit,
+) {
+    var body by remember { mutableStateOf("") }
+    val sheetState = rememberModalBottomSheetState()
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 24.dp)
+                    .imePadding(),
+        ) {
+            OutlinedTextField(
+                value = body,
+                onValueChange = { body = it },
+                label = { Text(text = stringResource(R.string.issue_comment_hint)) },
+                minLines = 3,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = { onSubmit(body) },
+                enabled = body.isNotBlank(),
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Text(text = stringResource(R.string.issue_comment_submit))
+            }
+        }
+    }
+}
+
+/** 编辑 Issue 对话框（标题 + 正文） */
+@Composable
+private fun EditIssueDialog(
+    issue: Issue,
+    onDismiss: () -> Unit,
+    onSubmit: (String, String) -> Unit,
+) {
+    var title by remember { mutableStateOf(issue.title) }
+    var body by remember { mutableStateOf(issue.body.orEmpty()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.issue_edit_title)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(text = stringResource(R.string.issue_edit_title_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = body,
+                    onValueChange = { body = it },
+                    label = { Text(text = stringResource(R.string.issue_edit_body_label)) },
+                    minLines = 4,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSubmit(title, body) },
+                enabled = title.isNotBlank(),
+            ) {
+                Text(text = stringResource(R.string.issue_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.issue_cancel))
+            }
+        },
+    )
+}
+
+/** 编辑评论对话框 */
+@Composable
+private fun EditCommentDialog(
+    comment: IssueTimelineItem.Comment,
+    onDismiss: () -> Unit,
+    onSubmit: (String) -> Unit,
+) {
+    var body by remember { mutableStateOf(comment.body.orEmpty()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.issue_edit_comment_title)) },
+        text = {
+            OutlinedTextField(
+                value = body,
+                onValueChange = { body = it },
+                minLines = 3,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSubmit(body) },
+                enabled = body.isNotBlank(),
+            ) {
+                Text(text = stringResource(R.string.issue_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.issue_cancel))
+            }
+        },
+    )
 }
 
 /** 事件项：按类型分发——交叉引用/关联 PR 独立成项，其余走通用事件文本 */
@@ -550,6 +976,25 @@ private fun labelColor(hex: String?): Color? {
     }.getOrNull()
 }
 
+/** [IssueSnackbarMessage] → 字符串资源 id（ViewModel 不产文案，UI 层本地化） */
+internal fun IssueSnackbarMessage.toRes(): Int =
+    when (this) {
+        IssueSnackbarMessage.COMMENT_ADDED -> R.string.issue_comment_added
+        IssueSnackbarMessage.COMMENT_UPDATED -> R.string.issue_comment_updated
+        IssueSnackbarMessage.COMMENT_DELETED -> R.string.issue_comment_deleted
+        IssueSnackbarMessage.REACTION_ADDED -> R.string.issue_reaction_added
+        IssueSnackbarMessage.REACTION_REMOVED -> R.string.issue_reaction_removed
+        IssueSnackbarMessage.ISSUE_CLOSED -> R.string.issue_closed_snackbar
+        IssueSnackbarMessage.ISSUE_REOPENED -> R.string.issue_reopened_snackbar
+        IssueSnackbarMessage.ISSUE_UPDATED -> R.string.issue_updated
+        IssueSnackbarMessage.TASK_LIST_UPDATED -> R.string.issue_task_list_updated
+        IssueSnackbarMessage.ERROR_NETWORK -> R.string.issue_error_network
+        IssueSnackbarMessage.ERROR_FORBIDDEN -> R.string.issue_error_forbidden
+        IssueSnackbarMessage.ERROR_NOT_FOUND -> R.string.issue_error_not_found
+        IssueSnackbarMessage.ERROR_VALIDATION -> R.string.issue_error_validation
+        IssueSnackbarMessage.ERROR_UNKNOWN -> R.string.issue_error_unknown
+    }
+
 private fun shareUrl(
     context: Context,
     url: String,
@@ -581,6 +1026,9 @@ private fun copyLink(
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText(null, url))
 }
+
+/** GitHub 反应类型（REST content 取值，顺序与 GitHub 一致） */
+private val REACTION_CONTENTS = listOf("+1", "-1", "laugh", "hooray", "confused", "heart", "rocket", "eyes")
 
 private const val FIXED_ALPHA_MASK = 0xFF000000L
 private const val TAG = "IssueDetailScreen"

@@ -148,6 +148,25 @@ tap_text "Commits"
 sleep 4
 adb exec-out screencap -p > "$OUT/pr-commits.png"
 
+# ── 5.7 仓库操作区（T12：语言栏 Linguist + Star/Watch 游客只读）──
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/hoowhoami/EchoMusic" -p "$PKG" >/dev/null
+wait_for_activity "$PKG" || true
+sleep 6
+adb exec-out screencap -p > "$OUT/repo-actions.png"
+
+# ── 5.8 仓库 Releases Tab（T12：Releases/Tags 列表）──
+tap_text "Releases"
+sleep 4
+adb exec-out screencap -p > "$OUT/repo-releases.png"
+
+# ── 5.9 Markdown 编辑器（T21：blob 深链 → FileViewer Rendered → Edit）──
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/README.md" -p "$PKG" >/dev/null
+wait_for_activity "$PKG" || true
+sleep 6
+tap_text "Edit"
+sleep 5
+adb exec-out screencap -p > "$OUT/editor.png"
+
 # ── 6. 我的 tab（force-stop 冷启动回首页——am start 对已在前台 app 不重置
 # 导航栈，深链页仍在前台导致 uiautomator 拿不到底栏）──────────
 adb shell cmd uimode night no
