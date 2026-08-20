@@ -116,23 +116,17 @@ tap_text "Repos"
 sleep 3
 adb exec-out screencap -p > "$OUT/repos.png"
 
-# ── 4. 普通 README（WebView 主渲染——mikepenz 样例：表格/代码/图片/徽章齐全）
-# Task B 后 README 一律 WebView（ADR-0007）；renderMode 判定以 ReadmeRender 日志为准
-adb shell am start -a android.intent.action.VIEW -d "https://github.com/mikepenz/multiplatform-markdown-renderer" -p "$PKG" >/dev/null
-wait_for_activity "$PKG" || true
-sleep 6
-adb exec-out screencap -p > "$OUT/readme-regular.png"
+# ── 4. 普通 README（WebView）—— 已由下方 readme-long 长截图覆盖，此处不再单独截，避免冗余 ──
 
 # ── 5. mermaid 仓库 README（WebView——mermaid 代码块特殊内容路径）─
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/mermaid-js/mermaid" -p "$PKG" >/dev/null
 sleep 8
 adb exec-out screencap -p > "$OUT/readme-mermaid.png"
 
-# ── 5.5 Issue 正文（WebView 渲染——测试面板 #71 覆盖全 md 格式）─
+# ── 5.5 导航到 Issue #71（WebView 正文已由下方 issue-long 长截图覆盖，此处仅就位供 5.6 评论区截图）─
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues/71" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
 sleep 8
-adb exec-out screencap -p > "$OUT/issue-body.png"
 
 # ── 5.6 Issue 评论（原生短文本渲染——正文 WebView 很高，滑到评论区）─
 adb shell input swipe 540 1800 540 400 500
