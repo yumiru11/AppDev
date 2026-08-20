@@ -137,7 +137,18 @@ adb shell input swipe 540 1800 540 400 500
 sleep 4
 adb exec-out screencap -p > "$OUT/issue-comments.png"
 
-# ── 5.7 Markdown 编辑器（T21：blob 深链 → FileViewer Rendered → Edit）──
+# ── 5.7 仓库操作区（T12：语言栏 Linguist + Star/Watch 游客只读）──
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/hoowhoami/EchoMusic" -p "$PKG" >/dev/null
+wait_for_activity "$PKG" || true
+sleep 6
+adb exec-out screencap -p > "$OUT/repo-actions.png"
+
+# ── 5.8 仓库 Releases Tab（T12：Releases/Tags 列表）──
+tap_text "Releases"
+sleep 4
+adb exec-out screencap -p > "$OUT/repo-releases.png"
+
+# ── 5.9 Markdown 编辑器（T21：blob 深链 → FileViewer Rendered → Edit）──
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/README.md" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
 sleep 6

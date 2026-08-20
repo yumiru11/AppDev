@@ -47,6 +47,8 @@ dependencies {
     // 数据层（REST IssueApi + T4 认证状态）
     implementation(project(":core:github-rest"))
     implementation(project(":core:github-auth"))
+    // GraphQL 通道（T14 任务列表 mutation + 写操作上下文 viewerPermission/node id）
+    implementation(project(":core:github-graphql"))
     // DTO 映射需访问 IssueDto.pullRequest（kotlinx.serialization JsonObject 类型）
     implementation(libs.kotlinx.serialization.json)
 
@@ -64,6 +66,7 @@ dependencies {
     testImplementation(libs.mockwebserver3)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
+    testImplementation(libs.turbine)
     testImplementation(libs.paging.testing)
     testImplementation(libs.kotlinx.serialization.json)
     testImplementation(kotlin("test"))

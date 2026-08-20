@@ -46,6 +46,7 @@ import com.yumiru11.githubapp.feature.auth.AuthViewModel
 import com.yumiru11.githubapp.feature.auth.LoginScreen
 import com.yumiru11.githubapp.feature.editor.MarkdownEditorScreen
 import com.yumiru11.githubapp.feature.home.HomeScreen
+import com.yumiru11.githubapp.feature.issue.CreateIssueScreen
 import com.yumiru11.githubapp.feature.issue.IssueDetailScreen
 import com.yumiru11.githubapp.feature.issue.IssueListScreen
 import com.yumiru11.githubapp.feature.notifications.NotificationsScreen
@@ -218,6 +219,13 @@ class MainActivity : ComponentActivity() {
                             repo = repo,
                             onBackClick = { navController.popBackStack() },
                             onIssueClick = onIssueClick,
+                            onCreateIssue = {
+                                navController.navigate(
+                                    AppRoute.ISSUE_CREATE
+                                        .replace("{owner}", owner)
+                                        .replace("{repo}", repo),
+                                )
+                            },
                         )
                     },
                     issueDetailScreen = { owner, repo, number ->
@@ -237,6 +245,16 @@ class MainActivity : ComponentActivity() {
                             onExternalLink = { url ->
                                 CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
                             },
+                        )
+                    },
+                    createIssueScreen = { owner, repo ->
+                        CreateIssueScreen(
+                            owner = owner,
+                            repo = repo,
+                            onBackClick = { navController.popBackStack() },
+                            onCreated = { navController.popBackStack() },
+                        )
+                    },
                         )
                     },
                 )

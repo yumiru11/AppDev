@@ -14,6 +14,8 @@ import com.yumiru11.githubapp.feature.issue.model.IssueState
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineEventType
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineItem
 import com.yumiru11.githubapp.feature.issue.model.IssueUser
+import com.yumiru11.githubapp.feature.issue.model.IssueViewerPermission
+import com.yumiru11.githubapp.feature.issue.model.IssueWriteContext
 import io.mockk.coEvery
 import io.mockk.mockk
 import org.junit.Rule
@@ -67,6 +69,13 @@ class IssueDetailScreenScreenshotTest : ScreenshotTest() {
                             actor = IssueUser(login = "octocat"),
                             label = IssueLabel(name = "bug", color = "d73a4a"),
                         ),
+                    )
+                // T14：写操作上下文（作者本人 + WRITE 权限 → 展示写操作 UI）
+                coEvery { getIssueWriteContext("octocat", "Hello-World", 42) } returns
+                    IssueWriteContext(
+                        viewerLogin = "octocat",
+                        viewerPermission = IssueViewerPermission.WRITE,
+                        issueNodeId = "I_kwDOA",
                     )
             }
         return IssueDetailViewModel(

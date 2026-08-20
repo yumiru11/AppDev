@@ -29,4 +29,31 @@
     <string name="repo_file_go">Go</string>
     <string name="repo_file_cancel">Cancel</string>
     <string name="repo_file_edit">Edit</string>
+
+    <!-- T12 仓库管理：Star/Watch/Fork + Releases/Tags + 语言栏 -->
+
+    <!-- T12 仓库管理：Star/Watch/Fork + Releases/Tags + 语言栏 -->
+    <string name="repo_tab_releases">Releases</string>
+    <string name="repo_subtab_releases">Releases</string>
+    <string name="repo_subtab_tags">Tags</string>
+    <string name="repo_star">Star</string>
+    <string name="repo_unstar">Unstar</string>
+    <string name="repo_watch">Watch</string>
+    <string name="repo_unwatch">Unwatch</string>
+    <string name="repo_fork">Fork</string>
+    <string name="repo_releases_loading">Loading releases…</string>
+    <string name="repo_tags_loading">Loading tags…</string>
+    <string name="repo_releases_empty">No releases</string>
+    <string name="repo_tags_empty">No tags</string>
+    <string name="repo_release_prerelease">Pre-release</string>
+    <string name="repo_release_draft">Draft</string>
+    <string name="repo_release_meta">%1$s · %2$s</string>
+    <string name="repo_release_body_empty">No description provided.</string>
+    <string name="repo_release_back">Back to releases</string>
+    <string name="repo_language_percent">%1$s %2$d%%</string>
+    <string name="repo_snackbar_toggle_failed">Action failed. Please retry.</string>
+    <string name="repo_snackbar_forked">Fork created</string>
+    <string name="repo_snackbar_fork_permission_denied">No permission to fork this repository</string>
+    <string name="repo_snackbar_fork_already_exists">You have already forked this repository</string>
+    <string name="repo_snackbar_fork_failed">Fork failed. Please retry.</string>
 </resources>

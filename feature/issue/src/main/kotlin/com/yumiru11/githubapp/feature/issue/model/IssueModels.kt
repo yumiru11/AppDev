@@ -10,6 +10,9 @@ enum class IssueState {
     companion object {
         fun fromRaw(value: String): IssueState = if (value == "open") OPEN else CLOSED
     }
+
+    /** REST state 字段值（写操作 PATCH 用） */
+    fun toRaw(): String = if (this == OPEN) "open" else "closed"
 }
 
 /** Issue 列表/详情条目 */
@@ -29,6 +32,10 @@ data class Issue(
     val updatedAt: String? = null,
     val htmlUrl: String? = null,
     val isPullRequest: Boolean = false,
+    /** 仓库级 viewer 权限（T14 写操作可见性；null = 未获取，保守隐藏写操作） */
+    val viewerPermission: IssueViewerPermission? = null,
+    /** Issue GraphQL node id（T14 任务列表 mutation 用；REST 通道为 null） */
+    val graphqlId: String? = null,
 )
 
 /** 作者/Assignees 用户（复用 REST UserDto 字段） */
@@ -52,7 +59,71 @@ data class IssueMilestone(
 /** 反应计数（ReactionBar 展示） */
 data class IssueReactions(
     val totalCount: Int = 0,
+    /** 各反应类型计数（content → count，content 取值 +1/-1/laugh/hooray/confused/heart/rocket/eyes） */
+    val counts: Map<String, Int> = emptyMap(),
 )
+
+/** 单个反应（add reaction 响应，id 供删除用） */
+data class IssueReaction(
+    val id: Long,
+    val content: String,
+    val user: IssueUser? = null,
+)
+
+/** 评论（create/update comment 响应，乐观插入后替换临时项） */
+data class IssueComment(
+    val id: Long,
+    val body: String? = null,
+    val author: IssueUser? = null,
+    val htmlUrl: String? = null,
+    val createdAt: String? = null,
+    val reactions: IssueReactions = IssueReactions(),
+)
+
+/**
+ * Issue 写操作上下文（T14，GraphQL IssueWriteContextQuery）。
+ *
+ * - [viewerLogin]：当前登录用户 login（作者/评论者身份判定）
+ * - [viewerPermission]：仓库级权限（决定操作可见性）
+ * - [issueNodeId]：Issue GraphQL node id（UpdateIssue mutation 必需；REST 通道不可得）
+ */
+data class IssueWriteContext(
+    val viewerLogin: String? = null,
+    val viewerPermission: IssueViewerPermission = IssueViewerPermission.NONE,
+    val issueNodeId: String? = null,
+)
+
+/**
+ * 仓库级 viewer 权限（GitHub GraphQL RepositoryPermission 映射）。
+ *
+ * 权限决定操作可见性（plan.md §6.1「权限决定可见性」）：
+ * - TRIAGE+：Labels/Assignees/Milestone 编辑
+ * - WRITE+：关闭/重开他人 Issue、编辑他人 Issue
+ * - 作者本人：编辑/关闭/重开自己的 Issue（不受仓库权限限制）
+ */
+enum class IssueViewerPermission(
+    val level: Int,
+) {
+    NONE(0),
+    READ(1),
+    TRIAGE(2),
+    WRITE(3),
+    MAINTAIN(4),
+    ADMIN(5),
+    ;
+
+    companion object {
+        fun fromRaw(raw: String?): IssueViewerPermission =
+            when (raw) {
+                "ADMIN" -> ADMIN
+                "MAINTAIN" -> MAINTAIN
+                "WRITE" -> WRITE
+                "TRIAGE" -> TRIAGE
+                "READ" -> READ
+                else -> NONE
+            }
+    }
+}
 
 /** 时间线条目（评论 vs 事件） */
 sealed interface IssueTimelineItem {

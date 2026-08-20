@@ -64,7 +64,8 @@ dependencies {
     // GraphQL 客户端 + Normalized Cache（Apollo 5 新版独立缓存库 com.apollographql.cache，
     // memory → SQLite 链；旧版 apollo-normalized-cache 已弃用且装配 API 均为 internal）
     api(libs.apollo.runtime)
-    implementation(libs.apollo.normalized.cache)
+    // api 暴露 FetchPolicy/fetchPolicy 扩展：消费方（feature:issue 写上下文查询）需控制缓存策略
+    api(libs.apollo.normalized.cache)
     implementation(libs.apollo.normalized.cache.sqlite)
 
     // 共享 OkHttp（Auth 拦截器/统一请求头由 core:github-rest 的装配提供）

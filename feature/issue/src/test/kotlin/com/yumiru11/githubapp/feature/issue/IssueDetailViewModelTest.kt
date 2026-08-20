@@ -8,6 +8,8 @@ import com.yumiru11.githubapp.feature.issue.model.IssueErrorType
 import com.yumiru11.githubapp.feature.issue.model.IssueState
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineEventType
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineItem
+import com.yumiru11.githubapp.feature.issue.model.IssueViewerPermission
+import com.yumiru11.githubapp.feature.issue.model.IssueWriteContext
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -75,6 +77,7 @@ class IssueDetailViewModelTest {
                 mockk<IssueRepository> {
                     coEvery { getIssue(owner, repo, number) } returns issue()
                     coEvery { timeline(owner, repo, number) } returns timeline()
+                    coEvery { getIssueWriteContext(any(), any(), any()) } returns IssueWriteContext()
                 }
 
             val viewModel = IssueDetailViewModel(savedStateHandle(), repository)
@@ -82,7 +85,7 @@ class IssueDetailViewModelTest {
             val state = viewModel.uiState.value
             assertTrue(state is IssueDetailUiState.Success)
             state as IssueDetailUiState.Success
-            assertEquals(issue(), state.issue)
+            assertEquals(issue().copy(viewerPermission = IssueViewerPermission.NONE), state.issue)
             assertEquals(timeline(), state.timeline)
         }
 
@@ -144,6 +147,7 @@ class IssueDetailViewModelTest {
             val repository =
                 mockk<IssueRepository> {
                     coEvery { getIssue(owner, repo, number) } throws IOException("network down")
+                    coEvery { getIssueWriteContext(any(), any(), any()) } returns IssueWriteContext()
                 }
             val viewModel = IssueDetailViewModel(savedStateHandle(), repository)
             assertEquals(
@@ -165,6 +169,7 @@ class IssueDetailViewModelTest {
                 mockk<IssueRepository> {
                     coEvery { getIssue(owner, repo, number) } returns issue()
                     coEvery { timeline(any(), any(), any()) } throws IOException("network down")
+                    coEvery { getIssueWriteContext(any(), any(), any()) } returns IssueWriteContext()
                 }
 
             val viewModel = IssueDetailViewModel(savedStateHandle(), repository)
@@ -185,6 +190,7 @@ class IssueDetailViewModelTest {
                 mockk<IssueRepository> {
                     coEvery { getIssue(owner, repo, number) } coAnswers { gate.await() }
                     coEvery { timeline(owner, repo, number) } returns timeline()
+                    coEvery { getIssueWriteContext(any(), any(), any()) } returns IssueWriteContext()
                 }
 
             val viewModel = IssueDetailViewModel(savedStateHandle(), repository)
@@ -198,7 +204,7 @@ class IssueDetailViewModelTest {
             val state = viewModel.uiState.value
             assertTrue(state is IssueDetailUiState.Success)
             state as IssueDetailUiState.Success
-            assertEquals(issue(), state.issue)
+            assertEquals(issue().copy(viewerPermission = IssueViewerPermission.NONE), state.issue)
             assertEquals(timeline(), state.timeline)
         }
 
@@ -210,6 +216,7 @@ class IssueDetailViewModelTest {
                 mockk<IssueRepository> {
                     coEvery { getIssue(owner, repo, number) } returns prIssue
                     coEvery { timeline(owner, repo, number) } returns timeline()
+                    coEvery { getIssueWriteContext(any(), any(), any()) } returns IssueWriteContext()
                 }
 
             val viewModel = IssueDetailViewModel(savedStateHandle(), repository)

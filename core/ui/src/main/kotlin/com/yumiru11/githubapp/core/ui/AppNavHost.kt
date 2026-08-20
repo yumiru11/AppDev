@@ -62,6 +62,7 @@ fun AppNavHost(
     ) -> Unit = { _, _, _ -> },
     issueDetailScreen: @Composable (owner: String, repo: String, number: Int) -> Unit = { _, _, _ -> },
     editorScreen: @Composable (initialContent: String, onClose: () -> Unit) -> Unit = { _, _ -> },
+    createIssueScreen: @Composable (owner: String, repo: String) -> Unit = { _, _ -> },
 ) {
     NavHost(
         navController = navController,
@@ -164,6 +165,20 @@ fun AppNavHost(
             val number = backStackEntry.arguments?.getInt("number") ?: 0
             // T13：Issue 详情页
             issueDetailScreen(owner, repo, number)
+        }
+
+        composable(
+            route = AppRoute.ISSUE_CREATE,
+            arguments =
+                listOf(
+                    navArgument("owner") { type = NavType.StringType },
+                    navArgument("repo") { type = NavType.StringType },
+                ),
+        ) { backStackEntry ->
+            val owner = backStackEntry.arguments?.getString("owner") ?: ""
+            val repo = backStackEntry.arguments?.getString("repo") ?: ""
+            // T14：创建 Issue 页；成功后返回列表
+            createIssueScreen(owner, repo)
         }
 
         composable(

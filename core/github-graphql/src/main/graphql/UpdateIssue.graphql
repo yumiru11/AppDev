@@ -1,0 +1,12 @@
+# 任务列表 checkbox 反向同步（T14）：更新 Issue body（checkbox 状态存于 markdown body）
+mutation UpdateIssue($id: ID!, $body: String) {
+  updateIssue(input: { id: $id, body: $body }) {
+    issue {
+      id
+      number
+      title
+      body
+      state
+    }
+  }
+}
