@@ -1,0 +1,13 @@
+# Issue 写操作上下文（T14）：viewer 登录名 + 仓库权限 + Issue GraphQL node id。
+# viewerPermission 决定操作可见性（无权限隐藏/禁用）；node id 供 UpdateIssue mutation。
+query IssueWriteContext($owner: String!, $name: String!, $number: Int!) {
+  viewer {
+    login
+  }
+  repository(owner: $owner, name: $name) {
+    viewerPermission
+    issue(number: $number) {
+      id
+    }
+  }
+}

@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,6 +65,7 @@ fun IssueListScreen(
     onIssueClick: (owner: String, repo: String, number: Int, isPullRequest: Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onSearchClick: () -> Unit = {},
+    onCreateIssue: () -> Unit = {},
     viewModel: IssueListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -89,6 +92,18 @@ fun IssueListScreen(
                         )
                     }
                 },
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = onCreateIssue,
+                icon = {
+                    Icon(
+                        imageVector = Icons.Filled.Create,
+                        contentDescription = null,
+                    )
+                },
+                text = { Text(text = stringResource(R.string.issue_create)) },
             )
         },
     ) { paddingValues ->
