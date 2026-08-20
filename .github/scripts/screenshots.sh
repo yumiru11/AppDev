@@ -137,6 +137,17 @@ adb shell input swipe 540 1800 540 400 500
 sleep 4
 adb exec-out screencap -p > "$OUT/issue-comments.png"
 
+# ── 5.7 PR 详情 Conversation（T15）──
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/pull/74" -p "$PKG" >/dev/null
+wait_for_activity "$PKG" || true
+sleep 8
+adb exec-out screencap -p > "$OUT/pr-conversation.png"
+
+# ── 5.8 PR Commits Tab（T15）──
+tap_text "Commits"
+sleep 4
+adb exec-out screencap -p > "$OUT/pr-commits.png"
+
 # ── 6. 我的 tab（force-stop 冷启动回首页——am start 对已在前台 app 不重置
 # 导航栈，深链页仍在前台导致 uiautomator 拿不到底栏）──────────
 adb shell cmd uimode night no
