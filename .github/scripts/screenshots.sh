@@ -55,20 +55,32 @@ launch_app() {
   sleep 3   # 首帧稳定
 }
 
-# 长截图（滚动 + 拼接，docs/research/actions-scroll-screenshot.md 方案 A）：
-# 导航到 $2 深链，long_screenshot.py 循环 screencap→swipe→等待 收集多帧并拼接；
-# 拼接失败则退化为单帧视口截图，不阻断 job。
+# 长截图（纯 adb 滚动 + 多帧截图，无 Python/PIL 依赖）：
+# 导航到 $2 深链，循环「上滑 → 截一帧」最多 $3 帧（默认 20），相邻帧二进制相同即视为到底、停止。
+# 输出到 $OUT/$1-01.png、$1-02.png …（多帧即长截图，人工翻看）。
 long_shot() {
-  local out="$1" url="$2"
+  local name="$1" url="$2" max="${3:-20}"
+  local delta=2000          # pixel_6 视口 2400：自底(y=2000)上滑 2000px，留 ~400 重叠
   adb shell am start -a android.intent.action.VIEW -d "$url" -p "$PKG" >/dev/null
   wait_for_activity "$PKG" || true
   sleep 6
-  if python3 .github/scripts/long_screenshot.py "$OUT/$out"; then
-    echo "::notice::long screenshot -> $out"
-  else
-    echo "::warning::long_screenshot failed; falling back to single viewport"
-    adb exec-out screencap -p > "$OUT/$out"
-  fi
+  local prev="" f i
+  for i in $(seq 1 "$max"); do
+    f="$OUT/${name}-$(printf '%02d' "$i").png"
+    adb exec-out screencap -p > "$f"
+    # 相邻帧相同 → 已到底（或页面不可滚），删重复帧并停止
+    if [ -n "$prev" ] && cmp -s "$prev" "$f"; then
+      rm -f "$f"
+      echo "::notice::long screenshot ($name) reached bottom at frame $((i - 1))"
+      break
+    fi
+    prev="$f"
+    # 末帧无需上滑
+    if [ "$i" -lt "$max" ]; then
+      adb shell input swipe 540 2000 540 $((2000 - delta)) 250
+      sleep 1.5
+    fi
+  done
 }
 
 # ── 0. 安装 debug APK（action 只启动模拟器，不装 APK——PR #60 第 8 轮实测）─
