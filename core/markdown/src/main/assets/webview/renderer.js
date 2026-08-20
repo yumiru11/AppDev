@@ -290,7 +290,8 @@
         checkbox.content = '<input type="checkbox" class="task-list-item-checkbox" ' +
           (checked ? 'checked ' : '') + 'aria-label="Task item">';
         first.content = first.content.slice(match[0].length);
-        inline.children.splice(0, 1, checkbox);
+        // 前插 checkbox，保留被切过首部的文本 token（splice(0,0,...) 而非 (0,1,...) 否则文字被吞）
+        inline.children.splice(0, 0, checkbox);
       }
     });
   }
