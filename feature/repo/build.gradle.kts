@@ -7,6 +7,11 @@ plugins {
 android {
     namespace = "com.yumiru11.githubapp.feature.repo"
 
+    defaultConfig {
+        // core:github-auth 库 manifest 的 ${appAuthRedirectScheme} 占位符（ADR-0001 自定义 scheme）
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.yumiru11.githubapp"
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -58,6 +63,9 @@ dependencies {
     implementation(project(":core:github-rest"))
     implementation(project(":core:database"))
 
+    // 登录态（游客只读：Star/Watch/Fork 按钮隐藏）
+    implementation(project(":core:github-auth"))
+
     // Markdown 渲染
     implementation(project(":core:markdown"))
     implementation(libs.markdown.renderer)
@@ -75,5 +83,6 @@ dependencies {
     testImplementation(libs.mockwebserver3)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
+    testImplementation(libs.turbine)
     testImplementation(kotlin("test"))
 }
