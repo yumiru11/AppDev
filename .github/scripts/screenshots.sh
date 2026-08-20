@@ -55,12 +55,37 @@ launch_app() {
   sleep 3   # 首帧稳定
 }
 
+# 长截图（滚动 + 拼接，docs/research/actions-scroll-screenshot.md 方案 A）：
+# 导航到 $2 深链，long_screenshot.py 循环 screencap→swipe→等待 收集多帧并拼接；
+# 拼接失败则退化为单帧视口截图，不阻断 job。
+long_shot() {
+  local out="$1" url="$2"
+  adb shell am start -a android.intent.action.VIEW -d "$url" -p "$PKG" >/dev/null
+  wait_for_activity "$PKG" || true
+  sleep 6
+  if python3 .github/scripts/long_screenshot.py "$OUT/$out"; then
+    echo "::notice::long screenshot -> $out"
+  else
+    echo "::warning::long_screenshot failed; falling back to single viewport"
+    adb exec-out screencap -p > "$OUT/$out"
+  fi
+}
+
 # ── 0. 安装 debug APK（action 只启动模拟器，不装 APK——PR #60 第 8 轮实测）─
 adb install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null
 adb shell pm disable com.android.launcher3 --user 0 >/dev/null 2>&1 || true
 
 # ── 0. 安装 APK（android-emulator-runner 不自动装；assembleDebug 产物在工作区）─
 adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+# ── 0.5 截图登录（若提供 SCREENSHOT_TOKEN 机密）：注入只读 PAT →
+# EncryptedTokenStorage（ScreenshotTokenReceiver），使 app 进入开发者模式
+# （Star/评论框/PR 操作可见）。未配置机密时整段跳过，其余截图不受影响。
+if [ -n "${SCREENSHOT_TOKEN:-}" ]; then
+  echo "::notice::SCREENSHOT_TOKEN provided — injecting PAT for authenticated screenshots"
+  adb shell am start -n "$PKG/com.yumiru11.githubapp.ScreenshotTokenReceiver" -e pat "$SCREENSHOT_TOKEN" >/dev/null 2>&1 || true
+  sleep 2
+fi
 
 # ── 1. 首页（浅色）──────────────────────────────────────────
 adb shell cmd uimode night no
@@ -114,6 +139,30 @@ launch_app
 tap_text "Profile"
 sleep 3
 adb exec-out screencap -p > "$OUT/profile.png"
+
+# ── 7. 登录后段（需 SCREENSHOT_TOKEN 注入）：Star 按钮 / 评论框 / PR 操作可见 ──
+if [ -n "${SCREENSHOT_TOKEN:-}" ]; then
+  adb shell am force-stop "$PKG"
+  # 仓库详情（Star 按钮）
+  adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev" -p "$PKG" >/dev/null
+  wait_for_activity "$PKG" || true
+  sleep 4
+  adb exec-out screencap -p > "$OUT/repo-star.png"
+  # Issue 详情（评论框可见）
+  adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues/71" -p "$PKG" >/dev/null
+  wait_for_activity "$PKG" || true
+  sleep 6
+  adb exec-out screencap -p > "$OUT/issue-authed.png"
+  # PR 详情（PR 操作可见）
+  adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/pull/73" -p "$PKG" >/dev/null
+  wait_for_activity "$PKG" || true
+  sleep 6
+  adb exec-out screencap -p > "$OUT/pr-actions.png"
+fi
+
+# ── 8. 长截图（滚动 + 拼接，docs/research/actions-scroll-screenshot.md 方案 A）──
+long_shot "readme-long.png" "https://github.com/yumiru11/AppDev"
+long_shot "issue-long.png" "https://github.com/yumiru11/AppDev/issues/71"
 
 # ── 清理：恢复浅色 + 回首页 ─────────────────────────────────
 adb shell cmd uimode night no

@@ -20,5 +20,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 截图登录接收器（DEBUG ONLY）：经 adb am start -e pat 注入只读 PAT →
+             EncryptedTokenStorage，无界面、存完即 finish。release 不声明。 -->
+        <activity
+            android:name="com.yumiru11.githubapp.ScreenshotTokenReceiver"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true" />
     </application>
 </manifest>

@@ -267,6 +267,10 @@ jobs:
       # com.yumiru11.githubapp；maestro test 会把截图自动拉到 ~/.maestro/tests/<flow-name>/。
       - name: Run Maestro screenshot flows on emulator
         uses: reactivecircus/android-emulator-runner@v2
+        # 截图登录机密：提供则 screenshots.sh 注入只读 PAT（Star/评论框/PR 操作可见）。
+        # 未配置时脚本自动跳过登录段，其余截图不受影响。
+        env:
+          SCREENSHOT_TOKEN: ${{ secrets.SCREENSHOT_TOKEN }}
         with:
           # API 31：CI 上最稳的模拟器镜像（API 34 google_apis 在 GitHub runner
           # 上 boot 卡死——PR #60 实测 8.5 分钟未完成，用户取消）。minSdk 26，
