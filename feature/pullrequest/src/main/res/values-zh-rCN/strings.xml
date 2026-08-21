@@ -152,4 +152,11 @@
         <item quantity="one">%1$d 年前</item>
         <item quantity="other">%1$d 年前</item>
     </plurals>
+
+    <!-- PR 评论 BottomSheet (PR #82) -->
+    <string name="pull_request_add_comment">添加评论</string>
+    <string name="pull_request_comment">评论</string>
+    <string name="pull_request_comment_placeholder">留下评论…</string>
+    <string name="cancel">取消</string>
+    <string name="submit">提交</string>
 </resources>

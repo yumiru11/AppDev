@@ -120,10 +120,10 @@ private fun createTextMateLanguage(
     themeSource: IThemeSource,
 ): TextMateLanguage? =
     runCatching {
-        val stream =
-            context.assets.open("grammars/$grammarFileName").use { it }
-        val grammarSource = IGrammarSource.fromInputStream(stream, grammarFileName, Charsets.UTF_8)
-        TextMateLanguage.createNoCompletion(grammarSource, themeSource)
+        context.assets.open("grammars/$grammarFileName").use { stream ->
+            val grammarSource = IGrammarSource.fromInputStream(stream, grammarFileName, Charsets.UTF_8)
+            TextMateLanguage.createNoCompletion(grammarSource, themeSource)
+        }
     }.onFailure { e ->
         // 语法资产损坏/加载失败统一兜底为纯文本，不崩溃
         android.util.Log.e("MarkdownEditorView", "Failed to load grammar: $grammarFileName", e)

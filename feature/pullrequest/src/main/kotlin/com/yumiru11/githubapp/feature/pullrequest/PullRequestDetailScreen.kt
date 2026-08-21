@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
@@ -137,7 +138,7 @@ fun PullRequestDetailScreen(
                 onClick = { showCommentSheet = true },
                 icon = {
                     Icon(
-                        imageVector = androidx.compose.material.icons.filled.Add,
+                        imageVector = Icons.Filled.Add,
                         contentDescription = stringResource(R.string.pull_request_add_comment),
                     )
                 },
@@ -191,8 +192,8 @@ fun PullRequestDetailScreen(
             if (showCommentSheet) {
                 CommentBottomSheet(
                     onDismiss = { showCommentSheet = false },
-                    onSubmit = { comment ->
-                        // 调用 ViewModel 提交评论
+                    onSubmit = {
+                        // 评论写入逻辑待接入 ViewModel（本 PR 仅完成 BottomSheet UI 与提交回调骨架）
                         showCommentSheet = false
                     },
                     sheetState = sheetState,

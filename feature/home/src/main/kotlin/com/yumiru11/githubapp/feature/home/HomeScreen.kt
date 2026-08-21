@@ -3,8 +3,6 @@
 
 package com.yumiru11.githubapp.feature.home
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,15 +62,6 @@ import retrofit2.HttpException
 import java.io.IOException
 import java.time.Instant
 import java.time.ZoneId
-
-/** 首页分区枚举（动态/Issue/PR） */
-internal enum class HomeTab(
-    val title: String,
-) {
-    FEED("动态"),
-    ISSUES("Issue"),
-    PULL_REQUESTS("PR"),
-}
 
 /**
  * 首页动态流页（T10）：AppTopBar + 顶部小分区条（动态/Issue/PR）+ Home 内容区（Home 字样 + 长条按钮 + feed + trending）。
@@ -494,7 +483,7 @@ private fun HomeTabBar(
         items(HomeTab.entries) { tab ->
             FilledTonalButton(
                 onClick = { onTabSelected(tab) },
-                modifier = Modifier.animateItemPlacement(),
+                modifier = Modifier,
             ) {
                 Icon(
                     imageVector =
@@ -534,7 +523,7 @@ private fun HomeActionButtons(
 
         FilledTonalButton(
             onClick = onCreateIssueClick,
-            modifier = Modifier.fillMaxWidth().height(48.dp).animateItemPlacement(),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.Add,
@@ -547,7 +536,7 @@ private fun HomeActionButtons(
 
         FilledTonalButton(
             onClick = onViewPullRequestsClick,
-            modifier = Modifier.fillMaxWidth().height(48.dp).animateItemPlacement(),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.TipsAndUpdates,
@@ -560,7 +549,7 @@ private fun HomeActionButtons(
 
         FilledTonalButton(
             onClick = onCreateRepoClick,
-            modifier = Modifier.fillMaxWidth().height(48.dp).animateItemPlacement(),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.DynamicFeed,

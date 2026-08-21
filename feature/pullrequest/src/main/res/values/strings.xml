@@ -152,4 +152,11 @@
         <item quantity="one">%1$d year ago</item>
         <item quantity="other">%1$d years ago</item>
     </plurals>
+
+    <!-- PR 评论 BottomSheet (PR #82) -->
+    <string name="pull_request_add_comment">Add comment</string>
+    <string name="pull_request_comment">Comment</string>
+    <string name="pull_request_comment_placeholder">Leave a comment…</string>
+    <string name="cancel">Cancel</string>
+    <string name="submit">Submit</string>
 </resources>
