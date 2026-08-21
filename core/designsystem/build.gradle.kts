@@ -17,6 +17,8 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
+    // Haze：backdrop blur（issue #83）——GlassSurface 的 hazeEffect 消费方
+    implementation(libs.haze)
     // ThemeMode 枚举统一在 core:datastore（数据层），UI 依赖数据层方向
     implementation(project(":core:datastore"))
 

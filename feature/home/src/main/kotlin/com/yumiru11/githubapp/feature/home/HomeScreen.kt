@@ -29,6 +29,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,17 +47,23 @@ import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.designsystem.token.AppBlur
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppTopBar
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.home.model.FeedEventType
 import com.yumiru11.githubapp.feature.home.model.FeedItem
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.flow.Flow
 import retrofit2.HttpException
 import java.io.IOException
@@ -72,6 +80,8 @@ import java.time.ZoneId
  * - 符合 ui-design.md §2.1：底部大分区（首页/仓库/我的）× 首页内小分区（动态/Issue/PR）；
  *   §2.2 的长条按钮/trending 待对应功能票落地后补齐（Issue 新建等均为 {owner}/{repo} 级路由，
  *   Home 无仓库上下文，不预置死入口）
+ * - backdrop blur（issue #83）：自持顶栏玻璃的 [LocalHazeState]，内容 Box 挂
+ *   `hazeSource`；顶栏 GlassSurface 经 `hazeEffect` 模糊背后滚动内容
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,57 +98,72 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(HomeTab.FEED) }
 
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            AppTopBar(
-                onSearchClick = onSearchClick,
-                onNotificationClick = onNotificationClick,
-                onProfileClick = onProfileClick,
-                blurEnabled = blurEnabled,
-            )
-        },
-    ) { paddingValues ->
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                when (val state = uiState) {
-                    is HomeUiState.Loading -> {
-                        LoadingContent(modifier = Modifier.fillMaxSize())
-                    }
+    // backdrop blur（issue #83）：顶栏 AppTopBar 的 hazeEffect 与本页内容侧 hazeSource
+    // 共享本 state。自建一份覆盖 MainTabPager 提供的底栏 state，避免顶栏 effect
+    // 嵌套进底栏 source 子树。
+    val hazeState = rememberHazeState()
+    val useHazeSource = blurEnabled && AppBlur.isBlurSupported()
 
-                    is HomeUiState.Unauthenticated -> {
-                        UnauthenticatedContent(
-                            onLoginClick = onLoginClick,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
+    CompositionLocalProvider(LocalHazeState provides hazeState) {
+        Scaffold(
+            modifier = modifier,
+            topBar = {
+                AppTopBar(
+                    onSearchClick = onSearchClick,
+                    onNotificationClick = onNotificationClick,
+                    onProfileClick = onProfileClick,
+                    blurEnabled = blurEnabled,
+                )
+            },
+        ) { paddingValues ->
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (useHazeSource) {
+                                // 顶栏玻璃的模糊源：feed/分区条等内容区
+                                Modifier.hazeSource(hazeState)
+                            } else {
+                                Modifier
+                            },
+                        ).padding(paddingValues),
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    when (val state = uiState) {
+                        is HomeUiState.Loading -> {
+                            LoadingContent(modifier = Modifier.fillMaxSize())
+                        }
 
-                    is HomeUiState.Error -> {
-                        ErrorContent(
-                            errorType = state.errorType,
-                            onRetry = { viewModel.retry() },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
+                        is HomeUiState.Unauthenticated -> {
+                            UnauthenticatedContent(
+                                onLoginClick = onLoginClick,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
 
-                    is HomeUiState.Success -> {
-                        // 顶部小分区条（动态/Issue/PR）——仅登录成功后有内容可切，未登录/错误态不渲染
-                        HomeTabBar(
-                            selectedTab = selectedTab,
-                            onTabSelected = { selectedTab = it },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        FeedContent(
-                            feed = state.feed,
-                            selectedTab = selectedTab,
-                            onFeedItemClick = onFeedItemClick,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        is HomeUiState.Error -> {
+                            ErrorContent(
+                                errorType = state.errorType,
+                                onRetry = { viewModel.retry() },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+
+                        is HomeUiState.Success -> {
+                            // 顶部小分区条（动态/Issue/PR）——仅登录成功后有内容可切，未登录/错误态不渲染
+                            HomeTabBar(
+                                selectedTab = selectedTab,
+                                onTabSelected = { selectedTab = it },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            FeedContent(
+                                feed = state.feed,
+                                selectedTab = selectedTab,
+                                onFeedItemClick = onFeedItemClick,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 }
             }
@@ -224,7 +249,9 @@ private fun FeedList(
         ) {
             items(
                 count = lazyItems.itemCount,
-                key = { index -> lazyItems[index]?.id ?: index },
+                // itemKey 内部用 peek(index)（不触发页加载，未加载区回退占位 key），
+                // 稳定 id 键保证翻页/刷新时已有行不重组合、滚动位置不跳变。
+                key = lazyItems.itemKey { it.id },
             ) { index ->
                 val item = lazyItems[index] ?: return@items
                 FeedRow(
@@ -466,5 +493,55 @@ private fun HomeTabBar(
                 text = { Text(text = stringResource(tab.titleRes)) },
             )
         }
+    }
+}
+
+// ── @Preview（#86）：行组件 Light/Dark 双主题预览，样例数据离线自足（avatar 置空避免 Coil 取网） ──
+
+@Preview(name = "Light", showBackground = true)
+@Composable
+private fun FeedRowPreviewLight() {
+    AppTheme(darkTheme = false) {
+        FeedRow(
+            item =
+                FeedItem(
+                    id = "1",
+                    type = FeedEventType.PULL_REQUEST,
+                    actorLogin = "octocat",
+                    actorAvatarUrl = null,
+                    repoFullName = "yumiru11/AppDev",
+                    action = "opened",
+                    title = "perf(list): Paging itemKey 迁移与模型稳定性标注",
+                    number = 86,
+                    commitCount = null,
+                    createdAt = "2026-08-21T08:30:00Z",
+                    htmlUrl = null,
+                ),
+            onClick = {},
+        )
+    }
+}
+
+@Preview(name = "Dark", showBackground = true)
+@Composable
+private fun FeedRowPreviewDark() {
+    AppTheme(darkTheme = true) {
+        FeedRow(
+            item =
+                FeedItem(
+                    id = "1",
+                    type = FeedEventType.STAR,
+                    actorLogin = "yumiru11",
+                    actorAvatarUrl = null,
+                    repoFullName = "yumiru11/AppDev",
+                    action = null,
+                    title = "",
+                    number = null,
+                    commitCount = null,
+                    createdAt = "2026-08-21T08:30:00Z",
+                    htmlUrl = null,
+                ),
+            onClick = {},
+        )
     }
 }

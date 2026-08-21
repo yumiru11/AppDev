@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -43,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,6 +50,8 @@ import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
+import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
@@ -241,9 +243,10 @@ private fun NotificationList(
     ) {
         items(
             count = lazyItems.itemCount,
-            // key 用 index 兜底：LazyPagingItems.get() 在 key lambda 内调用是反模式
-            // （未加载区域访问可能触发崩溃/回收竞争，2026-08-14 真机走查修复）
-            key = { index -> index },
+            // 2026-08-14 真机走查曾因「key lambda 内调 get() 触发页加载竞争」降级为 index key；
+            // itemKey{} 是官方正解：内部用 peek(index)（不触发加载，未加载区回退占位 key），
+            // 稳定 id 键保证翻页/刷新时已有行不重组合、滚动位置不跳变。
+            key = lazyItems.itemKey { it.id },
         ) { index ->
             val item = lazyItems[index] ?: return@items
             NotificationRow(
@@ -449,3 +452,47 @@ private fun reasonLabel(reason: String): String =
         "team_mention" -> stringResource(R.string.notification_reason_team_mention)
         else -> stringResource(R.string.notification_reason_unknown)
     }
+
+// ── @Preview（#86）：行组件 Light/Dark 双主题预览，样例数据离线自足 ──
+
+@Preview(name = "Light", showBackground = true)
+@Composable
+private fun NotificationRowPreviewLight() {
+    AppTheme(darkTheme = false) {
+        NotificationRow(
+            item =
+                NotificationItem(
+                    id = "1",
+                    repoFullName = "yumiru11/AppDev",
+                    subjectTitle = "perf(list): Paging itemKey 迁移与模型稳定性标注",
+                    subjectType = "Issue",
+                    reason = "mention",
+                    unread = true,
+                    updatedAt = "2026-08-21T09:00:00Z",
+                    htmlUrl = null,
+                ),
+            onClick = {},
+        )
+    }
+}
+
+@Preview(name = "Dark", showBackground = true)
+@Composable
+private fun NotificationRowPreviewDark() {
+    AppTheme(darkTheme = true) {
+        NotificationRow(
+            item =
+                NotificationItem(
+                    id = "2",
+                    repoFullName = "yumiru11/AppDev",
+                    subjectTitle = "docs(ui): 归档 UI 审查报告并立项 ui-audit 修复批",
+                    subjectType = "PullRequest",
+                    reason = "subscribed",
+                    unread = false,
+                    updatedAt = "2026-08-20T18:03:00Z",
+                    htmlUrl = null,
+                ),
+            onClick = {},
+        )
+    }
+}

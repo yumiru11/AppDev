@@ -15,8 +15,8 @@ import androidx.compose.ui.unit.dp
  * 2 layers, no dynamic blur.
  */
 object AppBlur {
-    /** 标准模糊半径（§6.2：12dp） */
-    val blurRadius: Dp = 12.dp
+    /** 标准模糊半径（ui-design.md §6.3 拍板：中 8dp；CONTEXT.md 玻璃清单同值） */
+    val blurRadius: Dp = 8.dp
 
     /**
      * 半透明纯色层的 alpha（§6.1 静止态 / §6.2 API 26–30 降级层）。

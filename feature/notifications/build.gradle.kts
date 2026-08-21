@@ -14,6 +14,7 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
     implementation(libs.compose.material.icons.core)
+    implementation(libs.compose.ui.tooling.preview)
 
     // Lifecycle
     implementation(libs.lifecycle.runtime.compose)
@@ -37,6 +38,8 @@ dependencies {
 
     // 相对时间 RelativeTime（#84 上移 core:ui）+ 后续共享 UI 组件
     implementation(project(":core:ui"))
+    // 主题（@Preview 用 AppTheme 包裹，#86；其余屏经 core:ui 传递获得）
+    implementation(project(":core:designsystem"))
 
     // Testing
     testImplementation(project(":core:testing"))

@@ -8,11 +8,16 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
+import com.yumiru11.githubapp.core.designsystem.token.AppBlur
 import com.yumiru11.githubapp.core.navigation.AppRoute
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.launch
 
 /**
@@ -24,6 +29,12 @@ import kotlinx.coroutines.launch
  * - 顶栏由各分区页自持（首页=搜索+铃铛、我的=标题+设置，保留页差异）
  * - 底栏 [AppBottomBar] 固定在容器底部，tab 与 pager 双向联动
  * - 分区内容由宿主注入（feature 模块无相互依赖）
+ *
+ * backdrop blur 接线（issue #83）：本组件持有底栏玻璃的 [LocalHazeState]，并对
+ * HorizontalPager 内容侧挂 `hazeSource`——底栏 [AppBottomBar] 的 GlassSurface 经
+ * hazeEffect 模糊本内容。provider 覆盖 Scaffold 全部插槽（bottomBar + content）；
+ * 分区页若自持顶栏（如 HomeScreen）应自建一份 state 覆盖本值，避免顶栏 effect
+ * 嵌套进底栏 source 子树。
  *
  * @param selectedTab 当前选中分区路由（AppRoute.HOME / repos / AppRoute.PROFILE）
  * @param onTabSelected tab 点击回调（宿主无需处理，本组件内部已联动 pager；保留参数供外部感知）
@@ -43,6 +54,10 @@ fun MainTabPager(
         rememberPagerState(initialPage = tabIndex) { TAB_COUNT }
     val scope = rememberCoroutineScope()
 
+    // backdrop blur（issue #83）：底栏 hazeEffect 与分区内容侧 hazeSource 共享本 state
+    val hazeState = rememberHazeState()
+    val useHazeSource = blurEnabled && AppBlur.isBlurSupported()
+
     // 外部 tab 状态变化（如顶部头像切到我的）→ 联动 pager 滚动
     LaunchedEffect(tabIndex) {
         if (pagerState.currentPage != tabIndex) {
@@ -50,37 +65,49 @@ fun MainTabPager(
         }
     }
 
-    Scaffold(
-        modifier = modifier,
-        // 分区页各自处理 insets（Home/Profile 有 TopAppBar 自带 statusBars；
-        // 容器不再叠加顶部 padding，否则出现「顶栏距状态栏空一段」——2026-08-14 真机走查修复）
-        contentWindowInsets = WindowInsets(0.dp),
-        bottomBar = {
-            AppBottomBar(
-                selectedTab = selectedTab,
-                onTabSelected = { route ->
-                    onTabSelected(route)
-                    scope.launch {
-                        pagerState.animateScrollToPage(tabIndexFor(route))
-                    }
-                },
-                blurEnabled = blurEnabled,
-            )
-        },
-    ) { paddingValues ->
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-        ) { page ->
-            val pagePadding =
-                PaddingValues(
-                    top = paddingValues.calculateTopPadding(),
-                    bottom = paddingValues.calculateBottomPadding(),
+    CompositionLocalProvider(LocalHazeState provides hazeState) {
+        Scaffold(
+            modifier = modifier,
+            // 分区页各自处理 insets（Home/Profile 有 TopAppBar 自带 statusBars；
+            // 容器不再叠加顶部 padding，否则出现「顶栏距状态栏空一段」——2026-08-14 真机走查修复）
+            contentWindowInsets = WindowInsets(0.dp),
+            bottomBar = {
+                AppBottomBar(
+                    selectedTab = selectedTab,
+                    onTabSelected = { route ->
+                        onTabSelected(route)
+                        scope.launch {
+                            pagerState.animateScrollToPage(tabIndexFor(route))
+                        }
+                    },
+                    blurEnabled = blurEnabled,
                 )
-            when (page) {
-                0 -> homePage(pagePadding)
-                1 -> reposPage(pagePadding)
-                2 -> profilePage(pagePadding)
+            },
+        ) { paddingValues ->
+            HorizontalPager(
+                state = pagerState,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (useHazeSource) {
+                                // 底栏玻璃的模糊源：三分区滚动内容（含各页自持顶栏背后的内容）
+                                Modifier.hazeSource(hazeState)
+                            } else {
+                                Modifier
+                            },
+                        ),
+            ) { page ->
+                val pagePadding =
+                    PaddingValues(
+                        top = paddingValues.calculateTopPadding(),
+                        bottom = paddingValues.calculateBottomPadding(),
+                    )
+                when (page) {
+                    0 -> homePage(pagePadding)
+                    1 -> reposPage(pagePadding)
+                    2 -> profilePage(pagePadding)
+                }
             }
         }
     }

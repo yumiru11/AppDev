@@ -1,12 +1,18 @@
 package com.yumiru11.githubapp.feature.notifications.model
 
+import androidx.compose.runtime.Immutable
+
 /**
  * 通知条目（领域模型；DTO → domain 映射见 NotificationsPagingSource）。
+ *
+ * 只读 UI 模型，标注 [Immutable]：行组件参数稳定，
+ * 滚动/翻页/过滤切换时跳过行级重组（#86）。
  *
  * @param reason GitHub 通知原因（mention/assign/subscribed/review_requested 等），
  *   UI 层映射本地化文案（ViewModel 不产英文）
  * @param htmlUrl 内容页链接（如 …/issues/1347），应用内导航解析基准
  */
+@Immutable
 data class NotificationItem(
     val id: String,
     val repoFullName: String,
