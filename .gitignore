@@ -9,6 +9,7 @@ captures/
 .cxx/
 *.apk
 *.aab
+*.log
 .omo/
 .cortexkit/
 .kotlin/
