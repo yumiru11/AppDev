@@ -31,10 +31,12 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -43,6 +45,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -100,6 +103,10 @@ fun PullRequestDetailScreen(
     val scope = rememberCoroutineScope()
     val currentUrl = (uiState as? PullRequestDetailUiState.Success)?.pullRequest?.htmlUrl
 
+    // 评论 BottomSheet 状态
+    var showCommentSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -123,6 +130,18 @@ fun PullRequestDetailScreen(
                         )
                     }
                 },
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { showCommentSheet = true },
+                icon = {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.filled.Add,
+                        contentDescription = stringResource(R.string.pull_request_add_comment),
+                    )
+                },
+                text = { Text(text = stringResource(R.string.pull_request_comment)) },
             )
         },
     ) { paddingValues ->
@@ -166,6 +185,18 @@ fun PullRequestDetailScreen(
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
+            }
+
+            // 评论输入 BottomSheet
+            if (showCommentSheet) {
+                CommentBottomSheet(
+                    onDismiss = { showCommentSheet = false },
+                    onSubmit = { comment ->
+                        // 调用 ViewModel 提交评论
+                        showCommentSheet = false
+                    },
+                    sheetState = sheetState,
+                )
             }
         }
     }
@@ -593,3 +624,64 @@ private fun copyLink(
 
 private const val FIXED_ALPHA_MASK = 0xFF000000L
 private const val TAG = "PullRequestDetailScreen"
+
+/** PR 评论输入 BottomSheet（Material You 风格） */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CommentBottomSheet(
+    onDismiss: () -> Unit,
+    onSubmit: (String) -> Unit,
+    sheetState: androidx.compose.material3.SheetState,
+) {
+    var commentText by remember { mutableStateOf("") }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.pull_request_add_comment),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            androidx.compose.material3.OutlinedTextField(
+                value = commentText,
+                onValueChange = { commentText = it },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                placeholder = { Text(text = stringResource(R.string.pull_request_comment_placeholder)) },
+                maxLines = 10,
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                androidx.compose.material3.TextButton(
+                    onClick = onDismiss,
+                ) {
+                    Text(text = stringResource(R.string.cancel))
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                androidx.compose.material3.Button(
+                    onClick = { onSubmit(commentText) },
+                    enabled = commentText.isNotBlank(),
+                ) {
+                    Text(text = stringResource(R.string.submit))
+                }
+            }
+        }
+    }
+}
