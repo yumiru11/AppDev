@@ -3,6 +3,8 @@
 
 package com.yumiru11.githubapp.feature.home
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,18 +18,29 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DynamicFeed
+import androidx.compose.material.icons.filled.TipsAndUpdates
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,13 +65,23 @@ import java.io.IOException
 import java.time.Instant
 import java.time.ZoneId
 
+/** 首页分区枚举（动态/Issue/PR） */
+internal enum class HomeTab(
+    val title: String,
+) {
+    FEED("动态"),
+    ISSUES("Issue"),
+    PULL_REQUESTS("PR"),
+}
+
 /**
- * 首页动态流页（T10）：AppTopBar + 动态流列表（底栏已上移 MainTabPager 容器，2026-08-14 分区重构）。
+ * 首页动态流页（T10）：AppTopBar + 顶部小分区条（动态/Issue/PR）+ Home 内容区（Home 字样 + 长条按钮 + feed + trending）。
  *
  * - 登录态驱动：未登录 → 登录引导（T10 验收第 1 条）
  * - 列表：Paging 分页（T10 验收第 2 条）+ PullToRefreshBox 下拉刷新（T10 验收第 3 条）
  * - 点击条目 → GitHubLinkParser 解析 html_url → 应用内导航（T10 验收第 4 条）
  * - 空/错/加载态齐全（T10 验收第 5 条）；分页加载错误由 LazyPagingItems.loadState 呈现
+ * - 符合 ui-design.md §2.1-§2.2：底部大分区（首页/仓库/我的）× 首页内小分区（动态/Issue/PR）
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,10 +92,14 @@ fun HomeScreen(
     blurEnabled: Boolean = true,
     onLoginClick: () -> Unit = {},
     onFeedItemClick: (ParsedUrl) -> Unit = {},
+    onCreateIssueClick: () -> Unit = {},
+    onViewPullRequestsClick: () -> Unit = {},
+    onCreateRepoClick: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var selectedTab by remember { mutableStateOf(HomeTab.FEED) }
 
     Scaffold(
         modifier = modifier,
@@ -91,32 +118,44 @@ fun HomeScreen(
                     .fillMaxSize()
                     .padding(paddingValues),
         ) {
-            when (val state = uiState) {
-                is HomeUiState.Loading -> {
-                    LoadingContent(modifier = Modifier.fillMaxSize())
-                }
+            Column(modifier = Modifier.fillMaxSize()) {
+                // 顶部小分区条（动态/Issue/PR）
+                HomeTabBar(
+                    onTabSelected = { selectedTab = it },
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
-                is HomeUiState.Unauthenticated -> {
-                    UnauthenticatedContent(
-                        onLoginClick = onLoginClick,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+                when (val state = uiState) {
+                    is HomeUiState.Loading -> {
+                        LoadingContent(modifier = Modifier.fillMaxSize())
+                    }
 
-                is HomeUiState.Error -> {
-                    ErrorContent(
-                        errorType = state.errorType,
-                        onRetry = { viewModel.retry() },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+                    is HomeUiState.Unauthenticated -> {
+                        UnauthenticatedContent(
+                            onLoginClick = onLoginClick,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
 
-                is HomeUiState.Success -> {
-                    FeedContent(
-                        feed = state.feed,
-                        onFeedItemClick = onFeedItemClick,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    is HomeUiState.Error -> {
+                        ErrorContent(
+                            errorType = state.errorType,
+                            onRetry = { viewModel.retry() },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+
+                    is HomeUiState.Success -> {
+                        FeedContent(
+                            feed = state.feed,
+                            selectedTab = selectedTab,
+                            onFeedItemClick = onFeedItemClick,
+                            onCreateIssueClick = onCreateIssueClick,
+                            onViewPullRequestsClick = onViewPullRequestsClick,
+                            onCreateRepoClick = onCreateRepoClick,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
         }
@@ -126,39 +165,70 @@ fun HomeScreen(
 @Composable
 private fun FeedContent(
     feed: Flow<PagingData<FeedItem>>,
+    selectedTab: HomeTab,
     onFeedItemClick: (ParsedUrl) -> Unit,
+    onCreateIssueClick: () -> Unit,
+    onViewPullRequestsClick: () -> Unit,
+    onCreateRepoClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lazyItems = feed.collectAsLazyPagingItems()
-    when {
-        lazyItems.loadState.refresh is LoadState.Error -> {
-            PagingErrorContent(
-                error = (lazyItems.loadState.refresh as LoadState.Error).error,
-                onRetry = { lazyItems.retry() },
-                modifier = modifier,
-            )
-        }
 
-        lazyItems.loadState.refresh is LoadState.Loading && lazyItems.itemCount == 0 -> {
-            LoadingContent(modifier = modifier)
-        }
+    // 根据分区显示不同内容
+    when (selectedTab) {
+        HomeTab.FEED -> {
+            // 动态流：长条按钮 + feed + trending
+            Column(modifier = modifier) {
+                // Home 长条按钮区（ui-design.md §2.2）
+                HomeActionButtons(
+                    onCreateIssueClick = onCreateIssueClick,
+                    onViewPullRequestsClick = onViewPullRequestsClick,
+                    onCreateRepoClick = onCreateRepoClick,
+                    modifier = Modifier.fillMaxWidth(),
+                )
 
-        lazyItems.itemCount == 0 -> {
-            PullToRefreshBox(
-                isRefreshing = lazyItems.loadState.refresh is LoadState.Loading,
-                onRefresh = { lazyItems.refresh() },
-                modifier = modifier,
-            ) {
-                EmptyContent(modifier = Modifier.fillMaxSize())
+                when {
+                    lazyItems.loadState.refresh is LoadState.Error -> {
+                        PagingErrorContent(
+                            error = (lazyItems.loadState.refresh as LoadState.Error).error,
+                            onRetry = { lazyItems.retry() },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+
+                    lazyItems.loadState.refresh is LoadState.Loading && lazyItems.itemCount == 0 -> {
+                        LoadingContent(modifier = Modifier.weight(1f))
+                    }
+
+                    lazyItems.itemCount == 0 -> {
+                        PullToRefreshBox(
+                            isRefreshing = lazyItems.loadState.refresh is LoadState.Loading,
+                            onRefresh = { lazyItems.refresh() },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            EmptyContent(modifier = Modifier.fillMaxSize())
+                        }
+                    }
+
+                    else -> {
+                        FeedList(
+                            lazyItems = lazyItems,
+                            onFeedItemClick = onFeedItemClick,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
             }
         }
 
-        else -> {
-            FeedList(
-                lazyItems = lazyItems,
-                onFeedItemClick = onFeedItemClick,
-                modifier = modifier,
-            )
+        HomeTab.ISSUES -> {
+            // Issue 列表页（后续 T14 实现）
+            EmptyContent(modifier = modifier)
+        }
+
+        HomeTab.PULL_REQUESTS -> {
+            // PR 列表页（后续 T15 实现）
+            EmptyContent(modifier = modifier)
         }
     }
 }
@@ -409,3 +479,98 @@ private fun errorMessage(errorType: HomeErrorType): String =
         HomeErrorType.NETWORK -> stringResource(R.string.feed_error_network)
         HomeErrorType.UNKNOWN -> stringResource(R.string.feed_error_unknown)
     }
+
+/** 首页顶部小分区条（动态/Issue/PR）—— ui-design.md §2.1-§2.2 */
+@Composable
+private fun HomeTabBar(
+    onTabSelected: (HomeTab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyRow(
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(HomeTab.entries) { tab ->
+            FilledTonalButton(
+                onClick = { onTabSelected(tab) },
+                modifier = Modifier.animateItemPlacement(),
+            ) {
+                Icon(
+                    imageVector =
+                        when (tab) {
+                            HomeTab.FEED -> Icons.Default.DynamicFeed
+                            HomeTab.ISSUES -> Icons.Default.TipsAndUpdates
+                            HomeTab.PULL_REQUESTS -> Icons.Default.Add
+                        },
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(text = tab.title)
+            }
+        }
+    }
+}
+
+/** Home 长条按钮区（ui-design.md §2.2：新建 Issue / 查看 PR / 新建仓库） */
+@Composable
+private fun HomeActionButtons(
+    onCreateIssueClick: () -> Unit,
+    onViewPullRequestsClick: () -> Unit,
+    onCreateRepoClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "Home",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        FilledTonalButton(
+            onClick = onCreateIssueClick,
+            modifier = Modifier.fillMaxWidth().height(48.dp).animateItemPlacement(),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text = stringResource(R.string.home_create_issue))
+        }
+
+        FilledTonalButton(
+            onClick = onViewPullRequestsClick,
+            modifier = Modifier.fillMaxWidth().height(48.dp).animateItemPlacement(),
+        ) {
+            Icon(
+                imageVector = Icons.Default.TipsAndUpdates,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text = stringResource(R.string.home_view_prs))
+        }
+
+        FilledTonalButton(
+            onClick = onCreateRepoClick,
+            modifier = Modifier.fillMaxWidth().height(48.dp).animateItemPlacement(),
+        ) {
+            Icon(
+                imageVector = Icons.Default.DynamicFeed,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(text = stringResource(R.string.home_create_repo))
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
