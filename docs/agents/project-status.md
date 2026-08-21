@@ -1,4 +1,4 @@
-# AppDev 项目状态（2026-08-19）
+# AppDev 项目状态（2026-08-21）
 
 > 本文件是当前进度的**权威快照**。每张票合并/关闭后更新。配合 `docs/agents/workflow.md`（流程）与 `AGENTS.md`（环境）阅读。
 
@@ -9,11 +9,11 @@
 | M0 基建（Gradle 骨架/CI/架构守卫） | ✅ 完成 |
 | M1 核心链路（网络/认证/主题/Markdown 渲染） | ✅ 完成 |
 | M2 首个端到端（README 浏览） | ✅ 完成 |
-| M3 主要功能域（首页/Issue/通知/Profile/设置） | 🔶 进行中（15/26 票） |
-| M4 全功能（PR/搜索/编辑/分支） | ⏳ 未开始 |
-| M5 发布收尾（性能/签名 Release） | ⏳ 未开始 |
+| M3 主要功能域（首页/Issue/通知/Profile/设置） | 🔶 进行中（21/26 票） |
+| M4 全功能（PR 深化/编辑提交/分支） | 🔶 进行中（T16/T17/T22/T23 待做） |
+| M5 发布收尾（性能/签名 Release） | ⏳ 未开始（T25） |
 
-## 2. 已完成（15 票，全部合入 main）
+## 2. 已完成（26 票计划内 21 票全部合入 main；另有 Task B、UI 打磨波等计划外交付）
 
 | Ticket | Issue | 内容 | 合入 |
 |---|---|---|---|
@@ -32,40 +32,41 @@
 | T20 Profile | #21 | 资料头 + Stars/Gists 入口 | ✅ |
 | T24 设置 | #25 | 主题/圆角/动画/语言/图标风格 | ✅ |
 | T26 M3 高亮 | #27 | M3TextMateTheme（半融合变体待 UI 票） | ✅ |
+| Task B 渲染切换 | #71 | WebView 主渲染（服务端 HTML + 离线 GFM 两级）PR #70/#73 合入 | ✅ |
+| T11 文件树浏览 | #12 | Git Data 递归树 + Sora read-only + M3 编辑器主题 | ✅ |
+| T18 全局搜索 | #19 | 四类结果 Tab + 历史 + qualifier + 代码搜索门禁 | ✅ |
+| T12 仓库管理 | #13 | Star/Watch/Fork + Releases/Tags + 语言栏（PR #74） | ✅ |
+| T14 Issue 写 | #15 | 创建/编辑/评论/反应/关闭/任务列表同步（PR #75） | ✅ |
+| T21 Markdown 编辑器 | #22 | Sora 编辑 + 工具栏 + 编辑/预览双 Tab（PR #77） | ✅ |
+| T15 PR 列表详情 | #16 | 四 Tab Conversation/Commits/Checks/Files changed（PR #76） | ✅ |
+| UI 打磨波 | #82 | Home Tab M3 化、PR 评论、Star/Watch 按钮（PR #82） | ✅ |
 
-## 3. 剩余 11 票（依赖链排序）
+## 3. 剩余 5 票（功能线，依赖已全部满足除注明外）
 
-### 🟢 可立即做（无阻塞）
-
-| Ticket | Issue | 难度 | 内容 |
-|---|---|---|---|
-| T11 文件树与代码浏览 | #12 | ★★★ | 文件树 + Sora read-only + 分支/路径选择 |
-| T12 仓库管理 | #13 | ★★ | Star/Watch/Fork + Releases/Tags |
-| T18 搜索 | #19 | ★★★ | 仓库/用户/Issue/PR 搜索 + Paging |
-
-### 🟡 功能域主干
-
-| Ticket | Issue | 难度 | 依赖 | 内容 |
+| Ticket | Issue | 难度 | 内容 | 备注 |
 |---|---|---|---|---|
-| T14 Issue 写 | #15 | ★★★★ | T13 | 创建/编辑/评论/反应/关闭 |
-| T15 PR 列表详情 | #16 | ★★★★ | T13 | 四 Tab（最复杂页面） |
-| T16 Diff + 行评论 | #17 | ★★★★ | T15 | 自研 Diff 渲染 |
-| T17 Review/Merge | #18 | ★★★ | T16 | approve/merge/squash/rebase |
-| T21 Markdown 编辑器 | #22 | ★★★★ | T7 | Sora 编辑 + 预览一致 |
-| T22 文件编辑提交 | #23 | ★★★★ | T11+T21 | Contents API + 409 |
-| T23 分支/PR 创建 | #24 | ★★★ | T15 | 分支列表 + 创建 PR |
+| T16 Diff + 行评论 | #17 | ★★★★ | 自研 Diff 渲染 + 行评论 BottomSheet | 可立即开工；与 UI 票 #85 有文件冲突需错峰 |
+| T17 Review/Merge | #18 | ★★★ | approve/merge/squash/rebase（建议 SplitButton） | 依赖 T16 |
+| T22 文件编辑提交 | #23 | ★★★★ | Contents API + 409 冲突 | 可立即开工 |
+| T23 分支/PR 创建 | #24 | ★★★ | 分支列表 + 创建 PR | 可立即开工 |
+| T25 性能发布 | #26 | ★★★ | Baseline Profiles + i18n 完整 + 签名 Release | 全场最后 |
 
-### 🔴 收尾
+## 4. 进行中：UI 审查修复批（2026-08-21 立项）
 
-| Ticket | Issue | 难度 | 依赖 | 内容 |
-|---|---|---|---|---|
-| T25 性能发布 | #26 | ★★★ | 全部 | Baseline Profiles + i18n 完整 + 签名 Release |
+来源 `docs/ui-audit-2026-08-21.md`，8 张票（label `ui-audit`），依赖边：#87/#88/#89/#90 ←blocked_by— #84。
 
-## 4. 进行中
+| Issue | 标题 | 依赖 |
+|---|---|---|
+| #83 | fix(designsystem): 毛玻璃改为 backdrop 模糊实现 | 无，可立即开工 |
+| #84 | feat(designsystem): 共享状态组件族与动效缩放基建 | 无，**依赖根，最优先** |
+| #85 | fix(issue,pr): 标签混色与状态徽章语义色 | 仅 StatusChip 行等 #84；⚠️ 与 T16 文件冲突错峰 |
+| #86 | perf(list): Paging itemKey 迁移与模型稳定性标注 | 无；Home 屏行与 #89 错峰 |
+| #87 | feat(settings): 设置页分组重构与个性化项接线 | blocked_by #84 |
+| #88 | feat(notifications): 通知面板完整形态 | blocked_by #84；玻璃复用 #83 |
+| #89 | feat(home): 首页分区 Pager 与长条按钮 | blocked_by #84 |
+| #90 | feat(navigation): 全局转场、预测返回与路由现代化 | blocked_by #84；路由迁移行等 T16-T23 合入 |
 
-| 任务 | 分支 | 执行方式 | 说明 |
-|---|---|---|---|
-| Task B 渲染架构切换 | `main`（工作树未提交） | 主代理 | WebView 主渲染切换完成（README/Issue 正文——服务端 HTML + 离线 GFM 两级；评论/通知短文本保持原生）；ADR-0007 已修订；待真机验收 + CI 截图验证 |
+待用户决策（不建 issue，见 audit 文档 §3.0）：图标候选批准 / 卡片两版对比 / 背景图 grill / README 收起动画构思。
 
 ## 5. 遗留事项（未闭环）
 
