@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -50,6 +49,7 @@ import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.feature.notifications.model.NotificationFilter
@@ -240,9 +240,10 @@ private fun NotificationList(
     ) {
         items(
             count = lazyItems.itemCount,
-            // key 用 index 兜底：LazyPagingItems.get() 在 key lambda 内调用是反模式
-            // （未加载区域访问可能触发崩溃/回收竞争，2026-08-14 真机走查修复）
-            key = { index -> index },
+            // 2026-08-14 真机走查曾因「key lambda 内调 get() 触发页加载竞争」降级为 index key；
+            // itemKey{} 是官方正解：内部用 peek(index)（不触发加载，未加载区回退占位 key），
+            // 稳定 id 键保证翻页/刷新时已有行不重组合、滚动位置不跳变。
+            key = lazyItems.itemKey { it.id },
         ) { index ->
             val item = lazyItems[index] ?: return@items
             NotificationRow(

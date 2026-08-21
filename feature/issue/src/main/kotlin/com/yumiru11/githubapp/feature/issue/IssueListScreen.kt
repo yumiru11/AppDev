@@ -43,6 +43,7 @@ import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueFilter
 import com.yumiru11.githubapp.feature.issue.model.IssueState
@@ -236,7 +237,9 @@ private fun IssueList(
         ) {
             items(
                 count = lazyItems.itemCount,
-                key = { index -> lazyItems[index]?.id ?: index },
+                // itemKey 内部用 peek(index)（不触发页加载，未加载区回退占位 key），
+                // 稳定 id 键保证翻页/刷新时已有行不重组合、滚动位置不跳变。
+                key = lazyItems.itemKey { it.id },
             ) { index ->
                 val issue = lazyItems[index] ?: return@items
                 IssueRow(issue = issue, onClick = { onIssueClick(owner, repo, issue.number, issue.isPullRequest) })
