@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,9 +44,12 @@ import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
+import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueFilter
 import com.yumiru11.githubapp.feature.issue.model.IssueState
+import com.yumiru11.githubapp.feature.issue.model.IssueUser
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -236,7 +240,9 @@ private fun IssueList(
         ) {
             items(
                 count = lazyItems.itemCount,
-                key = { index -> lazyItems[index]?.id ?: index },
+                // itemKey 内部用 peek(index)（不触发页加载，未加载区回退占位 key），
+                // 稳定 id 键保证翻页/刷新时已有行不重组合、滚动位置不跳变。
+                key = lazyItems.itemKey { it.id },
             ) { index ->
                 val issue = lazyItems[index] ?: return@items
                 IssueRow(issue = issue, onClick = { onIssueClick(owner, repo, issue.number, issue.isPullRequest) })
@@ -327,4 +333,44 @@ private fun PagingErrorContent(
     modifier: Modifier = Modifier,
 ) {
     IssueErrorContent(errorType = error.toIssueErrorType(), onRetry = onRetry, modifier = modifier)
+}
+
+// ── @Preview（#86）：行组件 Light/Dark 双主题预览，样例数据离线自足 ──
+
+@Preview(name = "Light", showBackground = true)
+@Composable
+private fun IssueRowPreviewLight() {
+    AppTheme(darkTheme = false) {
+        IssueRow(
+            issue =
+                Issue(
+                    id = 1347L,
+                    number = 1347,
+                    title = "列表滚动时已有卡片闪烁重排",
+                    state = IssueState.OPEN,
+                    author = IssueUser(login = "yumiru11"),
+                    commentCount = 3,
+                ),
+            onClick = {},
+        )
+    }
+}
+
+@Preview(name = "Dark", showBackground = true)
+@Composable
+private fun IssueRowPreviewDark() {
+    AppTheme(darkTheme = true) {
+        IssueRow(
+            issue =
+                Issue(
+                    id = 1348L,
+                    number = 1348,
+                    title = "WebView 正文渲染与原生评论混排的基线对齐",
+                    state = IssueState.CLOSED,
+                    author = IssueUser(login = "octocat"),
+                    commentCount = 0,
+                ),
+            onClick = {},
+        )
+    }
 }

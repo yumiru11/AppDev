@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,8 +47,10 @@ import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
+import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.designsystem.token.AppBlur
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
@@ -241,7 +244,9 @@ private fun FeedList(
         ) {
             items(
                 count = lazyItems.itemCount,
-                key = { index -> lazyItems[index]?.id ?: index },
+                // itemKey 内部用 peek(index)（不触发页加载，未加载区回退占位 key），
+                // 稳定 id 键保证翻页/刷新时已有行不重组合、滚动位置不跳变。
+                key = lazyItems.itemKey { it.id },
             ) { index ->
                 val item = lazyItems[index] ?: return@items
                 FeedRow(
@@ -486,5 +491,55 @@ private fun HomeTabBar(
                 text = { Text(text = stringResource(tab.titleRes)) },
             )
         }
+    }
+}
+
+// ── @Preview（#86）：行组件 Light/Dark 双主题预览，样例数据离线自足（avatar 置空避免 Coil 取网） ──
+
+@Preview(name = "Light", showBackground = true)
+@Composable
+private fun FeedRowPreviewLight() {
+    AppTheme(darkTheme = false) {
+        FeedRow(
+            item =
+                FeedItem(
+                    id = "1",
+                    type = FeedEventType.PULL_REQUEST,
+                    actorLogin = "octocat",
+                    actorAvatarUrl = null,
+                    repoFullName = "yumiru11/AppDev",
+                    action = "opened",
+                    title = "perf(list): Paging itemKey 迁移与模型稳定性标注",
+                    number = 86,
+                    commitCount = null,
+                    createdAt = "2026-08-21T08:30:00Z",
+                    htmlUrl = null,
+                ),
+            onClick = {},
+        )
+    }
+}
+
+@Preview(name = "Dark", showBackground = true)
+@Composable
+private fun FeedRowPreviewDark() {
+    AppTheme(darkTheme = true) {
+        FeedRow(
+            item =
+                FeedItem(
+                    id = "1",
+                    type = FeedEventType.STAR,
+                    actorLogin = "yumiru11",
+                    actorAvatarUrl = null,
+                    repoFullName = "yumiru11/AppDev",
+                    action = null,
+                    title = "",
+                    number = null,
+                    commitCount = null,
+                    createdAt = "2026-08-21T08:30:00Z",
+                    htmlUrl = null,
+                ),
+            onClick = {},
+        )
     }
 }

@@ -14,6 +14,7 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
     implementation(libs.compose.material.icons.core)
+    implementation(libs.compose.ui.tooling.preview)
 
     // Lifecycle
     implementation(libs.lifecycle.runtime.compose)
@@ -42,6 +43,7 @@ dependencies {
     // 首页外壳（AppTopBar/AppBottomBar 玻璃栏）
     implementation(project(":core:ui"))
     // 玻璃令牌与 LocalHazeState（backdrop blur 内容侧接线，issue #83；同 repo/search 先例）
+    // 主题 AppTheme（@Preview 包裹用，#86）
     implementation(project(":core:designsystem"))
     implementation(libs.haze)
 

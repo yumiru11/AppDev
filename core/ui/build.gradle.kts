@@ -22,6 +22,9 @@ dependencies {
     // Material Icons Core（基础图标集：Home/Person/Search/Notifications/Close/Folder 等）
     implementation(libs.compose.material.icons.core)
 
+    // @Preview 预览注解（#86 行组件/底栏 Light-Dark 双预览）
+    implementation(libs.compose.ui.tooling.preview)
+
     // Navigation (T3 nav skeleton)
     implementation(libs.navigation.compose)
 

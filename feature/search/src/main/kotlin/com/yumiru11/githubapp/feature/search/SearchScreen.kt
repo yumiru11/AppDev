@@ -40,6 +40,7 @@ import androidx.paging.LoadState
 import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import com.yumiru11.githubapp.core.data.model.Repository
 import com.yumiru11.githubapp.core.data.model.SearchCodeItem
 import com.yumiru11.githubapp.core.data.model.SearchIssue
@@ -343,6 +344,7 @@ private fun RepositoriesContent(
     val lazyItems = flow.collectAsLazyPagingItems()
     SearchPagingList(
         lazyItems = lazyItems,
+        keyOf = { it.fullName },
         modifier = modifier,
         row = { repository ->
             RepositoryRow(
@@ -365,6 +367,7 @@ private fun UsersContent(
     val lazyItems = flow.collectAsLazyPagingItems()
     SearchPagingList(
         lazyItems = lazyItems,
+        keyOf = { it.login },
         modifier = modifier,
         row = { user ->
             UserRow(
@@ -384,6 +387,7 @@ private fun IssuesContent(
     val lazyItems = flow.collectAsLazyPagingItems()
     SearchPagingList(
         lazyItems = lazyItems,
+        keyOf = { it.id },
         modifier = modifier,
         row = { issue ->
             IssueRow(
@@ -403,6 +407,8 @@ private fun CodeContent(
     val lazyItems = flow.collectAsLazyPagingItems()
     SearchPagingList(
         lazyItems = lazyItems,
+        // 代码搜索结果无唯一 id，用「仓库 + 文件路径」组合键（同一文件在结果集中至多一条）
+        keyOf = { "${it.repoFullName}/${it.path}" },
         modifier = modifier,
         row = { item ->
             CodeRow(
@@ -420,6 +426,7 @@ private fun CodeContent(
 @Composable
 private fun <T : Any> SearchPagingList(
     lazyItems: LazyPagingItems<T>,
+    keyOf: (T) -> Any,
     row: @Composable (T) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -450,8 +457,9 @@ private fun <T : Any> SearchPagingList(
             else -> {
                 items(
                     count = lazyItems.itemCount,
-                    // key 用 index 兜底：LazyPagingItems.get() 在 key lambda 内调用是反模式
-                    key = { index -> index },
+                    // itemKey 内部用 peek(index)（不触发页加载，未加载区回退占位 key），
+                    // 稳定 id 键保证翻页/刷新时已有行不重组合、滚动位置不跳变。
+                    key = lazyItems.itemKey(keyOf),
                 ) { index ->
                     val item = lazyItems[index] ?: return@items
                     row(item)
