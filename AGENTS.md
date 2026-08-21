@@ -38,6 +38,7 @@
 ./gradlew konsistCheck               # 架构测试（Konsist 分层依赖方向）
 ./gradlew :app:lintDebug             # Android Lint（abortOnError）
 ./gradlew :app:testDebugUnitTest     # 单测
+./gradlew coverageVerify             # JaCoCo 覆盖率硬门禁（聚合各模块 jacocoTestCoverageVerification；阈值表 build.gradle.kts coverageThresholds，改 UI/加文件会动分母）
 ./gradlew :app:verifyRoborazziDebug  # 截图基准校验
 ./gradlew :app:assembleDebug         # 打 debug APK
 ```
@@ -51,6 +52,7 @@
 
 **⚠️ 铁律（血泪教训）**：
 - 本地验证必须与 CI 门禁**命令级对齐**——只跑 compile/test 会漏 spotless/detekt，CI 必挂（T4/T6/T7 曾爆 9 个违规）。任何实现/修复任务验证命令**必须含 `spotlessCheck + detekt`**
+- **覆盖率门禁同理必跑**：CI 有 `coverageVerify` 硬门禁（各模块 LINE ≥ coverageThresholds 阈值），AGENTS 旧清单漏列导致「本地全绿 CI 必挂」重演（2026-08-21 feature:home 0.8043 < 0.81：新增 HomeTab.kt 枚举类不在 JaCoCo 排除名单且无单测）。新增/删除生产代码后必须跑 `coverageVerify`；JaCoCo 排除按【编译类名】匹配（`*Screen*` 命中的是 `XxxScreenKt.class`），新建顶层文件若不落排除模式就要配单测
 - 构建输出**禁止用 grep/tail/head 过滤后反复重跑**——一次跑完看完整输出
 - **不要用 LSP**（本机 kotlin-ls 冷启动失败/超时）——验证一律以 Gradle 输出为准
 - `recordRoborazziDebug` 本机极慢（1000s+ 曾卡死）——**默认禁止跑**；截图相关任务需先问用户

@@ -130,10 +130,12 @@ object MarkdownSyntaxFormatter {
                 text.substring(0, start) + "$fence\n$selected\n$fence" + text.substring(end)
             }
         return if (selected.isEmpty()) {
+            // 无选区：光标落在第一个围栏后的空行（用户可直接输入代码）
             val cursor = start + fence.length + 1
             SyntaxEditResult(newText, cursor, cursor)
         } else {
-            val cursor = end + fence.length + 1 + fence.length + 1
+            // 有选区：光标落在整个代码块之后（便于继续输入）
+            val cursor = start + fence.length + 1 + selected.length + 1 + fence.length
             SyntaxEditResult(newText, cursor, cursor)
         }
     }

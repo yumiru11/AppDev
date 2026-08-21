@@ -27,34 +27,40 @@ class MarkdownEditorController
         var onTextChanged: (String) -> Unit = {}
             internal set
 
+        private val contentListener =
+            object : ContentListener {
+                override fun beforeReplace(content: Content) = Unit
+
+                override fun afterInsert(
+                    content: Content,
+                    startLine: Int,
+                    startColumn: Int,
+                    endLine: Int,
+                    endColumn: Int,
+                    insertedContent: CharSequence,
+                ) {
+                    onTextChanged(editor.text.toString())
+                }
+
+                override fun afterDelete(
+                    content: Content,
+                    startLine: Int,
+                    startColumn: Int,
+                    endLine: Int,
+                    endColumn: Int,
+                    deletedContent: CharSequence,
+                ) {
+                    onTextChanged(editor.text.toString())
+                }
+            }
+
         init {
-            editor.text.addContentListener(
-                object : ContentListener {
-                    override fun beforeReplace(content: Content) = Unit
+            editor.text.addContentListener(contentListener)
+        }
 
-                    override fun afterInsert(
-                        content: Content,
-                        startLine: Int,
-                        startColumn: Int,
-                        endLine: Int,
-                        endColumn: Int,
-                        insertedContent: CharSequence,
-                    ) {
-                        onTextChanged(editor.text.toString())
-                    }
-
-                    override fun afterDelete(
-                        content: Content,
-                        startLine: Int,
-                        startColumn: Int,
-                        endLine: Int,
-                        endColumn: Int,
-                        deletedContent: CharSequence,
-                    ) {
-                        onTextChanged(editor.text.toString())
-                    }
-                },
-            )
+        /** 销毁控制器，移除监听器防止内存泄漏。必须在 Compose onDispose 中调用。 */
+        fun destroy() {
+            editor.text.removeContentListener(contentListener)
         }
 
         /** 应用工具栏动作（读取当前选区 → 语法格式化 → 写回 + 定位新选区）。 */

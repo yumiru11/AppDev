@@ -6,6 +6,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -24,7 +27,7 @@ import com.yumiru11.githubapp.core.navigation.AppRoute
 /**
  * 应用底部导航栏：首页 / 仓库 / 我的。
  *
- * 图标选中态 filled。
+ * 图标选中态 filled / 未选空心（Material You 规范）。
  *
  * 玻璃装配（T6 Wave2，ADR-0004 §6.1 允许清单）：[GlassSurface] 包住
  * [NavigationBar]，`windowInsets = navigationBars`（玻璃延伸进手势导航条区域），
@@ -41,14 +44,15 @@ fun AppBottomBar(
     data class TabItem(
         val route: String,
         val labelRes: Int,
-        val icon: ImageVector,
+        val selectedIcon: ImageVector,
+        val unselectedIcon: ImageVector,
     )
 
     val tabs =
         listOf(
-            TabItem(AppRoute.HOME, R.string.nav_home, Icons.Default.Home),
-            TabItem(TAB_REPOS, R.string.nav_repos, Icons.Default.Star),
-            TabItem(AppRoute.PROFILE, R.string.nav_profile, Icons.Default.Person),
+            TabItem(AppRoute.HOME, R.string.nav_home, Icons.Filled.Home, Icons.Outlined.Home),
+            TabItem(TAB_REPOS, R.string.nav_repos, Icons.Filled.Star, Icons.Outlined.Star),
+            TabItem(AppRoute.PROFILE, R.string.nav_profile, Icons.Filled.Person, Icons.Outlined.Person),
         )
 
     GlassSurface(
@@ -61,10 +65,16 @@ fun AppBottomBar(
             windowInsets = WindowInsets(0.dp),
         ) {
             tabs.forEach { tab ->
+                val isSelected = selectedTab == tab.route
                 NavigationBarItem(
-                    icon = { Icon(tab.icon, contentDescription = null) },
+                    icon = {
+                        Icon(
+                            imageVector = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
+                            contentDescription = null,
+                        )
+                    },
                     label = { Text(stringResource(tab.labelRes)) },
-                    selected = selectedTab == tab.route,
+                    selected = isSelected,
                     onClick = { onTabSelected(tab.route) },
                     colors =
                         NavigationBarItemDefaults.colors(

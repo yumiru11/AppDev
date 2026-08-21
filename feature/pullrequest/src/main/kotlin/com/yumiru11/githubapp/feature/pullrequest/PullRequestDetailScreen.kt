@@ -17,32 +17,42 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -100,6 +110,10 @@ fun PullRequestDetailScreen(
     val scope = rememberCoroutineScope()
     val currentUrl = (uiState as? PullRequestDetailUiState.Success)?.pullRequest?.htmlUrl
 
+    // 评论 BottomSheet 状态
+    var showCommentSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -124,6 +138,21 @@ fun PullRequestDetailScreen(
                     }
                 },
             )
+        },
+        floatingActionButton = {
+            // 评论属写操作：仅详情加载成功后提供入口（Loading/Error 态无目标可评）
+            if (uiState is PullRequestDetailUiState.Success) {
+                ExtendedFloatingActionButton(
+                    onClick = { showCommentSheet = true },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Filled.Add,
+                            contentDescription = null, // 文本「评论」已表意，避免 TalkBack 重复朗读
+                        )
+                    },
+                    text = { Text(text = stringResource(R.string.pull_request_comment)) },
+                )
+            }
         },
     ) { paddingValues ->
         Box(
@@ -166,6 +195,19 @@ fun PullRequestDetailScreen(
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
+            }
+
+            // 评论输入 BottomSheet
+            if (showCommentSheet) {
+                val commentUnavailableMessage = stringResource(R.string.pull_request_comment_unavailable)
+                CommentBottomSheet(
+                    onDismiss = { showCommentSheet = false },
+                    onSubmit = {
+                        // 写接口尚未接入（REST 评论发布属后续票）：明确告知，不关闭 sheet 以保留已输入内容
+                        scope.launch { snackbarHostState.showSnackbar(commentUnavailableMessage) }
+                    },
+                    sheetState = sheetState,
+                )
             }
         }
     }
@@ -593,3 +635,62 @@ private fun copyLink(
 
 private const val FIXED_ALPHA_MASK = 0xFF000000L
 private const val TAG = "PullRequestDetailScreen"
+
+/** PR 评论输入 BottomSheet（Material You 风格；写接口接入前 Submit 仅给出「暂未开放」反馈） */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CommentBottomSheet(
+    onDismiss: () -> Unit,
+    onSubmit: (String) -> Unit,
+    sheetState: SheetState,
+) {
+    var commentText by remember { mutableStateOf("") }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .imePadding() // 键盘弹出时抬升内容，避免输入框/按钮被遮挡
+                    .padding(16.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.pull_request_add_comment),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = commentText,
+                onValueChange = { commentText = it },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp),
+                placeholder = { Text(text = stringResource(R.string.pull_request_comment_placeholder)) },
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text(text = stringResource(R.string.cancel))
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = { onSubmit(commentText) },
+                    enabled = commentText.isNotBlank(),
+                ) {
+                    Text(text = stringResource(R.string.submit))
+                }
+            }
+        }
+    }
+}

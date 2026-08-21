@@ -23,11 +23,16 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,12 +58,15 @@ import java.time.Instant
 import java.time.ZoneId
 
 /**
- * 首页动态流页（T10）：AppTopBar + 动态流列表（底栏已上移 MainTabPager 容器，2026-08-14 分区重构）。
+ * 首页动态流页（T10）：AppTopBar + 顶部小分区条（动态/Issue/PR，TabRow 下划线指示器）+ feed 内容区。
  *
  * - 登录态驱动：未登录 → 登录引导（T10 验收第 1 条）
  * - 列表：Paging 分页（T10 验收第 2 条）+ PullToRefreshBox 下拉刷新（T10 验收第 3 条）
  * - 点击条目 → GitHubLinkParser 解析 html_url → 应用内导航（T10 验收第 4 条）
  * - 空/错/加载态齐全（T10 验收第 5 条）；分页加载错误由 LazyPagingItems.loadState 呈现
+ * - 符合 ui-design.md §2.1：底部大分区（首页/仓库/我的）× 首页内小分区（动态/Issue/PR）；
+ *   §2.2 的长条按钮/trending 待对应功能票落地后补齐（Issue 新建等均为 {owner}/{repo} 级路由，
+ *   Home 无仓库上下文，不预置死入口）
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +81,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var selectedTab by rememberSaveable { mutableStateOf(HomeTab.FEED) }
 
     Scaffold(
         modifier = modifier,
@@ -91,32 +100,41 @@ fun HomeScreen(
                     .fillMaxSize()
                     .padding(paddingValues),
         ) {
-            when (val state = uiState) {
-                is HomeUiState.Loading -> {
-                    LoadingContent(modifier = Modifier.fillMaxSize())
-                }
+            Column(modifier = Modifier.fillMaxSize()) {
+                when (val state = uiState) {
+                    is HomeUiState.Loading -> {
+                        LoadingContent(modifier = Modifier.fillMaxSize())
+                    }
 
-                is HomeUiState.Unauthenticated -> {
-                    UnauthenticatedContent(
-                        onLoginClick = onLoginClick,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+                    is HomeUiState.Unauthenticated -> {
+                        UnauthenticatedContent(
+                            onLoginClick = onLoginClick,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
 
-                is HomeUiState.Error -> {
-                    ErrorContent(
-                        errorType = state.errorType,
-                        onRetry = { viewModel.retry() },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+                    is HomeUiState.Error -> {
+                        ErrorContent(
+                            errorType = state.errorType,
+                            onRetry = { viewModel.retry() },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
 
-                is HomeUiState.Success -> {
-                    FeedContent(
-                        feed = state.feed,
-                        onFeedItemClick = onFeedItemClick,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    is HomeUiState.Success -> {
+                        // 顶部小分区条（动态/Issue/PR）——仅登录成功后有内容可切，未登录/错误态不渲染
+                        HomeTabBar(
+                            selectedTab = selectedTab,
+                            onTabSelected = { selectedTab = it },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        FeedContent(
+                            feed = state.feed,
+                            selectedTab = selectedTab,
+                            onFeedItemClick = onFeedItemClick,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
         }
@@ -126,39 +144,57 @@ fun HomeScreen(
 @Composable
 private fun FeedContent(
     feed: Flow<PagingData<FeedItem>>,
+    selectedTab: HomeTab,
     onFeedItemClick: (ParsedUrl) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lazyItems = feed.collectAsLazyPagingItems()
-    when {
-        lazyItems.loadState.refresh is LoadState.Error -> {
-            PagingErrorContent(
-                error = (lazyItems.loadState.refresh as LoadState.Error).error,
-                onRetry = { lazyItems.retry() },
-                modifier = modifier,
-            )
-        }
 
-        lazyItems.loadState.refresh is LoadState.Loading && lazyItems.itemCount == 0 -> {
-            LoadingContent(modifier = modifier)
-        }
+    // 根据分区显示不同内容
+    when (selectedTab) {
+        HomeTab.FEED -> {
+            // 动态流：feed + trending（trending 数据源待 §2.5 落地）
+            when {
+                lazyItems.loadState.refresh is LoadState.Error -> {
+                    PagingErrorContent(
+                        error = (lazyItems.loadState.refresh as LoadState.Error).error,
+                        onRetry = { lazyItems.retry() },
+                        modifier = modifier,
+                    )
+                }
 
-        lazyItems.itemCount == 0 -> {
-            PullToRefreshBox(
-                isRefreshing = lazyItems.loadState.refresh is LoadState.Loading,
-                onRefresh = { lazyItems.refresh() },
-                modifier = modifier,
-            ) {
-                EmptyContent(modifier = Modifier.fillMaxSize())
+                lazyItems.loadState.refresh is LoadState.Loading && lazyItems.itemCount == 0 -> {
+                    LoadingContent(modifier = modifier)
+                }
+
+                lazyItems.itemCount == 0 -> {
+                    PullToRefreshBox(
+                        isRefreshing = lazyItems.loadState.refresh is LoadState.Loading,
+                        onRefresh = { lazyItems.refresh() },
+                        modifier = modifier,
+                    ) {
+                        EmptyContent(modifier = Modifier.fillMaxSize())
+                    }
+                }
+
+                else -> {
+                    FeedList(
+                        lazyItems = lazyItems,
+                        onFeedItemClick = onFeedItemClick,
+                        modifier = modifier,
+                    )
+                }
             }
         }
 
-        else -> {
-            FeedList(
-                lazyItems = lazyItems,
-                onFeedItemClick = onFeedItemClick,
-                modifier = modifier,
-            )
+        HomeTab.ISSUES -> {
+            // Issue 列表占位（列表页属后续功能票；详情页 T14 已合入）
+            EmptyContent(modifier = modifier)
+        }
+
+        HomeTab.PULL_REQUESTS -> {
+            // PR 列表占位（列表页属后续功能票；详情页 T15 已合入）
+            EmptyContent(modifier = modifier)
         }
     }
 }
@@ -409,3 +445,24 @@ private fun errorMessage(errorType: HomeErrorType): String =
         HomeErrorType.NETWORK -> stringResource(R.string.feed_error_network)
         HomeErrorType.UNKNOWN -> stringResource(R.string.feed_error_unknown)
     }
+
+/** 首页顶部小分区条（动态/Issue/PR）—— ui-design.md §2.1：横向条 + 底部主题色指示条 */
+@Composable
+private fun HomeTabBar(
+    selectedTab: HomeTab,
+    onTabSelected: (HomeTab) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    PrimaryTabRow(
+        selectedTabIndex = selectedTab.ordinal,
+        modifier = modifier,
+    ) {
+        HomeTab.entries.forEach { tab ->
+            Tab(
+                selected = selectedTab == tab,
+                onClick = { onTabSelected(tab) },
+                text = { Text(text = stringResource(tab.titleRes)) },
+            )
+        }
+    }
+}

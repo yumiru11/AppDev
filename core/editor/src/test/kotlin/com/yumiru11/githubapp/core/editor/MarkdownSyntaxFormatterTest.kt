@@ -98,6 +98,34 @@ class MarkdownSyntaxFormatterTest {
         assertEquals(5, result.selectionEnd)
     }
 
+    @Test
+    fun apply_codeBlockEmptyText_placesCursorOnBlankLineInsideFences() {
+        val result = MarkdownSyntaxFormatter.apply(MarkdownToolbarAction.CODE_BLOCK, "", 0, 0)
+
+        assertEquals("```\n\n```", result.text)
+        assertEquals(4, result.selectionStart)
+        assertEquals(4, result.selectionEnd)
+    }
+
+    /** start > 0：光标必须落在闭合围栏之后（回归保护——旧公式在 start>0 时会算错位置） */
+    @Test
+    fun apply_codeBlockWithSelectionNotAtStart_placesCursorAfterClosingFence() {
+        val result = MarkdownSyntaxFormatter.apply(MarkdownToolbarAction.CODE_BLOCK, "hello world", 6, 11)
+
+        assertEquals("hello ```\nworld\n```", result.text)
+        assertEquals(19, result.selectionStart)
+        assertEquals(19, result.selectionEnd)
+    }
+
+    @Test
+    fun apply_codeBlockWithMultilineSelection_wrapsAllLinesAndPlacesCursorAfterClosingFence() {
+        val result = MarkdownSyntaxFormatter.apply(MarkdownToolbarAction.CODE_BLOCK, "a\nb", 0, 3)
+
+        assertEquals("```\na\nb\n```", result.text)
+        assertEquals(11, result.selectionStart)
+        assertEquals(11, result.selectionEnd)
+    }
+
     // ---- 标题 ----
 
     @Test
