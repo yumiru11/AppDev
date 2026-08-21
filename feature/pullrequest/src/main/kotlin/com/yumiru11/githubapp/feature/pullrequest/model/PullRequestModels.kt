@@ -1,5 +1,7 @@
 package com.yumiru11.githubapp.feature.pullrequest.model
 
+import androidx.compose.runtime.Immutable
+
 /** PR 状态（GitHub REST state + draft/merged_at 字段映射） */
 enum class PullRequestState {
     OPEN,
@@ -184,6 +186,7 @@ enum class PullRequestErrorType {
 }
 
 /** PR 列表/详情条目 */
+@Immutable
 data class PullRequest(
     val id: Long,
     val number: Int,
@@ -212,23 +215,27 @@ data class PullRequest(
 )
 
 /** 作者/Reviewers 用户 */
+@Immutable
 data class PullRequestUser(
     val login: String,
     val avatarUrl: String? = null,
 )
 
 /** 标签（LabelChip 展示） */
+@Immutable
 data class PullRequestLabel(
     val name: String,
     val color: String? = null,
 )
 
 /** 里程碑 */
+@Immutable
 data class PullRequestMilestone(
     val title: String,
 )
 
 /** 分支信息（base ← head） */
+@Immutable
 data class PullRequestBranch(
     val label: String? = null,
     val ref: String? = null,
@@ -236,6 +243,7 @@ data class PullRequestBranch(
 )
 
 /** 提交条目（Commits Tab） */
+@Immutable
 data class PullRequestCommit(
     val sha: String,
     val message: String? = null,
@@ -246,6 +254,7 @@ data class PullRequestCommit(
 )
 
 /** 提交内文件变更摘要（展开 diff 用） */
+@Immutable
 data class PullRequestCommitFile(
     val filename: String? = null,
     val status: PullRequestFileStatus = PullRequestFileStatus.UNKNOWN,
@@ -254,6 +263,7 @@ data class PullRequestCommitFile(
 )
 
 /** 文件变更条目（Files changed Tab） */
+@Immutable
 data class PullRequestFile(
     val filename: String,
     val status: PullRequestFileStatus = PullRequestFileStatus.UNKNOWN,
@@ -264,6 +274,7 @@ data class PullRequestFile(
 )
 
 /** Check Run 条目（Checks Tab） */
+@Immutable
 data class CheckRun(
     val id: Long,
     val name: String? = null,
@@ -279,6 +290,7 @@ data class CheckRun(
 )
 
 /** 合并状态摘要（Checks 摘要行） */
+@Immutable
 data class CombinedStatus(
     val state: String? = null,
     val totalCount: Int = 0,
@@ -290,6 +302,7 @@ sealed interface PullRequestTimelineItem {
     val id: Long
 
     /** 普通评论（body 经 MarkdownViewer 原生渲染） */
+    @Immutable
     data class Comment(
         override val id: Long,
         val author: PullRequestUser? = null,
@@ -298,6 +311,7 @@ sealed interface PullRequestTimelineItem {
     ) : PullRequestTimelineItem
 
     /** Review 卡片（approve/comment/request-changes） */
+    @Immutable
     data class Review(
         override val id: Long,
         val author: PullRequestUser? = null,
@@ -307,6 +321,7 @@ sealed interface PullRequestTimelineItem {
     ) : PullRequestTimelineItem
 
     /** 行内评论（path:line 定位） */
+    @Immutable
     data class ReviewComment(
         override val id: Long,
         val author: PullRequestUser? = null,
@@ -317,6 +332,7 @@ sealed interface PullRequestTimelineItem {
     ) : PullRequestTimelineItem
 
     /** 提交引用（committed 事件） */
+    @Immutable
     data class CommitReference(
         override val id: Long,
         val author: PullRequestUser? = null,
@@ -326,6 +342,7 @@ sealed interface PullRequestTimelineItem {
     ) : PullRequestTimelineItem
 
     /** 事件（closed/merged/labeled/cross-referenced 等） */
+    @Immutable
     data class Event(
         override val id: Long,
         val type: PullRequestTimelineEventType,

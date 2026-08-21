@@ -1,5 +1,7 @@
 package com.yumiru11.githubapp.feature.issue.model
 
+import androidx.compose.runtime.Immutable
+
 /** Issue 状态（GitHub REST state 字段映射） */
 enum class IssueState {
     OPEN,
@@ -16,6 +18,7 @@ enum class IssueState {
 }
 
 /** Issue 列表/详情条目 */
+@Immutable
 data class Issue(
     val id: Long,
     val number: Int,
@@ -39,24 +42,28 @@ data class Issue(
 )
 
 /** 作者/Assignees 用户（复用 REST UserDto 字段） */
+@Immutable
 data class IssueUser(
     val login: String,
     val avatarUrl: String? = null,
 )
 
 /** 标签（LabelChip 展示） */
+@Immutable
 data class IssueLabel(
     val name: String,
     val color: String? = null,
 )
 
 /** 里程碑 */
+@Immutable
 data class IssueMilestone(
     val title: String,
     val state: IssueState? = null,
 )
 
 /** 反应计数（ReactionBar 展示） */
+@Immutable
 data class IssueReactions(
     val totalCount: Int = 0,
     /** 各反应类型计数（content → count，content 取值 +1/-1/laugh/hooray/confused/heart/rocket/eyes） */
@@ -64,6 +71,7 @@ data class IssueReactions(
 )
 
 /** 单个反应（add reaction 响应，id 供删除用） */
+@Immutable
 data class IssueReaction(
     val id: Long,
     val content: String,
@@ -71,6 +79,7 @@ data class IssueReaction(
 )
 
 /** 评论（create/update comment 响应，乐观插入后替换临时项） */
+@Immutable
 data class IssueComment(
     val id: Long,
     val body: String? = null,
@@ -87,6 +96,7 @@ data class IssueComment(
  * - [viewerPermission]：仓库级权限（决定操作可见性）
  * - [issueNodeId]：Issue GraphQL node id（UpdateIssue mutation 必需；REST 通道不可得）
  */
+@Immutable
 data class IssueWriteContext(
     val viewerLogin: String? = null,
     val viewerPermission: IssueViewerPermission = IssueViewerPermission.NONE,
@@ -131,6 +141,7 @@ sealed interface IssueTimelineItem {
     val id: Long
 
     /** 评论（body 经 MarkdownViewer 原生渲染） */
+    @Immutable
     data class Comment(
         override val id: Long,
         val author: IssueUser? = null,
@@ -141,6 +152,7 @@ sealed interface IssueTimelineItem {
     ) : IssueTimelineItem
 
     /** 事件（closed/labeled/cross-referenced/connected 等） */
+    @Immutable
     data class Event(
         override val id: Long,
         val type: IssueTimelineEventType,
