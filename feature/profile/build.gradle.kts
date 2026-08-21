@@ -61,6 +61,7 @@ dependencies {
     // 导航
     implementation(project(":core:navigation"))
     implementation(project(":core:ui"))
+    implementation(project(":core:designsystem"))
 
     // Testing
     testImplementation(project(":core:testing"))

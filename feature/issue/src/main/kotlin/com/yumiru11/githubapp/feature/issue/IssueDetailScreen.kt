@@ -77,13 +77,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
+import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
-import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
-import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueLabel
 import com.yumiru11.githubapp.feature.issue.model.IssueReactions
@@ -91,7 +92,6 @@ import com.yumiru11.githubapp.feature.issue.model.IssueState
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineEventType
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineItem
 import com.yumiru11.githubapp.feature.issue.model.IssueUser
-import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.Locale

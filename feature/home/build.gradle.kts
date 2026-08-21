@@ -41,6 +41,7 @@ dependencies {
 
     // 首页外壳（AppTopBar/AppBottomBar 玻璃栏）
     implementation(project(":core:ui"))
+    implementation(project(":core:designsystem"))
 
     // Testing
     testImplementation(project(":core:testing"))

@@ -22,10 +22,10 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestReviewState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineEventType
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
-import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import java.util.Locale
 
 /** 评论条目：列表项风格（非重卡片），作者头像 + 登录名 + 相对时间 + Markdown 正文 */

@@ -46,6 +46,10 @@ import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
+import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
+import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
+import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppTopBar
@@ -373,8 +377,7 @@ private fun formatDate(isoTimestamp: String?): String {
 
 /** feed 行时间戳：相对时间优先，回退绝对日期（#84 缺陷 #11） */
 @Composable
-private fun feedTimestampText(isoTimestamp: String?): String =
-    isoTimestamp?.let { relativeTimeText(it) } ?: formatDate(isoTimestamp)
+private fun feedTimestampText(isoTimestamp: String?): String = isoTimestamp?.let { relativeTimeText(it) } ?: formatDate(isoTimestamp)
 
 @Composable
 private fun UnauthenticatedContent(
@@ -398,20 +401,18 @@ private fun UnauthenticatedContent(
 
 @Composable
 private fun LoadingContent(modifier: Modifier = Modifier) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
-    }
+    // #84：共享加载态组件
+    AppLoadingState(modifier = modifier)
 }
 
 @Composable
 private fun EmptyContent(modifier: Modifier = Modifier) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Text(
-            text = stringResource(R.string.feed_empty),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    // #84：共享空态组件（矢量插图 + 文案）
+    AppEmptyState(
+        icon = AppDevOcticons.Repo,
+        title = stringResource(R.string.feed_empty),
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -430,19 +431,13 @@ private fun ErrorContent(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = errorMessage(errorType),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.error,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onRetry) {
-                Text(text = stringResource(R.string.feed_retry))
-            }
-        }
-    }
+    // #84：共享错误态组件（Alert 插图 + 文案 + 重试按钮）
+    AppErrorState(
+        title = errorMessage(errorType),
+        actionLabel = stringResource(R.string.feed_retry),
+        onAction = onRetry,
+        modifier = modifier,
+    )
 }
 
 /** 错误类型 → 本地化文案（ViewModel 只传类型，不产英文） */

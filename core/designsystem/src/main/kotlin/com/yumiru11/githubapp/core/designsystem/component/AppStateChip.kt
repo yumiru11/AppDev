@@ -79,20 +79,25 @@ fun AppStateChip(
     val extended = MaterialTheme.extendedColors
     val (dotColor, containerColor, contentColor) =
         when (gitHubStatusColorRole(status)) {
-            AppStateColorRole.SUCCESS ->
+            AppStateColorRole.SUCCESS -> {
                 Triple(extended.success, extended.successContainer, extended.onSuccessContainer)
+            }
 
-            AppStateColorRole.DANGER ->
+            AppStateColorRole.DANGER -> {
                 Triple(extended.danger, extended.dangerContainer, extended.onDangerContainer)
+            }
 
-            AppStateColorRole.TERTIARY ->
+            AppStateColorRole.TERTIARY -> {
                 Triple(colorScheme.tertiary, colorScheme.tertiaryContainer, colorScheme.onTertiaryContainer)
+            }
 
-            AppStateColorRole.SURFACE_VARIANT ->
+            AppStateColorRole.SURFACE_VARIANT -> {
                 Triple(colorScheme.outline, colorScheme.surfaceVariant, colorScheme.onSurfaceVariant)
+            }
 
-            AppStateColorRole.ERROR ->
+            AppStateColorRole.ERROR -> {
                 Triple(colorScheme.error, colorScheme.errorContainer, colorScheme.onErrorContainer)
+            }
         }
     Surface(
         modifier = modifier.semantics(mergeDescendants = true) {},

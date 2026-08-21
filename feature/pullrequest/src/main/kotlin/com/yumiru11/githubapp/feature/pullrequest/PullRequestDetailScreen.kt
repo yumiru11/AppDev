@@ -71,10 +71,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
-import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
-import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
+import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
+import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
 import com.yumiru11.githubapp.feature.pullrequest.model.CombinedStatus
 import com.yumiru11.githubapp.feature.pullrequest.model.MergeableState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequest
@@ -85,7 +86,6 @@ import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTab
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestUser
-import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 

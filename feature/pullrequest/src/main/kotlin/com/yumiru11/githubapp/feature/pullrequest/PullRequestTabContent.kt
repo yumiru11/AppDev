@@ -46,6 +46,7 @@ import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRunConclusion
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRunStatus
@@ -54,7 +55,6 @@ import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestCommit
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFile
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFileStatus
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
-import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 
 /** Conversation Tab：PR 正文（WebView）+ 时间线（评论/Review/行内评论/提交引用/事件） */
 @Composable
