@@ -56,10 +56,10 @@ import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.feature.notifications.model.NotificationFilter
 import com.yumiru11.githubapp.feature.notifications.model.NotificationItem
+import kotlinx.coroutines.flow.Flow
 import java.io.IOException
 import java.time.Instant
 import java.time.ZoneId
-import kotlinx.coroutines.flow.Flow
 
 /**
  * 通知页（T19，docs/ui-design.md §3.4「通知 = 全屏 slide-in 面板」决策）。

@@ -76,12 +76,9 @@ fun AppBottomBar(
                     label = { Text(stringResource(tab.labelRes)) },
                     selected = isSelected,
                     onClick = { onTabSelected(tab.route) },
-                    colors =
-                        NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            selectedTextColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                        ),
+                    // 不传 colors：M3 默认即 onSecondaryContainer/onSecondaryContainer/
+                    // secondaryContainer（NavigationBarTokens ItemActive* 三 token），
+                    // 此前显式覆盖值恰等于默认（#86 清理冗余）。
                 )
             }
         }
