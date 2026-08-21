@@ -11,6 +11,9 @@ retrofit = "3.0.0"
 okhttp = "5.4.0"
 okio = "3.18.1"
 coil = "3.4.0"
+# Haze（chrisbanes/haze）：毛玻璃 backdrop blur（issue #83，ui-audit 缺陷 #1 修复载体）
+# 1.7.2 传递 androidx.activity 1.12.2 需 AGP≥8.9.1，与锁定基线 AGP 8.7.3 冲突 → 取 1.6.10
+haze = "1.6.10"
 jacoco = "0.8.13"
 lifecycle = "2.8.7"
 activity-compose = "1.9.3"
@@ -59,6 +62,9 @@ compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 compose-material-icons-core = { group = "androidx.compose.material", name = "material-icons-core" }
+
+# Haze（chrisbanes/haze）：backdrop blur——hazeSource 标内容侧 / hazeEffect 标玻璃栏侧（issue #83）
+haze = { group = "dev.chrisbanes.haze", name = "haze", version.ref = "haze" }
 
 # Icons — Material Symbols（= marella.github.io / fonts.google.com 同一套 Google 图标），MIT
 icons-material-symbols-outlined = { group = "com.composables", name = "icons-material-symbols-outlined-android", version.ref = "icons" }
