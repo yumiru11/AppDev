@@ -107,6 +107,7 @@ feature/                   auth, home, repo, issue, pullrequest, search, editor,
 | **执行流程（ticket/分支/PR/验证）** | `docs/agents/workflow.md` |
 | **DSH × V4 Pro 使用指南** | `docs/agents/dsh-guide.md` |
 | UI 设计规范（权威，2026-08-15 拍板版） | `docs/ui-design.md` |
+| **UI 审查问题清单（2026-08-21 快照，缺陷/挂账/提案）** | `docs/ui-audit-2026-08-21.md` |
 | 架构决策记录（ADR-0001~0006） | `docs/adr/` |
 | 术语表 | `CONTEXT.md` |
 | 真机走查反馈与状态 | `FEEDBACK.md` |
