@@ -34,6 +34,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -430,6 +431,7 @@ private fun RepoStatsRow(repo: Repository) {
 
 /**
  * Star/Watch/Fork 操作按钮行（登录态显示；pendingAction 期间禁用防重入）。
+ * Material You 风格：使用 FilledTonalButton 提供适中的视觉重量，支持动画过渡。
  */
 @Composable
 private fun ManagementButtons(
@@ -441,10 +443,13 @@ private fun ManagementButtons(
     onFork: () -> Unit,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(
+        FilledTonalButton(
             onClick = onToggleStar,
             enabled = pendingAction == null,
             modifier = Modifier.weight(1f),
+            contentPadding =
+                androidx.compose.foundation.layout
+                    .PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         ) {
             Icon(
                 imageVector = if (isStarred) Icons.Filled.Star else Icons.Outlined.Star,
@@ -457,10 +462,13 @@ private fun ManagementButtons(
                 maxLines = 1,
             )
         }
-        OutlinedButton(
+        FilledTonalButton(
             onClick = onToggleWatch,
             enabled = pendingAction == null,
             modifier = Modifier.weight(1f),
+            contentPadding =
+                androidx.compose.foundation.layout
+                    .PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         ) {
             Icon(
                 imageVector =
@@ -478,10 +486,13 @@ private fun ManagementButtons(
                 maxLines = 1,
             )
         }
-        OutlinedButton(
+        FilledTonalButton(
             onClick = onFork,
             enabled = pendingAction == null,
             modifier = Modifier.weight(1f),
+            contentPadding =
+                androidx.compose.foundation.layout
+                    .PaddingValues(horizontal = 12.dp, vertical = 8.dp),
         ) {
             if (pendingAction == RepoAction.FORK) {
                 CircularProgressIndicator(
