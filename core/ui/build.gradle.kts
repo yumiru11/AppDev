@@ -33,6 +33,8 @@ dependencies {
 
     // 玻璃拟真容器（ADR-0004：顶栏/底栏 GlassSurface，T6 已交付）
     implementation(project(":core:designsystem"))
+    // Haze：MainTabPager 对分区内容挂 hazeSource（backdrop blur 内容侧，issue #83）
+    implementation(libs.haze)
 
     // 测试：core:testing 已 api 导出 JUnit4/Robolectric/Roborazzi/compose-test
     testImplementation(project(":core:testing"))

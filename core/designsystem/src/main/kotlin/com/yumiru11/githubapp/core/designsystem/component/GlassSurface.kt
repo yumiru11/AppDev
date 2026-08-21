@@ -8,35 +8,42 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.token.AppBlur
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.hazeEffect
 
 /**
- * 玻璃拟真容器（docs/ui-design.md §6）。
+ * 玻璃拟真容器（docs/ui-design.md §6；issue #83 改为 backdrop blur）。
  *
  * 顶栏 / 底栏等 §6.1 允许清单场景的毛玻璃背景容器：
- * - **API 31+**（[AppBlur.isBlurSupported]）：[Modifier.blur]（RenderEffect 真模糊）
- *   模糊背后滚动内容；[BlurredEdgeTreatment.Unbounded] 让模糊延伸到元素边界之外，
- *   保证顶栏玻璃覆盖状态栏区域时该区域同样被模糊。
- * - **API 26–30**：纯半透明 surface 层降级（[AppBlur.SCRIM_ALPHA] alpha），
- *   不做 bitmap 模糊，性能优先（§6.2）。
- * - **[blurEnabled]=false**：完全不模糊，仅半透明 surface（设置页「毛玻璃」开关关闭时）。
+ * - **API 31+**（[AppBlur.isBlurSupported]）且上游提供了 [LocalHazeState]：
+ *   挂 Haze `hazeEffect`（RenderEffect backdrop blur），模糊 **背后滚动内容**
+ *   （内容侧须挂 `hazeSource`，由同时持有栏与内容的容器组件接线——MainTabPager /
+ *   HomeScreen）。玻璃层自身与栏内文字/图标保持锐利（修复 ui-audit 缺陷 #1：
+ *   旧实现 `Modifier.blur` 误模糊自身绘制内容，即 FEEDBACK #17 根因）。
+ *   半透明 scrim 叠在模糊层之上保证可读性（§6.1 静止态）。
+ * - **API 26–30 / 无 HazeState / [blurEnabled]=false**：纯半透明 surface 层降级
+ *   （[AppBlur.SCRIM_ALPHA] alpha），不做 bitmap 模糊，性能优先（§6.2）；
+ *   API<31 半透明降级策略与旧 AppBlur 方案一致。
  *
  * 玻璃层颜色一律取自 `MaterialTheme.colorScheme.surface`，禁止硬编码颜色。
  *
  * 性能约束（§6.2，调用方责任）：
- * - 只用于 §6.1 允许清单（顶栏 / 底栏 / BottomSheet / 全屏查看器 / Banner 悬浮层）
+ * - 只用于 §6.1 允许清单（顶栏 / 底栏 / BottomSheet / 通知面板 / 全屏查看器 /
+ *   Banner 悬浮层）
  * - **禁止**列表 item 内使用；**禁止**叠加超过 2 层毛玻璃；**禁止**动态模糊
  *
- * 接线方式（T6 完整装配 / T4/T10 集成时）：
- * - 顶栏：`GlassSurface(windowInsets = WindowInsets.statusBars, blurEnabled = blurEnabled)`
- *   包住 `TopAppBar`，并将 TopAppBar 的 `containerColor` 设为 `Color.Transparent`
- * - 底栏：同上包住 `NavigationBar`，`windowInsets = WindowInsets.navigationBars`
+ * 接线方式：
+ * - 玻璃栏：本组件包住 `TopAppBar` / `NavigationBar`，后者 `containerColor` 设为
+ *   `Color.Transparent`、自身 insets 归零；系统栏 insets 由 [windowInsets] 统一处理
+ *   （玻璃延伸进状态栏/导航栏区域，内容按 insets 内缩）
+ * - 内容侧：容器组件对「栏背后的滚动内容」挂 `Modifier.hazeSource(hazeState)`，
+ *   并用 `CompositionLocalProvider(LocalHazeState provides rememberHazeState())`
+ *   覆盖栏与内容的公共父级（见 MainTabPager / HomeScreen 示例）
  * - [blurEnabled] 由 feature 层收集 `UserPreferencesRepository.blurEnabled` 后传入
  *
  * @param modifier 应用在玻璃容器上的修饰符（尺寸 / 对齐等）
@@ -58,17 +65,24 @@ fun GlassSurface(
     val surfaceColor = MaterialTheme.colorScheme.surface
     // 半透明纯色层：模糊层之上叠加，保证内容可读性（§6.1 静止态 / §6.2 降级层）
     val glassColor = surfaceColor.copy(alpha = AppBlur.SCRIM_ALPHA)
-    val useBlur = blurEnabled && AppBlur.isBlurSupported()
+    val hazeState = LocalHazeState.current
+    val useHaze = blurEnabled && AppBlur.isBlurSupported() && hazeState != null
 
     Box(
         modifier =
             modifier
                 .then(
-                    if (useBlur) {
-                        Modifier.blur(
-                            radius = AppBlur.blurRadius,
-                            edgeTreatment = BlurredEdgeTreatment.Unbounded,
-                        )
+                    if (useHaze) {
+                        Modifier.hazeEffect(state = hazeState) {
+                            style =
+                                HazeStyle(
+                                    backgroundColor = surfaceColor,
+                                    // 无 tint：scrim 由下方 background(glassColor) 统一负责，
+                                    // 保证模糊/降级两条路径视觉一致
+                                    tints = emptyList(),
+                                    blurRadius = AppBlur.blurRadius,
+                                )
+                        }
                     } else {
                         Modifier
                     },
