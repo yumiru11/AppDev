@@ -58,12 +58,12 @@ fun MarkdownEditorView(
     // 语法 + 主题语言实例：语法资产或主题变化时重建（themeSource 变化 → 重新装入全局注册表）
     val editorLanguage =
         remember(MARKDOWN_GRAMMAR, themeSource, mentions, emojis) {
-            runCatching {
-                val textMate = createTextMateLanguage(context, MARKDOWN_GRAMMAR, themeSource)
-                // markdown 无关键字补全需求：禁用 TextMate 内置补全，引用补全由包装层接管
-                textMate.setAutoCompleteEnabled(false)
-                MarkdownEditorLanguage(textMate, mentions, emojis)
-            }.getOrNull()
+            createTextMateLanguage(context, MARKDOWN_GRAMMAR, themeSource)
+                ?.let { textMate ->
+                    // markdown 无关键字补全需求：禁用 TextMate 内置补全，引用补全由包装层接管
+                    textMate.setAutoCompleteEnabled(false)
+                    MarkdownEditorLanguage(textMate, mentions, emojis)
+                }
         }
 
     val currentOnEditorReady by rememberUpdatedState(onEditorReady)
@@ -100,19 +100,34 @@ fun MarkdownEditorView(
             controller?.onTextChanged = currentOnTextChanged
             controller?.let { currentOnEditorReady(it) }
         },
+        onReset = { editor ->
+            // 视图重置时销毁旧控制器（移除监听器），防止内存泄漏
+            controller?.destroy()
+            controller = null
+        },
+        onRelease = {
+            // 视图释放时销毁控制器（移除监听器），防止内存泄漏
+            controller?.destroy()
+            controller = null
+        },
     )
 }
 
-/** 从 assets 加载 Markdown 语法并创建 TextMate 语言（语法 JSON 损坏/不兼容时抛异常，由调用方兜底）。 */
+/** 从 assets 加载 Markdown 语法并创建 TextMate 语言（语法 JSON 损坏/不兼容时返回 null，降级为纯文本）。 */
 private fun createTextMateLanguage(
     context: Context,
     grammarFileName: String,
     themeSource: IThemeSource,
-): TextMateLanguage {
-    val stream = context.assets.open("grammars/$grammarFileName")
-    val grammarSource = IGrammarSource.fromInputStream(stream, grammarFileName, Charsets.UTF_8)
-    return TextMateLanguage.createNoCompletion(grammarSource, themeSource)
-}
+): TextMateLanguage? =
+    runCatching {
+        val stream =
+            context.assets.open("grammars/$grammarFileName").use { it }
+        val grammarSource = IGrammarSource.fromInputStream(stream, grammarFileName, Charsets.UTF_8)
+        TextMateLanguage.createNoCompletion(grammarSource, themeSource)
+    }.onFailure { e ->
+        // 语法资产损坏/加载失败统一兜底为纯文本，不崩溃
+        android.util.Log.e("MarkdownEditorView", "Failed to load grammar: $grammarFileName", e)
+    }.getOrNull()
 
 private const val MARKDOWN_GRAMMAR = "markdown.tmLanguage.json"
 private const val EDITOR_TEXT_SIZE_SP = 14f
