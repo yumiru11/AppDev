@@ -61,7 +61,8 @@ fun AppTopBar(
             title = {
                 Surface(
                     onClick = onSearchClick,
-                    shape = RoundedCornerShape(24.dp),
+                    // 胶囊形（ui-design §1.1-5 圆角全覆盖）：percent 50 = 高度一半，替代散落的 24dp 硬编码
+                    shape = RoundedCornerShape(percent = 50),
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier.fillMaxWidth(),
                 ) {

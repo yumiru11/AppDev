@@ -55,8 +55,9 @@ dependencies {
     // 导航（GitHubLinkParser 解析评论链接）
     implementation(project(":core:navigation"))
 
-    // 外壳（TopAppBar 等）
+    // 外壳（TopAppBar 等）+ AppStateChip 状态徽标（#84）
     implementation(project(":core:ui"))
+    implementation(project(":core:designsystem"))
 
     // 主题（@Preview 用 AppTheme 包裹，#86）
     implementation(project(":core:designsystem"))

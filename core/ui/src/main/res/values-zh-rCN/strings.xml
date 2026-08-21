@@ -23,4 +23,31 @@
     <string name="repo_owner_repo">%1$s / %2$s</string>
     <string name="placeholder_title">开发中</string>
     <string name="placeholder_desc">该页面正在开发中，敬请期待</string>
+
+    <!-- 相对时间（#84 自 feature/issue、feature/pullrequest 上移去重） -->
+    <string name="time_just_now">刚刚</string>
+    <plurals name="time_minutes">
+        <item quantity="one">%1$d 分钟前</item>
+        <item quantity="other">%1$d 分钟前</item>
+    </plurals>
+    <plurals name="time_hours">
+        <item quantity="one">%1$d 小时前</item>
+        <item quantity="other">%1$d 小时前</item>
+    </plurals>
+    <plurals name="time_days">
+        <item quantity="one">%1$d 天前</item>
+        <item quantity="other">%1$d 天前</item>
+    </plurals>
+    <plurals name="time_weeks">
+        <item quantity="one">%1$d 周前</item>
+        <item quantity="other">%1$d 周前</item>
+    </plurals>
+    <plurals name="time_months">
+        <item quantity="one">%1$d 个月前</item>
+        <item quantity="other">%1$d 个月前</item>
+    </plurals>
+    <plurals name="time_years">
+        <item quantity="one">%1$d 年前</item>
+        <item quantity="other">%1$d 年前</item>
+    </plurals>
 </resources>

@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -52,6 +53,10 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.data.model.Repository
 import com.yumiru11.githubapp.core.data.model.User
+import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
+import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
+import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
+import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 
 /**
  * 个人主页（T20）。
@@ -88,12 +93,8 @@ fun ProfileScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val state = uiState) {
                 is ProfileUiState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    // #84：共享加载态组件
+                    AppLoadingState(modifier = Modifier.fillMaxSize())
                 }
 
                 is ProfileUiState.Anonymous -> {
@@ -252,7 +253,7 @@ private fun LazyListScope.repositoryListItems(
         }
 
         items.itemCount == 0 -> {
-            item(key = "empty") { ListEmptyRow() }
+            item(key = "empty") { ListEmptyRow(icon = AppDevOcticons.Repo) }
         }
 
         else -> {
@@ -289,7 +290,7 @@ private fun LazyListScope.userListItems(
         }
 
         items.itemCount == 0 -> {
-            item(key = "empty") { ListEmptyRow() }
+            item(key = "empty") { ListEmptyRow(icon = AppDevOcticons.Eye) }
         }
 
         else -> {
@@ -410,53 +411,39 @@ private fun UserRow(
 
 @Composable
 private fun ListLoadingRow() {
-    Box(
+    // #84：共享加载态组件
+    AppLoadingState(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(vertical = 24.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        CircularProgressIndicator()
-    }
+    )
 }
 
+/** 空态行：图标按列表语境传入（仓库列表 Repo / 用户列表 Eye），文案本地化 */
 @Composable
-private fun ListEmptyRow() {
-    Box(
+private fun ListEmptyRow(icon: ImageVector) {
+    AppEmptyState(
+        icon = icon,
+        title = stringResource(R.string.profile_list_empty),
         modifier =
             Modifier
-                .fillMaxWidth()
-                .padding(vertical = 32.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = stringResource(R.string.profile_list_empty),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+                .fillMaxWidth(),
+    )
 }
 
 @Composable
 private fun ListErrorRow(onRetry: () -> Unit) {
-    Column(
+    // #84：共享错误态组件（Alert 插图 + 文案 + 重试按钮）
+    AppErrorState(
+        title = stringResource(R.string.profile_list_error),
+        actionLabel = stringResource(R.string.profile_list_retry),
+        onAction = onRetry,
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            text = stringResource(R.string.profile_list_error),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(onClick = onRetry) {
-            Text(stringResource(R.string.profile_list_retry))
-        }
-    }
+    )
 }
 
 /** 未登录引导：标题/说明/登录按钮（onLoginClick 由宿主接线） */

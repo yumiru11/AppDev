@@ -4,7 +4,6 @@ package com.yumiru11.githubapp.feature.search
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -114,7 +113,8 @@ private fun SearchInput(
             }
         },
         singleLine = true,
-        shape = RoundedCornerShape(28.dp),
+        // 形状令牌（ui-design §1.1-5）：28dp == AppDimens.cornerExtraLarge（scale=1 时视觉不变）
+        shape = MaterialTheme.shapes.extraLarge,
         colors =
             TextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,

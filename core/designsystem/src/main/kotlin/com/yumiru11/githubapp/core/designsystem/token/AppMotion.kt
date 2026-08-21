@@ -3,6 +3,8 @@ package com.yumiru11.githubapp.core.designsystem.token
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.Spring
+import androidx.compose.runtime.Composable
+import kotlin.math.roundToInt
 
 /**
  * M3 motion tokens — durations, easing curves, and spring physics.
@@ -56,4 +58,22 @@ object AppMotion {
 
     /** LazyColumn 首屏进入动画的 stagger 间隔 */
     const val LIST_STAGGER_INTERVAL_MILLIS: Int = 24
+
+    // ── 统一消费入口（#84，ui-design §4.4 动效缩放） ──
+
+    /**
+     * 按生效动效缩放折算后的时长（ms）。
+     *
+     * 所有动画时长必须经此消费：缩放 = min(设置页滑杆, 系统动画时长缩放)，
+     * 由 [LocalMotionScale] 在 AppTheme 注入。缩放为 0（系统「移除动画」）时
+     * 返回 0 —— 动画即时完成。
+     */
+    @Composable
+    fun scaledDuration(baseMillis: Int): Int = scaledDuration(baseMillis, LocalMotionScale.current)
+
+    /** 纯函数重载（可单测）：baseMillis × motionScale，四舍五入且不为负。 */
+    fun scaledDuration(
+        baseMillis: Int,
+        motionScale: Float,
+    ): Int = (baseMillis * motionScale.coerceIn(0f, MAX_MOTION_SCALE)).roundToInt().coerceAtLeast(0)
 }

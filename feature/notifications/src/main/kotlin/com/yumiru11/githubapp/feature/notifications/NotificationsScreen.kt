@@ -54,6 +54,7 @@ import androidx.paging.compose.itemKey
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.notifications.model.NotificationFilter
 import com.yumiru11.githubapp.feature.notifications.model.NotificationItem
 import kotlinx.coroutines.flow.Flow
@@ -298,7 +299,8 @@ private fun NotificationRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val date = formatDate(item.updatedAt)
+                // #84：相对时间优先，解析失败/未来时间回退绝对日期（缺陷 #11 时间显示统一）
+                val date = notificationTimestampText(item.updatedAt)
                 if (date.isNotEmpty()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -331,7 +333,7 @@ private fun handleItemClick(
     }
 }
 
-/** ISO-8601 时间戳 → 本地日期（yyyy-MM-dd）；解析失败返回空串（UI 隐藏时间行） */
+/** ISO-8601 时间戳 → 本地日期（yyyy-MM-dd）；解析失败返回空串（UI 隐藏时间行）。相对时间不可用时的回退 */
 private fun formatDate(isoTimestamp: String?): String {
     if (isoTimestamp.isNullOrBlank()) return ""
     return runCatching {
@@ -342,6 +344,11 @@ private fun formatDate(isoTimestamp: String?): String {
             .toString()
     }.getOrDefault("")
 }
+
+/** 通知行时间戳：相对时间优先，回退绝对日期（#84 缺陷 #11） */
+@Composable
+private fun notificationTimestampText(isoTimestamp: String?): String =
+    isoTimestamp?.let { relativeTimeText(it) } ?: formatDate(isoTimestamp)
 
 @Composable
 private fun UnauthenticatedContent(

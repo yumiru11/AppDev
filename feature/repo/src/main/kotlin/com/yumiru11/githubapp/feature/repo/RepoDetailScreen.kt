@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
@@ -526,7 +525,8 @@ private fun LanguageBar(languages: Map<String, Long>) {
                 Modifier
                     .fillMaxWidth()
                     .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
+                    // 形状令牌（ui-design §1.1-5）：4dp == AppDimens.cornerExtraSmall（scale=1 时视觉不变）
+                    .clip(MaterialTheme.shapes.extraSmall),
         ) {
             languages.entries.forEachIndexed { index, (_, bytes) ->
                 Box(
@@ -743,7 +743,8 @@ private fun ReleaseBadge(text: String) {
     Box(
         modifier =
             Modifier
-                .clip(RoundedCornerShape(4.dp))
+                // 形状令牌（ui-design §1.1-5）：4dp == AppDimens.cornerExtraSmall（scale=1 时视觉不变）
+                .clip(MaterialTheme.shapes.extraSmall)
                 .background(MaterialTheme.colorScheme.secondaryContainer)
                 .padding(horizontal = 6.dp, vertical = 2.dp),
     ) {

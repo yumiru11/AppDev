@@ -25,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
+import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 
 /**
  * 通知面板内容（无动画包装，可供截图测试直接使用）。
@@ -70,10 +72,10 @@ fun NotificationPanelContent(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    text = stringResource(R.string.notification_empty),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // #84：共享空态组件替换手搓 Text（audit §3.2「硬编码空态」）
+                AppEmptyState(
+                    icon = AppDevOcticons.Check,
+                    title = stringResource(R.string.notification_empty),
                 )
             }
         }

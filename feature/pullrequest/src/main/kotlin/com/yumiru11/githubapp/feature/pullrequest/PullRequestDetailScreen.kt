@@ -71,7 +71,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
+import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
 import com.yumiru11.githubapp.feature.pullrequest.model.CombinedStatus
 import com.yumiru11.githubapp.feature.pullrequest.model.MergeableState
@@ -83,7 +86,6 @@ import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTab
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestUser
-import com.yumiru11.githubapp.feature.pullrequest.util.relativeTimeText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -437,7 +439,7 @@ private fun PrHeader(
     }
 }
 
-/** Open/Closed/Merged/Draft 状态徽标（tonal 容器） */
+/** Open/Closed/Merged/Draft 状态徽标 → AppStateChip 语义色（#84 audit 缺陷 #4） */
 @Composable
 private fun StatusChip(state: PullRequestState) {
     val text =
@@ -447,17 +449,16 @@ private fun StatusChip(state: PullRequestState) {
             PullRequestState.MERGED -> stringResource(R.string.pull_request_state_merged)
             PullRequestState.DRAFT -> stringResource(R.string.pull_request_state_draft)
         }
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-        )
-    }
+    AppStateChip(
+        status =
+            when (state) {
+                PullRequestState.OPEN -> GitHubStatus.OPEN
+                PullRequestState.CLOSED -> GitHubStatus.CLOSED
+                PullRequestState.MERGED -> GitHubStatus.MERGED
+                PullRequestState.DRAFT -> GitHubStatus.DRAFT
+            },
+        label = text,
+    )
 }
 
 /** Mergeable 状态徽标：可合并（primary）/ 冲突（error）/ 待检查（surfaceVariant） */

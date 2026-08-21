@@ -77,11 +77,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
+import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueLabel
 import com.yumiru11.githubapp.feature.issue.model.IssueReactions
@@ -89,7 +92,6 @@ import com.yumiru11.githubapp.feature.issue.model.IssueState
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineEventType
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineItem
 import com.yumiru11.githubapp.feature.issue.model.IssueUser
-import com.yumiru11.githubapp.feature.issue.util.relativeTimeText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -536,17 +538,15 @@ private fun StatusChip(state: IssueState) {
             IssueState.OPEN -> stringResource(R.string.issue_state_open)
             IssueState.CLOSED -> stringResource(R.string.issue_state_closed)
         }
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-        )
-    }
+    // #84 audit 缺陷 #4：四态同色 secondaryContainer → AppStateChip 语义色
+    AppStateChip(
+        status =
+            when (state) {
+                IssueState.OPEN -> GitHubStatus.OPEN
+                IssueState.CLOSED -> GitHubStatus.CLOSED
+            },
+        label = text,
+    )
 }
 
 /** 标签徽标：取 label 色（低饱和混白），无则 surfaceVariant */

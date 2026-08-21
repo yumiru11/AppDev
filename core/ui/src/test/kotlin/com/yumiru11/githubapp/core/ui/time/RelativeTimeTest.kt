@@ -1,4 +1,4 @@
-package com.yumiru11.githubapp.feature.issue.util
+package com.yumiru11.githubapp.core.ui.time
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
  */
 object AppDimens {
     // Corner radii
+    val cornerExtraSmall: Dp = 4.dp
     val cornerSmall: Dp = 8.dp
     val cornerMedium: Dp = 12.dp
     val cornerLarge: Dp = 16.dp
