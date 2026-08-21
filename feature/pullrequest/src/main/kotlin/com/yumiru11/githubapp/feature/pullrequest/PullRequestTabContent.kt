@@ -54,7 +54,7 @@ import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestCommit
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFile
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFileStatus
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
-import com.yumiru11.githubapp.feature.pullrequest.util.relativeTimeText
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 
 /** Conversation Tab：PR 正文（WebView）+ 时间线（评论/Review/行内评论/提交引用/事件） */
 @Composable

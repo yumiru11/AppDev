@@ -89,7 +89,7 @@ import com.yumiru11.githubapp.feature.issue.model.IssueState
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineEventType
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineItem
 import com.yumiru11.githubapp.feature.issue.model.IssueUser
-import com.yumiru11.githubapp.feature.issue.util.relativeTimeText
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.Locale

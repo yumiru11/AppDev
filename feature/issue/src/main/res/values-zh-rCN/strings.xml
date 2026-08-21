@@ -75,33 +75,6 @@
     <string name="issue_create_labels_hint">逗号分隔的标签名（可选）</string>
     <string name="issue_create_submit">创建 Issue</string>
 
-    <!-- 相对时间 -->
-    <string name="time_just_now">刚刚</string>
-    <plurals name="time_minutes">
-        <item quantity="one">%1$d 分钟前</item>
-        <item quantity="other">%1$d 分钟前</item>
-    </plurals>
-    <plurals name="time_hours">
-        <item quantity="one">%1$d 小时前</item>
-        <item quantity="other">%1$d 小时前</item>
-    </plurals>
-    <plurals name="time_days">
-        <item quantity="one">%1$d 天前</item>
-        <item quantity="other">%1$d 天前</item>
-    </plurals>
-    <plurals name="time_weeks">
-        <item quantity="one">%1$d 周前</item>
-        <item quantity="other">%1$d 周前</item>
-    </plurals>
-    <plurals name="time_months">
-        <item quantity="one">%1$d 个月前</item>
-        <item quantity="other">%1$d 个月前</item>
-    </plurals>
-    <plurals name="time_years">
-        <item quantity="one">%1$d 年前</item>
-        <item quantity="other">%1$d 年前</item>
-    </plurals>
-
     <!-- 时间线事件文案（%1$s = actor login） -->
     <string name="issue_event_closed">%1$s 关闭了此 Issue</string>
     <string name="issue_event_reopened">%1$s 重新开启了此 Issue</string>

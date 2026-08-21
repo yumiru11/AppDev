@@ -126,33 +126,6 @@
     <string name="pull_request_copy_link">复制链接</string>
     <string name="pull_request_link_copied">链接已复制</string>
 
-    <!-- 相对时间 -->
-    <string name="time_just_now">刚刚</string>
-    <plurals name="time_minutes">
-        <item quantity="one">%1$d 分钟前</item>
-        <item quantity="other">%1$d 分钟前</item>
-    </plurals>
-    <plurals name="time_hours">
-        <item quantity="one">%1$d 小时前</item>
-        <item quantity="other">%1$d 小时前</item>
-    </plurals>
-    <plurals name="time_days">
-        <item quantity="one">%1$d 天前</item>
-        <item quantity="other">%1$d 天前</item>
-    </plurals>
-    <plurals name="time_weeks">
-        <item quantity="one">%1$d 周前</item>
-        <item quantity="other">%1$d 周前</item>
-    </plurals>
-    <plurals name="time_months">
-        <item quantity="one">%1$d 个月前</item>
-        <item quantity="other">%1$d 个月前</item>
-    </plurals>
-    <plurals name="time_years">
-        <item quantity="one">%1$d 年前</item>
-        <item quantity="other">%1$d 年前</item>
-    </plurals>
-
     <!-- PR 评论 BottomSheet (PR #82) -->
     <string name="pull_request_add_comment">添加评论</string>
     <string name="pull_request_comment">评论</string>

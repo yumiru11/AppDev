@@ -1,16 +1,16 @@
-package com.yumiru11.githubapp.feature.issue.util
+package com.yumiru11.githubapp.core.ui.time
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import com.yumiru11.githubapp.feature.issue.R
+import com.yumiru11.githubapp.core.ui.R
 import java.time.Duration
 import java.time.Instant
 
 /**
  * 相对时间单位
  */
-internal enum class RelativeTimeUnit {
+enum class RelativeTimeUnit {
     MINUTES,
     HOURS,
     DAYS,
@@ -20,7 +20,7 @@ internal enum class RelativeTimeUnit {
 }
 
 /** 相对时间结果：JustNow 或 Ago(数量+单位) */
-internal sealed interface RelativeTime {
+sealed interface RelativeTime {
     data object JustNow : RelativeTime
 
     data class Ago(
@@ -33,7 +33,7 @@ internal sealed interface RelativeTime {
  * ISO 时间戳 → 相对时间。
  * 解析失败或时间在未来（异常数据）返回 null，由调用方回退到原样时间。
  */
-internal fun computeRelativeTime(
+fun computeRelativeTime(
     isoTimestamp: String,
     now: Instant,
 ): RelativeTime? {
@@ -54,7 +54,7 @@ internal fun computeRelativeTime(
 
 /** ISO 时间戳 → 本地化相对时间文案；解析失败/未来时间返回 null（调用方回退） */
 @Composable
-internal fun relativeTimeText(isoTimestamp: String): String? {
+fun relativeTimeText(isoTimestamp: String): String? {
     val rel = computeRelativeTime(isoTimestamp, Instant.now()) ?: return null
     return when (rel) {
         RelativeTime.JustNow -> {

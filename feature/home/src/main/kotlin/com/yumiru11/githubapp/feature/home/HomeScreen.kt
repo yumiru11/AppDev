@@ -49,6 +49,7 @@ import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppTopBar
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.home.model.FeedEventType
 import com.yumiru11.githubapp.feature.home.model.FeedItem
 import kotlinx.coroutines.flow.Flow
@@ -280,7 +281,8 @@ private fun FeedRow(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    val date = formatDate(item.createdAt)
+                    // #84：相对时间优先（"3 小时前"），解析失败/未来时间回退绝对日期（缺陷 #11 时间显示统一）
+                    val date = feedTimestampText(item.createdAt)
                     if (date.isNotEmpty()) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -357,7 +359,7 @@ private const val ACTION_REOPENED = "reopened"
 private const val ACTION_EDITED = "edited"
 private const val ACTION_DELETED = "deleted"
 
-/** ISO-8601 时间戳 → 本地日期（yyyy-MM-dd）；解析失败返回空串（UI 隐藏时间） */
+/** ISO-8601 时间戳 → 本地日期（yyyy-MM-dd）；解析失败返回空串（UI 隐藏时间）。相对时间不可用时的回退 */
 private fun formatDate(isoTimestamp: String?): String {
     if (isoTimestamp.isNullOrBlank()) return ""
     return runCatching {
@@ -368,6 +370,11 @@ private fun formatDate(isoTimestamp: String?): String {
             .toString()
     }.getOrDefault("")
 }
+
+/** feed 行时间戳：相对时间优先，回退绝对日期（#84 缺陷 #11） */
+@Composable
+private fun feedTimestampText(isoTimestamp: String?): String =
+    isoTimestamp?.let { relativeTimeText(it) } ?: formatDate(isoTimestamp)
 
 @Composable
 private fun UnauthenticatedContent(

@@ -83,7 +83,7 @@ import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTab
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestUser
-import com.yumiru11.githubapp.feature.pullrequest.util.relativeTimeText
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
