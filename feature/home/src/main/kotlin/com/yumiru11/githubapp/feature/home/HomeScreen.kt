@@ -29,6 +29,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -48,12 +49,16 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.designsystem.token.AppBlur
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppTopBar
 import com.yumiru11.githubapp.feature.home.model.FeedEventType
 import com.yumiru11.githubapp.feature.home.model.FeedItem
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.flow.Flow
 import retrofit2.HttpException
 import java.io.IOException
@@ -70,6 +75,8 @@ import java.time.ZoneId
  * - 符合 ui-design.md §2.1：底部大分区（首页/仓库/我的）× 首页内小分区（动态/Issue/PR）；
  *   §2.2 的长条按钮/trending 待对应功能票落地后补齐（Issue 新建等均为 {owner}/{repo} 级路由，
  *   Home 无仓库上下文，不预置死入口）
+ * - backdrop blur（issue #83）：自持顶栏玻璃的 [LocalHazeState]，内容 Box 挂
+ *   `hazeSource`；顶栏 GlassSurface 经 `hazeEffect` 模糊背后滚动内容
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,57 +93,72 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedTab by rememberSaveable { mutableStateOf(HomeTab.FEED) }
 
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            AppTopBar(
-                onSearchClick = onSearchClick,
-                onNotificationClick = onNotificationClick,
-                onProfileClick = onProfileClick,
-                blurEnabled = blurEnabled,
-            )
-        },
-    ) { paddingValues ->
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                when (val state = uiState) {
-                    is HomeUiState.Loading -> {
-                        LoadingContent(modifier = Modifier.fillMaxSize())
-                    }
+    // backdrop blur（issue #83）：顶栏 AppTopBar 的 hazeEffect 与本页内容侧 hazeSource
+    // 共享本 state。自建一份覆盖 MainTabPager 提供的底栏 state，避免顶栏 effect
+    // 嵌套进底栏 source 子树。
+    val hazeState = rememberHazeState()
+    val useHazeSource = blurEnabled && AppBlur.isBlurSupported()
 
-                    is HomeUiState.Unauthenticated -> {
-                        UnauthenticatedContent(
-                            onLoginClick = onLoginClick,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
+    CompositionLocalProvider(LocalHazeState provides hazeState) {
+        Scaffold(
+            modifier = modifier,
+            topBar = {
+                AppTopBar(
+                    onSearchClick = onSearchClick,
+                    onNotificationClick = onNotificationClick,
+                    onProfileClick = onProfileClick,
+                    blurEnabled = blurEnabled,
+                )
+            },
+        ) { paddingValues ->
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (useHazeSource) {
+                                // 顶栏玻璃的模糊源：feed/分区条等内容区
+                                Modifier.hazeSource(hazeState)
+                            } else {
+                                Modifier
+                            },
+                        ).padding(paddingValues),
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    when (val state = uiState) {
+                        is HomeUiState.Loading -> {
+                            LoadingContent(modifier = Modifier.fillMaxSize())
+                        }
 
-                    is HomeUiState.Error -> {
-                        ErrorContent(
-                            errorType = state.errorType,
-                            onRetry = { viewModel.retry() },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
+                        is HomeUiState.Unauthenticated -> {
+                            UnauthenticatedContent(
+                                onLoginClick = onLoginClick,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
 
-                    is HomeUiState.Success -> {
-                        // 顶部小分区条（动态/Issue/PR）——仅登录成功后有内容可切，未登录/错误态不渲染
-                        HomeTabBar(
-                            selectedTab = selectedTab,
-                            onTabSelected = { selectedTab = it },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        FeedContent(
-                            feed = state.feed,
-                            selectedTab = selectedTab,
-                            onFeedItemClick = onFeedItemClick,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                        is HomeUiState.Error -> {
+                            ErrorContent(
+                                errorType = state.errorType,
+                                onRetry = { viewModel.retry() },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+
+                        is HomeUiState.Success -> {
+                            // 顶部小分区条（动态/Issue/PR）——仅登录成功后有内容可切，未登录/错误态不渲染
+                            HomeTabBar(
+                                selectedTab = selectedTab,
+                                onTabSelected = { selectedTab = it },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            FeedContent(
+                                feed = state.feed,
+                                selectedTab = selectedTab,
+                                onFeedItemClick = onFeedItemClick,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 }
             }
