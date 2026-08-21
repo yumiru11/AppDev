@@ -1,7 +1,7 @@
 package com.yumiru11.githubapp.core.designsystem.component
 
-import dev.chrisbanes.haze.HazeState
 import androidx.compose.runtime.staticCompositionLocalOf
+import dev.chrisbanes.haze.HazeState
 
 /**
  * 毛玻璃 backdrop blur 的共享 [HazeState]（issue #83，ui-audit 缺陷 #1）。

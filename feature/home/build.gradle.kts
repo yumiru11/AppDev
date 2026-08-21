@@ -41,6 +41,9 @@ dependencies {
 
     // 首页外壳（AppTopBar/AppBottomBar 玻璃栏）
     implementation(project(":core:ui"))
+    // 玻璃令牌与 LocalHazeState（backdrop blur 内容侧接线，issue #83；同 repo/search 先例）
+    implementation(project(":core:designsystem"))
+    implementation(libs.haze)
 
     // Testing
     testImplementation(project(":core:testing"))
