@@ -20,9 +20,9 @@
     <string name="feed_action_push">%1$s pushed %2$d commits</string>
     <string name="feed_action_star">%1$s starred</string>
     <string name="feed_action_fork">%1$s forked</string>
-    
-    <!-- Home action buttons (ui-design.md §2.2) -->
-    <string name="home_create_issue">New Issue</string>
-    <string name="home_view_prs">View Pull Requests</string>
-    <string name="home_create_repo">New Repository</string>
+
+    <!-- Home sub-tab bar (ui-design.md §2.1) -->
+    <string name="home_tab_feed">Feed</string>
+    <string name="home_tab_issues">Issues</string>
+    <string name="home_tab_pull_requests">Pull Requests</string>
 </resources>

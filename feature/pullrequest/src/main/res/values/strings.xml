@@ -157,6 +157,7 @@
     <string name="pull_request_add_comment">Add comment</string>
     <string name="pull_request_comment">Comment</string>
     <string name="pull_request_comment_placeholder">Leave a comment…</string>
+    <string name="pull_request_comment_unavailable">Comment posting isn\'t available yet</string>
     <string name="cancel">Cancel</string>
     <string name="submit">Submit</string>
 </resources>

@@ -3,6 +3,7 @@
 package com.yumiru11.githubapp.core.editor
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -126,7 +127,7 @@ private fun createTextMateLanguage(
         }
     }.onFailure { e ->
         // 语法资产损坏/加载失败统一兜底为纯文本，不崩溃
-        android.util.Log.e("MarkdownEditorView", "Failed to load grammar: $grammarFileName", e)
+        Log.e("MarkdownEditorView", "Failed to load grammar: $grammarFileName", e)
     }.getOrNull()
 
 private const val MARKDOWN_GRAMMAR = "markdown.tmLanguage.json"

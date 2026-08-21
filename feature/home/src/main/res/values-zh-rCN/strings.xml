@@ -20,9 +20,9 @@
     <string name="feed_action_push">%1$s 推送了 %2$d 个提交</string>
     <string name="feed_action_star">%1$s Star 了</string>
     <string name="feed_action_fork">%1$s Fork 了</string>
-    
-    <!-- Home action buttons (ui-design.md §2.2) -->
-    <string name="home_create_issue">新建 Issue</string>
-    <string name="home_view_prs">查看 Pull Requests</string>
-    <string name="home_create_repo">新建仓库</string>
+
+    <!-- Home sub-tab bar (ui-design.md §2.1) -->
+    <string name="home_tab_feed">动态</string>
+    <string name="home_tab_issues">Issue</string>
+    <string name="home_tab_pull_requests">PR</string>
 </resources>
