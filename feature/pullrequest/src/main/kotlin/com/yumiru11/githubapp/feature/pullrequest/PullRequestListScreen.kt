@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,9 +42,11 @@ import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
+import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequest
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFilter
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestState
+import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestUser
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -306,6 +309,46 @@ private fun EmptyContent(modifier: Modifier = Modifier) {
             text = stringResource(R.string.pull_request_list_empty),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+// ── @Preview（#86）：行组件 Light/Dark 双主题预览，样例数据离线自足 ──
+
+@Preview(name = "Light", showBackground = true)
+@Composable
+private fun PullRequestRowPreviewLight() {
+    AppTheme(darkTheme = false) {
+        PullRequestRow(
+            pullRequest =
+                PullRequest(
+                    id = 91L,
+                    number = 91,
+                    title = "docs(ui): 归档 UI 审查报告并立项 ui-audit 修复批",
+                    state = PullRequestState.OPEN,
+                    author = PullRequestUser(login = "yumiru11"),
+                    commentCount = 2,
+                ),
+            onClick = {},
+        )
+    }
+}
+
+@Preview(name = "Dark", showBackground = true)
+@Composable
+private fun PullRequestRowPreviewDark() {
+    AppTheme(darkTheme = true) {
+        PullRequestRow(
+            pullRequest =
+                PullRequest(
+                    id = 73L,
+                    number = 73,
+                    title = "feat(markdown): WebView 主渲染切换收尾",
+                    state = PullRequestState.MERGED,
+                    author = PullRequestUser(login = "octocat"),
+                    commentCount = 5,
+                ),
+            onClick = {},
         )
     }
 }

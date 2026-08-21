@@ -10,18 +10,18 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
+import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.navigation.AppRoute
 
 /**
@@ -90,3 +90,21 @@ fun AppBottomBar(
 
 /** 仓库 Tab 路由（底部导航专用，非 AppRoute 常量） */
 const val TAB_REPOS = "repos"
+
+// ── @Preview（#86）：底栏 Light/Dark 双主题预览 ──
+
+@Preview(name = "Light", showBackground = true)
+@Composable
+private fun AppBottomBarPreviewLight() {
+    AppTheme(darkTheme = false) {
+        AppBottomBar(selectedTab = AppRoute.HOME, onTabSelected = {})
+    }
+}
+
+@Preview(name = "Dark", showBackground = true)
+@Composable
+private fun AppBottomBarPreviewDark() {
+    AppTheme(darkTheme = true) {
+        AppBottomBar(selectedTab = TAB_REPOS, onTabSelected = {})
+    }
+}

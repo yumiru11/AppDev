@@ -26,6 +26,7 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
     implementation(libs.compose.material.icons.core)
+    implementation(libs.compose.ui.tooling.preview)
 
     // Lifecycle
     implementation(libs.lifecycle.runtime.compose)
@@ -60,6 +61,9 @@ dependencies {
 
     // 外壳（TopAppBar 等）
     implementation(project(":core:ui"))
+
+    // 主题（@Preview 用 AppTheme 包裹，#86）
+    implementation(project(":core:designsystem"))
 
     // Testing
     testImplementation(project(":core:testing"))
