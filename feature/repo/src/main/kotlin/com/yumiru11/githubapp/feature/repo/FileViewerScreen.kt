@@ -1,4 +1,6 @@
-@file:Suppress("LongMethod") // 查看器状态分支（CODE/MARKDOWN/大文件/二进制）结构固有，拆散反损可读性
+@file:Suppress("LongMethod", "CyclomaticComplexMethod")
+// 查看器状态分支（CODE/MARKDOWN/大文件/二进制）+ T22 编辑/搜索/跳转动作区 + 跳转对话框，
+// 圈复杂度到达 15 阈值边界，属屏幕装配固有结构，拆散反损可读性
 
 package com.yumiru11.githubapp.feature.repo
 
@@ -52,17 +54,19 @@ import com.yumiru11.githubapp.core.editor.CodeLanguageDetector
 import com.yumiru11.githubapp.core.editor.EditorThemeTokens
 import com.yumiru11.githubapp.core.editor.rememberM3EditorThemeTokens
 import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
-import com.yumiru11.githubapp.core.ui.LocalRepoDetailActions
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
 
 /**
- * 文件查看器（T11 验收 2-5 条）。
+ * 文件查看器（T11 验收 2-5 条 + T22 编辑入口）。
  *
- * - CODE：Sora 只读高亮（行号/横向滚动）+ 搜索（sora 内置搜索模式）+ 跳转行
- * - MARKDOWN：Rendered（[MarkdownViewer] 原生渲染）/ Source（Sora）切换
+ * - CODE：Sora 只读高亮（行号/横向滚动）+ 搜索（sora 内置搜索模式）+ 跳转行 + 编辑（T22）
+ * - MARKDOWN：Rendered（[MarkdownViewer] 原生渲染）/ Source（Sora）切换 + 编辑（T22，
+ *   D1 决策：md 编辑统一走可提交编辑器，T21 无提交入口摘除）
  * - TOO_LARGE / BINARY：明确提示卡片而非尝试渲染
  *
  * 编辑器主题跟随 M3（[rememberM3EditorThemeTokens]，plan.md §8.2 映射表）。
+ *
+ * @param editable 是否显示编辑入口（游客只读：[RepoDetailScreen] 按登录态传入）
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +77,7 @@ fun FileViewerScreen(
     viewModel: RepoFilesViewModel,
     actions: RepoDetailActions,
     baseRepoUrl: String,
+    editable: Boolean = true,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -104,6 +109,7 @@ fun FileViewerScreen(
                 actions = {
                     when (loaded?.kind) {
                         FileKind.CODE -> {
+                            if (editable) EditFileButton(viewModel)
                             IconButton(onClick = { editor?.startSearch() }) {
                                 Icon(
                                     imageVector = MaterialSymbols.Rounded.Search,
@@ -119,16 +125,8 @@ fun FileViewerScreen(
                         }
 
                         FileKind.MARKDOWN -> {
-                            // T21 编辑入口：onEditMarkdown 未接线（null）时隐藏编辑按钮
-                            val editMarkdown = LocalRepoDetailActions.current.onEditMarkdown
-                            if (editMarkdown != null) {
-                                IconButton(onClick = { editMarkdown(loaded?.text.orEmpty()) }) {
-                                    Icon(
-                                        imageVector = MaterialSymbols.Rounded.Edit,
-                                        contentDescription = stringResource(R.string.repo_file_edit),
-                                    )
-                                }
-                            }
+                            // T22 D1：md 编辑统一走可提交编辑器（T21 无提交入口摘除）
+                            if (editable) EditFileButton(viewModel)
                         }
 
                         else -> {}
@@ -235,6 +233,17 @@ fun FileViewerScreen(
                     Text(text = stringResource(R.string.repo_file_cancel))
                 }
             },
+        )
+    }
+}
+
+/** T22：进入可提交文件编辑（CODE/MARKDOWN 文本文件）。 */
+@Composable
+private fun EditFileButton(viewModel: RepoFilesViewModel) {
+    IconButton(onClick = { viewModel.startEdit() }) {
+        Icon(
+            imageVector = MaterialSymbols.Rounded.Edit,
+            contentDescription = stringResource(R.string.repo_file_edit),
         )
     }
 }

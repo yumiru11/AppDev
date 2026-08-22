@@ -46,6 +46,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -68,6 +69,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.rounded.Add
 import com.composables.icons.materialsymbols.rounded.Call_split
 import com.composables.icons.materialsymbols.rounded.Tag
 import com.composables.icons.materialsymbols.rounded.Visibility
@@ -113,6 +115,8 @@ fun RepoDetailScreen(
 
     val snackbarHostState = remember { SnackbarHostState() }
     RepoEventSnackbar(viewModel = viewModel, snackbarHostState = snackbarHostState)
+    // T22：文件编辑事件（提交/删除成功、保留本地剪贴板、失败文案）
+    FileEditEventSnackbar(viewModel = filesViewModel, snackbarHostState = snackbarHostState)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -141,7 +145,18 @@ fun RepoDetailScreen(
                 }
 
                 is RepoDetailUiState.Success -> {
-                    if (filesState.selectedPath != null) {
+                    if (filesState.editState !is FileEditState.Idle) {
+                        // T22：文件编辑全屏覆盖（编辑/预览/提交/删除/冲突对话框；返回键回查看器）
+                        FileEditScreen(
+                            editState = filesState.editState,
+                            filePath = filesState.selectedPath,
+                            baseRepoUrl = buildRepoUrl(state.repo),
+                            defaultRef = state.repo.defaultBranch ?: DEFAULT_REF,
+                            viewModel = filesViewModel,
+                            onClose = { filesViewModel.dismissEdit() },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else if (filesState.selectedPath != null) {
                         // T11：文件查看器全屏覆盖（树/README 内容隐藏，返回键回文件树）
                         FileViewerScreen(
                             fileState = filesState.fileState,
@@ -150,6 +165,7 @@ fun RepoDetailScreen(
                             viewModel = filesViewModel,
                             actions = actions,
                             baseRepoUrl = buildRepoUrl(state.repo),
+                            editable = state.isLoggedIn,
                             onClose = { filesViewModel.closeFile() },
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -200,6 +216,67 @@ private fun RepoEventSnackbar(
             snackbarHostState.showSnackbar(message)
         }
     }
+}
+
+/** 文件编辑事件 → Snackbar/剪贴板（UI 层 stringResource 映射，ViewModel 不产文案）。 */
+@Composable
+private fun FileEditEventSnackbar(
+    viewModel: RepoFilesViewModel,
+    snackbarHostState: SnackbarHostState,
+) {
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.editEvents.collect { event ->
+            when (event) {
+                is FileEditEvent.Committed -> {
+                    val message =
+                        if (event.isNewBranch) {
+                            context.getString(
+                                R.string.repo_file_snackbar_committed_new_branch,
+                                event.path,
+                                event.branch.orEmpty(),
+                            )
+                        } else {
+                            context.getString(R.string.repo_file_snackbar_committed, event.path)
+                        }
+                    snackbarHostState.showSnackbar(message)
+                }
+
+                is FileEditEvent.Deleted -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.repo_file_snackbar_deleted, event.path))
+                }
+
+                is FileEditEvent.KeepLocal -> {
+                    copyToClipboard(context, event.text)
+                    snackbarHostState.showSnackbar(context.getString(R.string.repo_file_snackbar_keep_local))
+                }
+
+                is FileEditEvent.Failed -> {
+                    snackbarHostState.showSnackbar(editErrorText(context, event.errorType))
+                }
+            }
+        }
+    }
+}
+
+/** 编辑错误类型 → 本地化文案（非 Composable 版本：事件收集场景不可用 stringResource）。 */
+private fun editErrorText(
+    context: Context,
+    errorType: RepoErrorType,
+): String =
+    when (errorType) {
+        RepoErrorType.NOT_FOUND -> context.getString(R.string.repo_error_not_found)
+        RepoErrorType.NETWORK -> context.getString(R.string.repo_error_network)
+        RepoErrorType.UNKNOWN -> context.getString(R.string.repo_error_unknown)
+    }
+
+/** 复制文本到系统剪贴板（409「保留本地更改」）。 */
+private fun copyToClipboard(
+    context: Context,
+    text: String,
+) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText("file-edit", text))
 }
 
 /** 顶栏：返回 + 仓库名。 */
@@ -297,13 +374,12 @@ private fun RepoDetailContent(
             }
 
             1 -> {
-                Box(Modifier.padding(horizontal = 16.dp)) {
-                    FileTreeSection(
-                        treeState = filesState.treeState,
-                        defaultBranch = state.repo.defaultBranch,
-                        viewModel = filesViewModel,
-                    )
-                }
+                FilesTab(
+                    filesState = filesState,
+                    filesViewModel = filesViewModel,
+                    isLoggedIn = state.isLoggedIn,
+                    defaultBranch = state.repo.defaultBranch,
+                )
             }
 
             else -> {
@@ -315,6 +391,39 @@ private fun RepoDetailContent(
                     )
                 }
             }
+        }
+    }
+}
+
+/** 文件 Tab（T22 扩展）：新建文件入口（登录态才可写）+ 文件树。 */
+@Composable
+private fun FilesTab(
+    filesState: RepoFilesUiState,
+    filesViewModel: RepoFilesViewModel,
+    isLoggedIn: Boolean,
+    defaultBranch: String?,
+) {
+    Box(Modifier.padding(horizontal = 16.dp)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (isLoggedIn) {
+                TextButton(
+                    onClick = { filesViewModel.startNewFile() },
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Icon(
+                        imageVector = MaterialSymbols.Rounded.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = stringResource(R.string.repo_file_new))
+                }
+            }
+            FileTreeSection(
+                treeState = filesState.treeState,
+                defaultBranch = defaultBranch,
+                viewModel = filesViewModel,
+            )
         }
     }
 }
