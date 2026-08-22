@@ -10,9 +10,13 @@ import com.yumiru11.githubapp.core.githubrest.api.ContentApi
 import com.yumiru11.githubapp.core.githubrest.api.GitTreeApi
 import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
+import com.yumiru11.githubapp.core.githubrest.model.FileDeleteRequest
+import com.yumiru11.githubapp.core.githubrest.model.FileWriteRequest
 import com.yumiru11.githubapp.core.githubrest.model.MarkdownRenderRequest
 import com.yumiru11.githubapp.core.githubrest.model.ReadmeDto
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
+import retrofit2.HttpException
+import java.util.Base64
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -112,6 +116,7 @@ class RepoRepository
                     size = dto.size,
                     kind = kind,
                     text = text,
+                    sha = dto.sha,
                 )
             }
 
@@ -267,6 +272,70 @@ class RepoRepository
             }
         }
 
+        /**
+         * 更新/创建文件（T22，plan.md §7.4）。
+         *
+         * @param text 新文件全文（UTF-8；客户端层 base64 编码后 PUT）
+         * @param sha 被替换文件 blob SHA；null = 新建文件（无 sha 校验）
+         * @param message 提交信息（必填）
+         * @param branch 目标分支名；null = 当前查看分支。分支不存在时 GitHub 自动创建
+         *   （2026-08-22 实测：PUT 到新分支返回 201 且分支自动建立，无需先建 ref）
+         * @return Success（新 blob/commit SHA）或 Conflict（409：远端最新 blob SHA，绝不静默覆盖）
+         */
+        suspend fun updateFileContent(
+            owner: String,
+            repo: String,
+            path: String,
+            text: String,
+            sha: String?,
+            message: String,
+            branch: String?,
+        ): Result<FileCommitResult> =
+            runCatching {
+                val dto =
+                    contentApi.updateFileContent(
+                        owner,
+                        repo,
+                        path,
+                        FileWriteRequest(
+                            message = message,
+                            content = Base64.getEncoder().encodeToString(text.toByteArray()),
+                            sha = sha,
+                            branch = branch,
+                        ),
+                    )
+                FileCommitResult.Success(commitSha = dto.commit?.sha, contentSha = dto.content?.sha)
+            }.recoverCatching { e ->
+                parseConflictSha(e)?.let { FileCommitResult.Conflict(it) } ?: throw e
+            }
+
+        /**
+         * 删除文件（T22，plan.md §7.4）。
+         *
+         * @param sha 被删除文件 blob SHA（必填，DELETE 请求体）
+         * @param branch 目标分支名；null = 当前查看分支
+         */
+        suspend fun deleteFile(
+            owner: String,
+            repo: String,
+            path: String,
+            sha: String,
+            message: String,
+            branch: String?,
+        ): Result<FileCommitResult> =
+            runCatching {
+                val dto =
+                    contentApi.deleteFile(
+                        owner,
+                        repo,
+                        path,
+                        FileDeleteRequest(message = message, sha = sha, branch = branch),
+                    )
+                FileCommitResult.Success(commitSha = dto.commit?.sha, contentSha = null)
+            }.recoverCatching { e ->
+                parseConflictSha(e)?.let { FileCommitResult.Conflict(it) } ?: throw e
+            }
+
         private companion object {
             const val TAG = "ReadmeRender"
         }
@@ -286,3 +355,35 @@ data class ReadmeContent(
     val renderMode: ReadmeRenderMode,
     val webViewRenderMode: RenderMode = RenderMode.SERVER_HTML,
 )
+
+/**
+ * 文件写操作结果（T22）。
+ *
+ * [Conflict] 情形绝不静默收敛——上层必须展示三选项（重载/覆盖/保留本地）让用户决定。
+ */
+sealed interface FileCommitResult {
+    /** 写入成功。 */
+    data class Success(
+        val commitSha: String?,
+        val contentSha: String?,
+    ) : FileCommitResult
+
+    /** 409 冲突：远端文件已变更，携带其最新 blob SHA（源自 409 响应体 message）。 */
+    data class Conflict(
+        val latestSha: String,
+    ) : FileCommitResult
+}
+
+/**
+ * 从 409 HttpException 响应体解析最新 blob SHA。
+ *
+ * GitHub 409 响应 message 格式："<path> does not match <sha>"（2026-08-22 实测）；
+ * 解析失败返回 null（调用方按普通错误处理，不做静默覆盖）。
+ */
+internal fun parseConflictSha(e: Throwable): String? {
+    if (e !is HttpException || e.code() != 409) return null
+    val body = runCatching { e.response()?.errorBody()?.string() }.getOrNull() ?: return null
+    return CONFLICT_SHA_REGEX.find(body)?.groupValues?.get(1)
+}
+
+private val CONFLICT_SHA_REGEX = Regex("does not match ([0-9a-f]{40})")

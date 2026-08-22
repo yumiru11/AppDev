@@ -28,6 +28,8 @@ data class FileContentData(
     val size: Long,
     val kind: FileKind,
     val text: String? = null,
+    /** 文件 blob SHA（T22 编辑提交必需：PUT sha 校验 / DELETE sha 必填）。 */
+    val sha: String? = null,
 )
 
 /**
