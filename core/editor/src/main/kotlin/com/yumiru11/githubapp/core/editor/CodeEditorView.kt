@@ -5,8 +5,10 @@ package com.yumiru11.githubapp.core.editor
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -18,26 +20,28 @@ import org.eclipse.tm4e.core.registry.IGrammarSource
 import org.eclipse.tm4e.core.registry.IThemeSource
 
 /**
- * Sora Editor 只读代码视图（plan.md §8.1：TextMate 高亮、行号、横向滚动）。
+ * Sora Editor 代码视图（plan.md §8.1/§8.2：TextMate 高亮、行号、横向滚动、可编辑）。
  *
- * - 只读：禁编辑/撤销；行号开启；禁软换行（横向滚动）
- * - 高亮：TextMate 语法（assets/grammars/ 资产，[CodeLanguageDetector] 选择）；
- *   语法缺失/加载失败 → 纯文本兜底，不崩溃
- * - 主题：M3 派生 VS Code 主题 JSON（[m3EditorThemeTokens] + [buildEditorThemeJson]），
- *   经全局 ThemeRegistry 注入（sora language-textmate 的 analyzer 从全局注册表取主题——
- *   本应用同时只显示一个编辑器，单例无冲突）
+ * - 默认只读（T11 代码浏览）：禁编辑/撤销；行号开启；禁软换行（横向滚动）
+ * - [editable] = true（T22 文件编辑提交）：可编辑 + undo/redo，文本变更经
+ *   [onTextChanged] 上报宿主（编辑器是文本唯一事实源，宿主据此同步提交状态）
+ * - 高亮/主题与只读共用：[CodeLanguageDetector] 选语法资产，M3 派生主题
  *
- * @param content 文件文本（已解码，保留原 CRLF）
+ * @param content 文件文本（已解码，保留原 CRLF；编辑模式仅用于初始化/外部重置）
  * @param grammarFileName TextMate 语法资产文件名（assets/grammars/ 下；null = 纯文本）
  * @param themeTokens M3 编辑器令牌（[rememberM3EditorThemeTokens]）
- * @param onEditorReady 编辑器控制句柄就绪回调（搜索/跳转行等外部控制用）
+ * @param editable 是否可编辑（false = 只读浏览，T11 默认行为）
+ * @param onEditorReady 编辑器控制句柄就绪回调（搜索/跳转行/撤销重做等外部控制用）
+ * @param onTextChanged 文本变更回调（编辑模式同步宿主状态；[CodeEditorController.onTextChanged]）
  */
 @Composable
 fun CodeEditorView(
     content: String,
     grammarFileName: String?,
     themeTokens: EditorThemeTokens,
+    editable: Boolean = false,
     onEditorReady: (CodeEditorController) -> Unit = {},
+    onTextChanged: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -58,17 +62,21 @@ fun CodeEditorView(
         }
 
     val currentOnEditorReady by rememberUpdatedState(onEditorReady)
+    val currentOnTextChanged by rememberUpdatedState(onTextChanged)
+
+    // 控制器只创建一次（注册内容监听器，重复创建会累积监听器）；onTextChanged 每次重组刷新
+    var controller by remember { mutableStateOf<CodeEditorController?>(null) }
 
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
             CodeEditor(ctx).apply {
-                setEditable(false)
+                setEditable(editable)
                 isLineNumberEnabled = true
                 isWordwrap = false
                 setTabWidth(4)
                 setTextSize(EDITOR_TEXT_SIZE_SP)
-                setUndoEnabled(false)
+                setUndoEnabled(editable)
             }
         },
         update = { editor ->
@@ -81,7 +89,23 @@ fun CodeEditorView(
                 editor.setEditorLanguage(language)
                 runCatching { editor.setColorScheme(TextMateColorScheme.create(ThemeRegistry.getInstance())) }
             }
-            currentOnEditorReady(CodeEditorController(editor))
+            if (controller == null) {
+                controller = CodeEditorController(editor)
+            }
+            controller?.let { c ->
+                c.onTextChanged = currentOnTextChanged
+                currentOnEditorReady(c)
+            }
+        },
+        onReset = {
+            // 视图重置时销毁旧控制器（移除监听器），防止内存泄漏
+            controller?.destroy()
+            controller = null
+        },
+        onRelease = {
+            // 视图释放时销毁控制器（移除监听器），防止内存泄漏
+            controller?.destroy()
+            controller = null
         },
     )
 }
