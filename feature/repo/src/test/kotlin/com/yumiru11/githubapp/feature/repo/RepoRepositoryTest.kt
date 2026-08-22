@@ -6,6 +6,7 @@ import com.yumiru11.githubapp.core.githubrest.api.ContentApi
 import com.yumiru11.githubapp.core.githubrest.api.GitTreeApi
 import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
+import com.yumiru11.githubapp.core.githubrest.model.ContentWriteResponseDto
 import com.yumiru11.githubapp.core.githubrest.model.FileContentDto
 import com.yumiru11.githubapp.core.githubrest.model.GitTreeResponseDto
 import com.yumiru11.githubapp.core.githubrest.model.ReadmeDto
@@ -451,4 +452,157 @@ class RepoRepositoryTest {
 
             assertTrue(result.isFailure)
         }
+
+    // ── T22 文件编辑提交（Contents API + 409 冲突） ─────────────────────────────
+
+    @Test
+    fun updateFileContent_success_encodesBase64AndReturnsShas() =
+        runTest {
+            val source = "fun main() = println(\"hi\")"
+            coEvery { contentApi.updateFileContent("octocat", "Hello-World", "src/Main.kt", any()) } returns
+                ContentWriteResponseDto(
+                    content = ContentWriteResponseDto.ContentWriteItemDto(sha = "blob-new"),
+                    commit = ContentWriteResponseDto.CommitWriteDto(sha = "commit-new"),
+                )
+
+            val result =
+                repository.updateFileContent(
+                    "octocat",
+                    "Hello-World",
+                    "src/Main.kt",
+                    source,
+                    sha = "blob-old",
+                    message = "fix",
+                    branch = "main",
+                )
+
+            assertTrue(result.isSuccess)
+            val success = result.getOrThrow() as FileCommitResult.Success
+            assertEquals("commit-new", success.commitSha)
+            assertEquals("blob-new", success.contentSha)
+            coVerify {
+                contentApi.updateFileContent(
+                    "octocat",
+                    "Hello-World",
+                    "src/Main.kt",
+                    match {
+                        it.message == "fix" &&
+                            it.content == Base64.getEncoder().encodeToString(source.toByteArray()) &&
+                            it.sha == "blob-old" &&
+                            it.branch == "main"
+                    },
+                )
+            }
+        }
+
+    @Test
+    fun updateFileContent_createNewFile_omitsShaAndBranch() =
+        runTest {
+            coEvery { contentApi.updateFileContent(any(), any(), any(), any()) } returns
+                ContentWriteResponseDto(commit = ContentWriteResponseDto.CommitWriteDto(sha = "c1"))
+
+            val result =
+                repository.updateFileContent("octocat", "Hello-World", "new.txt", "hello", sha = null, message = "add", branch = null)
+
+            assertTrue(result.isSuccess)
+            coVerify {
+                contentApi.updateFileContent(
+                    "octocat",
+                    "Hello-World",
+                    "new.txt",
+                    match { it.sha == null && it.branch == null && it.content == "aGVsbG8=" && it.message == "add" },
+                )
+            }
+        }
+
+    @Test
+    fun updateFileContent_conflict409_returnsConflictWithParsedLatestSha() =
+        runTest {
+            // GitHub 409 message 实测格式："<path> does not match <sha>"
+            coEvery { contentApi.updateFileContent(any(), any(), any(), any()) } throws
+                conflictException(
+                    409,
+                    """{"message":"probe.txt does not match c0d0fb45c382919737f8d0c20aaf57cf89b74af8","status":"409"}""",
+                )
+
+            val result =
+                repository.updateFileContent("octocat", "Hello-World", "probe.txt", "x", sha = "stale", message = "m", branch = "main")
+
+            assertTrue(result.isSuccess)
+            assertEquals(FileCommitResult.Conflict("c0d0fb45c382919737f8d0c20aaf57cf89b74af8"), result.getOrThrow())
+        }
+
+    @Test
+    fun updateFileContent_conflict409WithoutMatchMessage_returnsFailure() =
+        runTest {
+            coEvery { contentApi.updateFileContent(any(), any(), any(), any()) } throws
+                conflictException(409, """{"message":"Conflict","status":"409"}""")
+
+            val result =
+                repository.updateFileContent("octocat", "Hello-World", "probe.txt", "x", sha = "stale", message = "m", branch = null)
+
+            assertTrue(result.isFailure)
+        }
+
+    @Test
+    fun updateFileContent_networkFailure_returnsFailure() =
+        runTest {
+            coEvery { contentApi.updateFileContent(any(), any(), any(), any()) } throws IOException("down")
+
+            val result = repository.updateFileContent("octocat", "Hello-World", "a.txt", "x", sha = "s", message = "m", branch = null)
+
+            assertTrue(result.isFailure)
+        }
+
+    @Test
+    fun deleteFile_success_returnsCommitSha() =
+        runTest {
+            coEvery { contentApi.deleteFile("octocat", "Hello-World", "a.txt", any()) } returns
+                ContentWriteResponseDto(commit = ContentWriteResponseDto.CommitWriteDto(sha = "del-commit"))
+
+            val result = repository.deleteFile("octocat", "Hello-World", "a.txt", sha = "blob-old", message = "remove", branch = "main")
+
+            assertTrue(result.isSuccess)
+            assertEquals("del-commit", (result.getOrThrow() as FileCommitResult.Success).commitSha)
+            coVerify {
+                contentApi.deleteFile(
+                    "octocat",
+                    "Hello-World",
+                    "a.txt",
+                    match { it.message == "remove" && it.sha == "blob-old" && it.branch == "main" },
+                )
+            }
+        }
+
+    @Test
+    fun deleteFile_conflict409_returnsConflictWithParsedLatestSha() =
+        runTest {
+            coEvery { contentApi.deleteFile(any(), any(), any(), any()) } throws
+                conflictException(
+                    409,
+                    """{"message":"a.txt does not match abcdef0123456789abcdef0123456789abcdef01","status":"409"}""",
+                )
+
+            val result = repository.deleteFile("octocat", "Hello-World", "a.txt", sha = "old", message = "m", branch = null)
+
+            assertTrue(result.isSuccess)
+            assertEquals(FileCommitResult.Conflict("abcdef0123456789abcdef0123456789abcdef01"), result.getOrThrow())
+        }
+
+    @Test
+    fun parseConflictSha_non409_returnsNull() {
+        assertNull(parseConflictSha(httpException(422)))
+        assertNull(parseConflictSha(IOException("down")))
+    }
+
+    @Test
+    fun parseConflictSha_messageWithoutSha_returnsNull() =
+        runTest {
+            assertNull(parseConflictSha(conflictException(409, """{"message":"Conflict"}""")))
+        }
+
+    private fun conflictException(
+        code: Int,
+        body: String,
+    ): HttpException = HttpException(Response.error<Any>(code, body.toResponseBody("application/json".toMediaType())))
 }
