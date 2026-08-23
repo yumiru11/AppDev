@@ -3,11 +3,17 @@ package com.yumiru11.githubapp.core.githubrest.api
 import com.yumiru11.githubapp.core.githubrest.model.CheckRunsResponseDto
 import com.yumiru11.githubapp.core.githubrest.model.CombinedStatusDto
 import com.yumiru11.githubapp.core.githubrest.model.CreateReviewCommentRequest
+import com.yumiru11.githubapp.core.githubrest.model.CreateReviewRequest
 import com.yumiru11.githubapp.core.githubrest.model.IssueEventDto
+import com.yumiru11.githubapp.core.githubrest.model.MergePullRequestRequest
+import com.yumiru11.githubapp.core.githubrest.model.MergePullRequestResult
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestCommitDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestFileDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestReviewCommentDto
+import com.yumiru11.githubapp.core.githubrest.model.PullRequestReviewDto
+import com.yumiru11.githubapp.core.githubrest.model.UpdateBranchRequest
+import com.yumiru11.githubapp.core.githubrest.model.UpdateBranchResult
 import com.yumiru11.githubapp.core.githubrest.model.UpdateReviewCommentRequest
 import retrofit2.Response
 import retrofit2.http.Body
@@ -16,6 +22,7 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -172,6 +179,46 @@ interface PullRequestApi {
         @Path("repo") repo: String,
         @Path("ref") ref: String,
     ): CombinedStatusDto
+
+    /**
+     * POST /repos/{owner}/{repo}/pulls/{number}/reviews：提交 Review（T17）。
+     *
+     * @param request 结论（APPROVE / REQUEST_CHANGES / COMMENT）+ 正文（COMMENT 必填）
+     */
+    @POST("repos/{owner}/{repo}/pulls/{number}/reviews")
+    suspend fun createReview(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("number") number: Int,
+        @Body request: CreateReviewRequest,
+    ): PullRequestReviewDto
+
+    /**
+     * PUT /repos/{owner}/{repo}/pulls/{number}/merge：合并 PR（T17）。
+     *
+     * 合并方法 merge/squash/rebase 经 [MergePullRequestRequest.mergeMethod]；
+     * 405 = 不可合并（冲突/检查中），409 = sha 不匹配（他人已推进）。
+     */
+    @PUT("repos/{owner}/{repo}/pulls/{number}/merge")
+    suspend fun mergePullRequest(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("number") number: Int,
+        @Body request: MergePullRequestRequest,
+    ): MergePullRequestResult
+
+    /**
+     * PUT /repos/{owner}/{repo}/pulls/{number}/update-branch：更新分支（T17，202 Accepted）。
+     *
+     * 仅同仓库 PR 可用（跨仓库 GitHub 返回 422）；expected_head_sha 缺省=最新 head。
+     */
+    @PUT("repos/{owner}/{repo}/pulls/{number}/update-branch")
+    suspend fun updateBranch(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("number") number: Int,
+        @Body request: UpdateBranchRequest,
+    ): UpdateBranchResult
 
     private companion object {
         /** 时间线及 Reviews/Events 扩展媒体类型（GitHub preview） */

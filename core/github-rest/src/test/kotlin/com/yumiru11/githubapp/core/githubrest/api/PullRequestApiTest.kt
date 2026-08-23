@@ -3,6 +3,9 @@ package com.yumiru11.githubapp.core.githubrest.api
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
 import com.yumiru11.githubapp.core.githubrest.model.CreateReviewCommentRequest
+import com.yumiru11.githubapp.core.githubrest.model.CreateReviewRequest
+import com.yumiru11.githubapp.core.githubrest.model.MergePullRequestRequest
+import com.yumiru11.githubapp.core.githubrest.model.UpdateBranchRequest
 import com.yumiru11.githubapp.core.githubrest.model.UpdateReviewCommentRequest
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
@@ -466,6 +469,106 @@ class PullRequestApiTest {
             val request = server.takeRequest()
             assertEquals("DELETE", request.method.toString())
             assertEquals("/repos/octocat/Hello-World/pulls/comments/200", request.url.encodedPath)
+        }
+
+    @Test
+    fun createReview_sendsEventAndBody_returnsReview() =
+        runTest {
+            server.enqueue(
+                jsonResponse(
+                    """
+                    {
+                      "id": 1,
+                      "user": { "login": "reviewer", "id": 2 },
+                      "body": "LGTM",
+                      "state": "APPROVED",
+                      "submitted_at": "2026-08-02T00:00:00Z"
+                    }
+                    """.trimIndent(),
+                ),
+            )
+
+            val review =
+                pullRequestApi.createReview(
+                    "octocat",
+                    "Hello-World",
+                    number = 42,
+                    request = CreateReviewRequest(body = "LGTM", event = "APPROVE"),
+                )
+
+            assertEquals(1L, review.id)
+            assertEquals("APPROVED", review.state)
+            assertEquals("LGTM", review.body)
+            val request = server.takeRequest()
+            assertEquals("POST", request.method.toString())
+            assertEquals("/repos/octocat/Hello-World/pulls/42/reviews", request.url.encodedPath)
+            val body = request.body?.utf8()
+            assertTrue(body?.contains("\"event\":\"APPROVE\"") == true)
+            assertTrue(body?.contains("\"body\":\"LGTM\"") == true)
+        }
+
+    @Test
+    fun mergePullRequest_sendsMergeMethodTitleAndSha_parsesResult() =
+        runTest {
+            server.enqueue(
+                jsonResponse(
+                    """
+                    { "sha": "abc123", "merged": true, "message": "Pull Request successfully merged" }
+                    """.trimIndent(),
+                ),
+            )
+
+            val result =
+                pullRequestApi.mergePullRequest(
+                    "octocat",
+                    "Hello-World",
+                    number = 42,
+                    request =
+                        MergePullRequestRequest(
+                            commitTitle = "Merge PR",
+                            commitMessage = "note",
+                            sha = "head-sha",
+                            mergeMethod = "squash",
+                        ),
+                )
+
+            assertTrue(result.merged)
+            assertEquals("abc123", result.sha)
+            val request = server.takeRequest()
+            assertEquals("PUT", request.method.toString())
+            assertEquals("/repos/octocat/Hello-World/pulls/42/merge", request.url.encodedPath)
+            val body = request.body?.utf8()
+            assertTrue(body?.contains("\"merge_method\":\"squash\"") == true)
+            assertTrue(body?.contains("\"commit_title\":\"Merge PR\"") == true)
+            assertTrue(body?.contains("\"commit_message\":\"note\"") == true)
+            assertTrue(body?.contains("\"sha\":\"head-sha\"") == true)
+        }
+
+    @Test
+    fun updateBranch_sendsExpectedHeadSha_parsesAccepted() =
+        runTest {
+            server.enqueue(
+                jsonResponse(
+                    """
+                    { "message": "Updating pull request branch", "url": "https://api.github.com/repos/octocat/Hello-World/pulls/42" }
+                    """.trimIndent(),
+                ),
+            )
+
+            val result =
+                pullRequestApi.updateBranch(
+                    "octocat",
+                    "Hello-World",
+                    number = 42,
+                    request = UpdateBranchRequest(expectedHeadSha = "abc123"),
+                )
+
+            assertEquals("Updating pull request branch", result.message)
+            val request = server.takeRequest()
+            assertEquals("PUT", request.method.toString())
+            assertEquals("/repos/octocat/Hello-World/pulls/42/update-branch", request.url.encodedPath)
+            val body = request.body?.utf8()
+            assertTrue(body?.contains("\"expected_head_sha\":\"abc123\"") == true)
         }
 
     private fun jsonResponse(body: String): MockResponse =
