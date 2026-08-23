@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.core.githubrest.api
 
 import com.yumiru11.githubapp.core.githubrest.model.NotificationDto
 import retrofit2.Response
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.Path
@@ -13,6 +14,7 @@ import retrofit2.http.Query
  * - GET /notifications：通知列表（[all] 含已读、[participating] 仅参与、page 分页）
  * - PATCH /notifications/threads/{thread_id}：单条已读（GitHub 返回 205 Reset Content 空体）
  * - PATCH /notifications：全部已读
+ * - DELETE /notifications/threads/{thread_id}：标记单条 done（#88 面板左滑删除，204 空响应）
  *
  * mention 无独立服务端参数（GitHub API 仅 all/participating），由调用方按 reason 客户端过滤。
  */
@@ -35,4 +37,10 @@ interface NotificationApi {
     /** PATCH /notifications：标记全部已读（空体请求，服务端 205 空响应） */
     @PATCH("notifications")
     suspend fun markAllRead(): Response<Unit>
+
+    /** DELETE /notifications/threads/{thread_id}：标记单条 done（面板左滑删除，服务端 204 空响应） */
+    @DELETE("notifications/threads/{thread_id}")
+    suspend fun markThreadDone(
+        @Path("thread_id") threadId: String,
+    ): Response<Unit>
 }

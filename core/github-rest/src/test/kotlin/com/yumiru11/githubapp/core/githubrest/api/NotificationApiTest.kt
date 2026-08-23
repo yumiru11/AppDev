@@ -224,4 +224,22 @@ class NotificationApiTest {
             assertNull("updatedAt 缺失应解析为 null", notification.updatedAt)
             assertNull("htmlUrl 缺失应解析为 null", notification.htmlUrl)
         }
+
+    @Test
+    fun markThreadDone_success_sendsDeleteThreadRequest() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .code(204)
+                    .build(),
+            )
+
+            val response = notificationApi.markThreadDone("42")
+
+            assertTrue(response.isSuccessful)
+            val request = server.takeRequest()
+            assertEquals("DELETE", request.method)
+            assertEquals("/notifications/threads/42", request.url.encodedPath)
+        }
 }
