@@ -1,0 +1,21 @@
+query PullRequestReviewThreads($id: ID!, $threadsFirst: Int = 100, $commentsFirst: Int = 100) {
+  node(id: $id) {
+    ... on PullRequest {
+      reviewThreads(first: $threadsFirst) {
+        nodes {
+          id
+          path
+          line
+          originalLine
+          diffSide
+          isResolved
+          comments(first: $commentsFirst) {
+            nodes {
+              id
+            }
+          }
+        }
+      }
+    }
+  }
+}
