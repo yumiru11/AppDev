@@ -12,6 +12,17 @@
     <string name="settings_dynamic_color">动态取色</string>
     <string name="settings_dynamic_color_desc">使用壁纸取色（Android 12+）</string>
     <string name="settings_seed_color">主题色</string>
+    <!-- 色块色名（TalkBack，#87）-->
+    <string name="settings_seed_blue">蓝色</string>
+    <string name="settings_seed_purple">紫色</string>
+    <string name="settings_seed_sky">天蓝</string>
+    <string name="settings_seed_emerald">翠绿</string>
+    <string name="settings_seed_amber">琥珀</string>
+    <string name="settings_seed_red">红色</string>
+    <string name="settings_seed_pink">粉色</string>
+    <string name="settings_seed_slate">灰蓝</string>
+    <!-- 当前值副标题（原生设置惯例，#87）-->
+    <string name="settings_scale_percent">%1$d%%</string>
     <string name="settings_oled">OLED 纯黑</string>
     <string name="settings_oled_desc">AMOLED 纯黑省电背景</string>
     <string name="settings_high_contrast">高对比</string>

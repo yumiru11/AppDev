@@ -12,6 +12,17 @@
     <string name="settings_dynamic_color">Dynamic color</string>
     <string name="settings_dynamic_color_desc">Use wallpaper colors (Android 12+)</string>
     <string name="settings_seed_color">Seed color</string>
+    <!-- Seed swatch names (TalkBack, #87) -->
+    <string name="settings_seed_blue">Blue</string>
+    <string name="settings_seed_purple">Purple</string>
+    <string name="settings_seed_sky">Sky</string>
+    <string name="settings_seed_emerald">Emerald</string>
+    <string name="settings_seed_amber">Amber</string>
+    <string name="settings_seed_red">Red</string>
+    <string name="settings_seed_pink">Pink</string>
+    <string name="settings_seed_slate">Slate</string>
+    <!-- Current value subtitle (native settings convention, #87) -->
+    <string name="settings_scale_percent">%1$d%%</string>
     <string name="settings_oled">OLED pure black</string>
     <string name="settings_oled_desc">True black background for AMOLED</string>
     <string name="settings_high_contrast">High contrast</string>

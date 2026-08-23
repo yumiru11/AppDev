@@ -30,11 +30,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.component.CardGroup
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.githubauth.auth.AuthState
 
 /**
- * 开发者分组（ui-design §3.6）：PAT 输入（折叠项，明文开关）、REST-only
+ * 开发者分组（ui-design §3.6，#87 分组卡化）：PAT 输入（折叠项，明文开关）、REST-only
  * 降级提示（PAT 态展示）、剩余配额占位（待 API 接线）。
  */
 @Composable
@@ -44,18 +45,18 @@ internal fun DeveloperSettingsSection(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        PatEntrySection(
-            expanded = expanded,
-            onToggle = { expanded = !expanded },
-            onSave = viewModel::savePat,
-        )
-
-        if (uiState.authState is AuthState.PAT) {
-            RestOnlyNotice()
+    CardGroup {
+        item {
+            PatEntrySection(
+                expanded = expanded,
+                onToggle = { expanded = !expanded },
+                onSave = viewModel::savePat,
+            )
         }
-
-        RateLimitRow()
+        if (uiState.authState is AuthState.PAT) {
+            item { RestOnlyNotice() }
+        }
+        item { RateLimitRow() }
     }
 }
 
@@ -73,7 +74,7 @@ private fun PatEntrySection(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -147,7 +148,6 @@ private fun PatEntrySection(
 /** REST-only 降级提示卡（PAT 态展示，ADR-0003）。 */
 @Composable
 private fun RestOnlyNotice() {
-    Spacer(modifier = Modifier.height(8.dp))
     Surface(
         shape = RoundedCornerShape(AppDimens.cornerMedium),
         color = MaterialTheme.colorScheme.tertiaryContainer,
@@ -168,7 +168,6 @@ private fun RestOnlyNotice() {
 /** 剩余配额占位行（待 REST 通道配额 API 接线）。 */
 @Composable
 private fun RateLimitRow() {
-    Spacer(modifier = Modifier.height(8.dp))
     Row(
         modifier =
             Modifier
