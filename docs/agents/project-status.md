@@ -40,6 +40,7 @@
 | T21 Markdown 编辑器 | #22 | Sora 编辑 + 工具栏 + 编辑/预览双 Tab（PR #77） | ✅ |
 | T15 PR 列表详情 | #16 | 四 Tab Conversation/Commits/Checks/Files changed（PR #76） | ✅ |
 | UI 打磨波 | #82 | Home Tab M3 化、PR 评论、Star/Watch 按钮（PR #82） | ✅ |
+| UI 审查修复批·通知面板 | #88 | 面板完整形态：右侧滑入+遮罩+Haze 玻璃、按仓库分组折叠、右滑已读回弹/左滑 done 删除、未读左缘色条、筛选 chips 迁移、三态组件接入；旧独立路由与 T19 分页栈随面板化移除 | ✅ |
 
 ## 3. 剩余 5 票（功能线，依赖已全部满足除注明外）
 
@@ -62,7 +63,6 @@
 | #85 | fix(issue,pr): 标签混色与状态徽章语义色 | 仅 StatusChip 行等 #84；⚠️ 与 T16 文件冲突错峰 |
 | #86 | perf(list): Paging itemKey 迁移与模型稳定性标注 | 无；Home 屏行与 #89 错峰 |
 | #87 | feat(settings): 设置页分组重构与个性化项接线 | blocked_by #84 |
-| #88 | feat(notifications): 通知面板完整形态 | blocked_by #84；玻璃复用 #83 |
 | #89 | feat(home): 首页分区 Pager 与长条按钮 | blocked_by #84 |
 | #90 | feat(navigation): 全局转场、预测返回与路由现代化 | blocked_by #84；路由迁移行等 T16-T23 合入 |
 
