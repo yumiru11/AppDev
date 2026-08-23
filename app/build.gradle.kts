@@ -110,6 +110,8 @@ dependencies {
 
     // 主题（core:designsystem）
     implementation(project(":core:designsystem"))
+    // Haze（#88：MainActivity 根级 hazeSource，通知面板玻璃 backdrop-blur 整个导航内容）
+    implementation(libs.haze)
 
     // 数据层（T5）：仓库层/网络通道/离线缓存/偏好存储
     implementation(project(":core:github-data"))

@@ -13,10 +13,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +33,8 @@ import androidx.navigation.compose.rememberNavController
 import com.yumiru11.githubapp.auth.authStateToDestination
 import com.yumiru11.githubapp.auth.shouldNavigateForAuthState
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
+import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
+import com.yumiru11.githubapp.core.designsystem.token.AppBlur
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthCallbackException
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthConfig
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
@@ -49,7 +54,7 @@ import com.yumiru11.githubapp.feature.home.HomeScreen
 import com.yumiru11.githubapp.feature.issue.CreateIssueScreen
 import com.yumiru11.githubapp.feature.issue.IssueDetailScreen
 import com.yumiru11.githubapp.feature.issue.IssueListScreen
-import com.yumiru11.githubapp.feature.notifications.NotificationsScreen
+import com.yumiru11.githubapp.feature.notifications.ui.NotificationsPanel
 import com.yumiru11.githubapp.feature.profile.ProfileScreen
 import com.yumiru11.githubapp.feature.pullrequest.PullRequestDetailScreen
 import com.yumiru11.githubapp.feature.pullrequest.PullRequestListScreen
@@ -57,6 +62,8 @@ import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
 import com.yumiru11.githubapp.feature.settings.SettingsScreen
 import com.yumiru11.githubapp.feature.settings.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.launch
 import java.util.Locale
 import javax.inject.Inject
@@ -113,168 +120,191 @@ class MainActivity : ComponentActivity() {
             var mainTab by rememberSaveable { mutableStateOf(AppRoute.HOME) }
 
             AppThemeHost(repository = userPreferencesRepository) {
-                AppNavHost(
-                    navController = navController,
-                    startDestination = authStateToDestination(authState),
-                    homeScreen = {
-                        MainTabPager(
-                            selectedTab = mainTab,
-                            onTabSelected = { mainTab = it },
-                            blurEnabled = blurEnabled,
-                            homePage = { padding ->
-                                HomeScreen(
-                                    onSearchClick = { navController.navigate(AppRoute.SEARCH) },
-                                    onNotificationClick = { navController.navigate(AppRoute.NOTIFICATION) },
-                                    onProfileClick = { mainTab = AppRoute.PROFILE },
-                                    blurEnabled = blurEnabled,
-                                    onLoginClick = {
-                                        navController.navigate(AppRoute.LOGIN) {
-                                            popUpTo(0) { inclusive = true }
-                                        }
-                                    },
-                                    onFeedItemClick = { parsed -> navigateToParsedUrl(navController, parsed) },
-                                    modifier = Modifier.padding(padding),
-                                )
-                            },
-                            reposPage = { padding ->
-                                PlaceholderScreen(
-                                    modifier =
-                                        Modifier
-                                            .padding(padding)
-                                            .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()),
-                                )
-                            },
-                            profilePage = { padding ->
-                                ProfileScreen(
-                                    onLoginClick = {
-                                        navController.navigate(AppRoute.LOGIN) {
-                                            popUpTo(0) { inclusive = true }
-                                        }
-                                    },
-                                    onOpenRepository = { owner, repo ->
-                                        navController.navigate(
-                                            AppRoute.REPO
-                                                .replace("{owner}", owner)
-                                                .replace("{repo}", repo),
-                                        )
-                                    },
-                                    onOpenUser = { login ->
-                                        navController.navigate(
-                                            AppRoute.USER.replace("{login}", login),
-                                        )
-                                    },
-                                    onSettingsClick = { navController.navigate(AppRoute.SETTINGS) },
-                                    modifier = Modifier.padding(padding),
-                                )
-                            },
-                        )
-                    },
-                    loginScreen = {
-                        LoginScreen(
-                            onSignIn = { authViewModel.onSignIn() },
-                            onBrowseAsGuest = { authViewModel.onBrowseAsGuest() },
-                            onSavePat = { authViewModel.onSavePat(it) },
-                        )
-                    },
-                    repoDetailScreen = { owner, repo ->
-                        RepoDetailScreen(
-                            owner = owner,
-                            repo = repo,
-                            onBackClick = { navController.popBackStack() },
-                        )
-                    },
-                    notificationsScreen = {
-                        NotificationsScreen(
-                            onBackClick = { navController.popBackStack() },
+                // 根级 HazeState（#88）：通知面板玻璃 backdrop-blur 整个 NavHost 内容。
+                // MainTabPager/HomeScreen 自建内层 state 只服务其顶/底栏，面板读不到内层值
+                val rootHazeState = rememberHazeState()
+                var notificationPanelVisible by rememberSaveable { mutableStateOf(false) }
+                CompositionLocalProvider(LocalHazeState provides rootHazeState) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .then(
+                                        if (blurEnabled && AppBlur.isBlurSupported()) {
+                                            Modifier.hazeSource(rootHazeState)
+                                        } else {
+                                            Modifier
+                                        },
+                                    ),
+                        ) {
+                            AppNavHost(
+                                navController = navController,
+                                startDestination = authStateToDestination(authState),
+                                homeScreen = {
+                                    MainTabPager(
+                                        selectedTab = mainTab,
+                                        onTabSelected = { mainTab = it },
+                                        blurEnabled = blurEnabled,
+                                        homePage = { padding ->
+                                            HomeScreen(
+                                                onSearchClick = { navController.navigate(AppRoute.SEARCH) },
+                                                onNotificationClick = { notificationPanelVisible = true },
+                                                onProfileClick = { mainTab = AppRoute.PROFILE },
+                                                blurEnabled = blurEnabled,
+                                                onLoginClick = {
+                                                    navController.navigate(AppRoute.LOGIN) {
+                                                        popUpTo(0) { inclusive = true }
+                                                    }
+                                                },
+                                                onFeedItemClick = { parsed -> navigateToParsedUrl(navController, parsed) },
+                                                modifier = Modifier.padding(padding),
+                                            )
+                                        },
+                                        reposPage = { padding ->
+                                            PlaceholderScreen(
+                                                modifier =
+                                                    Modifier
+                                                        .padding(padding)
+                                                        .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()),
+                                            )
+                                        },
+                                        profilePage = { padding ->
+                                            ProfileScreen(
+                                                onLoginClick = {
+                                                    navController.navigate(AppRoute.LOGIN) {
+                                                        popUpTo(0) { inclusive = true }
+                                                    }
+                                                },
+                                                onOpenRepository = { owner, repo ->
+                                                    navController.navigate(
+                                                        AppRoute.REPO
+                                                            .replace("{owner}", owner)
+                                                            .replace("{repo}", repo),
+                                                    )
+                                                },
+                                                onOpenUser = { login ->
+                                                    navController.navigate(
+                                                        AppRoute.USER.replace("{login}", login),
+                                                    )
+                                                },
+                                                onSettingsClick = { navController.navigate(AppRoute.SETTINGS) },
+                                                modifier = Modifier.padding(padding),
+                                            )
+                                        },
+                                    )
+                                },
+                                loginScreen = {
+                                    LoginScreen(
+                                        onSignIn = { authViewModel.onSignIn() },
+                                        onBrowseAsGuest = { authViewModel.onBrowseAsGuest() },
+                                        onSavePat = { authViewModel.onSavePat(it) },
+                                    )
+                                },
+                                repoDetailScreen = { owner, repo ->
+                                    RepoDetailScreen(
+                                        owner = owner,
+                                        repo = repo,
+                                        onBackClick = { navController.popBackStack() },
+                                    )
+                                },
+                                profileScreen = { onLoginClick: () -> Unit, onSettingsClick: () -> Unit ->
+                                    ProfileScreen(
+                                        onLoginClick = onLoginClick,
+                                        onOpenRepository = { owner, repo ->
+                                            navController.navigate(
+                                                AppRoute.REPO
+                                                    .replace("{owner}", owner)
+                                                    .replace("{repo}", repo),
+                                            )
+                                        },
+                                        onOpenUser = { login ->
+                                            navController.navigate(
+                                                AppRoute.USER.replace("{login}", login),
+                                            )
+                                        },
+                                        onSettingsClick = { navController.navigate(AppRoute.SETTINGS) },
+                                    )
+                                },
+                                settingsScreen = {
+                                    SettingsScreen(viewModel = settingsViewModel)
+                                },
+                                issueListScreen = { owner, repo, onIssueClick ->
+                                    IssueListScreen(
+                                        owner = owner,
+                                        repo = repo,
+                                        onBackClick = { navController.popBackStack() },
+                                        onIssueClick = onIssueClick,
+                                        onCreateIssue = {
+                                            navController.navigate(
+                                                AppRoute.ISSUE_CREATE
+                                                    .replace("{owner}", owner)
+                                                    .replace("{repo}", repo),
+                                            )
+                                        },
+                                    )
+                                },
+                                issueDetailScreen = { owner, repo, number ->
+                                    IssueDetailScreen(
+                                        owner = owner,
+                                        repo = repo,
+                                        number = number,
+                                        onBackClick = { navController.popBackStack() },
+                                        onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
+                                    )
+                                },
+                                pullRequestListScreen = { owner, repo, onPullRequestClick ->
+                                    PullRequestListScreen(
+                                        owner = owner,
+                                        repo = repo,
+                                        onBackClick = { navController.popBackStack() },
+                                        onPullRequestClick = onPullRequestClick,
+                                    )
+                                },
+                                pullRequestDetailScreen = { owner, repo, number ->
+                                    PullRequestDetailScreen(
+                                        owner = owner,
+                                        repo = repo,
+                                        number = number,
+                                        onBackClick = { navController.popBackStack() },
+                                        onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
+                                    )
+                                },
+                                editorScreen = { initialContent, onClose ->
+                                    MarkdownEditorScreen(
+                                        initialContent = initialContent,
+                                        onClose = onClose,
+                                        onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
+                                        onExternalLink = { url ->
+                                            CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+                                        },
+                                    )
+                                },
+                                createIssueScreen = { owner, repo ->
+                                    CreateIssueScreen(
+                                        owner = owner,
+                                        repo = repo,
+                                        onBackClick = { navController.popBackStack() },
+                                        onCreated = { navController.popBackStack() },
+                                    )
+                                },
+                            )
+                        }
+                        // 通知面板（#88）：覆盖层挂在 NavHost 之上，铃铛置 visible；
+                        // 不进导航栈（ui-design §3.4 拍板「顶栏铃铛点击 → 右侧滑入面板」）
+                        NotificationsPanel(
+                            visible = notificationPanelVisible,
+                            onDismiss = { notificationPanelVisible = false },
                             onLoginClick = {
                                 navController.navigate(AppRoute.LOGIN) {
                                     popUpTo(0) { inclusive = true }
                                 }
                             },
                             onNotificationClick = { parsed -> navigateToParsedUrl(navController, parsed) },
+                            blurEnabled = blurEnabled,
                         )
-                    },
-                    profileScreen = { onLoginClick: () -> Unit, onSettingsClick: () -> Unit ->
-                        ProfileScreen(
-                            onLoginClick = onLoginClick,
-                            onOpenRepository = { owner, repo ->
-                                navController.navigate(
-                                    AppRoute.REPO
-                                        .replace("{owner}", owner)
-                                        .replace("{repo}", repo),
-                                )
-                            },
-                            onOpenUser = { login ->
-                                navController.navigate(
-                                    AppRoute.USER.replace("{login}", login),
-                                )
-                            },
-                            onSettingsClick = { navController.navigate(AppRoute.SETTINGS) },
-                        )
-                    },
-                    settingsScreen = {
-                        SettingsScreen(viewModel = settingsViewModel)
-                    },
-                    issueListScreen = { owner, repo, onIssueClick ->
-                        IssueListScreen(
-                            owner = owner,
-                            repo = repo,
-                            onBackClick = { navController.popBackStack() },
-                            onIssueClick = onIssueClick,
-                            onCreateIssue = {
-                                navController.navigate(
-                                    AppRoute.ISSUE_CREATE
-                                        .replace("{owner}", owner)
-                                        .replace("{repo}", repo),
-                                )
-                            },
-                        )
-                    },
-                    issueDetailScreen = { owner, repo, number ->
-                        IssueDetailScreen(
-                            owner = owner,
-                            repo = repo,
-                            number = number,
-                            onBackClick = { navController.popBackStack() },
-                            onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
-                        )
-                    },
-                    pullRequestListScreen = { owner, repo, onPullRequestClick ->
-                        PullRequestListScreen(
-                            owner = owner,
-                            repo = repo,
-                            onBackClick = { navController.popBackStack() },
-                            onPullRequestClick = onPullRequestClick,
-                        )
-                    },
-                    pullRequestDetailScreen = { owner, repo, number ->
-                        PullRequestDetailScreen(
-                            owner = owner,
-                            repo = repo,
-                            number = number,
-                            onBackClick = { navController.popBackStack() },
-                            onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
-                        )
-                    },
-                    editorScreen = { initialContent, onClose ->
-                        MarkdownEditorScreen(
-                            initialContent = initialContent,
-                            onClose = onClose,
-                            onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
-                            onExternalLink = { url ->
-                                CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
-                            },
-                        )
-                    },
-                    createIssueScreen = { owner, repo ->
-                        CreateIssueScreen(
-                            owner = owner,
-                            repo = repo,
-                            onBackClick = { navController.popBackStack() },
-                            onCreated = { navController.popBackStack() },
-                        )
-                    },
-                )
+                    }
+                }
             }
 
             // 语言切换（T24）：仓库 Flow 发射新 tag → 缓存（attachBaseContext 同步读取）

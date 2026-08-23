@@ -54,11 +54,6 @@ class AppRouteTest {
     }
 
     @Test
-    fun routeTable_notificationRoute_isNotification() {
-        assertEquals("notification", AppRoute.NOTIFICATION)
-    }
-
-    @Test
     fun routeTable_profileRoute_isProfile() {
         assertEquals("profile", AppRoute.PROFILE)
     }

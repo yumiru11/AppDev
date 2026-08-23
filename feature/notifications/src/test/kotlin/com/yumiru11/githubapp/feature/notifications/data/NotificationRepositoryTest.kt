@@ -1,6 +1,5 @@
 package com.yumiru11.githubapp.feature.notifications.data
 
-import androidx.paging.testing.asSnapshot
 import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
 import com.yumiru11.githubapp.core.githubrest.api.NotificationApi
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
@@ -9,23 +8,20 @@ import com.yumiru11.githubapp.feature.notifications.model.NotificationFilter
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
-import mockwebserver3.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.util.concurrent.TimeUnit
+import retrofit2.HttpException
 
 /**
  * NotificationRepository 单测（MockWebServer 模拟 GitHub API，零真实网络）。
  *
- * 注意：Pager.flow 先发射空 PagingData 再异步加载，`first()` 会在请求发出前返回；
- * 列表断言用 paging-testing 的 [asSnapshot]（等待加载收敛），已读刷新用活跃收集器 +
- * 带超时 takeRequest（runTest 虚拟时钟会与真实网络 IO 死锁，故用 runBlocking）。
- *
- * 覆盖：分页流构造与请求参数、单条/全部已读 PATCH 路径、已读后列表自动刷新
- * （T19 验收第 2 条状态同步）。
+ * 覆盖：[NotificationRepository.latest] 快照拉取（参数映射、短页即止、翻页上限、
+ * mention 客户端过滤、HTTP 错误抛出）与三个写操作路径（PATCH 已读 / PATCH 全部已读 /
+ * DELETE done，#88 左滑删除）。
  */
 class NotificationRepositoryTest {
     private lateinit var server: MockWebServer
@@ -44,19 +40,64 @@ class NotificationRepositoryTest {
     }
 
     @Test
-    fun notifications_filterAll_emitsItemsAndRequestsAllParam() =
+    fun latest_filterAll_mapsItemsAndRequestsPerPage100() =
         runBlocking {
-            server.enqueue(jsonResponse("[${notificationJson("1")}]"))
-            server.enqueue(jsonResponse("[]"))
+            server.enqueue(jsonResponse("[${notificationJson("1")}, ${notificationJson("2")}]"))
 
-            val items = repository.notifications(NotificationFilter.ALL).asSnapshot()
+            val items = repository.latest(NotificationFilter.ALL)
 
-            assertEquals(1, items.size)
-            assertEquals("1", items[0].id)
+            assertEquals(listOf("1", "2"), items.map { it.id })
             assertEquals("octocat/Hello-World", items[0].repoFullName)
+            // 短页（2 < 100）即止：仅一次请求
+            assertEquals(1, server.requestCount)
             val request = server.takeRequest()
             assertEquals("/notifications", request.url.encodedPath)
             assertEquals("true", request.url.queryParameter("all"))
+            assertEquals("100", request.url.queryParameter("per_page"))
+        }
+
+    @Test
+    fun latest_fullPage_fetchesSecondPageUntilShortPage() =
+        runBlocking {
+            val fullPage = (1..100).joinToString(",", "[", "]") { notificationJson(it.toString()) }
+            server.enqueue(jsonResponse(fullPage))
+            server.enqueue(jsonResponse("[${notificationJson("101")}]"))
+
+            val items = repository.latest(NotificationFilter.ALL)
+
+            assertEquals(101, items.size)
+            assertEquals(2, server.requestCount)
+            server.takeRequest() // 消费第一页请求
+            assertEquals("2", server.takeRequest().url.queryParameter("page"))
+        }
+
+    @Test
+    fun latest_filterMention_filtersByReasonClientSide() =
+        runBlocking {
+            server.enqueue(
+                jsonResponse(
+                    "[${notificationJson("1", reason = "mention")}, " +
+                        "${notificationJson("2", reason = "subscribed")}, " +
+                        "${notificationJson("3", reason = "team_mention")}]",
+                ),
+            )
+
+            val items = repository.latest(NotificationFilter.MENTION)
+
+            assertEquals(listOf("1", "3"), items.map { it.id })
+        }
+
+    @Test
+    fun latest_httpError_throwsOriginalException() =
+        runBlocking {
+            server.enqueue(MockResponse.Builder().code(404).build())
+
+            val exception =
+                assertThrows(HttpException::class.java) {
+                    runBlocking { repository.latest(NotificationFilter.ALL) }
+                }
+
+            assertEquals(404, exception.code())
         }
 
     @Test
@@ -84,67 +125,16 @@ class NotificationRepositoryTest {
         }
 
     @Test
-    fun markRead_afterLoad_subsequentLoadReflectsReadState() =
+    fun markDone_success_sendsDeleteThreadRequest() =
         runBlocking {
-            server.enqueue(jsonResponse("[${notificationJson("1")}]"))
-            server.enqueue(jsonResponse("[]"))
-            val flow = repository.notifications(NotificationFilter.ALL)
-            assertEquals(1, flow.asSnapshot().size)
+            server.enqueue(MockResponse.Builder().code(204).build())
 
-            server.enqueue(patchResponse())
-            server.enqueue(jsonResponse("[]"))
-            repository.markRead("1")
-
-            // 消费到 PATCH（首次加载的 prefetch GET 可能晚到，顺序不定）
-            val patchRequest = takeUntilPatch()
-            assertEquals("PATCH", patchRequest.method)
-            assertEquals("/notifications/threads/1", patchRequest.url.encodedPath)
-
-            // 已读后重新加载：服务端列表已不含该条目（状态同步）
-            assertEquals(0, flow.asSnapshot().size)
-        }
-
-    @Test
-    fun markAllRead_afterLoad_subsequentLoadReflectsReadState() =
-        runBlocking {
-            server.enqueue(jsonResponse("[${notificationJson("1")}]"))
-            server.enqueue(jsonResponse("[]"))
-            val flow = repository.notifications(NotificationFilter.ALL)
-            assertEquals(1, flow.asSnapshot().size)
-
-            server.enqueue(patchResponse())
-            server.enqueue(jsonResponse("[]"))
-            repository.markAllRead()
-
-            val patchRequest = takeUntilPatch()
-            assertEquals("PATCH", patchRequest.method)
-            assertEquals("/notifications", patchRequest.url.encodedPath)
-
-            assertEquals(0, flow.asSnapshot().size)
-        }
-
-    @Test
-    fun notifications_filterParticipating_requestsParticipatingParam() =
-        runBlocking {
-            server.enqueue(jsonResponse("[]"))
-
-            repository.notifications(NotificationFilter.PARTICIPATING).asSnapshot()
+            repository.markDone("42")
 
             val request = server.takeRequest()
-            assertEquals("true", request.url.queryParameter("participating"))
-            assertTrue(request.url.queryParameter("all") == null)
+            assertEquals("DELETE", request.method)
+            assertEquals("/notifications/threads/42", request.url.encodedPath)
         }
-
-    /** 消费请求队列直到出现 PATCH（首次加载的 prefetch GET 可能晚到，顺序不定） */
-    private fun takeUntilPatch(): RecordedRequest {
-        var attempts = 0
-        while (attempts < 5) {
-            attempts += 1
-            val request = server.takeRequest(5, TimeUnit.SECONDS) ?: break
-            if (request.method == "PATCH") return request
-        }
-        throw AssertionError("未收到 PATCH 请求")
-    }
 
     private fun patchResponse(): MockResponse =
         MockResponse

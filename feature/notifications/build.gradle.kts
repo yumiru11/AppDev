@@ -2,10 +2,24 @@ plugins {
     id("appdev.android.library")
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    // 截图基准（#88 通知面板 light/dark 基线；同 core:ui 配置）
+    alias(libs.plugins.roborazzi)
 }
 
 android {
     namespace = "com.yumiru11.githubapp.feature.notifications"
+
+    defaultConfig {
+        // Roborazzi 截图测试（unit test 含资源）触发 manifest 合并：core:github-auth 的
+        // OAuth 回调 scheme 占位符需由消费模块提供（与 app/defaultConfig 保持一致）
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.yumiru11.githubapp"
+    }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 dependencies {
@@ -19,10 +33,6 @@ dependencies {
     // Lifecycle
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.compose)
-
-    // Paging（通知列表分页）
-    implementation(libs.paging.runtime)
-    implementation(libs.paging.compose)
 
     // Hilt
     implementation(libs.hilt.android)
@@ -46,7 +56,6 @@ dependencies {
     testImplementation(libs.mockwebserver3)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
-    testImplementation(libs.paging.testing)
     testImplementation(libs.kotlinx.serialization.json)
     testImplementation(kotlin("test"))
 }
