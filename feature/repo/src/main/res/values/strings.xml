@@ -56,4 +56,28 @@
     <string name="repo_snackbar_fork_permission_denied">No permission to fork this repository</string>
     <string name="repo_snackbar_fork_already_exists">You have already forked this repository</string>
     <string name="repo_snackbar_fork_failed">Fork failed. Please retry.</string>
+    <!-- T22 文件编辑提交（Contents API + 409 冲突） -->
+    <string name="repo_file_new">New file</string>
+    <string name="repo_file_commit">Commit</string>
+    <string name="repo_file_commit_message">Commit message</string>
+    <string name="repo_file_commit_message_hint">Describe your changes…</string>
+    <string name="repo_file_branch_current">Commit to current branch (%1$s)</string>
+    <string name="repo_file_branch_new">Create a new branch</string>
+    <string name="repo_file_new_branch_name">New branch name</string>
+    <string name="repo_file_new_path">File path</string>
+    <string name="repo_file_preview">Preview</string>
+    <string name="repo_file_delete">Delete file</string>
+    <string name="repo_file_delete_confirm">Delete %1$s from this repository? This cannot be undone.</string>
+    <string name="repo_file_conflict_title">File changed on GitHub</string>
+    <string name="repo_file_conflict_body">This file was modified remotely since you opened it.</string>
+    <string name="repo_file_conflict_reload">Reload latest version</string>
+    <string name="repo_file_conflict_overwrite">Overwrite remote changes</string>
+    <string name="repo_file_conflict_overwrite_warning">Overwriting replaces the remote file with your version and discards the remote changes.</string>
+    <string name="repo_file_conflict_keep_local">Keep my changes (copy to clipboard)</string>
+    <string name="repo_file_conflict_retry_delete">Delete latest version</string>
+    <string name="repo_file_conflict_cancel">Cancel</string>
+    <string name="repo_file_snackbar_committed">Committed %1$s</string>
+    <string name="repo_file_snackbar_committed_new_branch">Committed %1$s to new branch %2$s</string>
+    <string name="repo_file_snackbar_deleted">Deleted %1$s</string>
+    <string name="repo_file_snackbar_keep_local">Your changes were copied to the clipboard</string>
 </resources>

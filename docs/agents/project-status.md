@@ -10,7 +10,7 @@
 | M1 核心链路（网络/认证/主题/Markdown 渲染） | ✅ 完成 |
 | M2 首个端到端（README 浏览） | ✅ 完成 |
 | M3 主要功能域（首页/Issue/通知/Profile/设置） | 🔶 进行中（21/26 票） |
-| M4 全功能（PR 深化/编辑提交/分支） | 🔶 进行中（T16/T17/T22/T23 待做） |
+| M4 全功能（PR 深化/编辑提交/分支） | 🔶 进行中（T16/T17/T23 待做） |
 | M5 发布收尾（性能/签名 Release） | ⏳ 未开始（T25） |
 
 ## 2. 已完成（26 票计划内 21 票全部合入 main；另有 Task B、UI 打磨波等计划外交付）
@@ -39,6 +39,7 @@
 | T14 Issue 写 | #15 | 创建/编辑/评论/反应/关闭/任务列表同步（PR #75） | ✅ |
 | T21 Markdown 编辑器 | #22 | Sora 编辑 + 工具栏 + 编辑/预览双 Tab（PR #77） | ✅ |
 | T15 PR 列表详情 | #16 | 四 Tab Conversation/Commits/Checks/Files changed（PR #76） | ✅ |
+| T22 文件编辑提交 | #23 | Contents API + sha 校验 + 409 三选项（重载/覆盖/保留本地，PR #96） | ✅ |
 | UI 打磨波 | #82 | Home Tab M3 化、PR 评论、Star/Watch 按钮（PR #82） | ✅ |
 | UI 审查修复批·通知面板 | #88 | 面板完整形态：右侧滑入+遮罩+Haze 玻璃、按仓库分组折叠、右滑已读回弹/左滑 done 删除、未读左缘色条、筛选 chips 迁移、三态组件接入；旧独立路由与 T19 分页栈随面板化移除 | ✅ |
 
@@ -48,7 +49,6 @@
 |---|---|---|---|---|
 | T16 Diff + 行评论 | #17 | ★★★★ | 自研 Diff 渲染 + 行评论 BottomSheet | 可立即开工；与 UI 票 #85 有文件冲突需错峰 |
 | T17 Review/Merge | #18 | ★★★ | approve/merge/squash/rebase（建议 SplitButton） | 依赖 T16 |
-| T22 文件编辑提交 | #23 | ★★★★ | Contents API + 409 冲突 | 可立即开工 |
 | T23 分支/PR 创建 | #24 | ★★★ | 分支列表 + 创建 PR | 可立即开工 |
 | T25 性能发布 | #26 | ★★★ | Baseline Profiles + i18n 完整 + 签名 Release | 全场最后 |
 

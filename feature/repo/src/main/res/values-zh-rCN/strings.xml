@@ -56,4 +56,28 @@
     <string name="repo_snackbar_fork_permission_denied">没有 Fork 该仓库的权限</string>
     <string name="repo_snackbar_fork_already_exists">已 Fork 过该仓库</string>
     <string name="repo_snackbar_fork_failed">Fork 失败，请重试</string>
+    <!-- T22 文件编辑提交（Contents API + 409 冲突） -->
+    <string name="repo_file_new">新建文件</string>
+    <string name="repo_file_commit">提交</string>
+    <string name="repo_file_commit_message">提交信息</string>
+    <string name="repo_file_commit_message_hint">描述你的更改…</string>
+    <string name="repo_file_branch_current">提交到当前分支（%1$s）</string>
+    <string name="repo_file_branch_new">新建分支提交</string>
+    <string name="repo_file_new_branch_name">新分支名称</string>
+    <string name="repo_file_new_path">文件路径</string>
+    <string name="repo_file_preview">预览</string>
+    <string name="repo_file_delete">删除文件</string>
+    <string name="repo_file_delete_confirm">从仓库中删除 %1$s？此操作不可撤销。</string>
+    <string name="repo_file_conflict_title">文件已在 GitHub 上被修改</string>
+    <string name="repo_file_conflict_body">你打开文件后，远端内容发生了变化。</string>
+    <string name="repo_file_conflict_reload">重载最新版本</string>
+    <string name="repo_file_conflict_overwrite">覆盖远端更改</string>
+    <string name="repo_file_conflict_overwrite_warning">覆盖会用你的版本替换远端文件并丢弃远端更改。</string>
+    <string name="repo_file_conflict_keep_local">保留我的更改（复制到剪贴板）</string>
+    <string name="repo_file_conflict_retry_delete">删除最新版本</string>
+    <string name="repo_file_conflict_cancel">取消</string>
+    <string name="repo_file_snackbar_committed">已提交 %1$s</string>
+    <string name="repo_file_snackbar_committed_new_branch">已提交 %1$s 到新分支 %2$s</string>
+    <string name="repo_file_snackbar_deleted">已删除 %1$s</string>
+    <string name="repo_file_snackbar_keep_local">你的更改已复制到剪贴板</string>
 </resources>
