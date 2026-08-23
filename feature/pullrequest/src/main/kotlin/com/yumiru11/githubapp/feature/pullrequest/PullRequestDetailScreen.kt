@@ -1,4 +1,6 @@
-@file:Suppress("LongMethod") // 详情页装配（PrHeader + 四 Tab 分发）聚合展示逻辑，拆分反损可读性（IssueDetailScreen 同款先例）
+@file:Suppress("LongMethod", "CyclomaticComplexMethod")
+// - LongMethod：详情页装配（PrHeader + 四 Tab 分发）聚合展示逻辑，拆分反损可读性（IssueDetailScreen 同款先例）
+// - CyclomaticComplexMethod：T17 事件收集（8 类写操作 Snackbar）+ ReviewSheet 状态装配，分支天然多（HomeScreen 同款先例）
 
 package com.yumiru11.githubapp.feature.pullrequest
 
@@ -122,6 +124,34 @@ fun PullRequestDetailScreen(
                 PullRequestDetailEvent.CommentFailed -> {
                     snackbarHostState.showSnackbar(context.getString(R.string.pull_request_line_comment_failed))
                 }
+
+                PullRequestDetailEvent.ReviewFailed -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_review_failed))
+                }
+
+                PullRequestDetailEvent.MergeSucceeded -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_merge_succeeded))
+                }
+
+                PullRequestDetailEvent.MergeFailed -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_merge_failed))
+                }
+
+                PullRequestDetailEvent.UpdateBranchSucceeded -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_update_branch_succeeded))
+                }
+
+                PullRequestDetailEvent.UpdateBranchFailed -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_update_branch_failed))
+                }
+
+                PullRequestDetailEvent.DeleteBranchSucceeded -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_delete_branch_succeeded))
+                }
+
+                PullRequestDetailEvent.DeleteBranchFailed -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_delete_branch_failed))
+                }
             }
         }
     }
@@ -130,6 +160,8 @@ fun PullRequestDetailScreen(
     // 评论 BottomSheet 状态
     var showCommentSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // T17：Review 提交 BottomSheet 状态
+    var showReviewSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -209,6 +241,21 @@ fun PullRequestDetailScreen(
                         onToggleFileExpanded = viewModel::toggleFileExpanded,
                         reviewComments = state.reviewComments,
                         reviewThreads = state.reviewThreads,
+                        conversationActions =
+                            ConversationActions(
+                                state = state.pullRequest.state,
+                                mergeableState = state.pullRequest.mergeableState,
+                                canReview = state.canReview,
+                                canMerge = state.canMerge,
+                                canDeleteHeadBranch = state.canDeleteHeadBranch,
+                                headSameRepo = state.headSameRepo,
+                                pendingAction = state.pendingAction,
+                                prTitle = state.pullRequest.title,
+                                onOpenReview = { showReviewSheet = true },
+                                onMerge = viewModel::mergePullRequest,
+                                onUpdateBranch = viewModel::updateBranch,
+                                onDeleteBranch = viewModel::deleteBranch,
+                            ),
                         onLineComment = viewModel::openLineComment,
                         onInternalLink = onInternalLink,
                         baseRepoUrl = "https://github.com/$owner/$repo",
@@ -239,6 +286,19 @@ fun PullRequestDetailScreen(
                     onDismiss = { viewModel.dismissLineComment() },
                     onSubmit = { anchor, body, inReplyToId -> viewModel.submitLineComment(anchor, body, inReplyToId) },
                     onToggleResolve = { thread -> viewModel.toggleThreadResolved(thread) },
+                )
+            }
+
+            // Review 提交 BottomSheet（T17）
+            if (showReviewSheet) {
+                val canApprove = (uiState as? PullRequestDetailUiState.Success)?.canApprove ?: false
+                ReviewSheet(
+                    canApprove = canApprove,
+                    onDismiss = { showReviewSheet = false },
+                    onSubmit = { conclusion, body ->
+                        viewModel.submitReview(conclusion, body)
+                        showReviewSheet = false
+                    },
                 )
             }
         }
@@ -301,6 +361,7 @@ private fun SuccessContent(
     combinedStatus: CombinedStatus?,
     reviewComments: List<ReviewComment>,
     reviewThreads: List<ReviewThread>,
+    conversationActions: ConversationActions,
     onLineComment: (String, DiffSide, Int) -> Unit,
     selectedTab: PullRequestTab,
     onTabSelected: (PullRequestTab) -> Unit,
@@ -332,6 +393,7 @@ private fun SuccessContent(
                     ConversationTab(
                         pullRequest = pullRequest,
                         timeline = timeline,
+                        conversationActions = conversationActions,
                         onInternalLink = onInternalLink,
                         baseRepoUrl = baseRepoUrl,
                         modifier = Modifier.fillMaxSize(),
