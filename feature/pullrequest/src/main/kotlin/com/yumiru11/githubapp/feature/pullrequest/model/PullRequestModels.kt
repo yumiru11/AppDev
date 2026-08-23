@@ -206,6 +206,8 @@ data class PullRequest(
     val createdAt: String? = null,
     val updatedAt: String? = null,
     val mergedAt: String? = null,
+    /** GraphQL node id（T16 会话解析按 PullRequest id 查 reviewThreads） */
+    val nodeId: String? = null,
     val htmlUrl: String? = null,
     val mergeable: Boolean? = null,
     val mergeableState: MergeableState = MergeableState.UNKNOWN,
@@ -419,3 +421,147 @@ enum class PullRequestTimelineEventType {
             }
     }
 }
+
+// ── T16：行内评论与 Diff 视图 ───────────────────────────────────────────
+
+/** diff 行类型（unified patch 单行分型） */
+enum class DiffLineKind {
+    /** 未变更的上下文行 */
+    CONTEXT,
+
+    /** 新增行（旧侧无对应行） */
+    ADDED,
+
+    /** 删除行（新侧无对应行） */
+    REMOVED,
+
+    /** hunk 头（@@ -a,b +c,d @@）与 diff --git/index/---/+++ 等元信息行 */
+    HEADER,
+
+    /** \ No newline at end of file 标记 */
+    NO_NEWLINE,
+}
+
+/** 解析后的 diff 行（unified patch 单行） */
+@Immutable
+data class DiffLine(
+    /** 旧文件行号（CONTEXT/REMOVED 有效，其余 null） */
+    val oldNumber: Int? = null,
+    /** 新文件行号（CONTEXT/ADDED 有效，其余 null） */
+    val newNumber: Int? = null,
+    val kind: DiffLineKind,
+    val text: String,
+)
+
+/** side-by-side 视图一行（左=旧/右=新；context 双栏同内容，单侧则为 null） */
+@Immutable
+data class DiffSideRow(
+    val old: DiffLine? = null,
+    val new: DiffLine? = null,
+)
+
+/** diff 视图模式（unified / side-by-side 切换） */
+enum class DiffViewMode {
+    UNIFIED,
+    SIDE_BY_SIDE,
+}
+
+/** 评论所在 diff 侧（REST side / GraphQL DiffSide 映射） */
+enum class DiffSide {
+    LEFT,
+    RIGHT,
+    UNKNOWN,
+    ;
+
+    /** REST 写请求参数值（LEFT/RIGHT；UNKNOWN 不发 → null） */
+    fun toRaw(): String? =
+        when (this) {
+            LEFT -> "LEFT"
+            RIGHT -> "RIGHT"
+            UNKNOWN -> null
+        }
+
+    companion object {
+        fun fromRaw(raw: String?): DiffSide =
+            when (raw?.uppercase()) {
+                "LEFT" -> LEFT
+                "RIGHT" -> RIGHT
+                else -> UNKNOWN
+            }
+    }
+}
+
+/** 行内评论（Files changed 锚点视图用；与时间线 [PullRequestTimelineItem.ReviewComment] 区分） */
+@Immutable
+data class ReviewComment(
+    val id: Long,
+    val body: String? = null,
+    val author: PullRequestUser? = null,
+    val path: String? = null,
+    /** side=RIGHT 的新文件行号 */
+    val line: Int? = null,
+    /** side=LEFT 的旧文件行号 */
+    val originalLine: Int? = null,
+    val side: DiffSide = DiffSide.UNKNOWN,
+    val commitId: String? = null,
+    val createdAt: String? = null,
+    val inReplyToId: Long? = null,
+    val resolved: Boolean = false,
+    val nodeId: String? = null,
+) {
+    /** diff 内定位锚行：RIGHT 用新行号，LEFT 用旧行号 */
+    val anchorLine: Int?
+        get() =
+            when (side) {
+                DiffSide.RIGHT -> line
+                DiffSide.LEFT -> originalLine
+                DiffSide.UNKNOWN -> line ?: originalLine
+            }
+}
+
+/** 会话（reviewThreads；GraphQL 是解析/解除的唯一通道——REST 无解析端点） */
+@Immutable
+data class ReviewThread(
+    val id: String,
+    val path: String,
+    val side: DiffSide,
+    val line: Int? = null,
+    val originalLine: Int? = null,
+    val isResolved: Boolean = false,
+    val commentIds: List<String> = emptyList(),
+) {
+    /** diff 内定位锚行（同 [ReviewComment.anchorLine] 语义） */
+    val anchorLine: Int?
+        get() =
+            when (side) {
+                DiffSide.RIGHT -> line
+                DiffSide.LEFT -> originalLine
+                DiffSide.UNKNOWN -> line ?: originalLine
+            }
+}
+
+/** 会话上下文（GraphQL 查询结果；pullRequestNodeId=null ⟺ GraphQL 不可用 → 隐藏解析入口） */
+@Immutable
+data class ReviewThreadContext(
+    val pullRequestNodeId: String? = null,
+    val threads: List<ReviewThread> = emptyList(),
+)
+
+/** 行评论操作定位（diff 行点击 → 评论输入目标） */
+@Immutable
+data class LineCommentAnchor(
+    val path: String,
+    val side: DiffSide,
+    val line: Int,
+) {
+    val sideRaw: String?
+        get() = side.toRaw()
+}
+
+/** 行评论输入目标（已打开的 sheet 全部所需数据，由 ViewModel 聚合） */
+@Immutable
+data class LineCommentTarget(
+    val anchor: LineCommentAnchor,
+    val thread: ReviewThread? = null,
+    val comments: List<ReviewComment> = emptyList(),
+)

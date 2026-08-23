@@ -133,4 +133,20 @@
     <string name="pull_request_comment_unavailable">Comment posting isn\'t available yet</string>
     <string name="cancel">Cancel</string>
     <string name="submit">Submit</string>
+
+    <!-- Diff 视图（T16） -->
+    <string name="pull_request_diff_unified">Unified</string>
+    <string name="pull_request_diff_side_by_side">Side-by-side</string>
+    <string name="pull_request_diff_empty">No diff preview</string>
+    <string name="pull_request_diff_fold_expand">Show %1$d hidden lines</string>
+    <string name="pull_request_diff_comment_count">%1$d comments</string>
+    <string name="pull_request_diff_thread_resolved">Resolved</string>
+
+    <!-- 行内评论（T16） -->
+    <string name="pull_request_line_comment_new">Comment</string>
+    <string name="pull_request_line_comment_reply">Reply</string>
+    <string name="pull_request_line_comment_placeholder">Leave a comment</string>
+    <string name="pull_request_line_comment_resolve">Resolve thread</string>
+    <string name="pull_request_line_comment_unresolve">Reopen thread</string>
+    <string name="pull_request_line_comment_failed">Failed to send comment</string>
 </resources>

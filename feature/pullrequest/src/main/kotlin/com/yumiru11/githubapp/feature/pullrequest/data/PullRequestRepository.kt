@@ -1,21 +1,38 @@
+@file:Suppress("TooGenericExceptionCaught", "SwallowedException")
+// - TooGenericExceptionCaught：GraphQL 通道异常统一兜底（fine-grained PAT 不支持 / 网络瞬断）
+// - SwallowedException：reviewThreadContext 失败返回保守空上下文（T14 getIssueWriteContext 同款降级）
+
 package com.yumiru11.githubapp.feature.pullrequest.data
 
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import com.apollographql.apollo.ApolloClient
+import com.apollographql.cache.normalized.FetchPolicy
+import com.apollographql.cache.normalized.fetchPolicy
+import com.yumiru11.githubapp.core.githubgraphql.generated.PullRequestReviewThreadsQuery
+import com.yumiru11.githubapp.core.githubgraphql.generated.ResolveReviewThreadMutation
+import com.yumiru11.githubapp.core.githubgraphql.generated.UnresolveReviewThreadMutation
+import com.yumiru11.githubapp.core.githubgraphql.generated.type.ResolveReviewThreadInput
+import com.yumiru11.githubapp.core.githubgraphql.generated.type.UnresolveReviewThreadInput
 import com.yumiru11.githubapp.core.githubrest.api.PullRequestApi
 import com.yumiru11.githubapp.core.githubrest.model.CheckRunDto
 import com.yumiru11.githubapp.core.githubrest.model.CombinedStatusDto
+import com.yumiru11.githubapp.core.githubrest.model.CreateReviewCommentRequest
 import com.yumiru11.githubapp.core.githubrest.model.IssueDto
 import com.yumiru11.githubapp.core.githubrest.model.IssueEventDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestCommitDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestFileDto
+import com.yumiru11.githubapp.core.githubrest.model.PullRequestReviewCommentDto
+import com.yumiru11.githubapp.core.githubrest.model.UpdateReviewCommentRequest
 import com.yumiru11.githubapp.core.githubrest.model.UserDto
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRunConclusion
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRunStatus
 import com.yumiru11.githubapp.feature.pullrequest.model.CombinedStatus
+import com.yumiru11.githubapp.feature.pullrequest.model.DiffSide
+import com.yumiru11.githubapp.feature.pullrequest.model.LineCommentAnchor
 import com.yumiru11.githubapp.feature.pullrequest.model.MergeableState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequest
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestBranch
@@ -31,6 +48,10 @@ import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineEventType
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestUser
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewComment
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThread
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThreadContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -50,6 +71,7 @@ class PullRequestRepository
     @Inject
     constructor(
         private val pullRequestApi: PullRequestApi,
+        private val apolloClient: ApolloClient,
     ) {
         /** PR 分页流（按 [filter] 过滤 open/closed/all） */
         fun pulls(
@@ -91,6 +113,132 @@ class PullRequestRepository
             number: Int,
         ): List<PullRequestFile> = pullRequestApi.listFiles(owner, repo, number).map { it.toDomain() }
 
+        /** 行内评论列表（T16；GET /pulls/{number}/comments） */
+        suspend fun reviewComments(
+            owner: String,
+            repo: String,
+            number: Int,
+        ): List<ReviewComment> = pullRequestApi.listReviewComments(owner, repo, number).map { it.toDomain() }
+
+        /** 新增行内评论（T16；REST 写优先通道） */
+        suspend fun createReviewComment(
+            owner: String,
+            repo: String,
+            number: Int,
+            anchor: LineCommentAnchor,
+            body: String,
+            commitId: String,
+        ): ReviewComment =
+            pullRequestApi
+                .createReviewComment(
+                    owner,
+                    repo,
+                    number,
+                    CreateReviewCommentRequest(
+                        body = body,
+                        commitId = commitId,
+                        path = anchor.path,
+                        line = anchor.line,
+                        side = anchor.sideRaw,
+                    ),
+                ).toDomain()
+
+        /** 回复行内评论（T16；in_reply_to_id 定位） */
+        suspend fun replyReviewComment(
+            owner: String,
+            repo: String,
+            number: Int,
+            path: String,
+            inReplyToId: Long,
+            body: String,
+        ): ReviewComment =
+            pullRequestApi
+                .createReviewComment(
+                    owner,
+                    repo,
+                    number,
+                    CreateReviewCommentRequest(body = body, path = path, inReplyToId = inReplyToId),
+                ).toDomain()
+
+        /** 编辑行内评论（T16 接口就绪；UI v1 未接线，留 T17 Review 使用） */
+        suspend fun updateReviewComment(
+            owner: String,
+            repo: String,
+            commentId: Long,
+            body: String,
+        ): ReviewComment =
+            pullRequestApi
+                .updateReviewComment(owner, repo, commentId, UpdateReviewCommentRequest(body = body))
+                .toDomain()
+
+        /** 删除行内评论（T16 接口就绪；UI v1 未接线，留 T17 Review 使用） */
+        suspend fun deleteReviewComment(
+            owner: String,
+            repo: String,
+            commentId: Long,
+        ) {
+            pullRequestApi.deleteReviewComment(owner, repo, commentId)
+        }
+
+        /**
+         * 会话上下文（GraphQL reviewThreads 查询，T16）。
+         *
+         * GraphQL 不可用（fine-grained PAT 不支持 / 网络异常）→ 保守空上下文
+         * （pullRequestNodeId=null，UI 隐藏解析入口），不抛异常（T14 getIssueWriteContext 同款降级）。
+         */
+        suspend fun reviewThreadContext(pullRequestNodeId: String?): ReviewThreadContext {
+            if (pullRequestNodeId == null) return ReviewThreadContext()
+            return try {
+                val response =
+                    apolloClient
+                        .query(PullRequestReviewThreadsQuery(id = pullRequestNodeId))
+                        .fetchPolicy(FetchPolicy.NetworkOnly)
+                        .execute()
+                val rawThreads =
+                    response.data
+                        ?.node
+                        ?.onPullRequest
+                        ?.reviewThreads
+                        ?.nodes
+                        ?.mapNotNull { node ->
+                            node?.let {
+                                RawReviewThread(
+                                    id = it.id,
+                                    path = it.path,
+                                    side = it.diffSide.rawValue,
+                                    line = it.line,
+                                    originalLine = it.originalLine,
+                                    isResolved = it.isResolved,
+                                    commentIds =
+                                        it.comments.nodes
+                                            ?.mapNotNull { comment -> comment?.id }
+                                            .orEmpty(),
+                                )
+                            }
+                        }.orEmpty()
+                ReviewThreadContext(
+                    pullRequestNodeId = pullRequestNodeId,
+                    threads = rawThreads.toReviewThreads(),
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ReviewThreadContext()
+            }
+        }
+
+        /** 解决/解除会话（T16；GraphQL 是唯一通道——REST 无解析端点） */
+        suspend fun setThreadResolved(
+            threadId: String,
+            resolved: Boolean,
+        ) {
+            if (resolved) {
+                apolloClient.mutation(ResolveReviewThreadMutation(input = ResolveReviewThreadInput(threadId = threadId))).execute()
+            } else {
+                apolloClient.mutation(UnresolveReviewThreadMutation(input = UnresolveReviewThreadInput(threadId = threadId))).execute()
+            }
+        }
+
         /** Check Run 列表（按 head sha） */
         suspend fun checkRuns(
             owner: String,
@@ -131,6 +279,7 @@ internal fun PullRequestDto.toDomain(): PullRequest =
         createdAt = createdAt,
         updatedAt = updatedAt,
         mergedAt = mergedAt,
+        nodeId = nodeId,
         htmlUrl = htmlUrl,
         mergeable = mergeable,
         mergeableState = MergeableState.fromRaw(mergeable, mergeableState),
@@ -242,6 +391,46 @@ private fun PullRequestFileDto.toDomain(): PullRequestFile =
         deletions = deletions,
         changes = changes,
         patch = patch,
+    )
+
+/** GraphQL reviewThreads 响应的最小映射源（解包自 Apollo 响应，交给纯函数映射便于单测） */
+data class RawReviewThread(
+    val id: String,
+    val path: String,
+    val side: String?,
+    val line: Int?,
+    val originalLine: Int?,
+    val isResolved: Boolean,
+    val commentIds: List<String>,
+)
+
+internal fun List<RawReviewThread>.toReviewThreads(): List<ReviewThread> = map { it.toDomain() }
+
+private fun RawReviewThread.toDomain(): ReviewThread =
+    ReviewThread(
+        id = id,
+        path = path,
+        side = DiffSide.fromRaw(side),
+        line = line,
+        originalLine = originalLine,
+        isResolved = isResolved,
+        commentIds = commentIds,
+    )
+
+internal fun PullRequestReviewCommentDto.toDomain(): ReviewComment =
+    ReviewComment(
+        id = id,
+        body = body,
+        author = user?.toDomain(),
+        path = path,
+        line = line,
+        originalLine = originalLine,
+        side = DiffSide.fromRaw(side),
+        commitId = commitId,
+        createdAt = createdAt,
+        inReplyToId = inReplyToId,
+        resolved = resolved ?: false,
+        nodeId = nodeId,
     )
 
 internal fun CheckRunDto.toDomain(): CheckRun =

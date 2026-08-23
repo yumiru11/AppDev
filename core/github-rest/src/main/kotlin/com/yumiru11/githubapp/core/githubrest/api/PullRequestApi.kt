@@ -2,12 +2,20 @@ package com.yumiru11.githubapp.core.githubrest.api
 
 import com.yumiru11.githubapp.core.githubrest.model.CheckRunsResponseDto
 import com.yumiru11.githubapp.core.githubrest.model.CombinedStatusDto
+import com.yumiru11.githubapp.core.githubrest.model.CreateReviewCommentRequest
 import com.yumiru11.githubapp.core.githubrest.model.IssueEventDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestCommitDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestFileDto
+import com.yumiru11.githubapp.core.githubrest.model.PullRequestReviewCommentDto
+import com.yumiru11.githubapp.core.githubrest.model.UpdateReviewCommentRequest
+import retrofit2.Response
+import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.PATCH
+import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -78,6 +86,52 @@ interface PullRequestApi {
         @Path("number") number: Int,
         @Query("per_page") perPage: Int = 100,
     ): List<PullRequestFileDto>
+
+    /**
+     * GET /repos/{owner}/{repo}/pulls/{number}/comments：行内评论列表（T16）。
+     */
+    @GET("repos/{owner}/{repo}/pulls/{number}/comments")
+    suspend fun listReviewComments(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("number") number: Int,
+        @Query("per_page") perPage: Int = 100,
+    ): List<PullRequestReviewCommentDto>
+
+    /**
+     * POST /repos/{owner}/{repo}/pulls/{number}/comments：新增/回复行内评论（T16）。
+     *
+     * 新增：body + commit_id + path + line + side；回复：body + in_reply_to_id。
+     */
+    @POST("repos/{owner}/{repo}/pulls/{number}/comments")
+    suspend fun createReviewComment(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("number") number: Int,
+        @Body request: CreateReviewCommentRequest,
+    ): PullRequestReviewCommentDto
+
+    /**
+     * PATCH /repos/{owner}/{repo}/pulls/comments/{comment_id}：编辑行内评论（T16）。
+     */
+    @PATCH("repos/{owner}/{repo}/pulls/comments/{comment_id}")
+    suspend fun updateReviewComment(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("comment_id") commentId: Long,
+        @Body request: UpdateReviewCommentRequest,
+    ): PullRequestReviewCommentDto
+
+    /**
+     * DELETE /repos/{owner}/{repo}/pulls/comments/{comment_id}：删除行内评论（T16）。
+     * GitHub 返回 204 空体。
+     */
+    @DELETE("repos/{owner}/{repo}/pulls/comments/{comment_id}")
+    suspend fun deleteReviewComment(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("comment_id") commentId: Long,
+    ): Response<Unit>
 
     /**
      * GET /repos/{owner}/{repo}/issues/{number}/timeline：PR 时间线。

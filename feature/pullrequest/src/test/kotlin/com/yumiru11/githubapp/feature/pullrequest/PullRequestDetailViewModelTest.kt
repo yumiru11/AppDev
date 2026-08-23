@@ -7,6 +7,8 @@ import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRunConclusion
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRunStatus
 import com.yumiru11.githubapp.feature.pullrequest.model.CombinedStatus
+import com.yumiru11.githubapp.feature.pullrequest.model.DiffSide
+import com.yumiru11.githubapp.feature.pullrequest.model.LineCommentAnchor
 import com.yumiru11.githubapp.feature.pullrequest.model.MergeableState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequest
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestBranch
@@ -14,12 +16,19 @@ import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestErrorType
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTab
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewComment
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThread
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThreadContext
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -89,6 +98,8 @@ class PullRequestDetailViewModelTest {
             coEvery { files(owner, repo, number) } returns emptyList()
             coEvery { checkRuns(owner, repo, "abc123") } returns checkRuns()
             coEvery { combinedStatus(owner, repo, "abc123") } returns CombinedStatus(state = "success", totalCount = 1)
+            coEvery { reviewComments(owner, repo, number) } returns emptyList()
+            coEvery { reviewThreadContext(any()) } returns ReviewThreadContext(pullRequestNodeId = "PR_1")
         }
 
     @Test
@@ -123,12 +134,12 @@ class PullRequestDetailViewModelTest {
                 mockk<HttpException> {
                     every { code() } returns 404
                 }
-            val repo =
+            val mockRepo =
                 mockk<PullRequestRepository> {
                     coEvery { getPullRequest(any(), any(), any()) } throws httpException
                 }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repo)
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
 
             val state = viewModel.uiState.value
             assertTrue(state is PullRequestDetailUiState.Error)
@@ -138,12 +149,12 @@ class PullRequestDetailViewModelTest {
     @Test
     fun load_ioError_emitsErrorNetwork() =
         runTest {
-            val repo =
+            val mockRepo =
                 mockk<PullRequestRepository> {
                     coEvery { getPullRequest(any(), any(), any()) } throws IOException("boom")
                 }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repo)
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
 
             val state = viewModel.uiState.value
             assertTrue(state is PullRequestDetailUiState.Error)
@@ -153,12 +164,12 @@ class PullRequestDetailViewModelTest {
     @Test
     fun load_unknownError_emitsErrorUnknown() =
         runTest {
-            val repo =
+            val mockRepo =
                 mockk<PullRequestRepository> {
                     coEvery { getPullRequest(any(), any(), any()) } throws IllegalStateException("boom")
                 }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repo)
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
 
             val state = viewModel.uiState.value
             assertTrue(state is PullRequestDetailUiState.Error)
@@ -168,13 +179,13 @@ class PullRequestDetailViewModelTest {
     @Test
     fun load_timelineFailure_emitsErrorNotPartialSuccess() =
         runTest {
-            val repo =
+            val mockRepo =
                 mockk<PullRequestRepository> {
                     coEvery { getPullRequest(owner, repo, number) } returns pullRequest()
                     coEvery { timeline(owner, repo, number) } throws IOException("timeline boom")
                 }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repo)
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
 
             val state = viewModel.uiState.value
             assertTrue("时间线失败 → 整体 Error（不产部分 Success）", state is PullRequestDetailUiState.Error)
@@ -197,6 +208,8 @@ class PullRequestDetailViewModelTest {
             coEvery { failingRepository.files(owner, repo, number) } returns emptyList()
             coEvery { failingRepository.checkRuns(owner, repo, "abc123") } returns checkRuns()
             coEvery { failingRepository.combinedStatus(owner, repo, "abc123") } returns CombinedStatus(state = "success", totalCount = 1)
+            coEvery { failingRepository.reviewComments(owner, repo, number) } returns emptyList()
+            coEvery { failingRepository.reviewThreadContext(any()) } returns ReviewThreadContext(pullRequestNodeId = "PR_1")
 
             viewModel.retry()
 
@@ -282,5 +295,188 @@ class PullRequestDetailViewModelTest {
 
             viewModel.toggleFileExpanded("src/Main.kt")
             assertFalse("src/Main.kt" in viewModel.expandedFileNames.value)
+        }
+
+    // ── T16：行评论与会话解析 ──
+
+    private fun reviewComment(
+        id: Long,
+        path: String = "README.md",
+        side: DiffSide = DiffSide.RIGHT,
+        line: Int? = 3,
+        body: String = "nice",
+    ): ReviewComment =
+        ReviewComment(
+            id = id,
+            body = body,
+            path = path,
+            side = side,
+            line = if (side == DiffSide.RIGHT) line else null,
+            originalLine = if (side == DiffSide.LEFT) line else null,
+        )
+
+    private fun reviewThread(
+        id: String = "THREAD_1",
+        path: String = "README.md",
+        side: DiffSide = DiffSide.RIGHT,
+        isResolved: Boolean = false,
+    ): ReviewThread = ReviewThread(id = id, path = path, side = side, line = 3, isResolved = isResolved)
+
+    private fun repositoryWithComments(
+        comments: List<ReviewComment> = emptyList(),
+        threads: List<ReviewThread> = emptyList(),
+        nodeId: String? = "PR_1",
+    ): PullRequestRepository =
+        mockk<PullRequestRepository> {
+            coEvery { getPullRequest(owner, repo, number) } returns pullRequest()
+            coEvery { timeline(owner, repo, number) } returns timeline()
+            coEvery { commits(owner, repo, number) } returns emptyList()
+            coEvery { files(owner, repo, number) } returns emptyList()
+            coEvery { checkRuns(owner, repo, "abc123") } returns checkRuns()
+            coEvery { combinedStatus(owner, repo, "abc123") } returns CombinedStatus(state = "success", totalCount = 1)
+            coEvery { reviewComments(owner, repo, number) } returns comments
+            coEvery { reviewThreadContext(any()) } returns ReviewThreadContext(pullRequestNodeId = nodeId, threads = threads)
+        }
+
+    @Test
+    fun load_success_carriesReviewCommentsAndThreads() =
+        runTest {
+            val comments = listOf(reviewComment(id = 1L))
+            val threads = listOf(reviewThread())
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repositoryWithComments(comments = comments, threads = threads))
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertEquals(comments, state.reviewComments)
+            assertEquals(threads, state.reviewThreads)
+            assertTrue("GraphQL 会话可用 → 可解析", state.canResolveThreads)
+        }
+
+    @Test
+    fun openLineComment_aggregatesThreadAndComments() =
+        runTest {
+            val viewModel =
+                PullRequestDetailViewModel(
+                    savedStateHandle(),
+                    repositoryWithComments(comments = listOf(reviewComment(id = 1L)), threads = listOf(reviewThread())),
+                )
+
+            viewModel.openLineComment("README.md", DiffSide.RIGHT, 3)
+
+            val target = viewModel.lineCommentTarget.value
+            assertNotNull(target)
+            assertEquals("README.md", target?.anchor?.path)
+            assertEquals(3, target?.anchor?.line)
+            assertEquals("THREAD_1", target?.thread?.id)
+            assertEquals(1, target?.comments?.size)
+        }
+
+    @Test
+    fun dismissLineComment_clearsTarget() =
+        runTest {
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repository())
+
+            viewModel.openLineComment("README.md", DiffSide.RIGHT, 3)
+            assertNotNull(viewModel.lineCommentTarget.value)
+
+            viewModel.dismissLineComment()
+
+            assertNull(viewModel.lineCommentTarget.value)
+        }
+
+    @Test
+    fun submitLineComment_success_replacesOptimisticAndCloses() =
+        runTest {
+            val created = reviewComment(id = 500L, body = "hi")
+            val mockRepo = repositoryWithComments()
+            coEvery { mockRepo.createReviewComment(owner, repo, number, any(), "hi", "abc123") } returns created
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val anchor = LineCommentAnchor(path = "README.md", side = DiffSide.RIGHT, line = 3)
+            viewModel.submitLineComment(anchor, "hi")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertEquals(1, state.reviewComments.size)
+            assertEquals(500L, state.reviewComments.single().id)
+            assertNull(viewModel.lineCommentTarget.value)
+            coVerify(exactly = 1) { mockRepo.createReviewComment(owner, repo, number, anchor, "hi", "abc123") }
+        }
+
+    @Test
+    fun submitLineComment_reply_callsReplyEndpoint() =
+        runTest {
+            val reply = reviewComment(id = 501L, body = "reply")
+            val mockRepo = repositoryWithComments(comments = listOf(reviewComment(id = 1L)))
+            coEvery { mockRepo.replyReviewComment(owner, repo, number, "README.md", 1L, "reply") } returns reply
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val anchor = LineCommentAnchor(path = "README.md", side = DiffSide.RIGHT, line = 3)
+            viewModel.submitLineComment(anchor, "reply", inReplyToId = 1L)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertEquals(2, state.reviewComments.size)
+            coVerify(exactly = 1) { mockRepo.replyReviewComment(owner, repo, number, "README.md", 1L, "reply") }
+        }
+
+    @Test
+    fun submitLineComment_failure_rollsBackAndKeepsSheetOpen() =
+        runTest {
+            val mockRepo = repositoryWithComments()
+            coEvery { mockRepo.createReviewComment(owner, repo, number, any(), any(), any()) } throws IOException("boom")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.openLineComment("README.md", DiffSide.RIGHT, 3)
+            viewModel.submitLineComment(LineCommentAnchor(path = "README.md", side = DiffSide.RIGHT, line = 3), "hi")
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertTrue("失败回滚 → 无残留乐观评论", state.reviewComments.isEmpty())
+            assertNotNull("失败不关闭 sheet，保留输入", viewModel.lineCommentTarget.value)
+        }
+
+    @Test
+    fun toggleThreadResolved_success_flipsResolved() =
+        runTest {
+            val mockRepo = repositoryWithComments(threads = listOf(reviewThread()))
+            coEvery { mockRepo.setThreadResolved("THREAD_1", true) } returns Unit
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val thread = (viewModel.uiState.value as PullRequestDetailUiState.Success).reviewThreads.single()
+            assertFalse(thread.isResolved)
+
+            viewModel.toggleThreadResolved(thread)
+            advanceUntilIdle()
+
+            assertTrue((viewModel.uiState.value as PullRequestDetailUiState.Success).reviewThreads.single().isResolved)
+            coVerify(exactly = 1) { mockRepo.setThreadResolved("THREAD_1", true) }
+        }
+
+    @Test
+    fun toggleThreadResolved_failure_rollsBack() =
+        runTest {
+            val mockRepo = repositoryWithComments(threads = listOf(reviewThread()))
+            coEvery { mockRepo.setThreadResolved("THREAD_1", true) } throws IOException("boom")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val thread = (viewModel.uiState.value as PullRequestDetailUiState.Success).reviewThreads.single()
+            viewModel.toggleThreadResolved(thread)
+            advanceUntilIdle()
+
+            assertFalse((viewModel.uiState.value as PullRequestDetailUiState.Success).reviewThreads.single().isResolved)
+        }
+
+    @Test
+    fun toggleThreadResolved_restOnlySession_isNoop() =
+        runTest {
+            val mockRepo = repositoryWithComments(threads = listOf(reviewThread()), nodeId = null)
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertFalse("REST-only 会话 → 无解析入口", state.canResolveThreads)
+
+            viewModel.toggleThreadResolved(state.reviewThreads.single())
+            advanceUntilIdle()
+
+            assertFalse((viewModel.uiState.value as PullRequestDetailUiState.Success).reviewThreads.single().isResolved)
+            coVerify(exactly = 0) { mockRepo.setThreadResolved(any(), any()) }
         }
 }

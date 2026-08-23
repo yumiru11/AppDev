@@ -133,4 +133,20 @@
     <string name="pull_request_comment_unavailable">评论发布暂未开放</string>
     <string name="cancel">取消</string>
     <string name="submit">提交</string>
+
+    <!-- Diff 视图（T16） -->
+    <string name="pull_request_diff_unified">统一视图</string>
+    <string name="pull_request_diff_side_by_side">分屏视图</string>
+    <string name="pull_request_diff_empty">无 diff 预览</string>
+    <string name="pull_request_diff_fold_expand">展开 %1$d 个隐藏行</string>
+    <string name="pull_request_diff_comment_count">%1$d 条评论</string>
+    <string name="pull_request_diff_thread_resolved">已解决</string>
+
+    <!-- 行内评论（T16） -->
+    <string name="pull_request_line_comment_new">评论</string>
+    <string name="pull_request_line_comment_reply">回复</string>
+    <string name="pull_request_line_comment_placeholder">写评论…</string>
+    <string name="pull_request_line_comment_resolve">解决会话</string>
+    <string name="pull_request_line_comment_unresolve">重新打开会话</string>
+    <string name="pull_request_line_comment_failed">评论发送失败</string>
 </resources>

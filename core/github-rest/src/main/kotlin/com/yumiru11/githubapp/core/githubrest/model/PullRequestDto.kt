@@ -23,6 +23,8 @@ data class PullRequestDto(
     val number: Int,
     val title: String,
     val state: String,
+    /** GraphQL node id（T16 会话解析需按 PullRequest id 查 reviewThreads） */
+    val nodeId: String? = null,
     val body: String? = null,
     val user: UserDto? = null,
     val labels: List<LabelDto> = emptyList(),
@@ -146,8 +148,21 @@ data class PullRequestReviewCommentDto(
     val user: UserDto? = null,
     val body: String? = null,
     val path: String? = null,
+    /** diff 新文件行号（side=RIGHT 时有效） */
     val line: Int? = null,
+    /** diff 旧文件行号（side=LEFT 时有效） */
+    val originalLine: Int? = null,
+    /** 已废弃的 diff 位置（GitHub 保留字段，勿用于新评论定位） */
     val position: Int? = null,
+    /** LEFT = 删除行（旧文件侧），RIGHT = 新增行（新文件侧）；null = 旧 API 无 side */
+    val side: String? = null,
+    /** 评论对应的提交 SHA */
+    val commitId: String? = null,
+    /** GraphQL node id（T16 与 reviewThreads 的 comments 关联） */
+    val nodeId: String? = null,
+    /** 所属会话是否已解决（REST 只读；解析/解除走 GraphQL） */
+    val resolved: Boolean? = null,
+    val resolvedBy: UserDto? = null,
     val createdAt: String? = null,
     val htmlUrl: String? = null,
     val inReplyToId: Long? = null,
