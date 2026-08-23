@@ -1,8 +1,11 @@
+@file:Suppress("LargeClass") // T15/T16/T17 三波测试聚合在同一 VM 测试类（文件内按票分段），拆分反损可读性（RepoFilesViewModelTest 同款先例）
+
 package com.yumiru11.githubapp.feature.pullrequest
 
 import androidx.lifecycle.SavedStateHandle
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.feature.pullrequest.data.PullRequestRepository
+import com.yumiru11.githubapp.feature.pullrequest.data.RepositoryControl
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRunConclusion
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRunStatus
@@ -13,16 +16,24 @@ import com.yumiru11.githubapp.feature.pullrequest.model.MergeableState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequest
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestBranch
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestErrorType
+import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestMergeMethod
+import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestReview
+import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestReviewState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTab
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
+import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestUser
+import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestWriteAction
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewComment
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewConclusion
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThread
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThreadContext
+import com.yumiru11.githubapp.feature.pullrequest.model.ViewerPermission
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -100,6 +111,8 @@ class PullRequestDetailViewModelTest {
             coEvery { combinedStatus(owner, repo, "abc123") } returns CombinedStatus(state = "success", totalCount = 1)
             coEvery { reviewComments(owner, repo, number) } returns emptyList()
             coEvery { reviewThreadContext(any()) } returns ReviewThreadContext(pullRequestNodeId = "PR_1")
+            coEvery { repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
         }
 
     @Test
@@ -210,6 +223,8 @@ class PullRequestDetailViewModelTest {
             coEvery { failingRepository.combinedStatus(owner, repo, "abc123") } returns CombinedStatus(state = "success", totalCount = 1)
             coEvery { failingRepository.reviewComments(owner, repo, number) } returns emptyList()
             coEvery { failingRepository.reviewThreadContext(any()) } returns ReviewThreadContext(pullRequestNodeId = "PR_1")
+            coEvery { failingRepository.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
 
             viewModel.retry()
 
@@ -336,6 +351,8 @@ class PullRequestDetailViewModelTest {
             coEvery { combinedStatus(owner, repo, "abc123") } returns CombinedStatus(state = "success", totalCount = 1)
             coEvery { reviewComments(owner, repo, number) } returns comments
             coEvery { reviewThreadContext(any()) } returns ReviewThreadContext(pullRequestNodeId = nodeId, threads = threads)
+            coEvery { repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
         }
 
     @Test
@@ -478,5 +495,338 @@ class PullRequestDetailViewModelTest {
 
             assertFalse((viewModel.uiState.value as PullRequestDetailUiState.Success).reviewThreads.single().isResolved)
             coVerify(exactly = 0) { mockRepo.setThreadResolved(any(), any()) }
+        }
+
+    // ── T17：Review / Merge / Update branch / 删除分支 ──
+
+    /** 同仓库 head 的 PR（Update branch / 删除分支可见性前提） */
+    private fun sameRepoPullRequest(): PullRequest =
+        pullRequest().copy(head = PullRequestBranch(ref = "feature", sha = "abc123", repoFullName = "octocat/Hello-World"))
+
+    @Test
+    fun load_success_writePermission_mapsActionFlags() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertTrue(state.canReview)
+            assertTrue(state.canApprove)
+            assertTrue(state.canMerge)
+            assertFalse("非同仓库 head → 不可删分支", state.canDeleteHeadBranch)
+        }
+
+    @Test
+    fun load_success_readPermission_hidesApproveAndMerge() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.READ, defaultBranch = "main")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertTrue("READ 可发起 comment 审查", state.canReview)
+            assertFalse(state.canApprove)
+            assertFalse(state.canMerge)
+        }
+
+    @Test
+    fun load_success_unknownPermission_hidesAllWrites() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns RepositoryControl()
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertFalse(state.canReview)
+            assertFalse(state.canApprove)
+            assertFalse(state.canMerge)
+        }
+
+    @Test
+    fun load_success_sameRepoHead_mapsDeleteBranchFlag() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returns sameRepoPullRequest()
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertTrue(state.headSameRepo)
+            assertFalse("feature ≠ main 默认分支 → 可删", state.headIsDefaultBranch)
+            assertTrue(state.canDeleteHeadBranch)
+        }
+
+    @Test
+    fun submitReview_success_optimisticInsertThenReplaced() =
+        runTest {
+            val mockRepo = repository()
+            val review =
+                PullRequestReview(
+                    id = 900L,
+                    author = PullRequestUser(login = "reviewer"),
+                    body = "LGTM",
+                    state = PullRequestReviewState.APPROVED,
+                )
+            val gate = CompletableDeferred<Unit>()
+            coEvery { mockRepo.submitReview(owner, repo, number, ReviewConclusion.APPROVE, "LGTM") } coAnswers {
+                gate.await()
+                review
+            }
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.submitReview(ReviewConclusion.APPROVE, "LGTM")
+
+            val optimistic = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertEquals(PullRequestWriteAction.REVIEW, optimistic.pendingAction)
+            val optimisticItem = optimistic.timeline.first() as PullRequestTimelineItem.Review
+            assertTrue("乐观临时 id 为负", optimisticItem.id < 0)
+            assertEquals(PullRequestReviewState.APPROVED, optimisticItem.state)
+
+            gate.complete(Unit)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertNull(state.pendingAction)
+            val item = state.timeline.first() as PullRequestTimelineItem.Review
+            assertEquals(900L, item.id)
+            assertEquals("reviewer", item.author?.login)
+            coVerify(exactly = 1) { mockRepo.submitReview(owner, repo, number, ReviewConclusion.APPROVE, "LGTM") }
+        }
+
+    @Test
+    fun submitReview_failure_rollsBackOptimisticAndClearsPending() =
+        runTest {
+            val mockRepo = repository()
+            val gate = CompletableDeferred<Unit>()
+            coEvery { mockRepo.submitReview(owner, repo, number, ReviewConclusion.COMMENT, "hi") } coAnswers {
+                gate.await()
+                throw IOException("boom")
+            }
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.submitReview(ReviewConclusion.COMMENT, "hi")
+
+            val optimistic = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertEquals(1, optimistic.timeline.filterIsInstance<PullRequestTimelineItem.Review>().size)
+
+            gate.complete(Unit)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertNull(state.pendingAction)
+            assertTrue("失败回滚 → 无残留 Review", state.timeline.none { it is PullRequestTimelineItem.Review })
+        }
+
+    @Test
+    fun submitReview_approveWithoutWritePermission_isIgnored() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.READ, defaultBranch = "main")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertFalse(state.canApprove)
+
+            viewModel.submitReview(ReviewConclusion.APPROVE, "LGTM")
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { mockRepo.submitReview(any(), any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun merge_success_optimisticMergedThenConfirmed() =
+        runTest {
+            val mockRepo = repository()
+            val gate = CompletableDeferred<Unit>()
+            coEvery { mockRepo.mergePullRequest(owner, repo, number, PullRequestMergeMethod.SQUASH, "title", "note", "abc123") } coAnswers {
+                gate.await()
+                true
+            }
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            // 加载态为 OPEN；合并成功后的刷新返回 MERGED（合并前建桩会令 canMerge=false）
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returns
+                pullRequest().copy(state = PullRequestState.MERGED, mergedAt = "2026-08-23T00:00:00Z")
+            viewModel.mergePullRequest(PullRequestMergeMethod.SQUASH, "title", "note", deleteBranch = false)
+
+            val optimistic = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertEquals(PullRequestState.MERGED, optimistic.pullRequest.state)
+            assertEquals(PullRequestWriteAction.MERGE, optimistic.pendingAction)
+
+            gate.complete(Unit)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertNull(state.pendingAction)
+            assertEquals("刷新保持 MERGED", PullRequestState.MERGED, state.pullRequest.state)
+            coVerify(
+                exactly = 1,
+            ) { mockRepo.mergePullRequest(owner, repo, number, PullRequestMergeMethod.SQUASH, "title", "note", "abc123") }
+        }
+
+    @Test
+    fun merge_failure_rollsBackOpenAndRestoresCanMerge() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.mergePullRequest(owner, repo, number, any(), any(), any(), any()) } throws IOException("boom")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.mergePullRequest(PullRequestMergeMethod.MERGE, "", "", deleteBranch = false)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertEquals(PullRequestState.OPEN, state.pullRequest.state)
+            assertNull(state.pendingAction)
+            assertTrue("回滚恢复可合并", state.canMerge)
+        }
+
+    @Test
+    fun mergeWithDeleteBranch_success_deletesHeadBranchAndHidesEntry() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returns sameRepoPullRequest()
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
+            coEvery { mockRepo.mergePullRequest(owner, repo, number, any(), any(), any(), "abc123") } returns true
+            coEvery { mockRepo.deleteBranch(owner, repo, "feature") } returns Unit
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val loaded = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertTrue(loaded.canDeleteHeadBranch)
+
+            // 合并成功后刷新返回 MERGED 态
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returns sameRepoPullRequest().copy(state = PullRequestState.MERGED)
+            viewModel.mergePullRequest(PullRequestMergeMethod.MERGE, "", "", deleteBranch = true)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { mockRepo.deleteBranch(owner, repo, "feature") }
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertFalse("删除后隐藏入口", state.canDeleteHeadBranch)
+        }
+
+    @Test
+    fun merge_whileMergePending_isIgnored() =
+        runTest {
+            val mockRepo = repository()
+            val gate = CompletableDeferred<Unit>()
+            coEvery { mockRepo.mergePullRequest(owner, repo, number, any(), any(), any(), any()) } coAnswers {
+                gate.await()
+                true
+            }
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            // 加载态为 OPEN；合并成功后的刷新返回 MERGED（合并前建桩会令 canMerge=false）
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returns pullRequest().copy(state = PullRequestState.MERGED)
+            viewModel.mergePullRequest(PullRequestMergeMethod.MERGE, "", "", deleteBranch = false)
+            viewModel.mergePullRequest(PullRequestMergeMethod.SQUASH, "", "", deleteBranch = false)
+            gate.complete(Unit)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { mockRepo.mergePullRequest(owner, repo, number, any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun updateBranch_success_clearsPending() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returns sameRepoPullRequest()
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
+            val gate = CompletableDeferred<Unit>()
+            coEvery { mockRepo.updateBranch(owner, repo, number, "abc123") } coAnswers {
+                gate.await()
+                Unit
+            }
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.updateBranch()
+
+            val optimistic = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertEquals(PullRequestWriteAction.UPDATE_BRANCH, optimistic.pendingAction)
+
+            gate.complete(Unit)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertNull(state.pendingAction)
+            coVerify(exactly = 1) { mockRepo.updateBranch(owner, repo, number, "abc123") }
+        }
+
+    @Test
+    fun updateBranch_failure_clearsPending() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returns sameRepoPullRequest()
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
+            val gate = CompletableDeferred<Unit>()
+            coEvery { mockRepo.updateBranch(owner, repo, number, "abc123") } coAnswers {
+                gate.await()
+                throw IOException("boom")
+            }
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.updateBranch()
+            gate.complete(Unit)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertNull(state.pendingAction)
+            coVerify(exactly = 1) { mockRepo.updateBranch(owner, repo, number, "abc123") }
+        }
+
+    @Test
+    fun deleteBranch_success_clearsFlag() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returns sameRepoPullRequest()
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
+            val gate = CompletableDeferred<Unit>()
+            coEvery { mockRepo.deleteBranch(owner, repo, "feature") } coAnswers {
+                gate.await()
+                Unit
+            }
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val loaded = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertTrue(loaded.canDeleteHeadBranch)
+
+            viewModel.deleteBranch()
+            gate.complete(Unit)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertFalse(state.canDeleteHeadBranch)
+            coVerify(exactly = 1) { mockRepo.deleteBranch(owner, repo, "feature") }
+        }
+
+    @Test
+    fun deleteBranch_failure_keepsEntry() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returns sameRepoPullRequest()
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
+            val gate = CompletableDeferred<Unit>()
+            coEvery { mockRepo.deleteBranch(owner, repo, "feature") } coAnswers {
+                gate.await()
+                throw IOException("boom")
+            }
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.deleteBranch()
+            gate.complete(Unit)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertTrue("失败保留入口可重试", state.canDeleteHeadBranch)
         }
 }
