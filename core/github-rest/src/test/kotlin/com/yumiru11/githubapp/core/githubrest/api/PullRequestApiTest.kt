@@ -2,6 +2,8 @@ package com.yumiru11.githubapp.core.githubrest.api
 
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
+import com.yumiru11.githubapp.core.githubrest.model.CreateReviewCommentRequest
+import com.yumiru11.githubapp.core.githubrest.model.UpdateReviewCommentRequest
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -133,6 +135,7 @@ class PullRequestApiTest {
                       "number": 43,
                       "title": "Draft PR",
                       "state": "open",
+                      "node_id": "PR_2",
                       "draft": true,
                       "mergeable": null,
                       "mergeable_state": "unknown"
@@ -143,6 +146,7 @@ class PullRequestApiTest {
 
             val pull = pullRequestApi.getPullRequest("octocat", "Hello-World", number = 43)
 
+            assertEquals("PR_2", pull.nodeId)
             assertTrue("draft 字段应解析为 true", pull.draft)
             assertNull("mergeable null = 待检查", pull.mergeable)
             assertEquals("unknown", pull.mergeableState)
@@ -344,6 +348,124 @@ class PullRequestApiTest {
             assertEquals(2, status.statuses.size)
             assertEquals("Lint", status.statuses[1].context)
             assertEquals("/repos/octocat/Hello-World/commits/abc123/status", server.takeRequest().url.encodedPath)
+        }
+
+    @Test
+    fun listReviewComments_parsesSideResolvedAndReply() =
+        runTest {
+            server.enqueue(
+                jsonResponse(
+                    """
+                    [
+                      {
+                        "id": 100,
+                        "user": { "login": "reviewer", "id": 2 },
+                        "body": "Please fix",
+                        "path": "README.md",
+                        "line": 10,
+                        "original_line": null,
+                        "side": "RIGHT",
+                        "commit_id": "abc123",
+                        "node_id": "PRRC_100",
+                        "resolved": true,
+                        "created_at": "2026-08-01T00:00:00Z",
+                        "in_reply_to_id": null
+                      },
+                      {
+                        "id": 101,
+                        "body": "Replied",
+                        "path": "README.md",
+                        "side": "LEFT",
+                        "original_line": 7,
+                        "line": null,
+                        "resolved": false,
+                        "in_reply_to_id": 100
+                      }
+                    ]
+                    """.trimIndent(),
+                ),
+            )
+
+            val comments = pullRequestApi.listReviewComments("octocat", "Hello-World", number = 42)
+
+            assertEquals(2, comments.size)
+            val top = comments[0]
+            assertEquals("Please fix", top.body)
+            assertEquals("RIGHT", top.side)
+            assertEquals(10, top.line)
+            assertEquals(true, top.resolved)
+            assertEquals("PRRC_100", top.nodeId)
+            assertEquals("abc123", top.commitId)
+            val reply = comments[1]
+            assertEquals("LEFT", reply.side)
+            assertEquals(7, reply.originalLine)
+            assertEquals(100L, reply.inReplyToId)
+            assertEquals("/repos/octocat/Hello-World/pulls/42/comments", server.takeRequest().url.encodedPath)
+        }
+
+    @Test
+    fun createReviewComment_sendsSnakeCaseBodyAndParsesCreated() =
+        runTest {
+            server.enqueue(
+                jsonResponse(
+                    """
+                    {
+                      "id": 200,
+                      "body": "Nice",
+                      "path": "README.md",
+                      "line": 10,
+                      "side": "RIGHT",
+                      "commit_id": "abc123"
+                    }
+                    """.trimIndent(),
+                ),
+            )
+
+            val created =
+                pullRequestApi.createReviewComment(
+                    "octocat",
+                    "Hello-World",
+                    number = 42,
+                    request = CreateReviewCommentRequest(body = "Nice", commitId = "abc123", path = "README.md", line = 10, side = "RIGHT"),
+                )
+
+            assertEquals(200L, created.id)
+            val request = server.takeRequest()
+            assertEquals("POST", request.method.toString())
+            assertEquals("/repos/octocat/Hello-World/pulls/42/comments", request.url.encodedPath)
+            // 请求体 JSON 形状由 ReviewCommentWriteDtosTest 覆盖（snake_case 序列化）
+        }
+
+    @Test
+    fun updateReviewComment_buildsCommentPath() =
+        runTest {
+            server.enqueue(jsonResponse("""{ "id": 200, "body": "Edited" }"""))
+
+            val updated =
+                pullRequestApi.updateReviewComment(
+                    "octocat",
+                    "Hello-World",
+                    commentId = 200,
+                    request = UpdateReviewCommentRequest(body = "Edited"),
+                )
+
+            assertEquals("Edited", updated.body)
+            val request = server.takeRequest()
+            assertEquals("PATCH", request.method.toString())
+            assertEquals("/repos/octocat/Hello-World/pulls/comments/200", request.url.encodedPath)
+        }
+
+    @Test
+    fun deleteReviewComment_sendsDeleteAndReturns204() =
+        runTest {
+            server.enqueue(MockResponse.Builder().code(204).build())
+
+            val response = pullRequestApi.deleteReviewComment("octocat", "Hello-World", commentId = 200)
+
+            assertEquals(204, response.code())
+            val request = server.takeRequest()
+            assertEquals("DELETE", request.method.toString())
+            assertEquals("/repos/octocat/Hello-World/pulls/comments/200", request.url.encodedPath)
         }
 
     private fun jsonResponse(body: String): MockResponse =

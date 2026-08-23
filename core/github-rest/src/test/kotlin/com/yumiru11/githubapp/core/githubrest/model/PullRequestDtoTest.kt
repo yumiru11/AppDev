@@ -57,6 +57,7 @@ class PullRequestDtoTest {
                 number = 42,
                 title = "Add feature",
                 state = "open",
+                nodeId = "PR_10",
                 body = "Body text",
                 user = user,
                 labels = listOf(label),
@@ -89,8 +90,10 @@ class PullRequestDtoTest {
         assertEquals(42, pull.component2())
         assertEquals("Add feature", pull.component3())
         assertEquals("open", pull.component4())
-        assertEquals(user, pull.component6())
-        assertEquals(listOf(label), pull.component7())
+        assertEquals("PR_10", pull.component5())
+        assertEquals("Body text", pull.component6())
+        assertEquals(user, pull.component7())
+        assertEquals(listOf(label), pull.component8())
         assertFalse("equals 应拒绝非同类对象", pull.equals("not a pr"))
         assertFalse("equals 应区分差异字段", pull.equals(pull.copy(number = 43)))
     }
