@@ -1,5 +1,6 @@
 @file:Suppress("LongMethod")
-// 外观分组含 10 个设置项（模式/开关/色盘/滑杆/风格），分支样板天然长；精准抑制。
+// 外观分组含 8 个设置项（模式/开关/色盘/滑杆），行内分支样板天然长；精准抑制（T24 先例）。
+@file:OptIn(ExperimentalLayoutApi::class)
 
 package com.yumiru11.githubapp.feature.settings
 
@@ -11,10 +12,11 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,15 +24,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -44,78 +41,78 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.yumiru11.githubapp.core.datastore.model.CodeFont
-import com.yumiru11.githubapp.core.datastore.model.IconStyle
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
+import com.yumiru11.githubapp.core.designsystem.component.CardGroup
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.AppIcon
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
+import kotlin.math.roundToInt
 
 /**
- * 外观分组（ui-design §3.6）：主题模式 / 动态取色 / seed 色盘 / OLED /
- * 高对比 / 毛玻璃 / 圆角强度滑杆（实时预览）/ 动画强度滑杆（实时预览）/
- * 图标风格（Rounded/Outlined/Filled 预览）/ 代码字体 / 行号。
+ * 外观分组（ui-design §3.6，#87 分组卡化）：主题模式 / 动态取色 / seed 色盘 /
+ * OLED / 高对比 / 毛玻璃 / 圆角强度滑杆（实时预览）/ 动画强度滑杆（实时预览），
+ * 经 [CardGroup] 呈现为分段卡；非开关项副标题显示当前值（原生设置惯例）。
+ *
+ * 图标风格 / 代码字体 / 行号三项暂隐藏（FEEDBACK #6 先例：消费点未落地前不暴露
+ * 入口）——iconStyle 待 AppIcon 风格消费基建（ADR-0004 挂账），codeFont /
+ * lineNumbers 待 Sora 配置接线；DataStore 字段与 [SettingsViewModel] 写入口保留。
  */
 @Composable
 internal fun AppearanceSettingsSection(
     uiState: SettingsUiState,
     viewModel: SettingsViewModel,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        ThemeModeRow(uiState = uiState, viewModel = viewModel)
-        HorizontalDivider()
-        SwitchSettingRow(
-            title = stringResource(R.string.settings_dynamic_color),
-            description = stringResource(R.string.settings_dynamic_color_desc),
-            checked = uiState.dynamicColorEnabled,
-            onCheckedChange = viewModel::setDynamicColorEnabled,
-        )
-        HorizontalDivider()
-        SeedColorRow(
-            selected = uiState.seedColor,
-            enabled = !uiState.dynamicColorEnabled,
-            onSelect = viewModel::setSeedColor,
-        )
-        HorizontalDivider()
-        SwitchSettingRow(
-            title = stringResource(R.string.settings_oled),
-            description = stringResource(R.string.settings_oled_desc),
-            checked = uiState.oledEnabled,
-            onCheckedChange = viewModel::setOledEnabled,
-        )
-        HorizontalDivider()
-        SwitchSettingRow(
-            title = stringResource(R.string.settings_high_contrast),
-            description = stringResource(R.string.settings_high_contrast_desc),
-            checked = uiState.highContrastEnabled,
-            onCheckedChange = viewModel::setHighContrastEnabled,
-        )
-        HorizontalDivider()
-        SwitchSettingRow(
-            title = stringResource(R.string.settings_blur),
-            description = stringResource(R.string.settings_blur_desc),
-            checked = uiState.blurEnabled,
-            onCheckedChange = viewModel::setBlurEnabled,
-        )
-        HorizontalDivider()
-        CornerScaleRow(scale = uiState.cornerScale, onScaleChange = viewModel::setCornerScale)
-        HorizontalDivider()
-        MotionScaleRow(scale = uiState.motionScale, onScaleChange = viewModel::setMotionScale)
-        HorizontalDivider()
-        IconStyleRow(selected = uiState.iconStyle, onSelect = viewModel::setIconStyle)
-        HorizontalDivider()
-        CodeFontRow(selected = uiState.codeFont, onSelect = viewModel::setCodeFont)
-        HorizontalDivider()
-        SwitchSettingRow(
-            title = stringResource(R.string.settings_code_line_numbers),
-            checked = uiState.codeLineNumbers,
-            onCheckedChange = viewModel::setCodeLineNumbers,
-        )
+    CardGroup {
+        item { ThemeModeRow(uiState = uiState, viewModel = viewModel) }
+        item {
+            SwitchSettingRow(
+                title = stringResource(R.string.settings_dynamic_color),
+                description = stringResource(R.string.settings_dynamic_color_desc),
+                checked = uiState.dynamicColorEnabled,
+                onCheckedChange = viewModel::setDynamicColorEnabled,
+            )
+        }
+        item {
+            SeedColorRow(
+                selected = uiState.seedColor,
+                enabled = !uiState.dynamicColorEnabled,
+                onSelect = viewModel::setSeedColor,
+            )
+        }
+        item {
+            SwitchSettingRow(
+                title = stringResource(R.string.settings_oled),
+                description = stringResource(R.string.settings_oled_desc),
+                checked = uiState.oledEnabled,
+                onCheckedChange = viewModel::setOledEnabled,
+            )
+        }
+        item {
+            SwitchSettingRow(
+                title = stringResource(R.string.settings_high_contrast),
+                description = stringResource(R.string.settings_high_contrast_desc),
+                checked = uiState.highContrastEnabled,
+                onCheckedChange = viewModel::setHighContrastEnabled,
+            )
+        }
+        item {
+            SwitchSettingRow(
+                title = stringResource(R.string.settings_blur),
+                description = stringResource(R.string.settings_blur_desc),
+                checked = uiState.blurEnabled,
+                onCheckedChange = viewModel::setBlurEnabled,
+            )
+        }
+        item { CornerScaleRow(scale = uiState.cornerScale, onScaleChange = viewModel::setCornerScale) }
+        item { MotionScaleRow(scale = uiState.motionScale, onScaleChange = viewModel::setMotionScale) }
     }
 }
 
-/** 主题模式三选一（System/Light/Dark，FilterChip 行）。 */
+/** 主题模式三选一（System/Light/Dark）；副标题常显当前值。 */
 @Composable
 private fun ThemeModeRow(
     uiState: SettingsUiState,
@@ -127,7 +124,8 @@ private fun ThemeModeRow(
             ThemeMode.LIGHT to stringResource(R.string.settings_theme_light),
             ThemeMode.DARK to stringResource(R.string.settings_theme_dark),
         )
-    SettingRow(title = stringResource(R.string.settings_theme_mode)) {
+    val currentValue = options.first { it.first == uiState.themeMode }.second
+    SettingRow(title = stringResource(R.string.settings_theme_mode), valueText = currentValue) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (mode, label) ->
                 FilterChip(
@@ -140,47 +138,92 @@ private fun ThemeModeRow(
     }
 }
 
-/** seed 色盘：一排色圆，选中项描边高亮；动态取色开启时禁用。 */
+/**
+ * seed 色盘：色圆一排（FlowRow 自动换行保证 48dp 触点放得下），选中项描边高亮；
+ * 动态取色开启时禁用。无障碍：每块色圆为独立 selectable 单选（TalkBack 读色名 +
+ * 选中态，缺陷 #8）。
+ */
 @Composable
 private fun SeedColorRow(
     selected: Long,
     enabled: Boolean,
     onSelect: (Long) -> Unit,
 ) {
-    SettingRow(title = stringResource(R.string.settings_seed_color)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            SEED_COLORS.forEach { color ->
-                val isSelected = color == selected
-                Box(
-                    modifier =
-                        Modifier
-                            .size(AppIcon.iconMedium)
-                            .clip(CircleShape)
-                            .background(Color(color))
-                            .then(
-                                if (isSelected) {
-                                    Modifier.border(
-                                        width = 3.dp,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        shape = CircleShape,
-                                    )
-                                } else {
-                                    Modifier
-                                },
-                            ).clickable(enabled = enabled) { onSelect(color) },
+    val selectedName =
+        SEED_COLORS
+            .firstOrNull { (color, _) -> color == selected }
+            ?.let { (_, nameRes) -> stringResource(nameRes) }
+    SettingRow(title = stringResource(R.string.settings_seed_color), valueText = selectedName) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            SEED_COLORS.forEach { (color, nameRes) ->
+                SeedSwatch(
+                    color = color,
+                    name = stringResource(nameRes),
+                    isSelected = color == selected,
+                    enabled = enabled,
+                    onSelect = { onSelect(color) },
                 )
             }
         }
     }
 }
 
-/** 圆角强度滑杆 + 实时预览卡（圆角 = AppDimens.cornerLarge × scale）。 */
+/** 单个 seed 色块：24dp 视觉圆 + 48dp 最小触区包裹（缺陷 #8 触点修复）。 */
+@Composable
+private fun SeedSwatch(
+    color: Long,
+    name: String,
+    isSelected: Boolean,
+    enabled: Boolean,
+    onSelect: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(AppDimens.minTouchTarget)
+                .semantics { contentDescription = name }
+                .selectable(
+                    selected = isSelected,
+                    enabled = enabled,
+                    role = Role.RadioButton,
+                    onClick = onSelect,
+                ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(AppIcon.iconMedium)
+                    .clip(CircleShape)
+                    .background(Color(color))
+                    .then(
+                        if (isSelected) {
+                            Modifier.border(
+                                width = 3.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = CircleShape,
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
+        )
+    }
+}
+
+/** 圆角强度滑杆 + 实时预览卡（圆角 = AppDimens.cornerLarge × scale）；副标题显百分比。 */
 @Composable
 private fun CornerScaleRow(
     scale: Float,
     onScaleChange: (Float) -> Unit,
 ) {
-    SettingRow(title = stringResource(R.string.settings_corner_scale)) {
+    SettingRow(
+        title = stringResource(R.string.settings_corner_scale),
+        valueText = stringResource(R.string.settings_scale_percent, (scale * 100).roundToInt()),
+    ) {
         Column {
             Slider(
                 value = scale,
@@ -210,7 +253,10 @@ private fun MotionScaleRow(
     scale: Float,
     onScaleChange: (Float) -> Unit,
 ) {
-    SettingRow(title = stringResource(R.string.settings_motion_scale)) {
+    SettingRow(
+        title = stringResource(R.string.settings_motion_scale),
+        valueText = stringResource(R.string.settings_scale_percent, (scale * 100).roundToInt()),
+    ) {
         Column {
             Slider(
                 value = scale,
@@ -258,86 +304,6 @@ private fun MotionPulsePreview(scale: Float) {
     }
 }
 
-/** 图标风格三选一（Outlined/Rounded/Filled，Material Icons Core 同图标三风格预览）。 */
-@Composable
-private fun IconStyleRow(
-    selected: IconStyle,
-    onSelect: (IconStyle) -> Unit,
-) {
-    val options =
-        listOf(
-            IconStyle.OUTLINED to (stringResource(R.string.settings_icon_outlined) to Icons.Outlined.Settings),
-            IconStyle.ROUNDED to (stringResource(R.string.settings_icon_rounded) to Icons.Rounded.Settings),
-            IconStyle.FILLED to (stringResource(R.string.settings_icon_filled) to Icons.Filled.Settings),
-        )
-    SettingRow(title = stringResource(R.string.settings_icon_style)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            options.forEach { (style, pair) ->
-                val (label, icon) = pair
-                val isSelected = selected == style
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier =
-                        Modifier
-                            .clip(RoundedCornerShape(AppDimens.cornerMedium))
-                            .clickable { onSelect(style) }
-                            .then(
-                                if (isSelected) {
-                                    Modifier.background(MaterialTheme.colorScheme.secondaryContainer)
-                                } else {
-                                    Modifier
-                                },
-                            ).padding(12.dp),
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = label,
-                        tint =
-                            if (isSelected) {
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** 代码字体二选一（Monospace / System default）。 */
-@Composable
-private fun CodeFontRow(
-    selected: CodeFont,
-    onSelect: (CodeFont) -> Unit,
-) {
-    val options =
-        listOf(
-            CodeFont.MONO to stringResource(R.string.settings_code_font_mono),
-            CodeFont.SYSTEM to stringResource(R.string.settings_code_font_system),
-        )
-    SettingRow(title = stringResource(R.string.settings_code_font)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            options.forEach { (font, label) ->
-                FilterChip(
-                    selected = selected == font,
-                    onClick = { onSelect(font) },
-                    label = { Text(label) },
-                )
-            }
-        }
-    }
-}
-
 /** 开关型设置行（标题 + 可选说明 + Switch）。 */
 @Composable
 internal fun SwitchSettingRow(
@@ -375,10 +341,11 @@ internal fun SwitchSettingRow(
     }
 }
 
-/** 标题 + 内容行的通用容器（内容可换行、右对齐）。 */
+/** 标题 + 当前值副标题（可选）+ 内容行的通用容器（内容可换行）。 */
 @Composable
-private fun SettingRow(
+internal fun SettingRow(
     title: String,
+    valueText: String? = null,
     content: @Composable () -> Unit,
 ) {
     Column(
@@ -391,6 +358,14 @@ private fun SettingRow(
             text = title,
             style = MaterialTheme.typography.bodyLarge,
         )
+        if (valueText != null) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = valueText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Spacer(modifier = Modifier.height(8.dp))
         content()
     }
@@ -400,15 +375,15 @@ private val SCALE_RANGE = 0.5f..1.5f
 
 private const val SCALE_STEPS = 9
 
-/** 预设 seed 色盘（T24；默认值 = UserPreferencesRepository.DEFAULT_SEED_COLOR）。 */
+/** 预设 seed 色盘（T24；默认值 = UserPreferencesRepository.DEFAULT_SEED_COLOR）+ 色名资源（#87 无障碍）。 */
 private val SEED_COLORS =
     listOf(
-        0xFF0969DA, // GitHub brand blue
-        0xFF7C3AED, // purple
-        0xFF0EA5E9, // sky
-        0xFF10B981, // emerald
-        0xFFF59E0B, // amber
-        0xFFEF4444, // red
-        0xFFEC4899, // pink
-        0xFF64748B, // slate
+        0xFF0969DA to R.string.settings_seed_blue, // GitHub brand blue
+        0xFF7C3AED to R.string.settings_seed_purple, // purple
+        0xFF0EA5E9 to R.string.settings_seed_sky, // sky
+        0xFF10B981 to R.string.settings_seed_emerald, // emerald
+        0xFFF59E0B to R.string.settings_seed_amber, // amber
+        0xFFEF4444 to R.string.settings_seed_red, // red
+        0xFFEC4899 to R.string.settings_seed_pink, // pink
+        0xFF64748B to R.string.settings_seed_slate, // slate
     )

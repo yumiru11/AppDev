@@ -20,11 +20,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yumiru11.githubapp.core.datastore.model.resolveEffectiveThemeMode
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
+import com.yumiru11.githubapp.core.designsystem.token.rememberSystemMotionScale
+import com.yumiru11.githubapp.core.designsystem.token.resolveEffectiveMotionScale
 
 /**
  * 设置页（T24）：分组列表（外观/开发者/通用），全部设置项经
@@ -49,6 +53,14 @@ fun SettingsScreen(
             highContrastEnabled = uiState.highContrastEnabled,
             systemDark = isSystemInDarkTheme(),
         )
+    // #87：设置页内层 AppTheme 与全局宿主同口径注入两缩放——修复「页内滑杆
+    // 实时预览断链」（内层此前缺省复位为 1f，拖动滑杆仅预览卡变化、页面内
+    // MaterialTheme 形状/动效不实时跟随）。
+    val effectiveMotionScale =
+        resolveEffectiveMotionScale(
+            userScale = uiState.motionScale,
+            systemScale = rememberSystemMotionScale(),
+        )
 
     Crossfade(
         targetState = effectiveMode,
@@ -59,7 +71,12 @@ fun SettingsScreen(
             ),
         label = "theme-crossfade",
     ) { mode ->
-        AppTheme(themeMode = mode, seedColor = Color(uiState.seedColor)) {
+        AppTheme(
+            themeMode = mode,
+            seedColor = Color(uiState.seedColor),
+            cornerScale = uiState.cornerScale,
+            motionScale = effectiveMotionScale,
+        ) {
             Scaffold(
                 topBar = {
                     TopAppBar(
@@ -99,13 +116,16 @@ fun SettingsScreen(
     }
 }
 
-/** 分组标题（M3 设置规范：labelLarge + primary 色）。 */
+/** 分组标题（M3 设置规范：labelLarge + primary 色；`heading()` 语义供 TalkBack 按节跳转，缺陷 #19）。 */
 @Composable
 internal fun SectionHeader(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier =
+            Modifier
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .semantics { heading() },
     )
 }
