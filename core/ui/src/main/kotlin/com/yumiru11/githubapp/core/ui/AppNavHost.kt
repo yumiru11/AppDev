@@ -5,10 +5,6 @@
 package com.yumiru11.githubapp.core.ui
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -22,7 +18,6 @@ import androidx.navigation.navArgument
 import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.EditorContentHolder
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
-import com.yumiru11.githubapp.core.ui.screens.NotificationScreen
 import com.yumiru11.githubapp.core.ui.screens.ProfileScreen
 import com.yumiru11.githubapp.core.ui.screens.SearchScreen
 
@@ -38,7 +33,7 @@ import com.yumiru11.githubapp.core.ui.screens.SearchScreen
  *   blurEnabled 等参数由宿主在 lambda 闭包内直接传给 feature:home HomeScreen）
  * - [loginScreen]：登录页 Composable（宿主注入，避免 core:ui 依赖 feature:auth）
  * - [repoDetailScreen]：仓库详情页 Composable（宿主注入，避免 core:ui 依赖 feature:repo）
- * - [notificationsScreen]：通知页 Composable（宿主注入，避免 core:ui 依赖 feature:notifications）
+ * - 通知自 #88 起为铃铛触发的覆盖面板（ui-design §3.4），不再有导航 destination
  * - [profileScreen]：个人主页 Composable（宿主注入，避免 core:ui 依赖 feature:profile；
  *   onLoginClick 由宿主接线到 LOGIN 路由）
  * - [settingsScreen]：设置页 Composable（宿主注入，避免 core:ui 依赖 feature:settings）
@@ -53,7 +48,6 @@ fun AppNavHost(
     homeScreen: @Composable () -> Unit = {},
     loginScreen: @Composable () -> Unit = {},
     repoDetailScreen: @Composable (owner: String, repo: String) -> Unit = { _, _ -> },
-    notificationsScreen: @Composable () -> Unit = {},
     profileScreen: @Composable (onLoginClick: () -> Unit, onSettingsClick: () -> Unit) -> Unit = { _, _ -> },
     settingsScreen: @Composable () -> Unit = {},
     issueListScreen: @Composable (
@@ -87,16 +81,6 @@ fun AppNavHost(
 
         composable(AppRoute.SEARCH) {
             SearchScreen()
-        }
-
-        // 通知页（T19，docs/ui-design.md §3.4）：全屏 slide-in 面板——从顶部滑入
-        // （与 T3 占位 NotificationPanel 的滑入方向一致），退出反向滑出
-        composable(
-            route = AppRoute.NOTIFICATION,
-            enterTransition = { slideInVertically(initialOffsetY = { -it }) + fadeIn() },
-            exitTransition = { slideOutVertically(targetOffsetY = { -it }) + fadeOut() },
-        ) {
-            notificationsScreen()
         }
 
         composable(AppRoute.SETTINGS) {

@@ -25,7 +25,8 @@ object AppRoute {
     const val BLOB = "blob/{owner}/{repo}/{ref}/{path}"
     const val USER = "user/{login}"
     const val SEARCH = "search"
-    const val NOTIFICATION = "notification"
+
+    // NOTIFICATION 路由随 #88 移除：通知改为铃铛触发的覆盖面板（ui-design §3.4），不再进导航栈
     const val PROFILE = "profile"
     const val SETTINGS = "settings"
     const val EXTERNAL = "external"
