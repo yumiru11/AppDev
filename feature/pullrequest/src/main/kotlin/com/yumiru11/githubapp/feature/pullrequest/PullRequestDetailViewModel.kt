@@ -1,4 +1,6 @@
-@file:Suppress("TooGenericExceptionCaught") // 网络/IO 错误统一兜底，T15 细化异常类型
+@file:Suppress("TooGenericExceptionCaught", "SwallowedException")
+// - TooGenericExceptionCaught：网络/IO 错误统一兜底，T15 细化异常类型
+// - SwallowedException：写操作失败统一回滚 + 事件通道（异常链无需透出）；refreshThreads 失败保持现状
 
 package com.yumiru11.githubapp.feature.pullrequest
 
@@ -6,13 +8,22 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yumiru11.githubapp.feature.pullrequest.data.PullRequestRepository
+import com.yumiru11.githubapp.feature.pullrequest.model.DiffSide
+import com.yumiru11.githubapp.feature.pullrequest.model.LineCommentAnchor
+import com.yumiru11.githubapp.feature.pullrequest.model.LineCommentTarget
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTab
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewComment
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThread
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThreadContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -57,6 +68,14 @@ class PullRequestDetailViewModel
         private val _expandedFileNames = MutableStateFlow<Set<String>>(emptySet())
         val expandedFileNames: StateFlow<Set<String>> = _expandedFileNames.asStateFlow()
 
+        /** T16：已打开的行评论目标（null = 未打开） */
+        private val _lineCommentTarget = MutableStateFlow<LineCommentTarget?>(null)
+        val lineCommentTarget: StateFlow<LineCommentTarget?> = _lineCommentTarget.asStateFlow()
+
+        /** T16 写操作失败事件通道（UI 层 stringResource 本地化，ViewModel 不产文案） */
+        private val _events = MutableSharedFlow<PullRequestDetailEvent>(extraBufferCapacity = EVENT_BUFFER)
+        val events: SharedFlow<PullRequestDetailEvent> = _events.asSharedFlow()
+
         init {
             loadPullRequestDetail()
         }
@@ -90,6 +109,129 @@ class PullRequestDetailViewModel
             _expandedFileNames.value = if (filename in current) current - filename else current + filename
         }
 
+        /** 打开行评论输入（聚合锚点的会话与评论；T16） */
+        fun openLineComment(
+            path: String,
+            side: DiffSide,
+            line: Int,
+        ) {
+            val state = _uiState.value as? PullRequestDetailUiState.Success ?: return
+            val anchor = LineCommentAnchor(path = path, side = side, line = line)
+            val thread = state.reviewThreads.firstOrNull { it.path == path && it.side == side && it.anchorLine == line }
+            val comments = state.reviewComments.filter { it.path == path && it.side == side && it.anchorLine == line }
+            _lineCommentTarget.value = LineCommentTarget(anchor = anchor, thread = thread, comments = comments)
+        }
+
+        /** 关闭行评论输入 */
+        fun dismissLineComment() {
+            _lineCommentTarget.value = null
+        }
+
+        /** 新增/回复行内评论：乐观插入 → 失败回滚 + Snackbar（T16，T14 Issue 同款模式） */
+        fun submitLineComment(
+            anchor: LineCommentAnchor,
+            body: String,
+            inReplyToId: Long? = null,
+        ) {
+            if (body.isBlank()) return
+            val state = _uiState.value as? PullRequestDetailUiState.Success ?: return
+            viewModelScope.launch {
+                val optimistic =
+                    ReviewComment(
+                        id = -System.nanoTime(),
+                        body = body,
+                        path = anchor.path,
+                        line = if (anchor.side == DiffSide.RIGHT) anchor.line else null,
+                        originalLine = if (anchor.side == DiffSide.LEFT) anchor.line else null,
+                        side = anchor.side,
+                        inReplyToId = inReplyToId,
+                    )
+                _uiState.value = state.copy(reviewComments = state.reviewComments + optimistic)
+                try {
+                    val created =
+                        if (inReplyToId != null) {
+                            repository.replyReviewComment(owner, repo, number, anchor.path, inReplyToId, body)
+                        } else {
+                            repository.createReviewComment(
+                                owner,
+                                repo,
+                                number,
+                                anchor,
+                                body,
+                                state.pullRequest.head
+                                    ?.sha
+                                    .orEmpty(),
+                            )
+                        }
+                    val current = _uiState.value as? PullRequestDetailUiState.Success ?: return@launch
+                    _uiState.value =
+                        current.copy(
+                            reviewComments = current.reviewComments.map { if (it.id == optimistic.id) created else it },
+                        )
+                    refreshThreads(current.pullRequest.nodeId)
+                    _lineCommentTarget.value = null
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    rollbackReviewComment(optimistic.id)
+                    _events.tryEmit(PullRequestDetailEvent.CommentFailed)
+                }
+            }
+        }
+
+        /** 解析/解除会话（GraphQL；REST-only 会话不显示入口，故不可达） */
+        fun toggleThreadResolved(thread: ReviewThread) {
+            val state = _uiState.value as? PullRequestDetailUiState.Success ?: return
+            if (!state.canResolveThreads) return
+            val targetResolved = !thread.isResolved
+            _uiState.value =
+                state.copy(
+                    reviewThreads =
+                        state.reviewThreads.map {
+                            if (it.id == thread.id) it.copy(isResolved = targetResolved) else it
+                        },
+                )
+            viewModelScope.launch {
+                try {
+                    repository.setThreadResolved(thread.id, targetResolved)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    val current = _uiState.value as? PullRequestDetailUiState.Success ?: return@launch
+                    _uiState.value =
+                        current.copy(
+                            reviewThreads =
+                                current.reviewThreads.map {
+                                    if (it.id == thread.id) it.copy(isResolved = thread.isResolved) else it
+                                },
+                        )
+                    _events.tryEmit(PullRequestDetailEvent.CommentFailed)
+                }
+            }
+        }
+
+        private suspend fun refreshThreads(pullRequestNodeId: String?) {
+            if (pullRequestNodeId == null) return
+            try {
+                val context = repository.reviewThreadContext(pullRequestNodeId)
+                val current = _uiState.value as? PullRequestDetailUiState.Success ?: return
+                _uiState.value =
+                    current.copy(
+                        reviewThreads = context.threads,
+                        canResolveThreads = context.pullRequestNodeId != null,
+                    )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // 刷新失败保持现状（乐观写入已成功）
+            }
+        }
+
+        private fun rollbackReviewComment(id: Long) {
+            val current = _uiState.value as? PullRequestDetailUiState.Success ?: return
+            _uiState.value = current.copy(reviewComments = current.reviewComments.filterNot { it.id == id })
+        }
+
         private fun loadPullRequestDetail() {
             viewModelScope.launch {
                 _uiState.value = PullRequestDetailUiState.Loading
@@ -109,12 +251,16 @@ class PullRequestDetailViewModel
                                 async {
                                     headSha?.let { repository.combinedStatus(owner, repo, it) }
                                 }
+                            val reviewCommentsDeferred = async { repository.reviewComments(owner, repo, number) }
+                            val threadContextDeferred = async { repository.reviewThreadContext(pullRequest.nodeId) }
                             TimelineBundle(
                                 timeline = timelineDeferred.await(),
                                 commits = commitsDeferred.await(),
                                 files = filesDeferred.await(),
                                 checkRuns = checksDeferred.await(),
                                 combinedStatus = statusDeferred.await(),
+                                reviewComments = reviewCommentsDeferred.await(),
+                                threadContext = threadContextDeferred.await(),
                             )
                         }
                     _uiState.value =
@@ -125,6 +271,9 @@ class PullRequestDetailViewModel
                             files = bundle.files,
                             checkRuns = bundle.checkRuns,
                             combinedStatus = bundle.combinedStatus,
+                            reviewComments = bundle.reviewComments,
+                            reviewThreads = bundle.threadContext.threads,
+                            canResolveThreads = bundle.threadContext.pullRequestNodeId != null,
                         )
                 } catch (e: CancellationException) {
                     throw e
@@ -132,6 +281,10 @@ class PullRequestDetailViewModel
                     _uiState.value = PullRequestDetailUiState.Error(errorType = e.toPullRequestErrorType())
                 }
             }
+        }
+
+        private companion object {
+            const val EVENT_BUFFER = 8
         }
     }
 
@@ -142,4 +295,6 @@ private data class TimelineBundle(
     val files: List<com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFile>,
     val checkRuns: List<com.yumiru11.githubapp.feature.pullrequest.model.CheckRun>,
     val combinedStatus: com.yumiru11.githubapp.feature.pullrequest.model.CombinedStatus?,
+    val reviewComments: List<com.yumiru11.githubapp.feature.pullrequest.model.ReviewComment>,
+    val threadContext: com.yumiru11.githubapp.feature.pullrequest.model.ReviewThreadContext,
 )

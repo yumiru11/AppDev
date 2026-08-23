@@ -52,6 +52,9 @@ dependencies {
     // Markdown（PR 正文 WebView 渲染 + 评论/Review 原生渲染）
     implementation(project(":core:markdown"))
 
+    // GraphQL（T16 会话解析/解除 reviewThreads——REST 无解析端点）
+    implementation(project(":core:github-graphql"))
+
     // 导航（GitHubLinkParser 解析评论链接）
     implementation(project(":core:navigation"))
 

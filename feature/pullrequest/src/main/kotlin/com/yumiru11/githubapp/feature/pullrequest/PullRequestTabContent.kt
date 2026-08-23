@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,14 +48,18 @@ import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
+import com.yumiru11.githubapp.feature.pullrequest.data.DiffParser
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRunConclusion
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRunStatus
+import com.yumiru11.githubapp.feature.pullrequest.model.DiffSide
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequest
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestCommit
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFile
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFileStatus
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewComment
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThread
 
 /** Conversation Tab：PR 正文（WebView）+ 时间线（评论/Review/行内评论/提交引用/事件） */
 @Composable
@@ -224,6 +229,9 @@ internal fun FilesTab(
     files: List<PullRequestFile>,
     expandedNames: Set<String>,
     onToggleExpanded: (String) -> Unit,
+    reviewComments: List<ReviewComment>,
+    reviewThreads: List<ReviewThread>,
+    onLineComment: (String, DiffSide, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (files.isEmpty()) {
@@ -243,6 +251,9 @@ internal fun FilesTab(
                 file = file,
                 expanded = file.filename in expandedNames,
                 onToggleExpanded = { onToggleExpanded(file.filename) },
+                comments = reviewComments.filter { it.path == file.filename },
+                threads = reviewThreads.filter { it.path == file.filename },
+                onLineComment = onLineComment,
             )
         }
     }
@@ -473,6 +484,9 @@ private fun FileRow(
     file: PullRequestFile,
     expanded: Boolean,
     onToggleExpanded: () -> Unit,
+    comments: List<ReviewComment>,
+    threads: List<ReviewThread>,
+    onLineComment: (String, DiffSide, Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -531,11 +545,14 @@ private fun FileRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    Text(
-                        text = patch,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    val diff = remember(patch) { DiffParser.parse(patch) }
+                    PullRequestDiffView(
+                        path = file.filename,
+                        diff = diff,
+                        comments = comments,
+                        threads = threads,
+                        onLineComment = onLineComment,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }

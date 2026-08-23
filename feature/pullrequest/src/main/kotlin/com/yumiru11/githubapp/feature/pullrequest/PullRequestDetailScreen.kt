@@ -54,6 +54,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,6 +78,7 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
 import com.yumiru11.githubapp.feature.pullrequest.model.CombinedStatus
+import com.yumiru11.githubapp.feature.pullrequest.model.DiffSide
 import com.yumiru11.githubapp.feature.pullrequest.model.MergeableState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequest
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestCommit
@@ -86,6 +88,8 @@ import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTab
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestUser
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewComment
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThread
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -110,6 +114,17 @@ fun PullRequestDetailScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.events.collect { event ->
+            when (event) {
+                PullRequestDetailEvent.CommentFailed -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_line_comment_failed))
+                }
+            }
+        }
+    }
     val currentUrl = (uiState as? PullRequestDetailUiState.Success)?.pullRequest?.htmlUrl
 
     // 评论 BottomSheet 状态
@@ -192,6 +207,9 @@ fun PullRequestDetailScreen(
                         onToggleCommitExpanded = viewModel::toggleCommitExpanded,
                         expandedFileNames = viewModel.expandedFileNames.collectAsStateWithLifecycle().value,
                         onToggleFileExpanded = viewModel::toggleFileExpanded,
+                        reviewComments = state.reviewComments,
+                        reviewThreads = state.reviewThreads,
+                        onLineComment = viewModel::openLineComment,
                         onInternalLink = onInternalLink,
                         baseRepoUrl = "https://github.com/$owner/$repo",
                         modifier = Modifier.fillMaxSize(),
@@ -209,6 +227,18 @@ fun PullRequestDetailScreen(
                         scope.launch { snackbarHostState.showSnackbar(commentUnavailableMessage) }
                     },
                     sheetState = sheetState,
+                )
+            }
+
+            // 行评论 BottomSheet（T16：新增/回复 + 会话解析）
+            val lineCommentTarget by viewModel.lineCommentTarget.collectAsStateWithLifecycle()
+            lineCommentTarget?.let { target ->
+                LineCommentSheet(
+                    target = target,
+                    canResolve = (uiState as? PullRequestDetailUiState.Success)?.canResolveThreads ?: false,
+                    onDismiss = { viewModel.dismissLineComment() },
+                    onSubmit = { anchor, body, inReplyToId -> viewModel.submitLineComment(anchor, body, inReplyToId) },
+                    onToggleResolve = { thread -> viewModel.toggleThreadResolved(thread) },
                 )
             }
         }
@@ -269,6 +299,9 @@ private fun SuccessContent(
     files: List<PullRequestFile>,
     checkRuns: List<CheckRun>,
     combinedStatus: CombinedStatus?,
+    reviewComments: List<ReviewComment>,
+    reviewThreads: List<ReviewThread>,
+    onLineComment: (String, DiffSide, Int) -> Unit,
     selectedTab: PullRequestTab,
     onTabSelected: (PullRequestTab) -> Unit,
     expandedCheckIds: Set<Long>,
@@ -328,6 +361,9 @@ private fun SuccessContent(
                         files = files,
                         expandedNames = expandedFileNames,
                         onToggleExpanded = onToggleFileExpanded,
+                        reviewComments = reviewComments,
+                        reviewThreads = reviewThreads,
+                        onLineComment = onLineComment,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

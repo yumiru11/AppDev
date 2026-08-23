@@ -174,6 +174,15 @@ val coverageExcludes =
         "**/*EditorController*.class",
         "**/*TabContent*.class",
         "**/*TimelineItems*.class",
+        // T16：自研 diff 视图 / 行评论 BottomSheet（纯 Composable，单测不可达，截图/真机兑底）
+        "**/*DiffView*.class",
+        "**/*LineCommentSheet*.class",
+        // T16：Apollo codegen 产物（schema 驱动生成，行为由 Apollo 运行时保障；单测门禁不计生成代码，
+        //   与 R/BuildConfig/Hilt 生成物同策略，防新增 .graphql 操作导致分母虚增）
+        "**/githubgraphql/generated/**",
+        // T16：github-graphql 的 Hilt 装配（provideApolloClient 纯胶水，需 android Context
+        //   无法纯 JVM 单测；与 Dagger/Hilt 生成物同策略排除，分支逻辑由 Factory 测试兜底）
+        "**/githubgraphql/di/**",
     )
 
 // 根聚合报告：先注册，子模块回调里填充（dependsOn + classDirs + exec + sources）
