@@ -49,6 +49,20 @@ tap_text() {
   fi
 }
 
+# 按可见 content-desc tap（图标按钮无 text 时用，如顶栏铃铛 Notifications）
+tap_desc() {
+  local desc="$1"
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1
+  local bounds
+  bounds=$(python3 -c "import re; xml=open('/tmp/ui.xml').read(); m=re.search(r'content-desc=\"$desc\"[^>]*bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"', xml); print((int(m.group(1))+int(m.group(3)))//2, (int(m.group(2))+int(m.group(4)))//2) if m else ''" 2>/dev/null || true)
+  if [ -n "$bounds" ]; then
+    adb shell input tap $bounds >/dev/null
+  else
+    echo "::warning::content-desc '$desc' not found in uiautomator dump"
+  fi
+}
+
 launch_app() {
   adb shell am start -n "$PKG/com.yumiru11.githubapp.MainActivity" >/dev/null
   wait_for_activity "$PKG" || true
@@ -111,7 +125,7 @@ adb shell am force-stop "$PKG"
 launch_app
 adb exec-out screencap -p > "$OUT/home-dark.png"
 
-# ── 3. 仓库 tab（占位页）────────────────────────────────────
+# ── 3. 仓库 tab（列表）──────────────────────────────────────
 tap_text "Repos"
 sleep 3
 adb exec-out screencap -p > "$OUT/repos.png"
@@ -167,6 +181,56 @@ tap_text "Edit"
 sleep 5
 adb exec-out screencap -p > "$OUT/editor.png"
 
+# ── 5.10 文件树（T11：RepoDetail Files Tab）──
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev" -p "$PKG" >/dev/null
+wait_for_activity "$PKG" || true
+sleep 6
+tap_text "Files"
+sleep 4
+adb exec-out screencap -p > "$OUT/file-tree.png"
+
+# ── 5.11 Sora 代码查看（T11：blob 深链直达 .kt 只读高亮，确定性优于树内点击）──
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/app/src/main/java/com/yumiru11/githubapp/MainActivity.kt" -p "$PKG" >/dev/null
+wait_for_activity "$PKG" || true
+sleep 6
+adb exec-out screencap -p > "$OUT/code-sora.png"
+
+# ── 5.12 全局搜索（T18：历史/建议态 + 输入后四类结果 Tab）──
+adb shell am force-stop "$PKG"; launch_app
+tap_text "Search GitHub…"
+sleep 3
+adb exec-out screencap -p > "$OUT/search-history.png"
+adb shell input text "material"
+sleep 4
+adb exec-out screencap -p > "$OUT/search-tabs.png"
+adb shell input keyevent 111   # ESC 收起键盘
+
+# ── 5.13 设置页分组卡（#87 CardGroup 分组重构）──
+adb shell am force-stop "$PKG"; launch_app
+tap_text "Profile"
+sleep 2
+tap_text "Settings"
+sleep 3
+adb exec-out screencap -p > "$OUT/settings-grouped.png"
+
+# ── 5.14 通知面板（#88：铃铛 → 右滑覆盖层；未登录为登录引导空态）──
+adb shell am force-stop "$PKG"; launch_app
+tap_desc "Notifications"
+sleep 3
+adb exec-out screencap -p > "$OUT/notification-panel.png"
+adb shell input keyevent 4   # back 关面板
+
+# ── 5.15 PR Files changed 双视图 Diff（T16：unified / side-by-side）──
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/pull/101" -p "$PKG" >/dev/null
+wait_for_activity "$PKG" || true
+sleep 8
+tap_text "Files changed"
+sleep 5
+adb exec-out screencap -p > "$OUT/pr-diff-unified.png"
+tap_text "Side-by-side"
+sleep 3
+adb exec-out screencap -p > "$OUT/pr-diff-side-by-side.png"
+
 # ── 6. 我的 tab（force-stop 冷启动回首页——am start 对已在前台 app 不重置
 # 导航栈，深链页仍在前台导致 uiautomator 拿不到底栏）──────────
 adb shell cmd uimode night no
@@ -194,11 +258,54 @@ if [ -n "${SCREENSHOT_TOKEN:-}" ]; then
   wait_for_activity "$PKG" || true
   sleep 6
   adb exec-out screencap -p > "$OUT/pr-actions.png"
+  # 创建 Issue 表单（T14）
+  adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues" -p "$PKG" >/dev/null
+  wait_for_activity "$PKG" || true
+  sleep 5
+  tap_text "New issue"
+  sleep 3
+  adb exec-out screencap -p > "$OUT/create-issue.png"
+  # 编辑器提交动作（T22：Commit 对话框；409 冲突态需并发篡改，无法确定性复现，不自动化）
+  adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/README.md" -p "$PKG" >/dev/null
+  wait_for_activity "$PKG" || true
+  sleep 6
+  tap_text "Edit"
+  sleep 4
+  tap_text "Commit"
+  sleep 2
+  adb exec-out screencap -p > "$OUT/commit-dialog.png"
 fi
 
 # ── 8. 长截图（滚动 + 拼接，docs/research/actions-scroll-screenshot.md 方案 A）──
 long_shot "readme-long.png" "https://github.com/mikepenz/multiplatform-markdown-renderer"
 long_shot "issue-long.png" "https://github.com/yumiru11/AppDev/issues/71"
+
+# ── 9. 分域拼板（montage 网格：PR 评论贴板图而非散图，一眼扫全功能）──
+# 每板 2 列网格，单帧缩放到 540 宽；缺失帧自动跳过；输出 JPEG 控制体积。
+# 原始单帧 PNG 照旧上传 release 供放大排查（上传机制保持原样）。
+montage_board() {
+  local out="$1"; shift
+  local imgs=()
+  for f in "$@"; do
+    if [ -f "$OUT/$f" ]; then imgs+=("$OUT/$f"); fi   # 缺失帧（如 token 段未跑）自动跳过
+  done
+  if [ ${#imgs[@]} -eq 0 ]; then
+    echo "::warning::board $out skipped (no frames)"
+    return 0
+  fi
+  montage "${imgs[@]}" -thumbnail 540x1170 -tile 2x -geometry +6+6 \
+    -background '#161b22' "$OUT/$out" || echo "::warning::montage failed for $out"
+}
+if command -v montage >/dev/null 2>&1; then
+  montage_board board-A-home.jpg          home-light.png home-dark.png profile.png
+  montage_board board-B-repo-code.jpg     repos.png repo-actions.png repo-releases.png file-tree.png code-sora.png editor.png
+  montage_board board-C-issue-pr-diff.jpg issue-comments.png create-issue.png pr-conversation.png pr-commits.png pr-diff-unified.png pr-diff-side-by-side.png
+  # 板 D Review/Merge 骨架——T17 合入后在此追加 review-sheet/merge-box/merge-state 三帧即自动生效
+  montage_board board-E-settings-notif.jpg settings-grouped.png notification-panel.png commit-dialog.png
+  montage_board board-F-search.jpg        search-history.png search-tabs.png
+else
+  echo "::warning::ImageMagick montage not found — boards skipped, raw frames only"
+fi
 
 # ── 清理：恢复浅色 + 回首页 ─────────────────────────────────
 adb shell cmd uimode night no
