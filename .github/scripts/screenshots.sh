@@ -89,10 +89,10 @@ ERROR_MARKERS='Repository not found|No access with current sign-in|Network error
 
 wait_for_attr() {
   local attr="$1" value="$2" timeout="${3:-12}"
-  local waited=0 bounds
+  local deadline=$(( $(date +%s) + timeout )) bounds
   while :; do
-    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || { sleep 1; waited=$((waited + 1)); continue; }
-    adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1 || { sleep 1; waited=$((waited + 1)); continue; }
+    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || { sleep 1; continue; }
+    adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1 || { sleep 1; continue; }
     if grep -q "<hierarchy" /tmp/ui.xml 2>/dev/null; then
       if grep -qE "$ERROR_MARKERS" /tmp/ui.xml; then
         echo "::notice::error state on screen while waiting for $attr '$value' — abort early"
@@ -104,12 +104,11 @@ wait_for_attr() {
         return 0
       fi
     fi
-    sleep 1
-    waited=$((waited + 1))
-    if [ "$waited" -ge "$timeout" ]; then
+    [ "$(date +%s)" -ge "$deadline" ] && {
       echo "::warning::timeout waiting for $attr '$value'"
       return 1
-    fi
+    }
+    sleep 1
   done
 }
 
@@ -161,18 +160,18 @@ launch_app() {
 
   adb shell am start -n "$PKG/com.yumiru11.githubapp.MainActivity" >/dev/null
   wait_for_activity "$PKG" || true
-  sleep 3   # 首帧稳定
+  sleep 2   # 首帧稳定（动画归零后无需更长）
 }
 
 # 长截图（纯 adb 滚动 + 多帧截图，无 Python/PIL 依赖）：
 # 导航到 $2 深链，循环「上滑 → 截一帧」最多 $3 帧（默认 20），相邻帧二进制相同即视为到底、停止。
 # 输出到 $OUT/$1-01.png、$1-02.png …（多帧即长截图，人工翻看）。
 long_shot() {
-  local name="$1" url="$2" max="${3:-20}"
+  local name="$1" url="$2" max="${3:-12}"
   local delta=2000          # pixel_6 视口 2400：自底(y=2000)上滑 2000px，留 ~400 重叠
   adb shell am start -a android.intent.action.VIEW -d "$url" -p "$PKG" >/dev/null
   wait_for_activity "$PKG" || true
-  sleep 6
+  sleep 4
   local prev="" f i
   for i in $(seq 1 "$max"); do
     f="$OUT/${name}-$(printf '%02d' "$i").png"
@@ -187,7 +186,7 @@ long_shot() {
     # 末帧无需上滑
     if [ "$i" -lt "$max" ]; then
       adb shell input swipe 540 2000 540 $((2000 - delta)) 250
-      sleep 1.5
+      sleep 1
     fi
   done
 }
@@ -234,13 +233,13 @@ adb exec-out screencap -p > "$OUT/repos.png"
 
 # ── 5. mermaid 仓库 README（WebView——mermaid 代码块特殊内容路径）─
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/mermaid-js/mermaid" -p "$PKG" >/dev/null
-sleep 8
+sleep 5
 adb exec-out screencap -p > "$OUT/readme-mermaid.png"
 
 # ── 5.5 导航到 Issue #71（WebView 正文已由下方 issue-long 长截图覆盖，此处仅就位供 5.6 评论区截图）─
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues/71" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
-sleep 8
+sleep 5
 
 # ── 5.6 Issue 评论（原生短文本渲染——正文 WebView 很高，滑到评论区）─
 adb shell input swipe 540 1800 540 400 500
@@ -248,35 +247,35 @@ sleep 2
 adb shell input swipe 540 1800 540 400 500
 sleep 2
 adb shell input swipe 540 1800 540 400 500
-sleep 4
+sleep 3
 adb exec-out screencap -p > "$OUT/issue-comments.png"
 
 # ── 5.7 PR 详情 Conversation（T15）──
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/pull/74" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
-sleep 8
+sleep 5
 adb exec-out screencap -p > "$OUT/pr-conversation.png"
 
 # ── 5.8 PR Commits Tab（T15）──
 tap_text "Commits"
-sleep 4
+sleep 3
 adb exec-out screencap -p > "$OUT/pr-commits.png"
 
 # ── 5.7 仓库操作区（T12：语言栏 Linguist + Star/Watch 游客只读）──
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/hoowhoami/EchoMusic" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
-sleep 6
+sleep 3
 adb exec-out screencap -p > "$OUT/repo-actions.png"
 
 # ── 5.8 仓库 Releases Tab（T12：Releases/Tags 列表）──
 tap_text "Releases"
-sleep 4
+sleep 3
 adb exec-out screencap -p > "$OUT/repo-releases.png"
 
 # ── 5.9 Markdown 编辑器（T21：blob 深链 → FileViewer Rendered → Edit）──
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/README.md" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
-sleep 6
+sleep 3
 wait_for_desc "Edit" && tap_desc "Edit"   # 编辑入口是 IconButton，desc=「Edit」
 wait_for_text "Commit" || true            # 编辑屏就绪信号（顶栏 Commit 动作）
 sleep 2
@@ -285,7 +284,7 @@ adb exec-out screencap -p > "$OUT/editor.png"
 # ── 5.10 文件树（T11：RepoDetail Files Tab）──
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
-sleep 6
+sleep 3
 wait_for_text "Files" && tap_text "Files"
 wait_for_text ".github" || true          # 树条目就绪信号（首屏可见的顶层目录；README.md 在折叠线下方必超时）
 adb exec-out screencap -p > "$OUT/file-tree.png"
@@ -294,7 +293,7 @@ adb exec-out screencap -p > "$OUT/file-tree.png"
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/app/src/main/java/com/yumiru11/githubapp/MainActivity.kt" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
 wait_for_desc "Edit" || true              # FileViewer 就绪信号；Sora 自绘无文本节点
-sleep 4
+sleep 3
 adb exec-out screencap -p > "$OUT/code-sora.png"
 
 # ── 5.12 全局搜索（T18：历史/建议态 + 输入后结果 Tab）──
@@ -336,8 +335,8 @@ fi
 wait_for_text "Unified" || true           # Diff 工具条出现 = 补丁渲染完成
 sleep 3                                   # 大 patch 再留一拍绘制余量
 adb exec-out screencap -p > "$OUT/pr-diff-unified.png"
-tap_segment_until_selected "Side-by-side"
-sleep 2
+tap_text "Side-by-side"
+sleep 1
 capture_until_changed "$OUT/pr-diff-unified.png" "$OUT/pr-diff-side-by-side.png" "Side-by-side"
 
 # ── 6. 我的 tab（force-stop 冷启动回首页——am start 对已在前台 app 不重置
