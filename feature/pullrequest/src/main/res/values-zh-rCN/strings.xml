@@ -149,4 +149,33 @@
     <string name="pull_request_line_comment_resolve">解决会话</string>
     <string name="pull_request_line_comment_unresolve">重新打开会话</string>
     <string name="pull_request_line_comment_failed">评论发送失败</string>
+
+    <!-- T17：Review 提交 -->
+    <string name="pull_request_review_changes">发起审查</string>
+    <string name="pull_request_review_title">提交审查</string>
+    <string name="pull_request_review_approve">批准</string>
+    <string name="pull_request_review_request_changes">请求更改</string>
+    <string name="pull_request_review_comment_option">评论</string>
+    <string name="pull_request_review_body_label">审查评论</string>
+    <string name="pull_request_review_failed">审查提交失败</string>
+
+    <!-- T17：MergeBox -->
+    <string name="pull_request_merge_box_title">合并 Pull Request</string>
+    <string name="pull_request_merge_method_merge">创建合并提交</string>
+    <string name="pull_request_merge_method_squash">压缩合并</string>
+    <string name="pull_request_merge_method_rebase">变基合并</string>
+    <string name="pull_request_merge_select_method">选择合并方式</string>
+    <string name="pull_request_merge_commit_title">提交标题</string>
+    <string name="pull_request_merge_commit_message">详细描述（可选）</string>
+    <string name="pull_request_merge_delete_branch">合并后删除源分支</string>
+    <string name="pull_request_merge_update_branch">更新分支</string>
+    <string name="pull_request_merge_succeeded">Pull Request 已合并</string>
+    <string name="pull_request_merge_failed">合并失败</string>
+    <string name="pull_request_merge_conflict_hint">合并前请先解决冲突</string>
+    <string name="pull_request_merge_checking_hint">正在检查可合并性…</string>
+    <string name="pull_request_update_branch_succeeded">分支已更新</string>
+    <string name="pull_request_update_branch_failed">分支更新失败</string>
+    <string name="pull_request_delete_branch">删除分支</string>
+    <string name="pull_request_delete_branch_succeeded">分支已删除</string>
+    <string name="pull_request_delete_branch_failed">分支删除失败</string>
 </resources>

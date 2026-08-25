@@ -16,15 +16,22 @@ import com.yumiru11.githubapp.core.githubgraphql.generated.UnresolveReviewThread
 import com.yumiru11.githubapp.core.githubgraphql.generated.type.ResolveReviewThreadInput
 import com.yumiru11.githubapp.core.githubgraphql.generated.type.UnresolveReviewThreadInput
 import com.yumiru11.githubapp.core.githubrest.api.PullRequestApi
+import com.yumiru11.githubapp.core.githubrest.api.RepoManagementApi
+import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.model.CheckRunDto
 import com.yumiru11.githubapp.core.githubrest.model.CombinedStatusDto
 import com.yumiru11.githubapp.core.githubrest.model.CreateReviewCommentRequest
+import com.yumiru11.githubapp.core.githubrest.model.CreateReviewRequest
 import com.yumiru11.githubapp.core.githubrest.model.IssueDto
 import com.yumiru11.githubapp.core.githubrest.model.IssueEventDto
+import com.yumiru11.githubapp.core.githubrest.model.MergePullRequestRequest
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestCommitDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestFileDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestReviewCommentDto
+import com.yumiru11.githubapp.core.githubrest.model.PullRequestReviewDto
+import com.yumiru11.githubapp.core.githubrest.model.RepositoryPermissionsDto
+import com.yumiru11.githubapp.core.githubrest.model.UpdateBranchRequest
 import com.yumiru11.githubapp.core.githubrest.model.UpdateReviewCommentRequest
 import com.yumiru11.githubapp.core.githubrest.model.UserDto
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
@@ -42,15 +49,19 @@ import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFile
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFileStatus
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFilter
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestLabel
+import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestMergeMethod
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestMilestone
+import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestReview
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestReviewState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineEventType
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestUser
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewComment
+import com.yumiru11.githubapp.feature.pullrequest.model.ReviewConclusion
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThread
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThreadContext
+import com.yumiru11.githubapp.feature.pullrequest.model.ViewerPermission
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -71,6 +82,8 @@ class PullRequestRepository
     @Inject
     constructor(
         private val pullRequestApi: PullRequestApi,
+        private val repositoryApi: RepositoryApi,
+        private val repoManagementApi: RepoManagementApi,
         private val apolloClient: ApolloClient,
     ) {
         /** PR 分页流（按 [filter] 过滤 open/closed/all） */
@@ -178,6 +191,92 @@ class PullRequestRepository
             commentId: Long,
         ) {
             pullRequestApi.deleteReviewComment(owner, repo, commentId)
+        }
+
+        // ── T17：Review / Merge / Update branch / 删除分支 ─────────────────
+
+        /**
+         * 仓库写权限与默认分支（T17：MergeBox/Review 显隐 + 默认分支不可删判断）。
+         *
+         * 选用 REST GET /repos/{owner}/{repo} 而非 GraphQL viewerPermission：
+         * REST 对所有令牌形态可用（含 fine-grained PAT 的 REST-only 降级通道），
+         * 与 reviewThreadContext 同款「失败保守降级」——网络异常 → UNKNOWN（隐藏写入口），不抛。
+         */
+        suspend fun repositoryControl(
+            owner: String,
+            repo: String,
+        ): RepositoryControl =
+            try {
+                val dto = repositoryApi.getRepository(owner, repo)
+                RepositoryControl(
+                    viewerPermission = dto.permissions.toViewerPermission(),
+                    defaultBranch = dto.defaultBranch,
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RepositoryControl()
+            }
+
+        /** 提交 Review（T17；REST 写优先；返回领域 Review 供乐观项替换） */
+        suspend fun submitReview(
+            owner: String,
+            repo: String,
+            number: Int,
+            conclusion: ReviewConclusion,
+            body: String,
+        ): PullRequestReview =
+            pullRequestApi
+                .createReview(
+                    owner,
+                    repo,
+                    number,
+                    CreateReviewRequest(
+                        body = body.takeIf { it.isNotBlank() },
+                        event = conclusion.toRaw(),
+                    ),
+                ).toDomain()
+
+        /** 合并 PR（T17；merged=false = 已被合并/无需新提交 → 调用方按成功处理并刷新） */
+        suspend fun mergePullRequest(
+            owner: String,
+            repo: String,
+            number: Int,
+            method: PullRequestMergeMethod,
+            commitTitle: String,
+            commitMessage: String,
+            headSha: String?,
+        ): Boolean =
+            pullRequestApi
+                .mergePullRequest(
+                    owner,
+                    repo,
+                    number,
+                    MergePullRequestRequest(
+                        commitTitle = commitTitle.takeIf { it.isNotBlank() },
+                        commitMessage = commitMessage.takeIf { it.isNotBlank() },
+                        sha = headSha,
+                        mergeMethod = method.toRaw(),
+                    ),
+                ).merged
+
+        /** Update branch（T17；仅同仓库 PR；expected_head_sha 缺省 = 最新 head） */
+        suspend fun updateBranch(
+            owner: String,
+            repo: String,
+            number: Int,
+            expectedHeadSha: String?,
+        ) {
+            pullRequestApi.updateBranch(owner, repo, number, UpdateBranchRequest(expectedHeadSha = expectedHeadSha))
+        }
+
+        /** 删除分支（T17；git refs 端点；默认分支不可删，GitHub 返回 422） */
+        suspend fun deleteBranch(
+            owner: String,
+            repo: String,
+            branch: String,
+        ) {
+            repoManagementApi.deleteBranch(owner, repo, branch)
         }
 
         /**
@@ -393,6 +492,12 @@ private fun PullRequestFileDto.toDomain(): PullRequestFile =
         patch = patch,
     )
 
+/** 仓库写控制上下文（T17：显隐开关数据源；加载失败 → 保守空值） */
+data class RepositoryControl(
+    val viewerPermission: ViewerPermission = ViewerPermission.UNKNOWN,
+    val defaultBranch: String? = null,
+)
+
 /** GraphQL reviewThreads 响应的最小映射源（解包自 Apollo 响应，交给纯函数映射便于单测） */
 data class RawReviewThread(
     val id: String,
@@ -459,6 +564,35 @@ private fun com.yumiru11.githubapp.core.githubrest.model.PullRequestBranchDto.to
         label = label,
         ref = ref,
         sha = sha,
+        repoFullName = repo?.fullName,
+    )
+
+/** 权限位 → 会话权限（admin/maintain/push → WRITE；仅 pull/triage → READ；缺失 → UNKNOWN） */
+internal fun RepositoryPermissionsDto?.toViewerPermission(): ViewerPermission =
+    when {
+        this == null -> ViewerPermission.UNKNOWN
+        admin || maintain || push -> ViewerPermission.WRITE
+        else -> ViewerPermission.READ
+    }
+
+/** PullRequestReviewDto → [PullRequestReview]（乐观项替换用） */
+internal fun PullRequestReviewDto.toDomain(): PullRequestReview =
+    PullRequestReview(
+        id = id,
+        author = user?.toDomain(),
+        body = body,
+        state = PullRequestReviewState.fromRaw(state),
+        submittedAt = submittedAt,
+    )
+
+/** [PullRequestReview] → 时间线条目（乐观临时项替换后落回时间线） */
+internal fun PullRequestReview.toTimelineItem(): PullRequestTimelineItem.Review =
+    PullRequestTimelineItem.Review(
+        id = id,
+        author = author,
+        body = body,
+        state = state,
+        submittedAt = submittedAt,
     )
 
 private fun UserDto.toDomain(): PullRequestUser = PullRequestUser(login = login, avatarUrl = avatarUrl)

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -40,7 +41,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
@@ -90,6 +93,8 @@ fun HomeScreen(
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
     blurEnabled: Boolean = true,
+    /** 底栏玻璃总高（MainTabPager 传入）：作为列表 contentPadding，让内容滚进玻璃背后 */
+    bottomContentPadding: Dp = 0.dp,
     onLoginClick: () -> Unit = {},
     onFeedItemClick: (ParsedUrl) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -107,13 +112,19 @@ fun HomeScreen(
     CompositionLocalProvider(LocalHazeState provides hazeState) {
         Scaffold(
             modifier = modifier,
+            // 内容必须延伸到顶/底玻璃栏背后（Haze source 需真实像素；否则毛玻璃
+            // 每帧采样到空背景＝真机「无效果」根因），insets 由本组件手工分配
+            contentWindowInsets = WindowInsets(0.dp),
             topBar = {
-                AppTopBar(
-                    onSearchClick = onSearchClick,
-                    onNotificationClick = onNotificationClick,
-                    onProfileClick = onProfileClick,
-                    blurEnabled = blurEnabled,
-                )
+                // zIndex 保证顶栏在内容之后绘制——Haze 要求 source 先于 effect 绘制
+                Box(modifier = Modifier.zIndex(1f)) {
+                    AppTopBar(
+                        onSearchClick = onSearchClick,
+                        onNotificationClick = onNotificationClick,
+                        onProfileClick = onProfileClick,
+                        blurEnabled = blurEnabled,
+                    )
+                }
             },
         ) { paddingValues ->
             Box(
@@ -127,7 +138,7 @@ fun HomeScreen(
                             } else {
                                 Modifier
                             },
-                        ).padding(paddingValues),
+                        ).padding(top = paddingValues.calculateTopPadding()),
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     when (val state = uiState) {
@@ -161,6 +172,7 @@ fun HomeScreen(
                                 feed = state.feed,
                                 selectedTab = selectedTab,
                                 onFeedItemClick = onFeedItemClick,
+                                bottomContentPadding = bottomContentPadding,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -176,6 +188,7 @@ private fun FeedContent(
     feed: Flow<PagingData<FeedItem>>,
     selectedTab: HomeTab,
     onFeedItemClick: (ParsedUrl) -> Unit,
+    bottomContentPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
     val lazyItems = feed.collectAsLazyPagingItems()
@@ -211,6 +224,7 @@ private fun FeedContent(
                     FeedList(
                         lazyItems = lazyItems,
                         onFeedItemClick = onFeedItemClick,
+                        bottomContentPadding = bottomContentPadding,
                         modifier = modifier,
                     )
                 }
@@ -235,6 +249,7 @@ private fun FeedContent(
 private fun FeedList(
     lazyItems: LazyPagingItems<FeedItem>,
     onFeedItemClick: (ParsedUrl) -> Unit,
+    bottomContentPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
     PullToRefreshBox(
@@ -244,7 +259,14 @@ private fun FeedList(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            // bottom 追加底栏玻璃高度：末条可滚出玻璃区，内容全程延伸到栏背后
+            contentPadding =
+                PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 8.dp,
+                    bottom = 8.dp + bottomContentPadding,
+                ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(

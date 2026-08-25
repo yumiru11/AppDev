@@ -66,6 +66,7 @@ import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThread
 internal fun ConversationTab(
     pullRequest: PullRequest,
     timeline: List<PullRequestTimelineItem>,
+    conversationActions: ConversationActions,
     onInternalLink: (ParsedUrl) -> Unit,
     baseRepoUrl: String,
     modifier: Modifier = Modifier,
@@ -84,6 +85,16 @@ internal fun ConversationTab(
                     baseRepoUrl = baseRepoUrl,
                     // PR 无服务端 HTML API → 离线 GFM + 融合样式（WebView 内 markdown-it 渲染）
                     renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        // T17：Review 入口 + MergeBox / 已合并删除分支（可见性由 ViewModel 计算的布尔位驱动）
+        if (conversationActions.hasVisibleContent) {
+            item(key = "pr_actions") {
+                PullRequestActionItems(
+                    actions = conversationActions,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

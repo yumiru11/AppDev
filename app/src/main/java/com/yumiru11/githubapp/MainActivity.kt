@@ -12,13 +12,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
@@ -45,7 +46,9 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppNavHost
 import com.yumiru11.githubapp.core.ui.MainTabPager
 import com.yumiru11.githubapp.core.ui.PlaceholderScreen
+import com.yumiru11.githubapp.core.ui.RepoDetailActions
 import com.yumiru11.githubapp.core.ui.navigateToParsedUrl
+import com.yumiru11.githubapp.core.ui.openExternalBrowser
 import com.yumiru11.githubapp.feature.auth.AuthNavigation
 import com.yumiru11.githubapp.feature.auth.AuthViewModel
 import com.yumiru11.githubapp.feature.auth.LoginScreen
@@ -58,7 +61,10 @@ import com.yumiru11.githubapp.feature.notifications.ui.NotificationsPanel
 import com.yumiru11.githubapp.feature.profile.ProfileScreen
 import com.yumiru11.githubapp.feature.pullrequest.PullRequestDetailScreen
 import com.yumiru11.githubapp.feature.pullrequest.PullRequestListScreen
+import com.yumiru11.githubapp.feature.repo.FileViewerScreen
 import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
+import com.yumiru11.githubapp.feature.repo.RepoFilesViewModel
+import com.yumiru11.githubapp.feature.search.SearchScreen
 import com.yumiru11.githubapp.feature.settings.SettingsScreen
 import com.yumiru11.githubapp.feature.settings.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -158,7 +164,7 @@ class MainActivity : ComponentActivity() {
                                                     }
                                                 },
                                                 onFeedItemClick = { parsed -> navigateToParsedUrl(navController, parsed) },
-                                                modifier = Modifier.padding(padding),
+                                                bottomContentPadding = padding.calculateBottomPadding(),
                                             )
                                         },
                                         reposPage = { padding ->
@@ -189,7 +195,7 @@ class MainActivity : ComponentActivity() {
                                                     )
                                                 },
                                                 onSettingsClick = { navController.navigate(AppRoute.SETTINGS) },
-                                                modifier = Modifier.padding(padding),
+                                                bottomContentPadding = padding.calculateBottomPadding(),
                                             )
                                         },
                                     )
@@ -199,6 +205,25 @@ class MainActivity : ComponentActivity() {
                                         onSignIn = { authViewModel.onSignIn() },
                                         onBrowseAsGuest = { authViewModel.onBrowseAsGuest() },
                                         onSavePat = { authViewModel.onSavePat(it) },
+                                    )
+                                },
+                                searchScreen = {
+                                    SearchScreen(
+                                        onResultClick = { parsed -> navigateToParsedUrl(navController, parsed) },
+                                        onLoginClick = {
+                                            navController.navigate(AppRoute.LOGIN) {
+                                                popUpTo(0) { inclusive = true }
+                                            }
+                                        },
+                                    )
+                                },
+                                blobScreen = { owner, repo, ref, path ->
+                                    BlobRoute(
+                                        owner = owner,
+                                        repo = repo,
+                                        ref = ref,
+                                        path = path,
+                                        navController = navController,
                                     )
                                 },
                                 repoDetailScreen = { owner, repo ->
@@ -276,7 +301,7 @@ class MainActivity : ComponentActivity() {
                                         onClose = onClose,
                                         onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
                                         onExternalLink = { url ->
-                                            CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+                                            openExternalBrowser(context, url)
                                         },
                                     )
                                 },
@@ -345,7 +370,7 @@ class MainActivity : ComponentActivity() {
                 val parsed = GitHubLinkParser.parseUrl(uri.toString())
                 if (parsed is ParsedUrl.External) {
                     // External 深链：用 Chrome Custom Tabs 在应用内打开原始 url
-                    CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(parsed.url))
+                    openExternalBrowser(context, parsed.url)
                 } else {
                     navigateToParsedUrl(navController, parsed)
                 }
@@ -409,4 +434,44 @@ class MainActivity : ComponentActivity() {
         @Volatile
         var cachedLanguageTag: String? = null
     }
+}
+
+/**
+ * BLOB 深链路由承载（T11 补接线）：把 owner/repo/ref/path 注入 [RepoFilesViewModel]
+ * 并以全屏 FileViewer 呈现——此前该路由误挂占位组件致深链/树外链接显示「Coming soon」。
+ */
+@Composable
+private fun BlobRoute(
+    owner: String,
+    repo: String,
+    ref: String,
+    path: String,
+    navController: androidx.navigation.NavHostController,
+    viewModel: RepoFilesViewModel =
+        androidx.hilt.navigation.compose
+            .hiltViewModel(),
+) {
+    val fileState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    LaunchedEffect(path) { viewModel.openDeepLinkFile(path) }
+
+    FileViewerScreen(
+        fileState = fileState.fileState,
+        selectedPath = fileState.selectedPath ?: path,
+        ref = ref,
+        viewModel = viewModel,
+        actions =
+            RepoDetailActions(
+                onNavigateToParsedUrl = { parsed -> navigateToParsedUrl(navController, parsed) },
+                onOpenExternal = { url ->
+                    openExternalBrowser(context, url)
+                },
+                onEditMarkdown = null,
+            ),
+        baseRepoUrl = "https://github.com/$owner/$repo",
+        editable = true,
+        onClose = { navController.popBackStack() },
+        modifier = Modifier.fillMaxSize(),
+    )
 }

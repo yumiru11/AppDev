@@ -7,11 +7,13 @@ import com.yumiru11.githubapp.core.`data`.model.Repository
 import com.yumiru11.githubapp.core.database.dao.CachedReadmeDao
 import com.yumiru11.githubapp.core.database.entity.CachedReadmeEntity
 import com.yumiru11.githubapp.core.githubrest.api.ContentApi
+import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
 import com.yumiru11.githubapp.core.githubrest.api.GitTreeApi
 import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.model.FileDeleteRequest
 import com.yumiru11.githubapp.core.githubrest.model.FileWriteRequest
+import com.yumiru11.githubapp.core.githubrest.model.GitRefCreateRequest
 import com.yumiru11.githubapp.core.githubrest.model.MarkdownRenderRequest
 import com.yumiru11.githubapp.core.githubrest.model.ReadmeDto
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
@@ -39,6 +41,7 @@ class RepoRepository
         private val cachedReadmeDao: CachedReadmeDao,
         private val gitTreeApi: GitTreeApi,
         private val contentApi: ContentApi,
+        private val gitRefApi: GitRefApi,
     ) {
         /**
          * 获取仓库元数据。
@@ -273,13 +276,34 @@ class RepoRepository
         }
 
         /**
+         * 从既有分支创建新分支（T22 新建文件到新分支的前置步骤）。
+         *
+         * Contents API 的 PUT 对不存在的 ref 返回 404（"No commit found for the ref"，
+         * 此前被误映射为「仓库未找到」），并不会自动建分支——必须先经 Git Refs API 建引用。
+         *
+         * @param fromBranch 基分支（取其 head SHA 作为新引用起点）
+         */
+        suspend fun createBranch(
+            owner: String,
+            repo: String,
+            newBranch: String,
+            fromBranch: String,
+        ): Result<Unit> =
+            runCatching {
+                val base = gitRefApi.getBranch(owner, repo, "heads/$fromBranch")
+                gitRefApi.createRef(
+                    GitRefCreateRequest(ref = "refs/heads/$newBranch", sha = base.`object`.sha),
+                )
+            }.map { }
+
+        /**
          * 更新/创建文件（T22，plan.md §7.4）。
          *
          * @param text 新文件全文（UTF-8；客户端层 base64 编码后 PUT）
          * @param sha 被替换文件 blob SHA；null = 新建文件（无 sha 校验）
          * @param message 提交信息（必填）
-         * @param branch 目标分支名；null = 当前查看分支。分支不存在时 GitHub 自动创建
-         *   （2026-08-22 实测：PUT 到新分支返回 201 且分支自动建立，无需先建 ref）
+         * @param branch 目标分支名；null = 当前查看分支。**分支必须已存在**——新建分支场景
+         *   需先调 [createBranch]（Contents API 对不存在的 ref 返回 404，不会自动建分支）
          * @return Success（新 blob/commit SHA）或 Conflict（409：远端最新 blob SHA，绝不静默覆盖）
          */
         suspend fun updateFileContent(

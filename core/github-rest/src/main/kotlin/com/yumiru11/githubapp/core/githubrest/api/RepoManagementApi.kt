@@ -101,4 +101,16 @@ interface RepoManagementApi {
         @Path("owner") owner: String,
         @Path("repo") repo: String,
     ): Map<String, Long>
+
+    /**
+     * DELETE /repos/{owner}/{repo}/git/refs/heads/{branch}：删除分支（T17 MergeBox，204）。
+     *
+     * 默认分支不可删（GitHub 返回 422）；仅 WRITE 权限可用。
+     */
+    @DELETE("repos/{owner}/{repo}/git/refs/heads/{branch}")
+    suspend fun deleteBranch(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("branch") branch: String,
+    ): Response<Unit>
 }

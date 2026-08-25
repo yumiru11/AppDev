@@ -378,4 +378,19 @@ class RepoManagementApiTest {
             assertEquals(102400L, languages["Kotlin"])
             assertEquals(51200L, languages["Java"])
         }
+
+    // ---- 分支删除（T17 MergeBox）----
+
+    @Test
+    fun deleteBranch_204Response_returnsSuccess() =
+        runTest {
+            server.enqueue(MockResponse.Builder().status("HTTP/1.1 204 No Content").build())
+
+            val response = api.deleteBranch("octocat", "Hello-World", "feature")
+
+            assertTrue(response.isSuccessful)
+            val request = server.takeRequest()
+            assertEquals("DELETE", request.method)
+            assertEquals("/repos/octocat/Hello-World/git/refs/heads/feature", request.url.encodedPath)
+        }
 }

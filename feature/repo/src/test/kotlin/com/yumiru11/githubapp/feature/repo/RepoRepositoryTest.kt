@@ -3,6 +3,7 @@ package com.yumiru11.githubapp.feature.repo
 import com.yumiru11.githubapp.core.database.dao.CachedReadmeDao
 import com.yumiru11.githubapp.core.database.entity.CachedReadmeEntity
 import com.yumiru11.githubapp.core.githubrest.api.ContentApi
+import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
 import com.yumiru11.githubapp.core.githubrest.api.GitTreeApi
 import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
@@ -39,6 +40,7 @@ class RepoRepositoryTest {
     private val cachedReadmeDao = mockk<CachedReadmeDao>()
     private val gitTreeApi = mockk<GitTreeApi>()
     private val contentApi = mockk<ContentApi>()
+    private val gitRefApi = mockk<GitRefApi>()
 
     private val repository =
         RepoRepository(
@@ -47,6 +49,7 @@ class RepoRepositoryTest {
             cachedReadmeDao = cachedReadmeDao,
             gitTreeApi = gitTreeApi,
             contentApi = contentApi,
+            gitRefApi = gitRefApi,
         )
 
     private fun readmeDto(

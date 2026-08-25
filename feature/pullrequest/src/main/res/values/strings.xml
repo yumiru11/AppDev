@@ -149,4 +149,33 @@
     <string name="pull_request_line_comment_resolve">Resolve thread</string>
     <string name="pull_request_line_comment_unresolve">Reopen thread</string>
     <string name="pull_request_line_comment_failed">Failed to send comment</string>
+
+    <!-- T17：Review 提交 -->
+    <string name="pull_request_review_changes">Review changes</string>
+    <string name="pull_request_review_title">Submit review</string>
+    <string name="pull_request_review_approve">Approve</string>
+    <string name="pull_request_review_request_changes">Request changes</string>
+    <string name="pull_request_review_comment_option">Comment</string>
+    <string name="pull_request_review_body_label">Review comment</string>
+    <string name="pull_request_review_failed">Failed to submit review</string>
+
+    <!-- T17：MergeBox -->
+    <string name="pull_request_merge_box_title">Merge pull request</string>
+    <string name="pull_request_merge_method_merge">Create a merge commit</string>
+    <string name="pull_request_merge_method_squash">Squash and merge</string>
+    <string name="pull_request_merge_method_rebase">Rebase and merge</string>
+    <string name="pull_request_merge_select_method">Select merge method</string>
+    <string name="pull_request_merge_commit_title">Commit title</string>
+    <string name="pull_request_merge_commit_message">Extended description (optional)</string>
+    <string name="pull_request_merge_delete_branch">Delete the head branch after merging</string>
+    <string name="pull_request_merge_update_branch">Update branch</string>
+    <string name="pull_request_merge_succeeded">Pull request merged</string>
+    <string name="pull_request_merge_failed">Failed to merge pull request</string>
+    <string name="pull_request_merge_conflict_hint">Resolve conflicts before merging</string>
+    <string name="pull_request_merge_checking_hint">Checking mergeability…</string>
+    <string name="pull_request_update_branch_succeeded">Branch updated</string>
+    <string name="pull_request_update_branch_failed">Failed to update branch</string>
+    <string name="pull_request_delete_branch">Delete branch</string>
+    <string name="pull_request_delete_branch_succeeded">Branch deleted</string>
+    <string name="pull_request_delete_branch_failed">Failed to delete branch</string>
 </resources>

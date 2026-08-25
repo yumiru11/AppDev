@@ -22,6 +22,16 @@ OUT="artifacts/screenshots"
 PKG="com.yumiru11.githubapp"
 mkdir -p "$OUT"
 
+# ImageMagick 后台预装（拼板前才需要）：安装的 ~20s 完全藏在前面截图时间里。
+# 直装优先（镜像常命中缓存），失败再 update+装，全程 timeout 兜底。
+APT_PID=""
+if ! command -v montage >/dev/null 2>&1; then
+  ( sudo timeout 120 apt-get install -y -qq imagemagick >/dev/null 2>&1 \
+      || { sudo timeout 90 apt-get update -qq >/dev/null 2>&1 || true
+           sudo timeout 150 apt-get install -y -qq imagemagick >/dev/null 2>&1; } ) &
+  APT_PID=$!
+fi
+
 # 等待指定 activity 成为前台（轮询，最多 40s）——比固定 sleep 稳
 wait_for_activity() {
   local expect="$1"
@@ -35,11 +45,30 @@ wait_for_activity() {
   return 1
 }
 
+
+# uiautomator dump 带重试：动画/加载期会报 idle 错误且静默失败（旧实现拿过期缓存
+# 继续点，是「点了没反应/两帧一致」类问题的根因）。成功标准：本地 xml 含 <hierarchy。
+dump_ui() {
+  local attempt
+  rm -f /tmp/ui.xml
+  for attempt in 1 2 3 4; do
+    # 先删设备侧旧 ui.xml 再 dump 并校验成功输出：uiautomator 偶发静默失败时
+    # 会残留上一次的层级，pull 拿到陈旧内容 →「元素明明可见却找不到」假超时
+    # （New issue/Title 连环超时的实证根因）
+    if adb shell "rm -f /sdcard/ui.xml; uiautomator dump /sdcard/ui.xml" 2>/dev/null | grep -q "dumped to"; then
+      adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1 || { sleep 1; continue; }
+      if grep -q "<hierarchy" /tmp/ui.xml 2>/dev/null; then return 0; fi
+    fi
+    sleep 1
+  done
+  echo "::warning::uiautomator dump failed after retries"
+  return 1
+}
+
 # 按可见文本 tap（uiautomator dump 拿 bounds 中心）——比硬编码坐标稳
 tap_text() {
   local text="$1"
-  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1
+  dump_ui || return 0
   local bounds
   bounds=$(python3 -c "import re; xml=open('/tmp/ui.xml').read(); m=re.search(r'text=\"$text\"[^>]*bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"', xml); print((int(m.group(1))+int(m.group(3)))//2, (int(m.group(2))+int(m.group(4)))//2) if m else ''" 2>/dev/null || true)
   if [ -n "$bounds" ]; then
@@ -49,21 +78,116 @@ tap_text() {
   fi
 }
 
+# 按可见 content-desc tap（图标按钮无 text 时用，如顶栏铃铛 Notifications）
+tap_desc() {
+  local desc="$1"
+  dump_ui || return 0
+  local bounds
+  bounds=$(python3 -c "import re; xml=open('/tmp/ui.xml').read(); m=re.search(r'content-desc=\"$desc\"[^>]*bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"', xml); print((int(m.group(1))+int(m.group(3)))//2, (int(m.group(2))+int(m.group(4)))//2) if m else ''" 2>/dev/null || true)
+  if [ -n "$bounds" ]; then
+    adb shell input tap $bounds >/dev/null
+  else
+    echo "::warning::content-desc '$desc' not found in uiautomator dump"
+  fi
+}
+
+# 轮询等待文本/content-desc 出现（墙钟上限默认 12s）。找到输出坐标到
+# /tmp/wait_bounds（供 tap 复用同一次 dump），超时返回 1 并告警。
+#
+# 性能要点（CI 16.5min 实测复盘）：
+# - 动画/加载态下 uiautomator 单次 dump 可卡 5-10s 等 idle，固定次数循环会把
+#   「20s 超时」拖成 60-90s 墙钟——下调默认值并按迭代数近似计时；
+# - 页面已呈错误态时继续轮询目标控件纯属浪费（token 缺权限段落曾各烧一分钟），
+#   dump 出现任一错误文案即早退。
+ERROR_MARKERS='Repository not found|No access with current sign-in|Network error|网络错误|当前登录无权访问'
+
+wait_for_attr() {
+  local attr="$1" value="$2" timeout="${3:-12}"
+  local deadline=$(( $(date +%s) + timeout )) bounds
+  while :; do
+    if ! adb shell "rm -f /sdcard/ui.xml; uiautomator dump /sdcard/ui.xml" 2>/dev/null | grep -q "dumped to"; then
+      sleep 1; continue
+    fi
+    adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1 || { sleep 1; continue; }
+    if grep -q "<hierarchy" /tmp/ui.xml 2>/dev/null; then
+      if grep -qE "$ERROR_MARKERS" /tmp/ui.xml; then
+        echo "::notice::error state on screen while waiting for $attr '$value' — abort early"
+        return 1
+      fi
+      bounds=$(python3 -c "import re; xml=open('/tmp/ui.xml').read(); m=re.search(r'$attr=\"$value\"[^>]*bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"', xml); print((int(m.group(1))+int(m.group(3)))//2, (int(m.group(2))+int(m.group(4)))//2) if m else ''" 2>/dev/null || true)
+      if [ -n "$bounds" ]; then
+        echo "$bounds" > /tmp/wait_bounds
+        return 0
+      fi
+    fi
+    [ "$(date +%s)" -ge "$deadline" ] && {
+      echo "::warning::timeout waiting for $attr '$value'"
+      return 1
+    }
+    sleep 1
+  done
+}
+
+wait_for_text() { wait_for_attr "text" "$@"; }
+wait_for_desc() { wait_for_attr "content-desc" "$@"; }
+
+
+# 验证 SegmentedButton 某段处于选中态（Compose selected 语义会暴露到节点属性）；
+# 未选中则重按一次——修复「点击生效了但截图时序早于状态翻转」的两帧一致问题。
+tap_segment_until_selected() {
+  local label="$1" try n
+  for try in 1 2; do
+    tap_text "$label"
+    for n in $(seq 1 6); do
+      dump_ui || { sleep 1; continue; }
+      if python3 -c "
+import sys
+label='$label'
+xml=open('/tmp/ui.xml').read()
+ok=any(('text=\"%s\"' % label) in seg and 'selected=\"true\"' in seg for seg in xml.split('<node'))
+sys.exit(0 if ok else 1)
+"; then return 0; fi
+      sleep 1
+    done
+  done
+  echo "::warning::segment '$label' not confirmed selected"
+}
+
+# 像素级验证：点击后截图必须与 prev 帧不同才算成功（md5 比对），否则重按再截。
+# 背景：tap_segment_until_selected 的 Compose selected 语义校验曾误判——节点属性
+# 翻转了但 Crossfade 未完成/坐标过期，最终两帧仍视觉一致（CI 实拍 C 板末两帧）。
+capture_until_changed() {
+  local prev="$1" out="$2" label="$3" i md5p md5n
+  md5p=$(md5sum "$prev" | awk '{print $1}')
+  for i in 1 2 3; do
+    if [ "$i" -gt 1 ]; then
+      tap_text "$label"
+      sleep 1
+    fi
+    adb exec-out screencap -p > "$out"
+    md5n=$(md5sum "$out" | awk '{print $1}')
+    if [ "$md5n" != "$md5p" ]; then return 0; fi
+    sleep 1
+  done
+  echo "::warning::frame '$out' never differed from '$prev' after tapping '$label'"
+}
+
 launch_app() {
+
   adb shell am start -n "$PKG/com.yumiru11.githubapp.MainActivity" >/dev/null
   wait_for_activity "$PKG" || true
-  sleep 3   # 首帧稳定
+  sleep 2   # 首帧稳定（动画归零后无需更长）
 }
 
 # 长截图（纯 adb 滚动 + 多帧截图，无 Python/PIL 依赖）：
 # 导航到 $2 深链，循环「上滑 → 截一帧」最多 $3 帧（默认 20），相邻帧二进制相同即视为到底、停止。
 # 输出到 $OUT/$1-01.png、$1-02.png …（多帧即长截图，人工翻看）。
 long_shot() {
-  local name="$1" url="$2" max="${3:-20}"
+  local name="$1" url="$2" max="${3:-12}"
   local delta=2000          # pixel_6 视口 2400：自底(y=2000)上滑 2000px，留 ~400 重叠
   adb shell am start -a android.intent.action.VIEW -d "$url" -p "$PKG" >/dev/null
   wait_for_activity "$PKG" || true
-  sleep 6
+  sleep 4
   local prev="" f i
   for i in $(seq 1 "$max"); do
     f="$OUT/${name}-$(printf '%02d' "$i").png"
@@ -78,17 +202,20 @@ long_shot() {
     # 末帧无需上滑
     if [ "$i" -lt "$max" ]; then
       adb shell input swipe 540 2000 540 $((2000 - delta)) 250
-      sleep 1.5
+      sleep 1
     fi
   done
 }
 
-# ── 0. 安装 debug APK（action 只启动模拟器，不装 APK——PR #60 第 8 轮实测）─
-adb install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null
-adb shell pm disable com.android.launcher3 --user 0 >/dev/null 2>&1 || true
-
-# ── 0. 安装 APK（android-emulator-runner 不自动装；assembleDebug 产物在工作区）─
+# ── 0. 安装 debug APK（android-emulator-runner 不自动装；APK 由 quality job
+#    构建上传、本 job 开头已下载到工作区原位）───────────────────────────────
 adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell pm disable com.android.launcher3 --user 0 >/dev/null 2>&1 || true
+# 动画时长归零：点击即时生效，进度圈/转场不再让 uiautomator 等 idle 卡死
+# （dump 单次 5-10s 是本轮 CI 拖到 16min 的主放大器）
+adb shell settings put global window_animation_scale 0
+adb shell settings put global transition_animation_scale 0
+adb shell settings put global animator_duration_scale 0
 
 # ── 0.5 截图登录（若提供 SCREENSHOT_TOKEN 机密）：注入只读 PAT →
 # EncryptedTokenStorage（ScreenshotTokenReceiver），使 app 进入开发者模式
@@ -111,22 +238,22 @@ adb shell am force-stop "$PKG"
 launch_app
 adb exec-out screencap -p > "$OUT/home-dark.png"
 
-# ── 3. 仓库 tab（占位页）────────────────────────────────────
+# ── 3. 仓库 tab（列表）──────────────────────────────────────
 tap_text "Repos"
 sleep 3
 adb exec-out screencap -p > "$OUT/repos.png"
 
-# ── 4. 普通 README（WebView）—— 已由下方 readme-long 长截图覆盖，此处不再单独截，避免冗余 ──
+# ── 4. 普通 README（WebView）—— 由 5.7 的 readme-webview 帧覆盖，不单独截 ──
 
 # ── 5. mermaid 仓库 README（WebView——mermaid 代码块特殊内容路径）─
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/mermaid-js/mermaid" -p "$PKG" >/dev/null
-sleep 8
+sleep 5
 adb exec-out screencap -p > "$OUT/readme-mermaid.png"
 
-# ── 5.5 导航到 Issue #71（WebView 正文已由下方 issue-long 长截图覆盖，此处仅就位供 5.6 评论区截图）─
+# ── 5.5 导航到 Issue #71（就位供 5.6 评论区截图）─
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues/71" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
-sleep 8
+sleep 5
 
 # ── 5.6 Issue 评论（原生短文本渲染——正文 WebView 很高，滑到评论区）─
 adb shell input swipe 540 1800 540 400 500
@@ -134,38 +261,111 @@ sleep 2
 adb shell input swipe 540 1800 540 400 500
 sleep 2
 adb shell input swipe 540 1800 540 400 500
-sleep 4
+sleep 3
 adb exec-out screencap -p > "$OUT/issue-comments.png"
 
 # ── 5.7 PR 详情 Conversation（T15）──
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/pull/74" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
-sleep 8
+sleep 5
 adb exec-out screencap -p > "$OUT/pr-conversation.png"
 
 # ── 5.8 PR Commits Tab（T15）──
 tap_text "Commits"
-sleep 4
+sleep 3
 adb exec-out screencap -p > "$OUT/pr-commits.png"
 
-# ── 5.7 仓库操作区（T12：语言栏 Linguist + Star/Watch 游客只读）──
-adb shell am start -a android.intent.action.VIEW -d "https://github.com/hoowhoami/EchoMusic" -p "$PKG" >/dev/null
+# ── 5.7 仓库详情三连帧（T11/T12）：一次深链串拍 操作区/Releases/Files 树。
+# 此前为 EchoMusic 独立深链——AppDev 同样具备语言栏与 Releases（截图产物仓库），
+# 且登录态下 Star 按钮可见，信息量只增不减，省两次深链往返
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
-sleep 6
+sleep 3
 adb exec-out screencap -p > "$OUT/repo-actions.png"
-
-# ── 5.8 仓库 Releases Tab（T12：Releases/Tags 列表）──
 tap_text "Releases"
-sleep 4
+sleep 3
 adb exec-out screencap -p > "$OUT/repo-releases.png"
+tap_text "Files"
+wait_for_text ".github" || true          # 树条目就绪信号（首屏可见的顶层目录）
+adb exec-out screencap -p > "$OUT/file-tree.png"
+# README WebView 渲染帧（ADR-0007 主路径）：树下方滚动一屏拍 README 区，
+# 替代被砍的 readme-long 长截图保住渲染分流回归信号
+adb shell input swipe 540 1800 540 500 400
+sleep 2
+adb exec-out screencap -p > "$OUT/readme-webview.png"
 
-# ── 5.9 Markdown 编辑器（T21：blob 深链 → FileViewer Rendered → Edit）──
+# ── 5.8 Markdown 编辑器（T21：blob 深链 → FileViewer Rendered → Edit）+ 提交对话框（T22）──
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/README.md" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
-sleep 6
-tap_text "Edit"
-sleep 5
+sleep 3
+if wait_for_desc "Edit"; then
+  tap_desc "Edit"                        # 编辑入口是 IconButton，desc=「Edit」
+fi
+wait_for_text "Commit" || true            # 编辑屏就绪信号（顶栏 Commit 动作）
+sleep 2
 adb exec-out screencap -p > "$OUT/editor.png"
+# T22：同一编辑会话直接点开 Commit 对话框（需登录态），省一次 blob 深链 +
+# Edit 往返；409 冲突态需并发篡改，无法确定性复现，不自动化
+if [ -n "${SCREENSHOT_TOKEN:-}" ]; then
+  tap_text "Commit" || true
+  wait_for_text "Describe your changes…" || true   # 对话框 placeholder 出现
+  sleep 1
+  adb exec-out screencap -p > "$OUT/commit-dialog.png"
+  adb shell input keyevent 4             # 关对话框回编辑器
+fi
+
+# ── 5.9 Sora 代码查看（T11：blob 深链直达 .kt 只读高亮——BLOB 深链多段路径已修复）──
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/app/src/main/java/com/yumiru11/githubapp/MainActivity.kt" -p "$PKG" >/dev/null
+wait_for_activity "$PKG" || true
+wait_for_desc "Edit" || true              # FileViewer 就绪信号；Sora 自绘无文本节点
+sleep 3
+adb exec-out screencap -p > "$OUT/code-sora.png"
+
+# ── 5.12 全局搜索（T18：历史/建议态 + 输入后结果 Tab）──
+adb shell am force-stop "$PKG"; launch_app
+wait_for_text "Search GitHub…" && tap_text "Search GitHub…"
+wait_for_text "Search GitHub…" || true    # SearchScreen 占位符就绪
+sleep 1
+adb exec-out screencap -p > "$OUT/search-history.png"
+adb shell input text "material"
+wait_for_text "Repos" || true             # 结果 Tab 行出现 = 防抖查询完成
+sleep 1
+adb exec-out screencap -p > "$OUT/search-tabs.png"
+adb shell input keyevent 111              # ESC 收起键盘
+
+# ── 5.13 设置分组卡（#87）+ 5.14 通知面板（#88）合并段：
+# 同一次冷启动串接——拍完设置返回 Profile，底栏切 Home 点铃铛，
+# 省一整次 force-stop 冷启动（铃铛在首页顶栏，Profile 域无入口）
+adb shell am force-stop "$PKG"; launch_app
+wait_for_text "Profile" && tap_text "Profile"
+wait_for_desc "Settings" && tap_desc "Settings"   # 顶栏齿轮是 content-desc，非文本
+wait_for_text "Appearance" || true        # 分组标题渲染完成
+adb exec-out screencap -p > "$OUT/settings-grouped.png"
+adb shell input keyevent 4                # 返回 Profile
+tap_text "Home"                           # 底栏切首页
+if wait_for_desc "Notifications"; then
+  tap_desc "Notifications"
+fi
+wait_for_text "Notifications" || true     # 面板标题滑入完成
+sleep 2
+adb exec-out screencap -p > "$OUT/notification-panel.png"
+adb shell input keyevent 4                # back 关面板
+
+# ── 5.15 PR Files changed 双视图 Diff（T16：unified / side-by-side）──
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/pull/101" -p "$PKG" >/dev/null
+wait_for_activity "$PKG" || true
+wait_for_text "Files changed" && tap_text "Files changed"
+# 文件行默认折叠——Unified/Side-by-side 分段按钮在展开补丁后才渲染
+# （此前两帧实为同一文件列表页：Unified 必然超时，重试全在列表页空转）
+if wait_for_desc "Show patch"; then
+  tap_desc "Show patch"
+fi
+wait_for_text "Unified" || true           # Diff 工具条出现 = 补丁渲染完成
+sleep 3                                   # 大 patch 再留一拍绘制余量
+adb exec-out screencap -p > "$OUT/pr-diff-unified.png"
+tap_text "Side-by-side"
+sleep 1
+capture_until_changed "$OUT/pr-diff-unified.png" "$OUT/pr-diff-side-by-side.png" "Side-by-side"
 
 # ── 6. 我的 tab（force-stop 冷启动回首页——am start 对已在前台 app 不重置
 # 导航栈，深链页仍在前台导致 uiautomator 拿不到底栏）──────────
@@ -194,11 +394,48 @@ if [ -n "${SCREENSHOT_TOKEN:-}" ]; then
   wait_for_activity "$PKG" || true
   sleep 6
   adb exec-out screencap -p > "$OUT/pr-actions.png"
+  # 创建 Issue 表单（T14）
+  adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues" -p "$PKG" >/dev/null
+  wait_for_activity "$PKG" || true
+  sleep 5
+  wait_for_text "New issue" && tap_text "New issue"
+  wait_for_text "Title" || true            # 表单字段渲染完成
+  adb exec-out screencap -p > "$OUT/create-issue.png"
 fi
 
-# ── 8. 长截图（滚动 + 拼接，docs/research/actions-scroll-screenshot.md 方案 A）──
-long_shot "readme-long.png" "https://github.com/mikepenz/multiplatform-markdown-renderer"
-long_shot "issue-long.png" "https://github.com/yumiru11/AppDev/issues/71"
+# ── 8. 长截图：已从 PR CI 移除（与单帧信息重叠、board 不消费、~30s/条）。
+# long_shot 函数保留——夜间全量/手动排查时可按需恢复调用。
+
+# ── 9. 分域拼板（montage 网格：PR 评论贴板图而非散图，一眼扫全功能）──
+# 每板 2 列网格，单帧缩放到 540 宽；缺失帧自动跳过；输出 JPEG 控制体积。
+# 原始单帧 PNG 照旧上传 release 供放大排查（上传机制保持原样）。
+montage_board() {
+  local out="$1"; shift
+  local imgs=()
+  for f in "$@"; do
+    if [ -f "$OUT/$f" ]; then imgs+=("$OUT/$f"); fi   # 缺失帧（如 token 段未跑）自动跳过
+  done
+  if [ ${#imgs[@]} -eq 0 ]; then
+    echo "::warning::board $out skipped (no frames)"
+    return 0
+  fi
+  montage "${imgs[@]}" -thumbnail 540x1170 -tile 2x -geometry +6+6 \
+    -background '#161b22' "$OUT/$out" || echo "::warning::montage failed for $out"
+}
+# 等待开头启动的后台安装收口（失败仅告警，板图自动跳过，原始帧照常上传）
+if [ -n "$APT_PID" ]; then
+  wait "$APT_PID" || echo "::warning::imagemagick install failed — boards may be skipped"
+fi
+if command -v montage >/dev/null 2>&1; then
+  montage_board board-A-home.jpg          home-light.png home-dark.png profile.png
+  montage_board board-B-repo-code.jpg     repos.png repo-actions.png repo-releases.png file-tree.png readme-webview.png code-sora.png editor.png
+  montage_board board-C-issue-pr-diff.jpg issue-comments.png create-issue.png pr-conversation.png pr-commits.png pr-diff-unified.png pr-diff-side-by-side.png
+  # 板 D Review/Merge 骨架——T17 合入后在此追加 review-sheet/merge-box/merge-state 三帧即自动生效
+  montage_board board-E-settings-notif.jpg settings-grouped.png notification-panel.png commit-dialog.png
+  montage_board board-F-search.jpg        search-history.png search-tabs.png
+else
+  echo "::warning::ImageMagick montage not found — boards skipped, raw frames only"
+fi
 
 # ── 清理：恢复浅色 + 回首页 ─────────────────────────────────
 adb shell cmd uimode night no

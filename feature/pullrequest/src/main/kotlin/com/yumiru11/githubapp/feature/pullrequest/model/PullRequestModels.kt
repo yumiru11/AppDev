@@ -242,6 +242,8 @@ data class PullRequestBranch(
     val label: String? = null,
     val ref: String? = null,
     val sha: String? = null,
+    /** 分支归属仓库 full_name（T17：Update branch / 删除分支仅同仓库可用） */
+    val repoFullName: String? = null,
 )
 
 /** 提交条目（Commits Tab） */
@@ -564,4 +566,77 @@ data class LineCommentTarget(
     val anchor: LineCommentAnchor,
     val thread: ReviewThread? = null,
     val comments: List<ReviewComment> = emptyList(),
+)
+
+// ── T17：Review / Merge ──────────────────────────────────────────────
+
+/** Review 结论（REST POST /pulls/{n}/reviews 的 event 值映射） */
+enum class ReviewConclusion {
+    APPROVE,
+    COMMENT,
+    REQUEST_CHANGES,
+
+    ;
+
+    /** REST event 值 */
+    fun toRaw(): String =
+        when (this) {
+            APPROVE -> "APPROVE"
+            COMMENT -> "COMMENT"
+            REQUEST_CHANGES -> "REQUEST_CHANGES"
+        }
+
+    /** 结论 → 时间线 Review 态（COMMENT → COMMENTED） */
+    fun toReviewState(): PullRequestReviewState =
+        when (this) {
+            APPROVE -> PullRequestReviewState.APPROVED
+            COMMENT -> PullRequestReviewState.COMMENTED
+            REQUEST_CHANGES -> PullRequestReviewState.CHANGES_REQUESTED
+        }
+}
+
+/** 合并方法（REST merge_method 值映射） */
+enum class PullRequestMergeMethod {
+    MERGE,
+    SQUASH,
+    REBASE,
+
+    ;
+
+    fun toRaw(): String =
+        when (this) {
+            MERGE -> "merge"
+            SQUASH -> "squash"
+            REBASE -> "rebase"
+        }
+}
+
+/** 当前会话的权限级别（REST 仓库 permissions 位映射：admin/maintain/push → WRITE） */
+enum class ViewerPermission {
+    /** 只读（triage/pull）——可发起 comment 结论 Review，不可 approve/request/merge */
+    READ,
+
+    /** 可写（admin/maintain/push）——approve/request changes/merge/删分支可用 */
+    WRITE,
+
+    /** 未知（游客或权限对象缺失）——保守隐藏全部写入口 */
+    UNKNOWN,
+}
+
+/** 进行中的写操作（防重入：按钮禁用/loading + 单测断言） */
+enum class PullRequestWriteAction {
+    REVIEW,
+    MERGE,
+    UPDATE_BRANCH,
+    DELETE_BRANCH,
+}
+
+/** 已提交的 Review 条目（T17：POST /pulls/{n}/reviews 响应 → 时间线替换乐观项） */
+@Immutable
+data class PullRequestReview(
+    val id: Long,
+    val author: PullRequestUser? = null,
+    val body: String? = null,
+    val state: PullRequestReviewState = PullRequestReviewState.UNKNOWN,
+    val submittedAt: String? = null,
 )

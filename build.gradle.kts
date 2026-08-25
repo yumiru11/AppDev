@@ -177,6 +177,9 @@ val coverageExcludes =
         // T16：自研 diff 视图 / 行评论 BottomSheet（纯 Composable，单测不可达，截图/真机兑底）
         "**/*DiffView*.class",
         "**/*LineCommentSheet*.class",
+        // T17：ReviewSheet / MergeBox（纯 Composable，单测不可达，截图/真机兑底；同 T16 DiffView 策略）
+        "**/*ReviewSheet*.class",
+        "**/*MergeBox*.class",
         // T16：Apollo codegen 产物（schema 驱动生成，行为由 Apollo 运行时保障；单测门禁不计生成代码，
         //   与 R/BuildConfig/Hilt 生成物同策略，防新增 .graphql 操作导致分母虚增）
         "**/githubgraphql/generated/**",

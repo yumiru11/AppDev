@@ -2,17 +2,24 @@ package com.yumiru11.githubapp.feature.pullrequest.data
 
 import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
 import com.yumiru11.githubapp.core.githubrest.model.IssueEventDto
+import com.yumiru11.githubapp.core.githubrest.model.PullRequestBranchDto
+import com.yumiru11.githubapp.core.githubrest.model.PullRequestRepoDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestReviewCommentDto
+import com.yumiru11.githubapp.core.githubrest.model.PullRequestReviewDto
+import com.yumiru11.githubapp.core.githubrest.model.RepositoryPermissionsDto
+import com.yumiru11.githubapp.core.githubrest.model.UserDto
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRunConclusion
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRunStatus
 import com.yumiru11.githubapp.feature.pullrequest.model.DiffSide
 import com.yumiru11.githubapp.feature.pullrequest.model.MergeableState
+import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestReview
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestReviewState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineEventType
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewComment
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThread
+import com.yumiru11.githubapp.feature.pullrequest.model.ViewerPermission
 import kotlinx.serialization.decodeFromString
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -81,6 +88,61 @@ class PullRequestRepositoryTest {
 
         assertEquals(MergeableState.UNKNOWN, dto.toDomain().mergeableState)
         assertNull(dto.toDomain().mergeable)
+    }
+
+    // ── T17：Review / Merge 数据映射 ──
+
+    @Test
+    fun toDomain_headBranchWithRepo_mapsRepoFullName() {
+        val dto =
+            pullRequestDto(state = "open", draft = false, mergedAt = null).copy(
+                head =
+                    PullRequestBranchDto(
+                        label = "octocat:feature",
+                        ref = "feature",
+                        sha = "abc123",
+                        repo = PullRequestRepoDto(name = "Hello-World", fullName = "octocat/Hello-World"),
+                    ),
+            )
+
+        val domain = dto.toDomain()
+
+        assertEquals("octocat/Hello-World", domain.head?.repoFullName)
+    }
+
+    @Test
+    fun toViewerPermission_writeBits_mapsWrite() {
+        assertEquals(ViewerPermission.WRITE, RepositoryPermissionsDto(push = true).toViewerPermission())
+        assertEquals(ViewerPermission.WRITE, RepositoryPermissionsDto(admin = true).toViewerPermission())
+        assertEquals(ViewerPermission.WRITE, RepositoryPermissionsDto(maintain = true).toViewerPermission())
+    }
+
+    @Test
+    fun toViewerPermission_readOnlyAndMissing_mapsReadAndUnknown() {
+        assertEquals(ViewerPermission.READ, RepositoryPermissionsDto(triage = true, pull = true).toViewerPermission())
+        assertEquals(ViewerPermission.UNKNOWN, null.toViewerPermission())
+    }
+
+    @Test
+    fun reviewDto_toDomainAndTimeline_mapsReviewCard() {
+        val dto =
+            PullRequestReviewDto(
+                id = 7L,
+                user = UserDto(login = "reviewer", id = 2),
+                body = "LGTM",
+                state = "APPROVED",
+                submittedAt = "2026-08-02T00:00:00Z",
+            )
+
+        val domain = dto.toDomain()
+        val item = domain.toTimelineItem()
+
+        assertEquals(7L, domain.id)
+        assertEquals(PullRequestReviewState.APPROVED, domain.state)
+        assertEquals(7L, item.id)
+        assertEquals("reviewer", item.author?.login)
+        assertEquals("LGTM", item.body)
+        assertEquals(PullRequestReviewState.APPROVED, item.state)
     }
 
     @Test

@@ -82,6 +82,9 @@ enum class ReadmeRenderMode {
  * 仓库/README 加载错误类型（UI 层映射为本地化文案）。
  */
 enum class RepoErrorType {
+    /** 401/403：登录过期或 token 无该资源权限（GitHub 对无权限仓库谎报 404，勿混淆） */
+    FORBIDDEN,
+
     /** 404：仓库或 README 不存在 */
     NOT_FOUND,
 
