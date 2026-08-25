@@ -8,6 +8,7 @@
     <string name="repo_stars">%d 星</string>
     <string name="repo_forks">%d 个 Fork</string>
     <string name="repo_language">%s</string>
+    <string name="repo_error_forbidden">当前登录无权访问该资源</string>
     <string name="repo_error_not_found">仓库未找到</string>
     <string name="repo_error_network">网络错误，请检查连接</string>
     <string name="repo_error_unknown">未知错误</string>

@@ -242,6 +242,16 @@ class GitHubLinkParserTest {
     }
 
     @Test
+    fun parseUrl_issueListUrl_returnsIssueList() {
+        // 回归：列表页此前返回 External → CustomTabs 隐式 VIEW 命中本应用自身
+        // intent-filter，弹「打开方式」选择器自循环（CI 实拍 C 板第 2 帧）
+        assertEquals(
+            ParsedUrl.IssueList("yumiru11", "AppDev"),
+            GitHubLinkParser.parseUrl("https://github.com/yumiru11/AppDev/issues"),
+        )
+    }
+
+    @Test
     fun parseUrl_commitShaTooShort_returnsExternal() {
         assertTrue(
             GitHubLinkParser.parseUrl("https://github.com/owner/repo/commit/abc123") is ParsedUrl.External,

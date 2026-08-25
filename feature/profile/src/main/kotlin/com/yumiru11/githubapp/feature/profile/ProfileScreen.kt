@@ -4,8 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -44,6 +46,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,6 +75,8 @@ fun ProfileScreen(
     onOpenRepository: (owner: String, repo: String) -> Unit = { _, _ -> },
     onOpenUser: (login: String) -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    /** 底栏玻璃总高（MainTabPager 传入）：作为列表 contentPadding，让内容滚进玻璃背后 */
+    bottomContentPadding: Dp = 0.dp,
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
@@ -79,6 +84,8 @@ fun ProfileScreen(
 
     Scaffold(
         modifier = modifier,
+        // 内容延伸到底栏玻璃背后（Haze source 需真实像素 + 消除栏上方空带）
+        contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.profile_title)) },
@@ -90,7 +97,7 @@ fun ProfileScreen(
             )
         },
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Box(modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
             when (val state = uiState) {
                 is ProfileUiState.Loading -> {
                     // #84：共享加载态组件
@@ -118,6 +125,7 @@ fun ProfileScreen(
                         viewModel = viewModel,
                         onOpenRepository = onOpenRepository,
                         onOpenUser = onOpenUser,
+                        bottomContentPadding = bottomContentPadding,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -135,6 +143,7 @@ private fun ProfileContent(
     viewModel: ProfileViewModel,
     onOpenRepository: (owner: String, repo: String) -> Unit,
     onOpenUser: (login: String) -> Unit,
+    bottomContentPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(ProfileTab.REPOSITORIES) }
@@ -144,7 +153,10 @@ private fun ProfileContent(
     val followers = viewModel.followers.collectAsLazyPagingItems()
     val following = viewModel.following.collectAsLazyPagingItems()
 
-    LazyColumn(modifier = modifier) {
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(bottom = bottomContentPadding),
+    ) {
         item(key = "header") { ProfileHeader(user) }
         item(key = "tabs") {
             ProfileTabs(

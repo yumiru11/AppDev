@@ -22,6 +22,12 @@ sealed interface ParsedUrl {
         val number: Int,
     ) : ParsedUrl
 
+    /** Issue 列表页链接，如 `github.com/{owner}/{repo}/issues`（无编号）。 */
+    data class IssueList(
+        val owner: String,
+        val repo: String,
+    ) : ParsedUrl
+
     data class PullRequest(
         val owner: String,
         val repo: String,
@@ -214,7 +220,17 @@ object GitHubLinkParser {
         return when (sub) {
             "issues" -> {
                 val number = rest.firstOrNull()?.toIntOrNull()
-                if (number != null) ParsedUrl.Issue(owner, repo, number) else ParsedUrl.External(original)
+                // 列表页（无编号）必须应用内路由——此前返回 External 会让 MainActivity 经
+                // CustomTabs 隐式 VIEW 打开 github.com，而本应用自身注册了同域 BROWSABLE
+                // intent-filter → 弹「打开方式」选择器自循环（CI 实拍 C 板第 2 帧）
+                when {
+                    number != null -> ParsedUrl.Issue(owner, repo, number)
+
+                    // 纯列表页（无任何编号段）→ 应用内列表；带无法解析的编号段仍是坏链
+                    rest.isEmpty() -> ParsedUrl.IssueList(owner, repo)
+
+                    else -> ParsedUrl.External(original)
+                }
             }
 
             "pull" -> {

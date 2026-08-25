@@ -12,7 +12,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -49,6 +48,7 @@ import com.yumiru11.githubapp.core.ui.MainTabPager
 import com.yumiru11.githubapp.core.ui.PlaceholderScreen
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
 import com.yumiru11.githubapp.core.ui.navigateToParsedUrl
+import com.yumiru11.githubapp.core.ui.openExternalBrowser
 import com.yumiru11.githubapp.feature.auth.AuthNavigation
 import com.yumiru11.githubapp.feature.auth.AuthViewModel
 import com.yumiru11.githubapp.feature.auth.LoginScreen
@@ -164,7 +164,7 @@ class MainActivity : ComponentActivity() {
                                                     }
                                                 },
                                                 onFeedItemClick = { parsed -> navigateToParsedUrl(navController, parsed) },
-                                                modifier = Modifier.padding(padding),
+                                                bottomContentPadding = padding.calculateBottomPadding(),
                                             )
                                         },
                                         reposPage = { padding ->
@@ -195,7 +195,7 @@ class MainActivity : ComponentActivity() {
                                                     )
                                                 },
                                                 onSettingsClick = { navController.navigate(AppRoute.SETTINGS) },
-                                                modifier = Modifier.padding(padding),
+                                                bottomContentPadding = padding.calculateBottomPadding(),
                                             )
                                         },
                                     )
@@ -301,7 +301,7 @@ class MainActivity : ComponentActivity() {
                                         onClose = onClose,
                                         onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
                                         onExternalLink = { url ->
-                                            CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+                                            openExternalBrowser(context, url)
                                         },
                                     )
                                 },
@@ -370,7 +370,7 @@ class MainActivity : ComponentActivity() {
                 val parsed = GitHubLinkParser.parseUrl(uri.toString())
                 if (parsed is ParsedUrl.External) {
                     // External 深链：用 Chrome Custom Tabs 在应用内打开原始 url
-                    CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(parsed.url))
+                    openExternalBrowser(context, parsed.url)
                 } else {
                     navigateToParsedUrl(navController, parsed)
                 }
@@ -465,7 +465,7 @@ private fun BlobRoute(
             RepoDetailActions(
                 onNavigateToParsedUrl = { parsed -> navigateToParsedUrl(navController, parsed) },
                 onOpenExternal = { url ->
-                    CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+                    openExternalBrowser(context, url)
                 },
                 onEditMarkdown = null,
             ),

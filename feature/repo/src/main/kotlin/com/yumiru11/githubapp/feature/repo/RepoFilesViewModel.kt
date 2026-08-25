@@ -483,6 +483,7 @@ class RepoFilesViewModel
         /** 异常 → 错误类型（404 → NOT_FOUND，IO → NETWORK，其余 → UNKNOWN） */
         private fun mapError(e: Throwable): RepoErrorType =
             when {
+                e is HttpException && (e.code() == 401 || e.code() == 403) -> RepoErrorType.FORBIDDEN
                 e is HttpException && e.code() == 404 -> RepoErrorType.NOT_FOUND
                 e is IOException -> RepoErrorType.NETWORK
                 else -> RepoErrorType.UNKNOWN

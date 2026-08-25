@@ -265,6 +265,7 @@ private fun editErrorText(
     errorType: RepoErrorType,
 ): String =
     when (errorType) {
+        RepoErrorType.FORBIDDEN -> context.getString(R.string.repo_error_forbidden)
         RepoErrorType.NOT_FOUND -> context.getString(R.string.repo_error_not_found)
         RepoErrorType.NETWORK -> context.getString(R.string.repo_error_network)
         RepoErrorType.UNKNOWN -> context.getString(R.string.repo_error_unknown)
@@ -1192,6 +1193,7 @@ internal fun ErrorContent(
 @Composable
 private fun errorMessage(errorType: RepoErrorType): String =
     when (errorType) {
+        RepoErrorType.FORBIDDEN -> stringResource(R.string.repo_error_forbidden)
         RepoErrorType.NOT_FOUND -> stringResource(R.string.repo_error_not_found)
         RepoErrorType.NETWORK -> stringResource(R.string.repo_error_network)
         RepoErrorType.UNKNOWN -> stringResource(R.string.repo_error_unknown)

@@ -8,6 +8,7 @@
     <string name="repo_stars">%d stars</string>
     <string name="repo_forks">%d forks</string>
     <string name="repo_language">%s</string>
+    <string name="repo_error_forbidden">No access with current sign-in</string>
     <string name="repo_error_not_found">Repository not found</string>
     <string name="repo_error_network">Network error. Check your connection.</string>
     <string name="repo_error_unknown">Unknown error</string>

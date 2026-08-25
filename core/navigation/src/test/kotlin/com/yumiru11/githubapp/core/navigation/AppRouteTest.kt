@@ -82,6 +82,14 @@ class AppRouteTest {
     }
 
     @Test
+    fun fromParsedUrl_issueList_buildsIssuesRoute() {
+        assertEquals(
+            "issues/yumiru11/AppDev",
+            AppRoute.fromParsedUrl(ParsedUrl.IssueList("yumiru11", "AppDev")),
+        )
+    }
+
+    @Test
     fun fromParsedUrl_pullRequest_buildsPrRoute() {
         assertEquals(
             "pr/owner/repo/456",

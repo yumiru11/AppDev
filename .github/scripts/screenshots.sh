@@ -121,6 +121,25 @@ sys.exit(0 if ok else 1)
   echo "::warning::segment '$label' not confirmed selected"
 }
 
+# 像素级验证：点击后截图必须与 prev 帧不同才算成功（md5 比对），否则重按再截。
+# 背景：tap_segment_until_selected 的 Compose selected 语义校验曾误判——节点属性
+# 翻转了但 Crossfade 未完成/坐标过期，最终两帧仍视觉一致（CI 实拍 C 板末两帧）。
+capture_until_changed() {
+  local prev="$1" out="$2" label="$3" i md5p md5n
+  md5p=$(md5sum "$prev" | awk '{print $1}')
+  for i in 1 2 3 4 5; do
+    if [ "$i" -gt 1 ]; then
+      tap_text "$label"
+      sleep 1
+    fi
+    adb exec-out screencap -p > "$out"
+    md5n=$(md5sum "$out" | awk '{print $1}')
+    if [ "$md5n" != "$md5p" ]; then return 0; fi
+    sleep 1
+  done
+  echo "::warning::frame '$out' never differed from '$prev' after tapping '$label'"
+}
+
 launch_app() {
 
   adb shell am start -n "$PKG/com.yumiru11.githubapp.MainActivity" >/dev/null
@@ -292,7 +311,7 @@ sleep 3                                   # 大 patch 再留一拍绘制余量
 adb exec-out screencap -p > "$OUT/pr-diff-unified.png"
 tap_segment_until_selected "Side-by-side"
 sleep 2
-adb exec-out screencap -p > "$OUT/pr-diff-side-by-side.png"
+capture_until_changed "$OUT/pr-diff-unified.png" "$OUT/pr-diff-side-by-side.png" "Side-by-side"
 
 # ── 6. 我的 tab（force-stop 冷启动回首页——am start 对已在前台 app 不重置
 # 导航栈，深链页仍在前台导致 uiautomator 拿不到底栏）──────────

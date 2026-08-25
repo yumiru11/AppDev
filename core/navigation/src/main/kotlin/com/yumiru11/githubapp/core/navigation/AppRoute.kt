@@ -54,6 +54,10 @@ object AppRoute {
                 "issue/${parsed.owner}/${parsed.repo}/${parsed.number}"
             }
 
+            is ParsedUrl.IssueList -> {
+                "issues/${parsed.owner}/${parsed.repo}"
+            }
+
             is ParsedUrl.PullRequest -> {
                 "pr/${parsed.owner}/${parsed.repo}/${parsed.number}"
             }
