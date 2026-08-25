@@ -77,23 +77,40 @@ tap_desc() {
   fi
 }
 
-# 轮询等待文本/content-desc 出现（默认 20s）——替代裸 sleep，页面加载完才继续。
-# 找到输出坐标到 /tmp/wait_bounds（供 tap 复用同一次 dump），超时返回 1 并告警。
+# 轮询等待文本/content-desc 出现（墙钟上限默认 12s）。找到输出坐标到
+# /tmp/wait_bounds（供 tap 复用同一次 dump），超时返回 1 并告警。
+#
+# 性能要点（CI 16.5min 实测复盘）：
+# - 动画/加载态下 uiautomator 单次 dump 可卡 5-10s 等 idle，固定次数循环会把
+#   「20s 超时」拖成 60-90s 墙钟——下调默认值并按迭代数近似计时；
+# - 页面已呈错误态时继续轮询目标控件纯属浪费（token 缺权限段落曾各烧一分钟），
+#   dump 出现任一错误文案即早退。
+ERROR_MARKERS='Repository not found|No access with current sign-in|Network error|网络错误|当前登录无权访问'
+
 wait_for_attr() {
-  local attr="$1" value="$2" timeout="${3:-20}"
-  for _ in $(seq 1 "$timeout"); do
-    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1
-    local bounds
-    bounds=$(python3 -c "import re; xml=open('/tmp/ui.xml').read(); m=re.search(r'$attr=\"$value\"[^>]*bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"', xml); print((int(m.group(1))+int(m.group(3)))//2, (int(m.group(2))+int(m.group(4)))//2) if m else ''" 2>/dev/null || true)
-    if [ -n "$bounds" ]; then
-      echo "$bounds" > /tmp/wait_bounds
-      return 0
+  local attr="$1" value="$2" timeout="${3:-12}"
+  local waited=0 bounds
+  while :; do
+    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || { sleep 1; waited=$((waited + 1)); continue; }
+    adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1 || { sleep 1; waited=$((waited + 1)); continue; }
+    if grep -q "<hierarchy" /tmp/ui.xml 2>/dev/null; then
+      if grep -qE "$ERROR_MARKERS" /tmp/ui.xml; then
+        echo "::notice::error state on screen while waiting for $attr '$value' — abort early"
+        return 1
+      fi
+      bounds=$(python3 -c "import re; xml=open('/tmp/ui.xml').read(); m=re.search(r'$attr=\"$value\"[^>]*bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"', xml); print((int(m.group(1))+int(m.group(3)))//2, (int(m.group(2))+int(m.group(4)))//2) if m else ''" 2>/dev/null || true)
+      if [ -n "$bounds" ]; then
+        echo "$bounds" > /tmp/wait_bounds
+        return 0
+      fi
     fi
     sleep 1
+    waited=$((waited + 1))
+    if [ "$waited" -ge "$timeout" ]; then
+      echo "::warning::timeout waiting for $attr '$value'"
+      return 1
+    fi
   done
-  echo "::warning::timeout waiting for $attr '$value'"
-  return 1
 }
 
 wait_for_text() { wait_for_attr "text" "$@"; }
@@ -181,6 +198,11 @@ adb shell pm disable com.android.launcher3 --user 0 >/dev/null 2>&1 || true
 
 # ── 0. 安装 APK（android-emulator-runner 不自动装；assembleDebug 产物在工作区）─
 adb install -r app/build/outputs/apk/debug/app-debug.apk
+# 动画时长归零：点击即时生效，进度圈/转场不再让 uiautomator 等 idle 卡死
+# （dump 单次 5-10s 是本轮 CI 拖到 16min 的主放大器）
+adb shell settings put global window_animation_scale 0
+adb shell settings put global transition_animation_scale 0
+adb shell settings put global animator_duration_scale 0
 
 # ── 0.5 截图登录（若提供 SCREENSHOT_TOKEN 机密）：注入只读 PAT →
 # EncryptedTokenStorage（ScreenshotTokenReceiver），使 app 进入开发者模式
@@ -265,7 +287,7 @@ adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11
 wait_for_activity "$PKG" || true
 sleep 6
 wait_for_text "Files" && tap_text "Files"
-wait_for_text "README.md" || true         # 树条目渲染完成信号（仓库根含 README.md）
+wait_for_text ".github" || true          # 树条目就绪信号（首屏可见的顶层目录；README.md 在折叠线下方必超时）
 adb exec-out screencap -p > "$OUT/file-tree.png"
 
 # ── 5.11 Sora 代码查看（T11：blob 深链直达 .kt 只读高亮——BLOB 深链多段路径已修复）──
@@ -306,6 +328,11 @@ adb shell input keyevent 4                # back 关面板
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/pull/101" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
 wait_for_text "Files changed" && tap_text "Files changed"
+# 文件行默认折叠——Unified/Side-by-side 分段按钮在展开补丁后才渲染
+# （此前两帧实为同一文件列表页：Unified 必然超时，重试全在列表页空转）
+if wait_for_desc "Show patch"; then
+  tap_desc "Show patch"
+fi
 wait_for_text "Unified" || true           # Diff 工具条出现 = 补丁渲染完成
 sleep 3                                   # 大 patch 再留一拍绘制余量
 adb exec-out screencap -p > "$OUT/pr-diff-unified.png"
@@ -379,8 +406,10 @@ montage_board() {
 # runner 镜像已不预装 ImageMagick（PR #102 实测：montage not found → 板图全跳过）
 if ! command -v montage >/dev/null 2>&1; then
   echo "::notice::installing imagemagick for board stitching"
-  sudo apt-get update -qq >/dev/null 2>&1 || true
-  sudo apt-get install -y -qq imagemagick >/dev/null 2>&1 || true
+  # 直装优先（apt-get update 在 runner 上可挂数分钟），全程 timeout 兜底
+  sudo timeout 120 apt-get install -y -qq imagemagick >/dev/null 2>&1 \
+    || { sudo timeout 90 apt-get update -qq >/dev/null 2>&1 || true
+         sudo timeout 150 apt-get install -y -qq imagemagick >/dev/null 2>&1 || true; }
 fi
 if command -v montage >/dev/null 2>&1; then
   montage_board board-A-home.jpg          home-light.png home-dark.png profile.png
