@@ -191,12 +191,10 @@ long_shot() {
   done
 }
 
-# ── 0. 安装 debug APK（action 只启动模拟器，不装 APK——PR #60 第 8 轮实测）─
-adb install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null
-adb shell pm disable com.android.launcher3 --user 0 >/dev/null 2>&1 || true
-
-# ── 0. 安装 APK（android-emulator-runner 不自动装；assembleDebug 产物在工作区）─
+# ── 0. 安装 debug APK（android-emulator-runner 不自动装；APK 由 quality job
+#    构建上传、本 job 开头已下载到工作区原位）───────────────────────────────
 adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell pm disable com.android.launcher3 --user 0 >/dev/null 2>&1 || true
 # 动画时长归零：点击即时生效，进度圈/转场不再让 uiautomator 等 idle 卡死
 # （dump 单次 5-10s 是本轮 CI 拖到 16min 的主放大器）
 adb shell settings put global window_animation_scale 0
@@ -308,16 +306,19 @@ sleep 1
 adb exec-out screencap -p > "$OUT/search-tabs.png"
 adb shell input keyevent 111              # ESC 收起键盘
 
-# ── 5.13 设置页分组卡（#87 CardGroup 分组重构）──
+# ── 5.13 设置分组卡（#87）+ 5.14 通知面板（#88）合并段：
+# 同一次冷启动串接——拍完设置返回 Profile，底栏切 Home 点铃铛，
+# 省一整次 force-stop 冷启动（铃铛在首页顶栏，Profile 域无入口）
 adb shell am force-stop "$PKG"; launch_app
 wait_for_text "Profile" && tap_text "Profile"
 wait_for_desc "Settings" && tap_desc "Settings"   # 顶栏齿轮是 content-desc，非文本
 wait_for_text "Appearance" || true        # 分组标题渲染完成
 adb exec-out screencap -p > "$OUT/settings-grouped.png"
-
-# ── 5.14 通知面板（#88：铃铛 → 右滑覆盖层；未登录为登录引导空态）──
-adb shell am force-stop "$PKG"; launch_app
-wait_for_desc "Notifications" && tap_desc "Notifications"
+adb shell input keyevent 4                # 返回 Profile
+tap_text "Home"                           # 底栏切首页
+if wait_for_desc "Notifications"; then
+  tap_desc "Notifications"
+fi
 wait_for_text "Notifications" || true     # 面板标题滑入完成
 sleep 2
 adb exec-out screencap -p > "$OUT/notification-panel.png"

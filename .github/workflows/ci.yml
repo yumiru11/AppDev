@@ -242,24 +242,13 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           ls -l /dev/kvm
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v5
+      # quality job 已构建并上传 APK——本 job 不再重复编译（曾花 ~150s 全量重打，
+      # 纯重复劳动：needs: quality 保证构件必已存在）。下载到脚本安装路径原位。
+      - name: Download debug APK from quality job
+        uses: actions/download-artifact@v7
         with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Override local JDK path for CI
-        # GNU sed（ubuntu）与 BSD sed（macos）的 -i 语法不兼容——python 跨平台
-        run: python3 -c "import re; p='gradle.properties'; s=open(p).read(); open(p,'w').write(re.sub(r'(?m)^org\.gradle\.java\.home.*\n?', '', s))"
-
-      # quality job 已跑完整构建（含 seed-plugins 兜底）；screenshots 只重打 APK。
-      # macos-14 上 seed-plugins.sh curl 失败（exit 56 网络接收错误）——macos 网络
-      # 通道不同，插件解析未验证是否需要 seed；若 assemble 因此失败再加回。
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
-
-      - name: Assemble debug APK
-        run: ./gradlew :app:assembleDebug --no-daemon
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug
 
       # 模拟器 boot 由 action 处理（KVM udev + 等待 sys.boot_completed）；adb 暴露在
       # localhost:5554，Maestro 自动发现设备。Maestro CLI 在此脚本内安装（~/.maestro/bin）。
