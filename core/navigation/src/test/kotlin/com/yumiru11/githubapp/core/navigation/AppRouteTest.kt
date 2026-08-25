@@ -39,8 +39,8 @@ class AppRouteTest {
     }
 
     @Test
-    fun routeTable_blobRoute_hasOwnerRepoRefPathPlaceholders() {
-        assertEquals("blob/{owner}/{repo}/{ref}/{path}", AppRoute.BLOB)
+    fun routeTable_blobRoute_usesQueryPathForMultiSegment() {
+        assertEquals("blob/{owner}/{repo}/{ref}?path={path}", AppRoute.BLOB)
     }
 
     @Test
@@ -118,8 +118,36 @@ class AppRouteTest {
     @Test
     fun fromParsedUrl_blob_buildsBlobRoute() {
         assertEquals(
-            "blob/owner/repo/main/src/Main.kt",
+            "blob/owner/repo/main?path=src%2FMain.kt",
             AppRoute.fromParsedUrl(ParsedUrl.Blob("owner", "repo", "main", "src/Main.kt")),
+        )
+    }
+
+    @Test
+    fun fromParsedUrl_blob_deepMultiSegmentPath_encodesAllSlashes() {
+        // 回归：多段文件路径深链曾因 {path} 单段占位符匹配失败而崩溃
+        // （CI 截图 5.11 MainActivity.kt 六段路径 → IllegalArgumentException）
+        val route =
+            AppRoute.fromParsedUrl(
+                ParsedUrl.Blob(
+                    "yumiru11",
+                    "AppDev",
+                    "main",
+                    "app/src/main/java/com/yumiru11/githubapp/MainActivity.kt",
+                ),
+            )
+        assertEquals(
+            "blob/yumiru11/AppDev/main?path=" +
+                "app%2Fsrc%2Fmain%2Fjava%2Fcom%2Fyumiru11%2Fgithubapp%2FMainActivity.kt",
+            route,
+        )
+    }
+
+    @Test
+    fun fromParsedUrl_blob_pathWithSpace_encodesSpaceAsPercent20() {
+        assertEquals(
+            "blob/owner/repo/main?path=My%20File.kt",
+            AppRoute.fromParsedUrl(ParsedUrl.Blob("owner", "repo", "main", "My File.kt")),
         )
     }
 

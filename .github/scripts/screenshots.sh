@@ -63,6 +63,28 @@ tap_desc() {
   fi
 }
 
+# 轮询等待文本/content-desc 出现（默认 20s）——替代裸 sleep，页面加载完才继续。
+# 找到输出坐标到 /tmp/wait_bounds（供 tap 复用同一次 dump），超时返回 1 并告警。
+wait_for_attr() {
+  local attr="$1" value="$2" timeout="${3:-20}"
+  for _ in $(seq 1 "$timeout"); do
+    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+    adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1
+    local bounds
+    bounds=$(python3 -c "import re; xml=open('/tmp/ui.xml').read(); m=re.search(r'$attr=\"$value\"[^>]*bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"', xml); print((int(m.group(1))+int(m.group(3)))//2, (int(m.group(2))+int(m.group(4)))//2) if m else ''" 2>/dev/null || true)
+    if [ -n "$bounds" ]; then
+      echo "$bounds" > /tmp/wait_bounds
+      return 0
+    fi
+    sleep 1
+  done
+  echo "::warning::timeout waiting for $attr '$value'"
+  return 1
+}
+
+wait_for_text() { wait_for_attr "text" "$@"; }
+wait_for_desc() { wait_for_attr "content-desc" "$@"; }
+
 launch_app() {
   adb shell am start -n "$PKG/com.yumiru11.githubapp.MainActivity" >/dev/null
   wait_for_activity "$PKG" || true
@@ -177,58 +199,62 @@ adb exec-out screencap -p > "$OUT/repo-releases.png"
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/README.md" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
 sleep 6
-tap_text "Edit"
-sleep 5
+wait_for_desc "Edit" && tap_desc "Edit"   # 编辑入口是 IconButton，desc=「Edit」
+wait_for_text "Commit" || true            # 编辑屏就绪信号（顶栏 Commit 动作）
+sleep 2
 adb exec-out screencap -p > "$OUT/editor.png"
 
 # ── 5.10 文件树（T11：RepoDetail Files Tab）──
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
 sleep 6
-tap_text "Files"
-sleep 4
+wait_for_text "Files" && tap_text "Files"
+wait_for_text "README.md" || true         # 树条目渲染完成信号（仓库根含 README.md）
 adb exec-out screencap -p > "$OUT/file-tree.png"
 
-# ── 5.11 Sora 代码查看（T11：blob 深链直达 .kt 只读高亮，确定性优于树内点击）──
+# ── 5.11 Sora 代码查看（T11：blob 深链直达 .kt 只读高亮——BLOB 深链多段路径已修复）──
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/app/src/main/java/com/yumiru11/githubapp/MainActivity.kt" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
-sleep 6
+wait_for_desc "Edit" || true              # FileViewer 就绪信号；Sora 自绘无文本节点
+sleep 4
 adb exec-out screencap -p > "$OUT/code-sora.png"
 
-# ── 5.12 全局搜索（T18：历史/建议态 + 输入后四类结果 Tab）──
+# ── 5.12 全局搜索（T18：历史/建议态 + 输入后结果 Tab）──
 adb shell am force-stop "$PKG"; launch_app
-tap_text "Search GitHub…"
-sleep 3
+wait_for_text "Search GitHub…" && tap_text "Search GitHub…"
+wait_for_text "Search GitHub…" || true    # SearchScreen 占位符就绪
+sleep 1
 adb exec-out screencap -p > "$OUT/search-history.png"
 adb shell input text "material"
-sleep 4
+wait_for_text "Repos" || true             # 结果 Tab 行出现 = 防抖查询完成
+sleep 1
 adb exec-out screencap -p > "$OUT/search-tabs.png"
-adb shell input keyevent 111   # ESC 收起键盘
+adb shell input keyevent 111              # ESC 收起键盘
 
 # ── 5.13 设置页分组卡（#87 CardGroup 分组重构）──
 adb shell am force-stop "$PKG"; launch_app
-tap_text "Profile"
-sleep 2
-tap_text "Settings"
-sleep 3
+wait_for_text "Profile" && tap_text "Profile"
+wait_for_desc "Settings" && tap_desc "Settings"   # 顶栏齿轮是 content-desc，非文本
+wait_for_text "Appearance" || true        # 分组标题渲染完成
 adb exec-out screencap -p > "$OUT/settings-grouped.png"
 
 # ── 5.14 通知面板（#88：铃铛 → 右滑覆盖层；未登录为登录引导空态）──
 adb shell am force-stop "$PKG"; launch_app
-tap_desc "Notifications"
-sleep 3
+wait_for_desc "Notifications" && tap_desc "Notifications"
+wait_for_text "Notifications" || true     # 面板标题滑入完成
+sleep 2
 adb exec-out screencap -p > "$OUT/notification-panel.png"
-adb shell input keyevent 4   # back 关面板
+adb shell input keyevent 4                # back 关面板
 
 # ── 5.15 PR Files changed 双视图 Diff（T16：unified / side-by-side）──
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/pull/101" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
-sleep 8
-tap_text "Files changed"
-sleep 5
+wait_for_text "Files changed" && tap_text "Files changed"
+wait_for_text "Unified" || true           # Diff 工具条出现 = 补丁渲染完成
+sleep 3                                   # 大 patch 再留一拍绘制余量
 adb exec-out screencap -p > "$OUT/pr-diff-unified.png"
 tap_text "Side-by-side"
-sleep 3
+sleep 4
 adb exec-out screencap -p > "$OUT/pr-diff-side-by-side.png"
 
 # ── 6. 我的 tab（force-stop 冷启动回首页——am start 对已在前台 app 不重置
@@ -262,17 +288,15 @@ if [ -n "${SCREENSHOT_TOKEN:-}" ]; then
   adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues" -p "$PKG" >/dev/null
   wait_for_activity "$PKG" || true
   sleep 5
-  tap_text "New issue"
-  sleep 3
+  wait_for_text "New issue" && tap_text "New issue"
+  wait_for_text "Title" || true            # 表单字段渲染完成
   adb exec-out screencap -p > "$OUT/create-issue.png"
   # 编辑器提交动作（T22：Commit 对话框；409 冲突态需并发篡改，无法确定性复现，不自动化）
   adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/README.md" -p "$PKG" >/dev/null
   wait_for_activity "$PKG" || true
-  sleep 6
-  tap_text "Edit"
-  sleep 4
-  tap_text "Commit"
-  sleep 2
+  wait_for_desc "Edit" && tap_desc "Edit"
+  wait_for_text "Commit" && tap_text "Commit"
+  wait_for_text "Describe your changes…" || true   # 对话框 placeholder 出现
   adb exec-out screencap -p > "$OUT/commit-dialog.png"
 fi
 
@@ -296,6 +320,12 @@ montage_board() {
   montage "${imgs[@]}" -thumbnail 540x1170 -tile 2x -geometry +6+6 \
     -background '#161b22' "$OUT/$out" || echo "::warning::montage failed for $out"
 }
+# runner 镜像已不预装 ImageMagick（PR #102 实测：montage not found → 板图全跳过）
+if ! command -v montage >/dev/null 2>&1; then
+  echo "::notice::installing imagemagick for board stitching"
+  sudo apt-get update -qq >/dev/null 2>&1 || true
+  sudo apt-get install -y -qq imagemagick >/dev/null 2>&1 || true
+fi
 if command -v montage >/dev/null 2>&1; then
   montage_board board-A-home.jpg          home-light.png home-dark.png profile.png
   montage_board board-B-repo-code.jpg     repos.png repo-actions.png repo-releases.png file-tree.png code-sora.png editor.png

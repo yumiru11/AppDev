@@ -4,6 +4,7 @@
 package com.yumiru11.githubapp.core.navigation
 
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
+import java.net.URLEncoder
 
 /**
  * 应用内导航路由表。
@@ -22,7 +23,11 @@ object AppRoute {
     const val PR = "pr/{owner}/{repo}/{number}"
     const val COMMIT = "commit/{owner}/{repo}/{sha}"
     const val DISCUSSION = "discussion/{owner}/{repo}/{number}"
-    const val BLOB = "blob/{owner}/{repo}/{ref}/{path}"
+
+    // path 走 query 参数：文件路径天然多段（a/b/c.kt），单段 {path} 占位符无法匹配
+    // 多段深链，会抛 "Navigation destination cannot be found" 崩溃（CI 截图段 5.11 首次暴露）。
+    // 构造时必须 URLEncoder.encode（见 fromParsedUrl）；目标参数 NavType.StringType 自动解码。
+    const val BLOB = "blob/{owner}/{repo}/{ref}?path={path}"
     const val USER = "user/{login}"
     const val SEARCH = "search"
 
@@ -66,7 +71,9 @@ object AppRoute {
             }
 
             is ParsedUrl.Blob -> {
-                "blob/${parsed.owner}/${parsed.repo}/${parsed.ref}/${parsed.path}"
+                // path 多段必须整体编码成单段 query 值（'/'→%2F，'+'→%20 防空格歧义）
+                "blob/${parsed.owner}/${parsed.repo}/${parsed.ref}?path=" +
+                    URLEncoder.encode(parsed.path, "UTF-8").replace("+", "%20")
             }
 
             is ParsedUrl.User -> {

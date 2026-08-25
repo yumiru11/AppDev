@@ -242,7 +242,11 @@ fun AppNavHost(
                     navArgument("owner") { type = NavType.StringType },
                     navArgument("repo") { type = NavType.StringType },
                     navArgument("ref") { type = NavType.StringType },
-                    navArgument("path") { type = NavType.StringType },
+                    // query 参数必须带默认值；Navigation 自动完成 %2F/%20 解码
+                    navArgument("path") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
                 ),
         ) {
             // T5+ Blob 详情页
