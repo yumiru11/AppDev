@@ -22,6 +22,16 @@ OUT="artifacts/screenshots"
 PKG="com.yumiru11.githubapp"
 mkdir -p "$OUT"
 
+# ImageMagick 后台预装（拼板前才需要）：安装的 ~20s 完全藏在前面截图时间里。
+# 直装优先（镜像常命中缓存），失败再 update+装，全程 timeout 兜底。
+APT_PID=""
+if ! command -v montage >/dev/null 2>&1; then
+  ( sudo timeout 120 apt-get install -y -qq imagemagick >/dev/null 2>&1 \
+      || { sudo timeout 90 apt-get update -qq >/dev/null 2>&1 || true
+           sudo timeout 150 apt-get install -y -qq imagemagick >/dev/null 2>&1; } ) &
+  APT_PID=$!
+fi
+
 # 等待指定 activity 成为前台（轮询，最多 40s）——比固定 sleep 稳
 wait_for_activity() {
   local expect="$1"
@@ -42,9 +52,13 @@ dump_ui() {
   local attempt
   rm -f /tmp/ui.xml
   for attempt in 1 2 3 4; do
-    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || { sleep 1; continue; }
-    adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1 || { sleep 1; continue; }
-    if grep -q "<hierarchy" /tmp/ui.xml 2>/dev/null; then return 0; fi
+    # 先删设备侧旧 ui.xml 再 dump 并校验成功输出：uiautomator 偶发静默失败时
+    # 会残留上一次的层级，pull 拿到陈旧内容 →「元素明明可见却找不到」假超时
+    # （New issue/Title 连环超时的实证根因）
+    if adb shell "rm -f /sdcard/ui.xml; uiautomator dump /sdcard/ui.xml" 2>/dev/null | grep -q "dumped to"; then
+      adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1 || { sleep 1; continue; }
+      if grep -q "<hierarchy" /tmp/ui.xml 2>/dev/null; then return 0; fi
+    fi
     sleep 1
   done
   echo "::warning::uiautomator dump failed after retries"
@@ -91,7 +105,9 @@ wait_for_attr() {
   local attr="$1" value="$2" timeout="${3:-12}"
   local deadline=$(( $(date +%s) + timeout )) bounds
   while :; do
-    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || { sleep 1; continue; }
+    if ! adb shell "rm -f /sdcard/ui.xml; uiautomator dump /sdcard/ui.xml" 2>/dev/null | grep -q "dumped to"; then
+      sleep 1; continue
+    fi
     adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1 || { sleep 1; continue; }
     if grep -q "<hierarchy" /tmp/ui.xml 2>/dev/null; then
       if grep -qE "$ERROR_MARKERS" /tmp/ui.xml; then
@@ -143,7 +159,7 @@ sys.exit(0 if ok else 1)
 capture_until_changed() {
   local prev="$1" out="$2" label="$3" i md5p md5n
   md5p=$(md5sum "$prev" | awk '{print $1}')
-  for i in 1 2 3 4 5; do
+  for i in 1 2 3; do
     if [ "$i" -gt 1 ]; then
       tap_text "$label"
       sleep 1
@@ -227,14 +243,14 @@ tap_text "Repos"
 sleep 3
 adb exec-out screencap -p > "$OUT/repos.png"
 
-# ── 4. 普通 README（WebView）—— 已由下方 readme-long 长截图覆盖，此处不再单独截，避免冗余 ──
+# ── 4. 普通 README（WebView）—— 由 5.7 的 readme-webview 帧覆盖，不单独截 ──
 
 # ── 5. mermaid 仓库 README（WebView——mermaid 代码块特殊内容路径）─
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/mermaid-js/mermaid" -p "$PKG" >/dev/null
 sleep 5
 adb exec-out screencap -p > "$OUT/readme-mermaid.png"
 
-# ── 5.5 导航到 Issue #71（WebView 正文已由下方 issue-long 长截图覆盖，此处仅就位供 5.6 评论区截图）─
+# ── 5.5 导航到 Issue #71（就位供 5.6 评论区截图）─
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues/71" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
 sleep 5
@@ -259,35 +275,46 @@ tap_text "Commits"
 sleep 3
 adb exec-out screencap -p > "$OUT/pr-commits.png"
 
-# ── 5.7 仓库操作区（T12：语言栏 Linguist + Star/Watch 游客只读）──
-adb shell am start -a android.intent.action.VIEW -d "https://github.com/hoowhoami/EchoMusic" -p "$PKG" >/dev/null
-wait_for_activity "$PKG" || true
-sleep 3
-adb exec-out screencap -p > "$OUT/repo-actions.png"
-
-# ── 5.8 仓库 Releases Tab（T12：Releases/Tags 列表）──
-tap_text "Releases"
-sleep 3
-adb exec-out screencap -p > "$OUT/repo-releases.png"
-
-# ── 5.9 Markdown 编辑器（T21：blob 深链 → FileViewer Rendered → Edit）──
-adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/README.md" -p "$PKG" >/dev/null
-wait_for_activity "$PKG" || true
-sleep 3
-wait_for_desc "Edit" && tap_desc "Edit"   # 编辑入口是 IconButton，desc=「Edit」
-wait_for_text "Commit" || true            # 编辑屏就绪信号（顶栏 Commit 动作）
-sleep 2
-adb exec-out screencap -p > "$OUT/editor.png"
-
-# ── 5.10 文件树（T11：RepoDetail Files Tab）──
+# ── 5.7 仓库详情三连帧（T11/T12）：一次深链串拍 操作区/Releases/Files 树。
+# 此前为 EchoMusic 独立深链——AppDev 同样具备语言栏与 Releases（截图产物仓库），
+# 且登录态下 Star 按钮可见，信息量只增不减，省两次深链往返
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
 sleep 3
-wait_for_text "Files" && tap_text "Files"
-wait_for_text ".github" || true          # 树条目就绪信号（首屏可见的顶层目录；README.md 在折叠线下方必超时）
+adb exec-out screencap -p > "$OUT/repo-actions.png"
+tap_text "Releases"
+sleep 3
+adb exec-out screencap -p > "$OUT/repo-releases.png"
+tap_text "Files"
+wait_for_text ".github" || true          # 树条目就绪信号（首屏可见的顶层目录）
 adb exec-out screencap -p > "$OUT/file-tree.png"
+# README WebView 渲染帧（ADR-0007 主路径）：树下方滚动一屏拍 README 区，
+# 替代被砍的 readme-long 长截图保住渲染分流回归信号
+adb shell input swipe 540 1800 540 500 400
+sleep 2
+adb exec-out screencap -p > "$OUT/readme-webview.png"
 
-# ── 5.11 Sora 代码查看（T11：blob 深链直达 .kt 只读高亮——BLOB 深链多段路径已修复）──
+# ── 5.8 Markdown 编辑器（T21：blob 深链 → FileViewer Rendered → Edit）+ 提交对话框（T22）──
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/README.md" -p "$PKG" >/dev/null
+wait_for_activity "$PKG" || true
+sleep 3
+if wait_for_desc "Edit"; then
+  tap_desc "Edit"                        # 编辑入口是 IconButton，desc=「Edit」
+fi
+wait_for_text "Commit" || true            # 编辑屏就绪信号（顶栏 Commit 动作）
+sleep 2
+adb exec-out screencap -p > "$OUT/editor.png"
+# T22：同一编辑会话直接点开 Commit 对话框（需登录态），省一次 blob 深链 +
+# Edit 往返；409 冲突态需并发篡改，无法确定性复现，不自动化
+if [ -n "${SCREENSHOT_TOKEN:-}" ]; then
+  tap_text "Commit" || true
+  wait_for_text "Describe your changes…" || true   # 对话框 placeholder 出现
+  sleep 1
+  adb exec-out screencap -p > "$OUT/commit-dialog.png"
+  adb shell input keyevent 4             # 关对话框回编辑器
+fi
+
+# ── 5.9 Sora 代码查看（T11：blob 深链直达 .kt 只读高亮——BLOB 深链多段路径已修复）──
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/app/src/main/java/com/yumiru11/githubapp/MainActivity.kt" -p "$PKG" >/dev/null
 wait_for_activity "$PKG" || true
 wait_for_desc "Edit" || true              # FileViewer 就绪信号；Sora 自绘无文本节点
@@ -374,18 +401,10 @@ if [ -n "${SCREENSHOT_TOKEN:-}" ]; then
   wait_for_text "New issue" && tap_text "New issue"
   wait_for_text "Title" || true            # 表单字段渲染完成
   adb exec-out screencap -p > "$OUT/create-issue.png"
-  # 编辑器提交动作（T22：Commit 对话框；409 冲突态需并发篡改，无法确定性复现，不自动化）
-  adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/README.md" -p "$PKG" >/dev/null
-  wait_for_activity "$PKG" || true
-  wait_for_desc "Edit" && tap_desc "Edit"
-  wait_for_text "Commit" && tap_text "Commit"
-  wait_for_text "Describe your changes…" || true   # 对话框 placeholder 出现
-  adb exec-out screencap -p > "$OUT/commit-dialog.png"
 fi
 
-# ── 8. 长截图（滚动 + 拼接，docs/research/actions-scroll-screenshot.md 方案 A）──
-long_shot "readme-long.png" "https://github.com/mikepenz/multiplatform-markdown-renderer"
-long_shot "issue-long.png" "https://github.com/yumiru11/AppDev/issues/71"
+# ── 8. 长截图：已从 PR CI 移除（与单帧信息重叠、board 不消费、~30s/条）。
+# long_shot 函数保留——夜间全量/手动排查时可按需恢复调用。
 
 # ── 9. 分域拼板（montage 网格：PR 评论贴板图而非散图，一眼扫全功能）──
 # 每板 2 列网格，单帧缩放到 540 宽；缺失帧自动跳过；输出 JPEG 控制体积。
@@ -403,17 +422,13 @@ montage_board() {
   montage "${imgs[@]}" -thumbnail 540x1170 -tile 2x -geometry +6+6 \
     -background '#161b22' "$OUT/$out" || echo "::warning::montage failed for $out"
 }
-# runner 镜像已不预装 ImageMagick（PR #102 实测：montage not found → 板图全跳过）
-if ! command -v montage >/dev/null 2>&1; then
-  echo "::notice::installing imagemagick for board stitching"
-  # 直装优先（apt-get update 在 runner 上可挂数分钟），全程 timeout 兜底
-  sudo timeout 120 apt-get install -y -qq imagemagick >/dev/null 2>&1 \
-    || { sudo timeout 90 apt-get update -qq >/dev/null 2>&1 || true
-         sudo timeout 150 apt-get install -y -qq imagemagick >/dev/null 2>&1 || true; }
+# 等待开头启动的后台安装收口（失败仅告警，板图自动跳过，原始帧照常上传）
+if [ -n "$APT_PID" ]; then
+  wait "$APT_PID" || echo "::warning::imagemagick install failed — boards may be skipped"
 fi
 if command -v montage >/dev/null 2>&1; then
   montage_board board-A-home.jpg          home-light.png home-dark.png profile.png
-  montage_board board-B-repo-code.jpg     repos.png repo-actions.png repo-releases.png file-tree.png code-sora.png editor.png
+  montage_board board-B-repo-code.jpg     repos.png repo-actions.png repo-releases.png file-tree.png readme-webview.png code-sora.png editor.png
   montage_board board-C-issue-pr-diff.jpg issue-comments.png create-issue.png pr-conversation.png pr-commits.png pr-diff-unified.png pr-diff-side-by-side.png
   # 板 D Review/Merge 骨架——T17 合入后在此追加 review-sheet/merge-box/merge-state 三帧即自动生效
   montage_board board-E-settings-notif.jpg settings-grouped.png notification-panel.png commit-dialog.png
