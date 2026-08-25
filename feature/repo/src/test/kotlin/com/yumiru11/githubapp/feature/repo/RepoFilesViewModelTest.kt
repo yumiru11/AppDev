@@ -473,6 +473,8 @@ class RepoFilesViewModelTest {
                     coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("Main.kt", "Main.kt")))
                     coEvery { getFileContent(any(), any(), any(), any()) } returns
                         Result.success(FileContentData("Main.kt", "Main.kt", 4L, FileKind.CODE, "code", "blob-old"))
+                    // 新建分支：先经 Git Refs API 建引用（Contents API 对不存在的 ref 返回 404）
+                    coEvery { createBranch(any(), any(), any(), any()) } returns Result.success(Unit)
                     coEvery { updateFileContent(any(), any(), any(), any(), any(), any(), any()) } returns
                         Result.success(FileCommitResult.Success("c1", "b1"))
                 }
@@ -482,6 +484,8 @@ class RepoFilesViewModelTest {
 
             vm.commitEdit(message = "fix", newBranchName = "feat-x", newFilePath = null)
 
+            // 先建分支引用（基分支=当前查看分支），再提交文件
+            coVerify(exactly = 1) { repoRepository.createBranch("octocat", "Hello-World", "feat-x", any()) }
             coVerify {
                 repoRepository.updateFileContent("octocat", "Hello-World", "Main.kt", "code", "blob-old", "fix", "feat-x")
             }

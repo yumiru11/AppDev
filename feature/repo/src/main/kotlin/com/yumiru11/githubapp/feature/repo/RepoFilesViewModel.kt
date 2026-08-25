@@ -26,7 +26,8 @@ import javax.inject.Inject
  *   失败保持收起（保留重试机会）；再次点击收起
  * - 文件：点击 → 加载内容（分类判定在 RepoRepository，本层只透传状态）
  * - 编辑（T22）：[startEdit]/[startNewFile] 进入编辑态 → [commitEdit] 提交
- *   （当前分支或新建分支，分支不存在 GitHub 自动创建）→ 409 冲突转 [FileEditState.Conflict]，
+ *   （当前分支或新建分支；新建分支经 Git Refs API 先建引用，失败回编辑态并上抛
+ *   [FileEditEvent.Failed]）→ 409 冲突转 [FileEditState.Conflict]，
  *   三选项（[reloadAfterConflict]/[overwriteAfterConflict]/[keepLocalAfterConflict]）绝不静默覆盖；
  *   [deleteFile] 删除（确认由 UI 弹窗）；提交/删除成功后清缓存并重载目标分支树（AC4 缓存失效）。
  *
@@ -42,6 +43,9 @@ class RepoFilesViewModel
     ) : ViewModel() {
         private val owner: String = checkNotNull(savedStateHandle["owner"])
         private val repo: String = checkNotNull(savedStateHandle["repo"])
+
+        /** 深链（BLOB 路由）进入时的 ref 参数；树内流程以 [loadedRef] 为准 */
+        private val refArg: String = savedStateHandle["ref"] ?: "main"
 
         private val _uiState = MutableStateFlow(RepoFilesUiState())
         val uiState: StateFlow<RepoFilesUiState> = _uiState.asStateFlow()
@@ -151,6 +155,25 @@ class RepoFilesViewModel
             }
         }
 
+        /**
+         * BLOB 深链进入：按原始 path 直接加载文件（不经文件树）。
+         * ref 优先取路由参数，其次当前已加载分支。
+         */
+        fun openDeepLinkFile(path: String) {
+            if (_uiState.value.fileState is FileViewState.Loading) return
+            _uiState.update { it.copy(selectedPath = path, fileState = FileViewState.Loading) }
+            viewModelScope.launch {
+                repoRepository.getFileContent(owner, repo, path, loadedRef ?: refArg).fold(
+                    onSuccess = { data ->
+                        _uiState.update { it.copy(fileState = FileViewState.Loaded(data)) }
+                    },
+                    onFailure = { e ->
+                        _uiState.update { it.copy(fileState = FileViewState.Error(mapError(e))) }
+                    },
+                )
+            }
+        }
+
         fun closeFile() {
             _uiState.update { it.copy(selectedPath = null, fileState = FileViewState.Idle) }
         }
@@ -217,6 +240,21 @@ class RepoFilesViewModel
                 it.copy(editState = FileEditState.Submitting(editing.text, editing.isNew, editing.isMarkdown))
             }
             viewModelScope.launch {
+                // 新建分支：Contents API 对不存在的 ref 返回 404（此前误报「仓库未找到」），
+                // 必须先经 Git Refs API 从当前分支建引用，再 PUT 文件
+                val newBranchTrimmed = newBranchName?.trim()?.takeIf { it.isNotBlank() }
+                if (isNewBranch && newBranchTrimmed != null) {
+                    val fromBranch = loadedRef ?: refArg
+                    repoRepository.createBranch(owner, repo, newBranchTrimmed, fromBranch).fold(
+                        onSuccess = {},
+                        onFailure = { e ->
+                            // 失败回编辑态（文本保留），错误事件上抛——与既有失败路径一致
+                            _uiState.update { it.copy(editState = editing) }
+                            _editEvents.trySend(FileEditEvent.Failed(mapError(e)))
+                            return@launch
+                        },
+                    )
+                }
                 repoRepository.updateFileContent(owner, repo, path, editing.text, editing.sha, message, targetBranch).fold(
                     onSuccess = { result ->
                         when (result) {

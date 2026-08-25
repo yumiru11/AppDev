@@ -15,7 +15,7 @@ data class FileWriteRequest(
     val content: String,
     /** 被替换文件的 blob SHA；null = 新建文件（T22 新建模式）。 */
     val sha: String? = null,
-    /** 目标分支名；null = 仓库默认分支。分支不存在时 GitHub 自动创建（2026-08-22 实测）。 */
+    /** 目标分支名；null = 仓库默认分支。分支必须已存在（新建分支需先经 Git Refs API 创建）。 */
     val branch: String? = null,
 )
 

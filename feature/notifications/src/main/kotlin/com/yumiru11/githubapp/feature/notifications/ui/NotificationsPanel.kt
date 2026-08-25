@@ -179,9 +179,12 @@ fun NotificationsPanel(
 
 /**
  * 面板内容（无动画包装与遮罩，供截图测试直接使用）。
- *
  * 标题栏（通知 | 筛选 | 全部已读 | 关闭）+ 可展开筛选 chips + 状态分支内容。
+ *
+ * LongMethod 抑制原因：标题白字为用户拍板的一行色值补充后恰超 80 行阈值
+ * （精准抑制，同 RepoFilesViewModel 先例）。
  */
+@Suppress("LongMethod")
 @Composable
 fun NotificationsPanelContent(
     uiState: NotificationsPanelUiState,
@@ -210,6 +213,8 @@ fun NotificationsPanelContent(
             Text(
                 text = stringResource(R.string.notification_title),
                 style = MaterialTheme.typography.headlineSmall,
+                // 用户拍板（2026-08-25 真机反馈）：面板玻璃压深色壁纸，标题固定白色保证可读
+                color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),

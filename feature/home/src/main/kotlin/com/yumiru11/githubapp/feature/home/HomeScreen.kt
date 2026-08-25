@@ -41,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
@@ -108,12 +109,15 @@ fun HomeScreen(
         Scaffold(
             modifier = modifier,
             topBar = {
-                AppTopBar(
-                    onSearchClick = onSearchClick,
-                    onNotificationClick = onNotificationClick,
-                    onProfileClick = onProfileClick,
-                    blurEnabled = blurEnabled,
-                )
+                // zIndex 保证顶栏在内容之后绘制——Haze 要求 source 先于 effect 绘制
+                Box(modifier = Modifier.zIndex(1f)) {
+                    AppTopBar(
+                        onSearchClick = onSearchClick,
+                        onNotificationClick = onNotificationClick,
+                        onProfileClick = onProfileClick,
+                        blurEnabled = blurEnabled,
+                    )
+                }
             },
         ) { paddingValues ->
             Box(

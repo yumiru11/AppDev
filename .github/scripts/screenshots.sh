@@ -35,11 +35,26 @@ wait_for_activity() {
   return 1
 }
 
+
+# uiautomator dump 带重试：动画/加载期会报 idle 错误且静默失败（旧实现拿过期缓存
+# 继续点，是「点了没反应/两帧一致」类问题的根因）。成功标准：本地 xml 含 <hierarchy。
+dump_ui() {
+  local attempt
+  rm -f /tmp/ui.xml
+  for attempt in 1 2 3 4; do
+    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || { sleep 1; continue; }
+    adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1 || { sleep 1; continue; }
+    if grep -q "<hierarchy" /tmp/ui.xml 2>/dev/null; then return 0; fi
+    sleep 1
+  done
+  echo "::warning::uiautomator dump failed after retries"
+  return 1
+}
+
 # 按可见文本 tap（uiautomator dump 拿 bounds 中心）——比硬编码坐标稳
 tap_text() {
   local text="$1"
-  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1
+  dump_ui || return 0
   local bounds
   bounds=$(python3 -c "import re; xml=open('/tmp/ui.xml').read(); m=re.search(r'text=\"$text\"[^>]*bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"', xml); print((int(m.group(1))+int(m.group(3)))//2, (int(m.group(2))+int(m.group(4)))//2) if m else ''" 2>/dev/null || true)
   if [ -n "$bounds" ]; then
@@ -52,8 +67,7 @@ tap_text() {
 # 按可见 content-desc tap（图标按钮无 text 时用，如顶栏铃铛 Notifications）
 tap_desc() {
   local desc="$1"
-  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1
+  dump_ui || return 0
   local bounds
   bounds=$(python3 -c "import re; xml=open('/tmp/ui.xml').read(); m=re.search(r'content-desc=\"$desc\"[^>]*bounds=\"\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]\"', xml); print((int(m.group(1))+int(m.group(3)))//2, (int(m.group(2))+int(m.group(4)))//2) if m else ''" 2>/dev/null || true)
   if [ -n "$bounds" ]; then
@@ -85,7 +99,30 @@ wait_for_attr() {
 wait_for_text() { wait_for_attr "text" "$@"; }
 wait_for_desc() { wait_for_attr "content-desc" "$@"; }
 
+
+# 验证 SegmentedButton 某段处于选中态（Compose selected 语义会暴露到节点属性）；
+# 未选中则重按一次——修复「点击生效了但截图时序早于状态翻转」的两帧一致问题。
+tap_segment_until_selected() {
+  local label="$1" try n
+  for try in 1 2; do
+    tap_text "$label"
+    for n in $(seq 1 6); do
+      dump_ui || { sleep 1; continue; }
+      if python3 -c "
+import sys
+label='$label'
+xml=open('/tmp/ui.xml').read()
+ok=any(('text=\"%s\"' % label) in seg and 'selected=\"true\"' in seg for seg in xml.split('<node'))
+sys.exit(0 if ok else 1)
+"; then return 0; fi
+      sleep 1
+    done
+  done
+  echo "::warning::segment '$label' not confirmed selected"
+}
+
 launch_app() {
+
   adb shell am start -n "$PKG/com.yumiru11.githubapp.MainActivity" >/dev/null
   wait_for_activity "$PKG" || true
   sleep 3   # 首帧稳定
@@ -253,8 +290,8 @@ wait_for_text "Files changed" && tap_text "Files changed"
 wait_for_text "Unified" || true           # Diff 工具条出现 = 补丁渲染完成
 sleep 3                                   # 大 patch 再留一拍绘制余量
 adb exec-out screencap -p > "$OUT/pr-diff-unified.png"
-tap_text "Side-by-side"
-sleep 4
+tap_segment_until_selected "Side-by-side"
+sleep 2
 adb exec-out screencap -p > "$OUT/pr-diff-side-by-side.png"
 
 # ── 6. 我的 tab（force-stop 冷启动回首页——am start 对已在前台 app 不重置

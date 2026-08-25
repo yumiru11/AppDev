@@ -19,7 +19,7 @@ import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.EditorContentHolder
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.screens.ProfileScreen
-import com.yumiru11.githubapp.core.ui.screens.SearchScreen
+import com.yumiru11.githubapp.core.ui.screens.SearchScreen as PlaceholderSearchScreen
 
 /**
  * 应用导航宿主：入口 Composable，内部 Navigation Compose NavHost。
@@ -47,7 +47,10 @@ fun AppNavHost(
     startDestination: String = AppRoute.HOME,
     homeScreen: @Composable () -> Unit = {},
     loginScreen: @Composable () -> Unit = {},
+    searchScreen: @Composable () -> Unit = {},
     repoDetailScreen: @Composable (owner: String, repo: String) -> Unit = { _, _ -> },
+    blobScreen:
+        @Composable (owner: String, repo: String, ref: String, path: String) -> Unit = { _, _, _, _ -> },
     profileScreen: @Composable (onLoginClick: () -> Unit, onSettingsClick: () -> Unit) -> Unit = { _, _ -> },
     settingsScreen: @Composable () -> Unit = {},
     issueListScreen: @Composable (
@@ -80,7 +83,8 @@ fun AppNavHost(
         }
 
         composable(AppRoute.SEARCH) {
-            SearchScreen()
+            // T18 真实搜索屏（feature/search）；此前误挂 core.ui 占位组件致「Coming soon」
+            searchScreen()
         }
 
         composable(AppRoute.SETTINGS) {
@@ -231,8 +235,8 @@ fun AppNavHost(
                     navArgument("sha") { type = NavType.StringType },
                 ),
         ) {
-            // T5+ Commit 详情页
-            SearchScreen()
+            // T5+ Commit 详情页（真实屏未开发；暂以占位承载，避免悬空路由）
+            PlaceholderSearchScreen()
         }
 
         composable(
@@ -248,9 +252,14 @@ fun AppNavHost(
                         defaultValue = ""
                     },
                 ),
-        ) {
-            // T5+ Blob 详情页
-            SearchScreen()
+        ) { backStackEntry ->
+            // T11：blob 深链直达 FileViewer（此前误挂占位组件致「Coming soon」；
+            // 多段 path 经 query 参数 ?path= 传入，Navigation 自动解码）
+            val ownerArg = backStackEntry.arguments?.getString("owner") ?: ""
+            val repoArg = backStackEntry.arguments?.getString("repo") ?: ""
+            val ref = backStackEntry.arguments?.getString("ref") ?: ""
+            val path = backStackEntry.arguments?.getString("path") ?: ""
+            blobScreen(ownerArg, repoArg, ref, path)
         }
     }
 }

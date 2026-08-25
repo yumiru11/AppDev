@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
 import com.yumiru11.githubapp.core.designsystem.token.AppBlur
 import com.yumiru11.githubapp.core.navigation.AppRoute
@@ -72,16 +73,20 @@ fun MainTabPager(
             // 容器不再叠加顶部 padding，否则出现「顶栏距状态栏空一段」——2026-08-14 真机走查修复）
             contentWindowInsets = WindowInsets(0.dp),
             bottomBar = {
-                AppBottomBar(
-                    selectedTab = selectedTab,
-                    onTabSelected = { route ->
-                        onTabSelected(route)
-                        scope.launch {
-                            pagerState.animateScrollToPage(tabIndexFor(route))
-                        }
-                    },
-                    blurEnabled = blurEnabled,
-                )
+                // zIndex 保证底栏在 pager 内容之后绘制——Haze backdrop blur 要求
+                // source 先于 effect 绘制，否则底栏每帧拿到空背景（真机无效果根因）
+                Box(modifier = Modifier.zIndex(1f)) {
+                    AppBottomBar(
+                        selectedTab = selectedTab,
+                        onTabSelected = { route ->
+                            onTabSelected(route)
+                            scope.launch {
+                                pagerState.animateScrollToPage(tabIndexFor(route))
+                            }
+                        },
+                        blurEnabled = blurEnabled,
+                    )
+                }
             },
         ) { paddingValues ->
             HorizontalPager(
