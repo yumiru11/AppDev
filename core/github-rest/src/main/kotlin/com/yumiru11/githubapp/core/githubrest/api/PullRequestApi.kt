@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.core.githubrest.api
 
 import com.yumiru11.githubapp.core.githubrest.model.CheckRunsResponseDto
 import com.yumiru11.githubapp.core.githubrest.model.CombinedStatusDto
+import com.yumiru11.githubapp.core.githubrest.model.CreatePullRequestRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreateReviewCommentRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreateReviewRequest
 import com.yumiru11.githubapp.core.githubrest.model.IssueEventDto
@@ -219,6 +220,19 @@ interface PullRequestApi {
         @Path("number") number: Int,
         @Body request: UpdateBranchRequest,
     ): UpdateBranchResult
+
+    /**
+     * POST /repos/{owner}/{repo}/pulls：创建 PR（T23）。
+     *
+     * head/base 为分支名（head 支持 "owner:branch" 跨仓库；本票先同仓库场景）。
+     * 422 = base/head 相同或校验失败；404 = 分支不存在。
+     */
+    @POST("repos/{owner}/{repo}/pulls")
+    suspend fun createPullRequest(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Body request: CreatePullRequestRequest,
+    ): PullRequestDto
 
     private companion object {
         /** 时间线及 Reviews/Events 扩展媒体类型（GitHub preview） */
