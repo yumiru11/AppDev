@@ -25,4 +25,15 @@
     <string name="home_tab_feed">Feed</string>
     <string name="home_tab_issues">Issues</string>
     <string name="home_tab_pull_requests">Pull Requests</string>
+
+    <!-- Quick actions & repo picker (issue #89, ui-design.md §2.2/§3.1) -->
+    <string name="home_title">Home</string>
+    <string name="home_action_create_issue">Create issue</string>
+    <string name="home_action_view_pulls">View pull requests</string>
+    <string name="home_action_create_repo">Create repository</string>
+    <string name="home_action_create_repo_cd">Coming soon</string>
+    <string name="repo_picker_title">Choose a repository</string>
+    <string name="repo_picker_empty">No repositories found</string>
+    <string name="repo_picker_error">Couldn\'t load repositories</string>
+    <string name="repo_picker_retry">Retry</string>
 </resources>
