@@ -50,4 +50,9 @@
         <item quantity="one">%1$d 年前</item>
         <item quantity="other">%1$d 年前</item>
     </plurals>
+
+    <!-- 通知铃铛未读角标语义描述（issue #85 / audit #14） -->
+    <plurals name="notification_unread_badge_cd">
+        <item quantity="other">%d 条未读通知</item>
+    </plurals>
 </resources>

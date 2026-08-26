@@ -66,7 +66,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,6 +75,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
+import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
+import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
@@ -601,12 +602,19 @@ private fun MergeableChip(mergeableState: MergeableState) {
     }
 }
 
-/** 标签徽标：取 label 色（低饱和混白），无则 surfaceVariant */
+/** 标签徽标：label 原色与主题 surface 低饱和混合，无则 surfaceVariant（#85 audit #2/#20） */
 @Composable
 private fun LabelChip(label: PullRequestLabel) {
-    val defaultContainer = MaterialTheme.colorScheme.surfaceVariant
     val container =
-        labelColor(label.color)?.let { lerp(it, Color.White, 0.45f) } ?: defaultContainer
+        labelColor(label.color)
+            ?.let { labelChipContainerColor(labelColor = it, surface = MaterialTheme.colorScheme.surface) }
+            ?: MaterialTheme.colorScheme.surfaceVariant
+    val contentColor =
+        labelChipContentColor(
+            container = container,
+            onSurface = MaterialTheme.colorScheme.onSurface,
+            surface = MaterialTheme.colorScheme.surface,
+        )
     Surface(
         shape = MaterialTheme.shapes.small,
         color = container,
@@ -614,7 +622,7 @@ private fun LabelChip(label: PullRequestLabel) {
         Text(
             text = label.name,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = contentColor,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
         )
     }

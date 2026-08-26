@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
@@ -85,17 +86,24 @@ fun AppTopBar(
                 }
             },
             actions = {
+                // audit 缺陷 #14（issue #85）：未读数并入铃铛语义描述，TalkBack 可感知数量
+                val notificationBellDescription =
+                    if (unreadCount > 0) {
+                        pluralStringResource(R.plurals.notification_unread_badge_cd, unreadCount, unreadCount)
+                    } else {
+                        stringResource(R.string.notification_title)
+                    }
                 BadgedBox(
                     badge = {
                         if (unreadCount > 0) {
-                            Badge { Text("$unreadCount") }
+                            Badge { Text(formatBadgeCount(unreadCount)) }
                         }
                     },
                 ) {
                     IconButton(onClick = onNotificationClick) {
                         Icon(
                             imageVector = Icons.Default.Notifications,
-                            contentDescription = stringResource(R.string.notification_title),
+                            contentDescription = notificationBellDescription,
                         )
                     }
                 }
@@ -111,3 +119,14 @@ fun AppTopBar(
         )
     }
 }
+
+/** 角标数字显示上限：超过显示 99+（audit 缺陷 #14 / issue #85）。 */
+internal const val BADGE_MAX_COUNT = 99
+
+/** 未读角标数字格式化：不超过 [BADGE_MAX_COUNT] 时原样显示，超出显示 99+。 */
+internal fun formatBadgeCount(count: Int): String =
+    if (count > BADGE_MAX_COUNT) {
+        "${BADGE_MAX_COUNT}+"
+    } else {
+        count.toString()
+    }

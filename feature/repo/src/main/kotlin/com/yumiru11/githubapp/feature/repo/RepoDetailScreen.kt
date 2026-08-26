@@ -541,7 +541,8 @@ private fun RepoStatsRow(repo: Repository) {
 
 /**
  * Star/Watch/Fork 操作按钮行（登录态显示；pendingAction 期间禁用防重入）。
- * Material You 风格：使用 FilledTonalButton 提供适中的视觉重量，支持动画过渡。
+ * Material You 风格：使用 FilledTonalButton 提供适中的视觉重量。Star/Watch 图标随状态
+ * 瞬时切换（动画过渡由 UI 打磨波 Star 动画专项实现，见 docs/ui-audit-2026-08-21.md §4 提案）。
  */
 @Composable
 private fun ManagementButtons(

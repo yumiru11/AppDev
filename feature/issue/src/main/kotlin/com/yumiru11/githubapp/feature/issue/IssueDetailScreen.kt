@@ -24,9 +24,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -70,15 +72,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
+import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
+import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
@@ -549,12 +554,19 @@ private fun StatusChip(state: IssueState) {
     )
 }
 
-/** 标签徽标：取 label 色（低饱和混白），无则 surfaceVariant */
+/** 标签徽标：label 原色与主题 surface 低饱和混合，无则 surfaceVariant（#85 audit #2/#20） */
 @Composable
 private fun LabelChip(label: IssueLabel) {
-    val defaultContainer = MaterialTheme.colorScheme.surfaceVariant
     val container =
-        labelColor(label.color)?.let { lerp(it, Color.White, 0.45f) } ?: defaultContainer
+        labelColor(label.color)
+            ?.let { labelChipContainerColor(labelColor = it, surface = MaterialTheme.colorScheme.surface) }
+            ?: MaterialTheme.colorScheme.surfaceVariant
+    val contentColor =
+        labelChipContentColor(
+            container = container,
+            onSurface = MaterialTheme.colorScheme.onSurface,
+            surface = MaterialTheme.colorScheme.surface,
+        )
     Surface(
         shape = MaterialTheme.shapes.small,
         color = container,
@@ -562,7 +574,7 @@ private fun LabelChip(label: IssueLabel) {
         Text(
             text = label.name,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = contentColor,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
         )
     }
@@ -605,6 +617,8 @@ private fun ReactionBar(
 ) {
     val visible = REACTION_CONTENTS.filter { reactions.counts[it] ?: 0 > 0 || myReactions.containsKey(it) }
     if (visible.isEmpty()) return
+    // audit 缺陷 #18（issue #85）：已反应态对 TalkBack 播报状态描述
+    val reactedStateText = stringResource(R.string.issue_reaction_reacted)
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -621,10 +635,24 @@ private fun ReactionBar(
                         MaterialTheme.colorScheme.surfaceVariant
                     },
                 onClick = { onToggle(content) },
+                modifier =
+                    Modifier
+                        // audit 缺陷 #15（issue #85）：最小触点 48dp
+                        .heightIn(min = 48.dp)
+                        .then(
+                            if (reacted) {
+                                Modifier.semantics { stateDescription = reactedStateText }
+                            } else {
+                                Modifier
+                            },
+                        ),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxHeight()
+                            .padding(horizontal = 12.dp),
                 ) {
                     Text(
                         text = content,

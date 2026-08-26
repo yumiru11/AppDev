@@ -16,6 +16,9 @@ import java.util.Locale
  * - 注入脚本只包含本对象生成的 hex/theme 值，**token 绝不进入 WebView JS 上下文**
  */
 object MaterialYouFusionMapper {
+    /** WebView 深色背景基色（ui-design.md §3.11 用户拍板色）：近黑基底，深色下微融主题色。 */
+    internal val NEAR_BLACK_BACKGROUND: Color = Color(0xFF0B0B0D)
+
     private const val THEME_LIGHT = "light"
     private const val THEME_DARK = "dark"
 
@@ -253,9 +256,9 @@ object MaterialYouFusionMapper {
         scheme: ColorScheme,
         isDark: Boolean,
     ): Map<String, String> {
-        // 深色背景 = 近黑 + 主题色（与原型 Activity 背景一致，用户拍板：
-        // 纯 M3 surface 发灰，要黑色融入一点点主题色）。
-        val nearBlack = Color(0xFF0B0B0D)
+        // 深色背景 = 近黑基色 + 主题色（用户拍板见 ui-design.md §3.11：纯 M3 surface 发灰，
+        // 要黑色融入一点点主题色）。基色提为命名 token（#85 audit 杂项）：NEAR_BLACK_BACKGROUND。
+        val nearBlack = NEAR_BLACK_BACKGROUND
         val bgDefault = if (isDark) lerp(nearBlack, scheme.primary, 0.06f) else scheme.surface
         val bgMuted = if (isDark) lerp(nearBlack, scheme.primary, 0.10f) else scheme.surfaceContainerLow
         val bgInset = if (isDark) lerp(nearBlack, scheme.primary, 0.04f) else scheme.surfaceContainerLowest
