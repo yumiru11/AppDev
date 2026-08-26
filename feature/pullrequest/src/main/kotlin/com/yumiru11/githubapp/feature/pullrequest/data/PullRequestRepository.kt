@@ -15,11 +15,13 @@ import com.yumiru11.githubapp.core.githubgraphql.generated.ResolveReviewThreadMu
 import com.yumiru11.githubapp.core.githubgraphql.generated.UnresolveReviewThreadMutation
 import com.yumiru11.githubapp.core.githubgraphql.generated.type.ResolveReviewThreadInput
 import com.yumiru11.githubapp.core.githubgraphql.generated.type.UnresolveReviewThreadInput
+import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
 import com.yumiru11.githubapp.core.githubrest.api.PullRequestApi
 import com.yumiru11.githubapp.core.githubrest.api.RepoManagementApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.model.CheckRunDto
 import com.yumiru11.githubapp.core.githubrest.model.CombinedStatusDto
+import com.yumiru11.githubapp.core.githubrest.model.CreatePullRequestRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreateReviewCommentRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreateReviewRequest
 import com.yumiru11.githubapp.core.githubrest.model.IssueDto
@@ -78,12 +80,14 @@ import javax.inject.Singleton
  * - Checks：[checkRuns]（GET .../commits/{ref}/check-runs）+ [combinedStatus]（GET .../commits/{ref}/status）
  */
 @Singleton
+@Suppress("TooManyFunctions") // T23 新增 createPullRequest/branches 后 21 个职责相关方法（列表/详情/写/审查/合并），拆类反损内聚
 class PullRequestRepository
     @Inject
     constructor(
         private val pullRequestApi: PullRequestApi,
         private val repositoryApi: RepositoryApi,
         private val repoManagementApi: RepoManagementApi,
+        private val gitRefApi: GitRefApi,
         private val apolloClient: ApolloClient,
     ) {
         /** PR 分页流（按 [filter] 过滤 open/closed/all） */
@@ -278,6 +282,33 @@ class PullRequestRepository
         ) {
             repoManagementApi.deleteBranch(owner, repo, branch)
         }
+
+        // ── T23：创建 PR 与分支候选 ─────────────────────────────────
+
+        /** 分支名列表（创建 PR 的 base/head 候选；空 → 无可选分支）。 */
+        suspend fun branches(
+            owner: String,
+            repo: String,
+        ): Result<List<String>> =
+            runCatching {
+                gitRefApi.listBranches(owner, repo).map { it.name }
+            }
+
+        /** 创建 PR（REST 写优先；返回领域模型供创建后导航打开）。 */
+        suspend fun createPullRequest(
+            owner: String,
+            repo: String,
+            title: String,
+            body: String?,
+            head: String,
+            base: String,
+        ): PullRequest =
+            pullRequestApi
+                .createPullRequest(
+                    owner,
+                    repo,
+                    CreatePullRequestRequest(title = title, head = head, base = base, body = body),
+                ).toDomain()
 
         /**
          * 会话上下文（GraphQL reviewThreads 查询，T16）。

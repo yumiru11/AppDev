@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.cachedIn
 import com.yumiru11.githubapp.feature.pullrequest.data.PullRequestRepository
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFilter
+import com.yumiru11.githubapp.feature.pullrequest.model.ViewerPermission
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,7 +64,13 @@ class PullRequestListViewModel
                 _uiState.value = PullRequestListUiState.Loading
                 try {
                     val pulls = repository.pulls(owner, repo, _filter.value).cachedIn(viewModelScope)
-                    _uiState.value = PullRequestListUiState.Success(pulls = pulls)
+                    // T23：仓库推送权限（创建 PR 入口显隐；repositoryControl 失败保守隐藏，不阻塞列表）
+                    val permission = repository.repositoryControl(owner, repo).viewerPermission
+                    _uiState.value =
+                        PullRequestListUiState.Success(
+                            pulls = pulls,
+                            canCreatePullRequest = permission == ViewerPermission.WRITE,
+                        )
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {

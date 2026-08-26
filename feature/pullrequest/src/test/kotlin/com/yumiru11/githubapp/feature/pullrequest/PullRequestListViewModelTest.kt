@@ -4,13 +4,17 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.paging.PagingData
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.feature.pullrequest.data.PullRequestRepository
+import com.yumiru11.githubapp.feature.pullrequest.data.RepositoryControl
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestErrorType
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFilter
+import com.yumiru11.githubapp.feature.pullrequest.model.ViewerPermission
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -30,6 +34,8 @@ class PullRequestListViewModelTest {
     private fun repository(): PullRequestRepository =
         mockk<PullRequestRepository> {
             every { pulls(any(), any(), any()) } returns flowOf(PagingData.empty())
+            // T23：仓库写控制（创建 PR 入口显隐；默认 UNKNOWN → 隐藏）
+            coEvery { repositoryControl(any(), any()) } returns RepositoryControl()
         }
 
     private fun savedState(
@@ -44,6 +50,29 @@ class PullRequestListViewModelTest {
 
             assertTrue(viewModel.uiState.value is PullRequestListUiState.Success)
             assertEquals(PullRequestFilter.OPEN, viewModel.filter.value)
+        }
+
+    @Test
+    fun load_writePermission_setsCanCreatePullRequest() =
+        runTest {
+            val repo =
+                mockk<PullRequestRepository> {
+                    every { pulls(any(), any(), any()) } returns flowOf(PagingData.empty())
+                    coEvery { repositoryControl(any(), any()) } returns
+                        RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
+                }
+
+            val viewModel = PullRequestListViewModel(savedState(), repo)
+
+            assertTrue((viewModel.uiState.value as PullRequestListUiState.Success).canCreatePullRequest)
+        }
+
+    @Test
+    fun load_noPermission_setsCanCreatePullRequestFalse() =
+        runTest {
+            val viewModel = PullRequestListViewModel(savedState(), repository())
+
+            assertFalse((viewModel.uiState.value as PullRequestListUiState.Success).canCreatePullRequest)
         }
 
     @Test
@@ -118,6 +147,7 @@ class PullRequestListViewModelTest {
             val repo =
                 mockk<PullRequestRepository> {
                     every { pulls(any(), any(), any()) } throws httpException
+                    coEvery { repositoryControl(any(), any()) } returns RepositoryControl()
                 }
 
             val viewModel = PullRequestListViewModel(savedState(), repo)
@@ -167,6 +197,7 @@ class PullRequestListViewModelTest {
             val repo =
                 mockk<PullRequestRepository> {
                     every { pulls(any(), any(), any()) } throws httpException
+                    coEvery { repositoryControl(any(), any()) } returns RepositoryControl()
                 }
             val viewModel = PullRequestListViewModel(savedState(), repo)
             assertTrue(viewModel.uiState.value is PullRequestListUiState.Error)
