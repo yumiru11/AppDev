@@ -71,6 +71,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.launch
+import java.net.URLEncoder
 import java.util.Locale
 import javax.inject.Inject
 
@@ -240,11 +241,24 @@ class MainActivity : ComponentActivity() {
                                         navController = navController,
                                     )
                                 },
-                                repoDetailScreen = { owner, repo ->
+                                repoDetailScreen = { owner, repo, ref ->
                                     RepoDetailScreen(
                                         owner = owner,
                                         repo = repo,
+                                        initialRef = ref.ifBlank { null },
                                         onBackClick = { navController.popBackStack() },
+                                        // T23：文件 Tab 分支 Chip → 分支管理页（带当前分支高亮）
+                                        onBranchesClick = { o, r, currentRef ->
+                                            navController.navigate(
+                                                AppRoute.BRANCHES
+                                                    .replace("{owner}", o)
+                                                    .replace("{repo}", r)
+                                                    .replace(
+                                                        "{ref}",
+                                                        URLEncoder.encode(currentRef.orEmpty(), "UTF-8").replace("+", "%20"),
+                                                    ),
+                                            )
+                                        },
                                     )
                                 },
                                 profileScreen = { onLoginClick: () -> Unit, onSettingsClick: () -> Unit ->
@@ -298,6 +312,14 @@ class MainActivity : ComponentActivity() {
                                         repo = repo,
                                         onBackClick = { navController.popBackStack() },
                                         onPullRequestClick = onPullRequestClick,
+                                        // T23：PR 列表顶栏「新建」→ 创建 PR 页
+                                        onCreatePullRequest = { o, r ->
+                                            navController.navigate(
+                                                AppRoute.PR_CREATE
+                                                    .replace("{owner}", o)
+                                                    .replace("{repo}", r),
+                                            )
+                                        },
                                     )
                                 },
                                 pullRequestDetailScreen = { owner, repo, number ->

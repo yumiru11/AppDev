@@ -19,6 +19,7 @@ import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.EditorContentHolder
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.screens.ProfileScreen
+import java.net.URLEncoder
 import com.yumiru11.githubapp.core.ui.screens.SearchScreen as PlaceholderSearchScreen
 
 /**
@@ -48,7 +49,7 @@ fun AppNavHost(
     homeScreen: @Composable () -> Unit = {},
     loginScreen: @Composable () -> Unit = {},
     searchScreen: @Composable () -> Unit = {},
-    repoDetailScreen: @Composable (owner: String, repo: String) -> Unit = { _, _ -> },
+    repoDetailScreen: @Composable (owner: String, repo: String, ref: String) -> Unit = { _, _, _ -> },
     blobScreen:
         @Composable (owner: String, repo: String, ref: String, path: String) -> Unit = { _, _, _, _ -> },
     profileScreen: @Composable (onLoginClick: () -> Unit, onSettingsClick: () -> Unit) -> Unit = { _, _ -> },
@@ -65,6 +66,18 @@ fun AppNavHost(
         onPullRequestClick: (owner: String, repo: String, number: Int) -> Unit,
     ) -> Unit = { _, _, _ -> },
     pullRequestDetailScreen: @Composable (owner: String, repo: String, number: Int) -> Unit = { _, _, _ -> },
+    branchesScreen: @Composable (
+        owner: String,
+        repo: String,
+        currentRef: String?,
+        onBackClick: () -> Unit,
+        onBranchSelected: (String) -> Unit,
+    ) -> Unit = { _, _, _, _, _ -> },
+    createPullRequestScreen: @Composable (
+        owner: String,
+        repo: String,
+        onCreated: (owner: String, repo: String, number: Int) -> Unit,
+    ) -> Unit = { _, _, _ -> },
     editorScreen: @Composable (initialContent: String, onClose: () -> Unit) -> Unit = { _, _ -> },
     createIssueScreen: @Composable (owner: String, repo: String) -> Unit = { _, _ -> },
 ) {
@@ -97,10 +110,16 @@ fun AppNavHost(
                 listOf(
                     navArgument("owner") { type = NavType.StringType },
                     navArgument("repo") { type = NavType.StringType },
+                    // T23：分支切换深链（ref 为 query；Navigation 自动解码）
+                    navArgument("ref") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
                 ),
         ) { backStackEntry ->
             val owner = backStackEntry.arguments?.getString("owner") ?: ""
             val repo = backStackEntry.arguments?.getString("repo") ?: ""
+            val ref = backStackEntry.arguments?.getString("ref") ?: ""
             val context = LocalContext.current
             // T9 验收第 3 条：README 链接接线——内部链接应用内导航，外部链接 CustomTabs
             CompositionLocalProvider(
@@ -116,7 +135,7 @@ fun AppNavHost(
                         },
                     ),
             ) {
-                repoDetailScreen(owner, repo)
+                repoDetailScreen(owner, repo, ref)
             }
         }
 
@@ -195,6 +214,63 @@ fun AppNavHost(
             val repo = backStackEntry.arguments?.getString("repo") ?: ""
             // T14：创建 Issue 页；成功后返回列表
             createIssueScreen(owner, repo)
+        }
+
+        composable(
+            route = AppRoute.PR_CREATE,
+            arguments =
+                listOf(
+                    navArgument("owner") { type = NavType.StringType },
+                    navArgument("repo") { type = NavType.StringType },
+                ),
+        ) { backStackEntry ->
+            val owner = backStackEntry.arguments?.getString("owner") ?: ""
+            val repo = backStackEntry.arguments?.getString("repo") ?: ""
+            // T23：创建 PR 页；成功后清出本页并打开新 PR 详情
+            createPullRequestScreen(owner, repo) { o, r, number ->
+                navController.navigate(
+                    AppRoute.PR
+                        .replace("{owner}", o)
+                        .replace("{repo}", r)
+                        .replace("{number}", number.toString()),
+                ) {
+                    popUpTo(AppRoute.PR_CREATE) { inclusive = true }
+                }
+            }
+        }
+
+        composable(
+            route = AppRoute.BRANCHES,
+            arguments =
+                listOf(
+                    navArgument("owner") { type = NavType.StringType },
+                    navArgument("repo") { type = NavType.StringType },
+                    navArgument("ref") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+        ) { backStackEntry ->
+            val owner = backStackEntry.arguments?.getString("owner") ?: ""
+            val repo = backStackEntry.arguments?.getString("repo") ?: ""
+            val ref = backStackEntry.arguments?.getString("ref") ?: ""
+            // T23：分支管理页；切换分支 → 带 ref 深链重进仓库详情（旧 REPO 页一并弹出）
+            branchesScreen(
+                owner,
+                repo,
+                ref.ifBlank { null },
+                { navController.popBackStack() },
+                { branch ->
+                    navController.navigate(
+                        AppRoute.REPO
+                            .replace("{owner}", owner)
+                            .replace("{repo}", repo)
+                            .replace("{ref}", URLEncoder.encode(branch, "UTF-8").replace("+", "%20")),
+                    ) {
+                        popUpTo(AppRoute.REPO) { inclusive = true }
+                    }
+                },
+            )
         }
 
         composable(
