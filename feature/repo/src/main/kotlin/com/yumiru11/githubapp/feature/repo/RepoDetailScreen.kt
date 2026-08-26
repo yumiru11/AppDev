@@ -1,4 +1,6 @@
-@file:Suppress("TooManyFunctions") // 屏幕文件：多个小 Composable 是 Compose 惯用结构，拆文件反损可读性（T3 先例）
+@file:Suppress("TooManyFunctions", "LongMethod")
+// 屏幕文件：多个小 Composable 是 Compose 惯用结构，拆文件反损可读性（T3 先例）；
+// RepoDetailScreen 主入口装配（T23 新增分支入口参数后 81 行）结构固有，拆散反损可读性（BranchesScreen 先例）
 
 package com.yumiru11.githubapp.feature.repo
 
@@ -38,6 +40,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -106,6 +109,8 @@ fun RepoDetailScreen(
     owner: String,
     repo: String,
     onBackClick: () -> Unit = {},
+    initialRef: String? = null,
+    onBranchesClick: (owner: String, repo: String, currentRef: String?) -> Unit = { _, _, _ -> },
     viewModel: RepoDetailViewModel = hiltViewModel(),
     actions: RepoDetailActions = LocalRepoDetailActions.current,
 ) {
@@ -176,6 +181,8 @@ fun RepoDetailScreen(
                             filesViewModel = filesViewModel,
                             actions = actions,
                             onRetryReadme = { viewModel.retry() },
+                            initialRef = initialRef,
+                            onBranchesClick = { onBranchesClick(owner, repo, filesState.currentRef) },
                             managementCallbacks =
                                 RepoManagementCallbacks(
                                     onToggleStar = { viewModel.toggleStar() },
@@ -318,6 +325,8 @@ private fun RepoDetailContent(
     filesViewModel: RepoFilesViewModel,
     actions: RepoDetailActions,
     onRetryReadme: () -> Unit,
+    initialRef: String? = null,
+    onBranchesClick: () -> Unit,
     managementCallbacks: RepoManagementCallbacks,
     modifier: Modifier = Modifier,
 ) {
@@ -380,6 +389,9 @@ private fun RepoDetailContent(
                     filesViewModel = filesViewModel,
                     isLoggedIn = state.isLoggedIn,
                     defaultBranch = state.repo.defaultBranch,
+                    currentRef = filesState.currentRef,
+                    initialRef = initialRef,
+                    onBranchesClick = onBranchesClick,
                 )
             }
 
@@ -396,33 +408,47 @@ private fun RepoDetailContent(
     }
 }
 
-/** 文件 Tab（T22 扩展）：新建文件入口（登录态才可写）+ 文件树。 */
+/** 文件 Tab（T22 新建文件 + T23 分支入口）：分支 Chip（当前分支） + 新建文件（登录态）+ 文件树。 */
 @Composable
 private fun FilesTab(
     filesState: RepoFilesUiState,
     filesViewModel: RepoFilesViewModel,
     isLoggedIn: Boolean,
     defaultBranch: String?,
+    currentRef: String?,
+    initialRef: String? = null,
+    onBranchesClick: () -> Unit,
 ) {
     Box(Modifier.padding(horizontal = 16.dp)) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (isLoggedIn) {
-                TextButton(
-                    onClick = { filesViewModel.startNewFile() },
-                    modifier = Modifier.align(Alignment.End),
-                ) {
-                    Icon(
-                        imageVector = MaterialSymbols.Rounded.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = stringResource(R.string.repo_file_new))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                InputChip(
+                    selected = false,
+                    onClick = onBranchesClick,
+                    label = { Text(text = currentRef ?: defaultBranch ?: stringResource(R.string.repo_branches)) },
+                )
+                if (isLoggedIn) {
+                    TextButton(
+                        onClick = { filesViewModel.startNewFile() },
+                    ) {
+                        Icon(
+                            imageVector = MaterialSymbols.Rounded.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = stringResource(R.string.repo_file_new))
+                    }
                 }
             }
             FileTreeSection(
                 treeState = filesState.treeState,
                 defaultBranch = defaultBranch,
+                initialRef = initialRef,
                 viewModel = filesViewModel,
             )
         }

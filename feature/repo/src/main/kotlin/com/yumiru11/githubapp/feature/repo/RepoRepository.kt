@@ -1,4 +1,6 @@
-@file:Suppress("TooGenericExceptionCaught") // 网络/IO 错误统一兜底
+@file:Suppress("TooGenericExceptionCaught", "SwallowedException")
+// 网络/IO 错误统一兜底；branchControl 权限读取失败保守降级为隐藏写入口（异常即结果，
+// 无需再抛——PullRequestRepository.repositoryControl 同款模式，T17 先例）
 
 package com.yumiru11.githubapp.feature.repo
 
@@ -17,6 +19,7 @@ import com.yumiru11.githubapp.core.githubrest.model.GitRefCreateRequest
 import com.yumiru11.githubapp.core.githubrest.model.MarkdownRenderRequest
 import com.yumiru11.githubapp.core.githubrest.model.ReadmeDto
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
+import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.util.Base64
 import javax.inject.Inject
@@ -290,11 +293,50 @@ class RepoRepository
             fromBranch: String,
         ): Result<Unit> =
             runCatching {
-                val base = gitRefApi.getBranch(owner, repo, "heads/$fromBranch")
+                // T23：经 listBranches 取基分支 head SHA（T22 曾用 getBranch("heads/xxx")——
+                // Retrofit 将 '/' 编码为 %2F 形成双重前缀路径致 GitHub 404；列表端点无此问题）
+                val baseSha =
+                    gitRefApi
+                        .listBranches(owner, repo)
+                        .firstOrNull { it.name == fromBranch }
+                        ?.commit
+                        ?.sha
+                        ?: error("base branch not found: $fromBranch")
                 gitRefApi.createRef(
-                    GitRefCreateRequest(ref = "refs/heads/$newBranch", sha = base.`object`.sha),
+                    owner,
+                    repo,
+                    GitRefCreateRequest(ref = "refs/heads/$newBranch", sha = baseSha),
                 )
             }.map { }
+
+        /**
+         * 分支列表（T23；保持 API 顺序，默认分支排首由 ViewModel 排序）。
+         */
+        suspend fun branches(
+            owner: String,
+            repo: String,
+        ): Result<List<Branch>> =
+            runCatching {
+                gitRefApi.listBranches(owner, repo).map { dto ->
+                    Branch(name = dto.name, sha = dto.commit?.sha, isProtected = dto.`protected`)
+                }
+            }
+
+        /**
+         * 仓库写控制（T23：新建/删除分支显隐；permissions 缺失/网络失败 → 保守隐藏写入口）。
+         */
+        suspend fun branchControl(
+            owner: String,
+            repo: String,
+        ): BranchControl =
+            try {
+                val dto = repositoryApi.getRepository(owner, repo)
+                BranchControl(canPush = dto.permissions?.push == true, defaultBranch = dto.defaultBranch)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                BranchControl()
+            }
 
         /**
          * 更新/创建文件（T22，plan.md §7.4）。

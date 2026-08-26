@@ -81,4 +81,27 @@
     <string name="repo_file_snackbar_committed_new_branch">Committed %1$s to new branch %2$s</string>
     <string name="repo_file_snackbar_deleted">Deleted %1$s</string>
     <string name="repo_file_snackbar_keep_local">Your changes were copied to the clipboard</string>
+
+    <!-- T23 分支管理（Git Refs API：列出/切换/创建/删除） -->
+    <string name="repo_branches">Branch</string>
+    <string name="repo_branch_current">Current</string>
+    <string name="repo_branch_default">Default</string>
+    <string name="repo_branch_protected">Protected</string>
+    <string name="repo_branch_new">New branch</string>
+    <string name="repo_branch_name">Branch name</string>
+    <string name="repo_branch_name_hint">e.g. feature/new</string>
+    <string name="repo_branch_create">Create</string>
+    <string name="repo_branch_from_base">Based on %1$s</string>
+    <string name="repo_branch_delete">Delete branch</string>
+    <string name="repo_branch_delete_confirm">Delete branch %1$s? This cannot be undone.</string>
+    <string name="repo_branch_cancel">Cancel</string>
+    <string name="repo_branch_back">Back</string>
+    <string name="repo_branch_retry">Retry</string>
+    <string name="repo_branch_empty">No branches</string>
+    <string name="repo_branch_error_forbidden">No permission for this action</string>
+    <string name="repo_branch_error_not_found">Branch list not found</string>
+    <string name="repo_branch_error_network">Network error. Check your connection.</string>
+    <string name="repo_branch_error_unknown">Unknown error</string>
+    <string name="repo_branch_snackbar_created">Branch %1$s created</string>
+    <string name="repo_branch_snackbar_deleted">Branch %1$s deleted</string>
 </resources>

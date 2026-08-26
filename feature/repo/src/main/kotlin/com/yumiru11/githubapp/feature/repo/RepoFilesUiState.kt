@@ -10,6 +10,8 @@ data class RepoFilesUiState(
     val selectedPath: String? = null,
     val fileState: FileViewState = FileViewState.Idle,
     val editState: FileEditState = FileEditState.Idle,
+    /** 当前查看分支（T23：文件 Tab 分支 Chip 显示源；loadRootTree 时回写） */
+    val currentRef: String? = null,
 )
 
 /** 文件树子状态。 */

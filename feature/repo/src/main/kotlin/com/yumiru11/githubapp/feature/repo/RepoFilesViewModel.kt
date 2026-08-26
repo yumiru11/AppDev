@@ -60,6 +60,8 @@ class RepoFilesViewModel
         fun loadRootTree(ref: String) {
             if (loadedRef == ref && _uiState.value.treeState is TreeState.Loaded) return
             loadedRef = ref
+            // T23：分支 Chip 显示当前查看分支（分支切换返回后经此回写）
+            _uiState.update { it.copy(currentRef = ref) }
             viewModelScope.launch {
                 _uiState.update { it.copy(treeState = TreeState.Loading) }
                 repoRepository.getTree(owner, repo, ref).fold(
