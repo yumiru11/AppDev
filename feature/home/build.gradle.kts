@@ -6,6 +6,19 @@ plugins {
 
 android {
     namespace = "com.yumiru11.githubapp.feature.home"
+
+    defaultConfig {
+        // core:github-auth 库 manifest 的 {appAuthRedirectScheme} 占位符（ADR-0001）；
+        // Robolectric 测试开资源表后 testManifest 合并需要（settings/feature-issue 同款）
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.yumiru11.githubapp"
+    }
+
+    // Robolectric compose 测试需要资源表（#89 RepoPickerSheetTest；settings/designsystem 同款配置）
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 dependencies {

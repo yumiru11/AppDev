@@ -157,6 +157,20 @@ class MainActivity : ComponentActivity() {
                                                 onSearchClick = { navController.navigate(AppRoute.SEARCH) },
                                                 onNotificationClick = { notificationPanelVisible = true },
                                                 onProfileClick = { mainTab = AppRoute.PROFILE },
+                                                onCreateIssue = { owner, repo ->
+                                                    navController.navigate(
+                                                        AppRoute.ISSUE_CREATE
+                                                            .replace("{owner}", owner)
+                                                            .replace("{repo}", repo),
+                                                    )
+                                                },
+                                                onViewPullRequests = { owner, repo ->
+                                                    navController.navigate(
+                                                        AppRoute.PULLS
+                                                            .replace("{owner}", owner)
+                                                            .replace("{repo}", repo),
+                                                    )
+                                                },
                                                 blurEnabled = blurEnabled,
                                                 onLoginClick = {
                                                     navController.navigate(AppRoute.LOGIN) {

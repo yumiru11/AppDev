@@ -1,27 +1,20 @@
-@file:Suppress("CyclomaticComplexMethod")
-// feedActionText 对事件类型 × GitHub action 枚举做穷尽映射，分支天然多（同 NotificationsScreen.reasonLabel 先例）；精准抑制。
-
 package com.yumiru11.githubapp.feature.home
 
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
@@ -33,14 +26,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -51,40 +44,42 @@ import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
-import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
+import com.yumiru11.githubapp.core.designsystem.component.LongBarAction
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
-import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.designsystem.token.AppBlur
+import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppTopBar
-import com.yumiru11.githubapp.core.ui.time.relativeTimeText
-import com.yumiru11.githubapp.feature.home.model.FeedEventType
 import com.yumiru11.githubapp.feature.home.model.FeedItem
+import com.yumiru11.githubapp.feature.home.ui.FeedRow
+import com.yumiru11.githubapp.feature.home.ui.RepoPickerSheet
+import com.yumiru11.githubapp.feature.home.ui.STAGGER_MAX_ITEMS
+import com.yumiru11.githubapp.feature.home.ui.rememberStaggerEnterModifier
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import java.io.IOException
-import java.time.Instant
-import java.time.ZoneId
 
 /**
- * 首页动态流页（T10）：AppTopBar + 顶部小分区条（动态/Issue/PR，TabRow 下划线指示器）+ feed 内容区。
+ * 首页（T10 + #89）：AppTopBar + 小分区条（动态/Issue/PR）+ HorizontalPager 分区内容区。
  *
  * - 登录态驱动：未登录 → 登录引导（T10 验收第 1 条）
- * - 列表：Paging 分页（T10 验收第 2 条）+ PullToRefreshBox 下拉刷新（T10 验收第 3 条）
+ * - #89：分区改 [HorizontalPager] 跟手滑动；点 Tab 弹簧微回弹滚页（ui-design.md §2.1/§4.2 H1-1），
+ *   拖页时 TabRow 指示条经 targetPage 即时跟随
+ * - #89：动态页头部 LongBarAction ×3（新建 Issue / 查看 Pull Requests / 新建仓库占位禁用）。
+ *   前两者经仓库选择器（[RepoPickerSheet]）取得 {owner}/{repo} 后由调用方路由到 T14/T15 页面
+ * - 列表：Paging 分页（T10）+ PullToRefreshBox 下拉刷新（只作用于动态分区，B1-4）
+ *   + 首屏 stagger 进入动效（[rememberStaggerEnterModifier]，经 MotionScale 缩放）
  * - 点击条目 → GitHubLinkParser 解析 html_url → 应用内导航（T10 验收第 4 条）
  * - 空/错/加载态齐全（T10 验收第 5 条）；分页加载错误由 LazyPagingItems.loadState 呈现
- * - 符合 ui-design.md §2.1：底部大分区（首页/仓库/我的）× 首页内小分区（动态/Issue/PR）；
- *   §2.2 的长条按钮/trending 待对应功能票落地后补齐（Issue 新建等均为 {owner}/{repo} 级路由，
- *   Home 无仓库上下文，不预置死入口）
- * - backdrop blur（issue #83）：自持顶栏玻璃的 [LocalHazeState]，内容 Box 挂
- *   `hazeSource`；顶栏 GlassSurface 经 `hazeEffect` 模糊背后滚动内容
+ * - backdrop blur（issue #83）：自持顶栏玻璃的 [LocalHazeState]，内容 Box 挂 hazeSource
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,6 +92,10 @@ fun HomeScreen(
     bottomContentPadding: Dp = 0.dp,
     onLoginClick: () -> Unit = {},
     onFeedItemClick: (ParsedUrl) -> Unit = {},
+    /** #89：仓库选择器选中后路由到 issue_create/{owner}/{repo} */
+    onCreateIssue: (owner: String, repo: String) -> Unit = { _, _ -> },
+    /** #89：仓库选择器选中后路由到 pulls/{owner}/{repo} */
+    onViewPullRequests: (owner: String, repo: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -162,18 +161,13 @@ fun HomeScreen(
                         }
 
                         is HomeUiState.Success -> {
-                            // 顶部小分区条（动态/Issue/PR）——仅登录成功后有内容可切，未登录/错误态不渲染
-                            HomeTabBar(
-                                selectedTab = selectedTab,
-                                onTabSelected = { selectedTab = it },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            FeedContent(
+                            HomeSuccessContent(
                                 feed = state.feed,
                                 selectedTab = selectedTab,
                                 onFeedItemClick = onFeedItemClick,
                                 bottomContentPadding = bottomContentPadding,
-                                modifier = Modifier.fillMaxSize(),
+                                onCreateIssue = onCreateIssue,
+                                onViewPullRequests = onViewPullRequests,
                             )
                         }
                     }
@@ -183,67 +177,217 @@ fun HomeScreen(
     }
 }
 
+/** 登录成功后的分区内容（#89）：选择器状态 + TabRow↔Pager 双向联动 + 选择器宿主。 */
 @Composable
-private fun FeedContent(
+private fun HomeSuccessContent(
     feed: Flow<PagingData<FeedItem>>,
     selectedTab: HomeTab,
     onFeedItemClick: (ParsedUrl) -> Unit,
     bottomContentPadding: Dp,
+    onCreateIssue: (owner: String, repo: String) -> Unit,
+    onViewPullRequests: (owner: String, repo: String) -> Unit,
+) {
+    val pickerViewModel: RepoPickerViewModel = hiltViewModel()
+    val pickerUiState by pickerViewModel.uiState.collectAsStateWithLifecycle()
+    var pickerVisible by rememberSaveable { mutableStateOf(false) }
+    var pickerTarget by rememberSaveable { mutableStateOf(PickerTarget.CREATE_ISSUE) }
+
+    val pagerState =
+        rememberPagerState(initialPage = selectedTab.ordinal) {
+            HomeTab.entries.size
+        }
+    val scope = rememberCoroutineScope()
+
+    // 顶部小分区条 ↔ Pager 双向联动：拖页时 targetPage 即时跟随；
+    // 点 Tab 弹簧微回弹滚页（H1-1「过冲一点回弹」，令牌走 AppMotion）
+    HomeTabBar(
+        selectedTabIndex = pagerState.targetPage.coerceIn(0, HomeTab.entries.lastIndex),
+        onTabSelected = { tab ->
+            if (tab.ordinal != pagerState.targetPage) {
+                scope.launch {
+                    pagerState.animateScrollToPage(
+                        page = tab.ordinal,
+                        animationSpec =
+                            spring(
+                                dampingRatio = AppMotion.DampingRatioHighBouncy,
+                                stiffness = AppMotion.StiffnessMedium,
+                            ),
+                    )
+                }
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    HorizontalPager(
+        state = pagerState,
+        modifier = Modifier.fillMaxSize(),
+    ) { page ->
+        HomePage(
+            page = page,
+            feed = feed,
+            onFeedItemClick = onFeedItemClick,
+            bottomContentPadding = bottomContentPadding,
+            onCreateIssueClick = {
+                pickerTarget = PickerTarget.CREATE_ISSUE
+                pickerVisible = true
+            },
+            onViewPullRequestsClick = {
+                pickerTarget = PickerTarget.VIEW_PULL_REQUESTS
+                pickerVisible = true
+            },
+        )
+    }
+    RepoPickerSheet(
+        visible = pickerVisible,
+        uiState = pickerUiState,
+        onPick = { owner, repo ->
+            pickerVisible = false
+            if (pickerTarget == PickerTarget.CREATE_ISSUE) {
+                onCreateIssue(owner, repo)
+            } else {
+                onViewPullRequests(owner, repo)
+            }
+        },
+        onDismiss = { pickerVisible = false },
+        onRetry = { pickerViewModel.retry() },
+    )
+}
+
+/** Pager 单页分发（动态页含快捷入口；Issue/PR 列表为占位空态）。 */
+@Composable
+private fun HomePage(
+    page: Int,
+    feed: Flow<PagingData<FeedItem>>,
+    onFeedItemClick: (ParsedUrl) -> Unit,
+    bottomContentPadding: Dp,
+    onCreateIssueClick: () -> Unit,
+    onViewPullRequestsClick: () -> Unit,
+) {
+    when (HomeTab.entries[page]) {
+        HomeTab.FEED -> {
+            FeedPage(
+                feed = feed,
+                onFeedItemClick = onFeedItemClick,
+                bottomContentPadding = bottomContentPadding,
+                onCreateIssueClick = onCreateIssueClick,
+                onViewPullRequestsClick = onViewPullRequestsClick,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        HomeTab.ISSUES -> {
+            // Issue 列表占位（列表页属后续功能票；详情页 T14 已合入）
+            EmptyContent(modifier = Modifier.fillMaxSize())
+        }
+
+        HomeTab.PULL_REQUESTS -> {
+            // PR 列表占位（列表页属后续功能票；详情页 T15 已合入）
+            EmptyContent(modifier = Modifier.fillMaxSize())
+        }
+    }
+}
+
+/** 首页快捷入口区（#89，ui-design.md §2.2）：Home 字样 + 长条按钮 ×3。 */
+@Composable
+private fun QuickActionsSection(
+    onCreateIssueClick: () -> Unit,
+    onViewPullRequestsClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val comingSoon = stringResource(R.string.home_action_create_repo_cd)
+    Column(
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.home_title),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        LongBarAction(
+            text = stringResource(R.string.home_action_create_issue),
+            icon = AppDevOcticons.IssueOpened,
+            onClick = onCreateIssueClick,
+        )
+        LongBarAction(
+            text = stringResource(R.string.home_action_view_pulls),
+            icon = AppDevOcticons.PullRequest,
+            onClick = onViewPullRequestsClick,
+        )
+        // 新建仓库：占位待功能票（issue #89 任务清单），禁用态语义可辨
+        LongBarAction(
+            text = stringResource(R.string.home_action_create_repo),
+            icon = AppDevOcticons.Repo,
+            onClick = {},
+            enabled = false,
+            modifier =
+                Modifier.semantics {
+                    stateDescription = comingSoon
+                },
+        )
+    }
+}
+
+/** 动态页（#89）：快捷入口区 + feed 状态区；下拉刷新只作用于本分区（B1-4 只刷新当前分区）。 */
+@Composable
+private fun FeedPage(
+    feed: Flow<PagingData<FeedItem>>,
+    onFeedItemClick: (ParsedUrl) -> Unit,
+    bottomContentPadding: Dp,
+    onCreateIssueClick: () -> Unit,
+    onViewPullRequestsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lazyItems = feed.collectAsLazyPagingItems()
-
-    // 根据分区显示不同内容
-    when (selectedTab) {
-        HomeTab.FEED -> {
-            // 动态流：feed + trending（trending 数据源待 §2.5 落地）
+    Column(modifier = modifier) {
+        QuickActionsSection(
+            onCreateIssueClick = onCreateIssueClick,
+            onViewPullRequestsClick = onViewPullRequestsClick,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Box(modifier = Modifier.weight(1f)) {
             when {
                 lazyItems.loadState.refresh is LoadState.Error -> {
                     PagingErrorContent(
                         error = (lazyItems.loadState.refresh as LoadState.Error).error,
                         onRetry = { lazyItems.retry() },
-                        modifier = modifier,
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
 
                 lazyItems.loadState.refresh is LoadState.Loading && lazyItems.itemCount == 0 -> {
-                    LoadingContent(modifier = modifier)
+                    LoadingContent(modifier = Modifier.fillMaxSize())
                 }
 
                 lazyItems.itemCount == 0 -> {
                     PullToRefreshBox(
                         isRefreshing = lazyItems.loadState.refresh is LoadState.Loading,
                         onRefresh = { lazyItems.refresh() },
-                        modifier = modifier,
+                        modifier = Modifier.fillMaxSize(),
                     ) {
                         EmptyContent(modifier = Modifier.fillMaxSize())
                     }
                 }
 
                 else -> {
-                    FeedList(
-                        lazyItems = lazyItems,
-                        onFeedItemClick = onFeedItemClick,
-                        bottomContentPadding = bottomContentPadding,
-                        modifier = modifier,
-                    )
+                    PullToRefreshBox(
+                        isRefreshing = lazyItems.loadState.refresh is LoadState.Loading,
+                        onRefresh = { lazyItems.refresh() },
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        FeedList(
+                            lazyItems = lazyItems,
+                            onFeedItemClick = onFeedItemClick,
+                            bottomContentPadding = bottomContentPadding,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
-        }
-
-        HomeTab.ISSUES -> {
-            // Issue 列表占位（列表页属后续功能票；详情页 T14 已合入）
-            EmptyContent(modifier = modifier)
-        }
-
-        HomeTab.PULL_REQUESTS -> {
-            // PR 列表占位（列表页属后续功能票；详情页 T15 已合入）
-            EmptyContent(modifier = modifier)
         }
     }
 }
 
-/** 动态列表：PullToRefreshBox 下拉触发 paging refresh（invalidate 重建请求） */
+/** 动态列表：PullToRefreshBox 下拉触发 paging refresh + 首屏 stagger（#89）。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FeedList(
@@ -273,77 +417,21 @@ private fun FeedList(
                 count = lazyItems.itemCount,
                 // itemKey 内部用 peek(index)（不触发页加载，未加载区回退占位 key），
                 // 稳定 id 键保证翻页/刷新时已有行不重组合、滚动位置不跳变。
+                // ⚠️ itemKey/key 逻辑归 #86（perf(list)）领地，本票不改其行为。
                 key = lazyItems.itemKey { it.id },
             ) { index ->
                 val item = lazyItems[index] ?: return@items
-                FeedRow(
-                    item = item,
-                    onClick = { handleItemClick(item, onFeedItemClick) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun FeedRow(
-    item: FeedItem,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            ),
-    ) {
-        Row(modifier = Modifier.padding(12.dp)) {
-            AsyncImage(
-                model = item.actorAvatarUrl,
-                contentDescription = item.actorLogin,
-                modifier =
-                    Modifier
-                        .size(32.dp)
-                        .clip(CircleShape),
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = feedActionText(item),
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (item.title.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = item.repoFullName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    // #84：相对时间优先（"3 小时前"），解析失败/未来时间回退绝对日期（缺陷 #11 时间显示统一）
-                    val date = feedTimestampText(item.createdAt)
-                    if (date.isNotEmpty()) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = date,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                val enterModifier =
+                    if (index < STAGGER_MAX_ITEMS) {
+                        rememberStaggerEnterModifier(index)
+                    } else {
+                        Modifier
                     }
+                Box(modifier = enterModifier) {
+                    FeedRow(
+                        item = item,
+                        onClick = { handleItemClick(item, onFeedItemClick) },
+                    )
                 }
             }
         }
@@ -361,72 +449,6 @@ private fun handleItemClick(
         onFeedItemClick(parsed)
     }
 }
-
-/** 事件类型 + action → 本地化动作文案（ViewModel 只传原始值，不产英文） */
-@Composable
-private fun feedActionText(item: FeedItem): String =
-    when (item.type) {
-        FeedEventType.ISSUE -> {
-            when (item.action) {
-                ACTION_OPENED -> stringResource(R.string.feed_action_issue_opened, item.actorLogin, item.number ?: 0)
-                ACTION_CLOSED -> stringResource(R.string.feed_action_issue_closed, item.actorLogin, item.number ?: 0)
-                ACTION_REOPENED -> stringResource(R.string.feed_action_issue_reopened, item.actorLogin, item.number ?: 0)
-                else -> stringResource(R.string.feed_action_issue_other, item.actorLogin, item.number ?: 0)
-            }
-        }
-
-        FeedEventType.ISSUE_COMMENT -> {
-            when (item.action) {
-                ACTION_EDITED -> stringResource(R.string.feed_action_issue_comment_edited, item.actorLogin, item.number ?: 0)
-                ACTION_DELETED -> stringResource(R.string.feed_action_issue_comment_deleted, item.actorLogin, item.number ?: 0)
-                else -> stringResource(R.string.feed_action_issue_comment, item.actorLogin, item.number ?: 0)
-            }
-        }
-
-        FeedEventType.PULL_REQUEST -> {
-            when (item.action) {
-                ACTION_OPENED -> stringResource(R.string.feed_action_pr_opened, item.actorLogin, item.number ?: 0)
-                ACTION_CLOSED -> stringResource(R.string.feed_action_pr_closed, item.actorLogin, item.number ?: 0)
-                ACTION_REOPENED -> stringResource(R.string.feed_action_pr_reopened, item.actorLogin, item.number ?: 0)
-                else -> stringResource(R.string.feed_action_pr_other, item.actorLogin, item.number ?: 0)
-            }
-        }
-
-        FeedEventType.PUSH -> {
-            stringResource(R.string.feed_action_push, item.actorLogin, item.commitCount ?: 0)
-        }
-
-        FeedEventType.STAR -> {
-            stringResource(R.string.feed_action_star, item.actorLogin)
-        }
-
-        FeedEventType.FORK -> {
-            stringResource(R.string.feed_action_fork, item.actorLogin)
-        }
-    }
-
-/** GitHub 事件 action 字面量 */
-private const val ACTION_OPENED = "opened"
-private const val ACTION_CLOSED = "closed"
-private const val ACTION_REOPENED = "reopened"
-private const val ACTION_EDITED = "edited"
-private const val ACTION_DELETED = "deleted"
-
-/** ISO-8601 时间戳 → 本地日期（yyyy-MM-dd）；解析失败返回空串（UI 隐藏时间）。相对时间不可用时的回退 */
-private fun formatDate(isoTimestamp: String?): String {
-    if (isoTimestamp.isNullOrBlank()) return ""
-    return runCatching {
-        Instant
-            .parse(isoTimestamp)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
-            .toString()
-    }.getOrDefault("")
-}
-
-/** feed 行时间戳：相对时间优先，回退绝对日期（#84 缺陷 #11） */
-@Composable
-private fun feedTimestampText(isoTimestamp: String?): String = isoTimestamp?.let { relativeTimeText(it) } ?: formatDate(isoTimestamp)
 
 @Composable
 private fun UnauthenticatedContent(
@@ -497,73 +519,23 @@ private fun errorMessage(errorType: HomeErrorType): String =
         HomeErrorType.UNKNOWN -> stringResource(R.string.feed_error_unknown)
     }
 
-/** 首页顶部小分区条（动态/Issue/PR）—— ui-design.md §2.1：横向条 + 底部主题色指示条 */
+/** 首页顶部小分区条（动态/Issue/PR）—— ui-design.md §2.1；#89 起与 Pager 双向联动 */
 @Composable
 private fun HomeTabBar(
-    selectedTab: HomeTab,
+    selectedTabIndex: Int,
     onTabSelected: (HomeTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     PrimaryTabRow(
-        selectedTabIndex = selectedTab.ordinal,
+        selectedTabIndex = selectedTabIndex,
         modifier = modifier,
     ) {
         HomeTab.entries.forEach { tab ->
             Tab(
-                selected = selectedTab == tab,
+                selected = selectedTabIndex == tab.ordinal,
                 onClick = { onTabSelected(tab) },
                 text = { Text(text = stringResource(tab.titleRes)) },
             )
         }
-    }
-}
-
-// ── @Preview（#86）：行组件 Light/Dark 双主题预览，样例数据离线自足（avatar 置空避免 Coil 取网） ──
-
-@Preview(name = "Light", showBackground = true)
-@Composable
-private fun FeedRowPreviewLight() {
-    AppTheme(darkTheme = false) {
-        FeedRow(
-            item =
-                FeedItem(
-                    id = "1",
-                    type = FeedEventType.PULL_REQUEST,
-                    actorLogin = "octocat",
-                    actorAvatarUrl = null,
-                    repoFullName = "yumiru11/AppDev",
-                    action = "opened",
-                    title = "perf(list): Paging itemKey 迁移与模型稳定性标注",
-                    number = 86,
-                    commitCount = null,
-                    createdAt = "2026-08-21T08:30:00Z",
-                    htmlUrl = null,
-                ),
-            onClick = {},
-        )
-    }
-}
-
-@Preview(name = "Dark", showBackground = true)
-@Composable
-private fun FeedRowPreviewDark() {
-    AppTheme(darkTheme = true) {
-        FeedRow(
-            item =
-                FeedItem(
-                    id = "1",
-                    type = FeedEventType.STAR,
-                    actorLogin = "yumiru11",
-                    actorAvatarUrl = null,
-                    repoFullName = "yumiru11/AppDev",
-                    action = null,
-                    title = "",
-                    number = null,
-                    commitCount = null,
-                    createdAt = "2026-08-21T08:30:00Z",
-                    htmlUrl = null,
-                ),
-            onClick = {},
-        )
     }
 }
