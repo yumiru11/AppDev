@@ -88,4 +88,7 @@
     <string name="issue_event_linked">%1$s linked a pull request</string>
     <string name="issue_event_linked_number">%1$s linked pull request #%2$d</string>
     <string name="issue_event_default">%1$s %2$s this issue</string>
+
+    <!-- 反应条已反应态（issue #85 / audit #18） -->
+    <string name="issue_reaction_reacted">Reacted</string>
 </resources>
