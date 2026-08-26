@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.core.githubrest.api
 
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
+import com.yumiru11.githubapp.core.githubrest.model.CreatePullRequestRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreateReviewCommentRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreateReviewRequest
 import com.yumiru11.githubapp.core.githubrest.model.MergePullRequestRequest
@@ -15,8 +16,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+import retrofit2.HttpException
 
 /**
  * [PullRequestApi] 集成测试（T15，MockWebServer 模拟 GitHub API，零真实网络）。
@@ -569,6 +572,92 @@ class PullRequestApiTest {
             assertEquals("/repos/octocat/Hello-World/pulls/42/update-branch", request.url.encodedPath)
             val body = request.body?.utf8()
             assertTrue(body?.contains("\"expected_head_sha\":\"abc123\"") == true)
+        }
+
+    @Test
+    fun createPullRequest_sendsBodyAndParsesResponse() =
+        runTest {
+            server.enqueue(
+                jsonResponse(
+                    """
+                    {
+                      "id": 1,
+                      "number": 42,
+                      "title": "Add feature",
+                      "state": "open",
+                      "body": "Description",
+                      "html_url": "https://github.com/octocat/Hello-World/pull/42",
+                      "draft": false,
+                      "head": {"label": "octocat:feature", "ref": "feature", "sha": "abc123"},
+                      "base": {"label": "octocat:main", "ref": "main", "sha": "def456"}
+                    }
+                    """.trimIndent(),
+                ),
+            )
+
+            val dto =
+                pullRequestApi.createPullRequest(
+                    "octocat",
+                    "Hello-World",
+                    CreatePullRequestRequest(
+                        title = "Add feature",
+                        head = "feature",
+                        base = "main",
+                        body = "Description",
+                    ),
+                )
+
+            assertEquals(42, dto.number)
+            assertEquals("Add feature", dto.title)
+            assertEquals("feature", dto.head?.ref)
+            assertEquals("main", dto.base?.ref)
+            val request = server.takeRequest()
+            assertEquals("POST", request.method.toString())
+            assertEquals("/repos/octocat/Hello-World/pulls", request.url.encodedPath)
+            val body = request.body?.utf8()
+            assertTrue(body?.contains("\"title\":\"Add feature\"") == true)
+            assertTrue(body?.contains("\"head\":\"feature\"") == true)
+            assertTrue(body?.contains("\"base\":\"main\"") == true)
+            assertTrue(body?.contains("\"body\":\"Description\"") == true)
+            // draft=false 为 DTO 缺省值，encodeDefaults=false 下省略（服务端默认同语义）；draft=true 由下一测试覆盖
+        }
+
+    @Test
+    fun createPullRequest_draftTrue_includesDraftFlag() =
+        runTest {
+            server.enqueue(jsonResponse("""{"id":1,"number":43,"title":"Draft","state":"open","draft":true}"""))
+
+            pullRequestApi.createPullRequest(
+                "octocat",
+                "Hello-World",
+                CreatePullRequestRequest(title = "Draft", head = "feature", base = "main", draft = true),
+            )
+
+            val body = server.takeRequest().body?.utf8()
+            assertTrue(body?.contains("\"draft\":true") == true)
+        }
+
+    @Test
+    fun createPullRequest_httpError_throwsHttpException() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 422 Unprocessable Entity")
+                    .body("""{"message":"Validation Failed"}""")
+                    .build(),
+            )
+
+            try {
+                pullRequestApi.createPullRequest(
+                    "octocat",
+                    "Hello-World",
+                    CreatePullRequestRequest(title = "T", head = "feature", base = "feature"),
+                )
+                fail("expected HttpException")
+            } catch (e: HttpException) {
+                assertEquals(422, e.code())
+            }
         }
 
     private fun jsonResponse(body: String): MockResponse =

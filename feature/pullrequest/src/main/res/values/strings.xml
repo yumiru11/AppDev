@@ -178,4 +178,16 @@
     <string name="pull_request_delete_branch">Delete branch</string>
     <string name="pull_request_delete_branch_succeeded">Branch deleted</string>
     <string name="pull_request_delete_branch_failed">Failed to delete branch</string>
+
+    <!-- T23：创建 PR（分支管理全流程） -->
+    <string name="pull_request_create">New pull request</string>
+    <string name="pull_request_create_title">New pull request</string>
+    <string name="pull_request_create_submit">Create</string>
+    <string name="pull_request_create_title_label">Title</string>
+    <string name="pull_request_create_body_label">Description (optional)</string>
+    <string name="pull_request_create_base">Base branch</string>
+    <string name="pull_request_create_head">Head branch</string>
+    <string name="pull_request_create_select_branch">Select a branch</string>
+    <string name="pull_request_create_same_branch_hint">The head branch must be different from the base branch</string>
+    <string name="pull_request_create_no_permission_hint">You do not have permission to create a pull request</string>
 </resources>

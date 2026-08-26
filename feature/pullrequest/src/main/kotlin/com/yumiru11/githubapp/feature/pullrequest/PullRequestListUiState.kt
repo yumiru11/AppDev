@@ -19,6 +19,8 @@ sealed interface PullRequestListUiState {
     /** 加载成功（[pulls] 分页数据流；当前过滤态由 [PullRequestListViewModel.filter] 单独暴露） */
     data class Success(
         val pulls: Flow<PagingData<PullRequest>>,
+        /** T23：当前会话有推送权限（创建 PR 按钮显隐；加载失败保守隐藏） */
+        val canCreatePullRequest: Boolean = false,
     ) : PullRequestListUiState
 
     /** 加载失败（错误类型驱动文案，UI 层 stringResource 映射） */

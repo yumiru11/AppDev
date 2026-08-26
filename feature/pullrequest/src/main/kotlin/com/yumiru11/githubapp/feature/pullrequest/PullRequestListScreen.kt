@@ -42,6 +42,8 @@ import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.rounded.Add
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequest
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFilter
@@ -64,6 +66,7 @@ fun PullRequestListScreen(
     repo: String,
     onBackClick: () -> Unit,
     onPullRequestClick: (owner: String, repo: String, number: Int) -> Unit,
+    onCreatePullRequest: (owner: String, repo: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
     viewModel: PullRequestListViewModel = hiltViewModel(),
 ) {
@@ -81,6 +84,17 @@ fun PullRequestListScreen(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.pull_request_back),
                         )
+                    }
+                },
+                actions = {
+                    // T23：创建 PR 入口（仅推送权限会话显示；权限未知/游客隐藏）
+                    if ((uiState as? PullRequestListUiState.Success)?.canCreatePullRequest == true) {
+                        IconButton(onClick = { onCreatePullRequest(owner, repo) }) {
+                            Icon(
+                                imageVector = MaterialSymbols.Rounded.Add,
+                                contentDescription = stringResource(R.string.pull_request_create),
+                            )
+                        }
                     }
                 },
             )

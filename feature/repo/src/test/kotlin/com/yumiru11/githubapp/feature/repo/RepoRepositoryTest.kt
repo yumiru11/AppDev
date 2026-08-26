@@ -7,19 +7,26 @@ import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
 import com.yumiru11.githubapp.core.githubrest.api.GitTreeApi
 import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
+import com.yumiru11.githubapp.core.githubrest.model.BranchCommitDto
+import com.yumiru11.githubapp.core.githubrest.model.BranchDto
 import com.yumiru11.githubapp.core.githubrest.model.ContentWriteResponseDto
 import com.yumiru11.githubapp.core.githubrest.model.FileContentDto
+import com.yumiru11.githubapp.core.githubrest.model.GitRefCreateRequest
+import com.yumiru11.githubapp.core.githubrest.model.GitRefDto
 import com.yumiru11.githubapp.core.githubrest.model.GitTreeResponseDto
 import com.yumiru11.githubapp.core.githubrest.model.ReadmeDto
+import com.yumiru11.githubapp.core.githubrest.model.RepositoryPermissionsDto
 import com.yumiru11.githubapp.core.githubrest.model.TreeItemDto
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -602,6 +609,81 @@ class RepoRepositoryTest {
     fun parseConflictSha_messageWithoutSha_returnsNull() =
         runTest {
             assertNull(parseConflictSha(conflictException(409, """{"message":"Conflict"}""")))
+        }
+
+    // ── T23：分支管理数据层（列表/创建/写控制） ──────────────────
+
+    @Test
+    fun branches_mapsNameShaAndProtected() =
+        runTest {
+            coEvery { gitRefApi.listBranches("octocat", "Hello-World") } returns
+                listOf(
+                    BranchDto(name = "main", commit = BranchCommitDto(sha = "abc123"), `protected` = true),
+                    BranchDto(name = "dev", commit = BranchCommitDto(sha = "def456")),
+                )
+
+            val branches = repository.branches("octocat", "Hello-World").getOrThrow()
+
+            assertEquals(2, branches.size)
+            assertEquals("main", branches[0].name)
+            assertEquals("abc123", branches[0].sha)
+            assertTrue(branches[0].isProtected)
+            assertFalse(branches[1].isProtected)
+        }
+
+    @Test
+    fun createBranch_fromBranchSha_createsRef() =
+        runTest {
+            coEvery { gitRefApi.listBranches(any(), any()) } returns
+                listOf(BranchDto(name = "main", commit = BranchCommitDto(sha = "abc123")))
+            coEvery { gitRefApi.createRef(any(), any(), any()) } returns
+                GitRefDto(ref = "refs/heads/feat-x", `object` = GitRefDto.RefObject(sha = "abc123", type = "commit"))
+
+            val result = repository.createBranch("octocat", "Hello-World", "feat-x", "main")
+
+            assertTrue(result.isSuccess)
+            coVerify(exactly = 1) {
+                gitRefApi.createRef(
+                    "octocat",
+                    "Hello-World",
+                    GitRefCreateRequest(ref = "refs/heads/feat-x", sha = "abc123"),
+                )
+            }
+        }
+
+    @Test
+    fun createBranch_missingBaseBranch_returnsFailure() =
+        runTest {
+            coEvery { gitRefApi.listBranches(any(), any()) } returns listOf(BranchDto(name = "main"))
+
+            val result = repository.createBranch("octocat", "Hello-World", "feat-x", "nope")
+
+            assertTrue(result.isFailure)
+        }
+
+    @Test
+    fun branchControl_pushPermission_mapsCanPushAndDefault() =
+        runTest {
+            coEvery { repositoryApi.getRepository(any(), any()) } returns
+                mockk<com.yumiru11.githubapp.core.githubrest.model.RepositoryDto> {
+                    every { permissions } returns RepositoryPermissionsDto(push = true)
+                    every { defaultBranch } returns "main"
+                }
+
+            val control = repository.branchControl("octocat", "Hello-World")
+
+            assertTrue(control.canPush)
+            assertEquals("main", control.defaultBranch)
+        }
+
+    @Test
+    fun branchControl_failure_hidesWriteActions() =
+        runTest {
+            coEvery { repositoryApi.getRepository(any(), any()) } throws IOException("boom")
+
+            val control = repository.branchControl("octocat", "Hello-World")
+
+            assertFalse(control.canPush)
         }
 
     private fun conflictException(

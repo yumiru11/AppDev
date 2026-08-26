@@ -97,6 +97,15 @@ class RepoManagementRepository
                 Result.failure(e)
             }
 
+        /** 删除分支（T23；Git refs 端点；默认分支 GitHub 返回 422 → 调方按失败事件处理）。 */
+        suspend fun deleteBranch(
+            owner: String,
+            repo: String,
+            branch: String,
+        ) {
+            repoManagementApi.deleteBranch(owner, repo, branch)
+        }
+
         /** Release 列表。 */
         suspend fun getReleases(
             owner: String,

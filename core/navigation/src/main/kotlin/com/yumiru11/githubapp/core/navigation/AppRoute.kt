@@ -15,10 +15,16 @@ import java.net.URLEncoder
 object AppRoute {
     const val HOME = "home"
     const val LOGIN = "login"
-    const val REPO = "repo/{owner}/{repo}"
+
+    // ref 为可选 query（T23 分支切换深链：切换后带新 ref 重进仓库详情，文件树按该分支加载）
+    const val REPO = "repo/{owner}/{repo}?ref={ref}"
     const val ISSUE = "issue/{owner}/{repo}/{number}"
     const val ISSUES = "issues/{owner}/{repo}"
     const val PULLS = "pulls/{owner}/{repo}"
+    const val PR_CREATE = "pr_create/{owner}/{repo}"
+
+    // ref 可选 query：从仓库文件 Tab 分支 Chip 进入时携带当前分支，分支页高亮
+    const val BRANCHES = "branches/{owner}/{repo}?ref={ref}"
     const val ISSUE_CREATE = "issue_create/{owner}/{repo}"
     const val PR = "pr/{owner}/{repo}/{number}"
     const val COMMIT = "commit/{owner}/{repo}/{sha}"

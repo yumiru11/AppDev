@@ -15,7 +15,8 @@ class AppRouteTest {
 
     @Test
     fun routeTable_repoRoute_hasOwnerAndRepoPlaceholders() {
-        assertEquals("repo/{owner}/{repo}", AppRoute.REPO)
+        // T23：ref 为可选 query（分支切换深链）
+        assertEquals("repo/{owner}/{repo}?ref={ref}", AppRoute.REPO)
     }
 
     @Test

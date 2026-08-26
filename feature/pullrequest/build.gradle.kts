@@ -26,6 +26,9 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
     implementation(libs.compose.material.icons.core)
+    // T23：创建 PR 入口图标（与 feature/repo 同款 Material Symbols 体系）
+    implementation(libs.icons.material.symbols.rounded)
+    implementation(libs.icons.material.symbols.rounded.cmp)
     implementation(libs.compose.ui.tooling.preview)
 
     // Lifecycle
@@ -71,6 +74,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.paging.testing)
+    testImplementation(libs.turbine)
     testImplementation(libs.kotlinx.serialization.json)
     testImplementation(kotlin("test"))
 }

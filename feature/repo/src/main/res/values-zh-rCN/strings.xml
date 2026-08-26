@@ -81,4 +81,27 @@
     <string name="repo_file_snackbar_committed_new_branch">已提交 %1$s 到新分支 %2$s</string>
     <string name="repo_file_snackbar_deleted">已删除 %1$s</string>
     <string name="repo_file_snackbar_keep_local">你的更改已复制到剪贴板</string>
+
+    <!-- T23 分支管理（Git Refs API：列出/切换/创建/删除） -->
+    <string name="repo_branches">分支</string>
+    <string name="repo_branch_current">当前</string>
+    <string name="repo_branch_default">默认</string>
+    <string name="repo_branch_protected">受保护</string>
+    <string name="repo_branch_new">新建分支</string>
+    <string name="repo_branch_name">分支名称</string>
+    <string name="repo_branch_name_hint">例如：feature/new</string>
+    <string name="repo_branch_create">创建</string>
+    <string name="repo_branch_from_base">基于 %1$s</string>
+    <string name="repo_branch_delete">删除分支</string>
+    <string name="repo_branch_delete_confirm">删除分支 %1$s？此操作不可撤销。</string>
+    <string name="repo_branch_cancel">取消</string>
+    <string name="repo_branch_back">返回</string>
+    <string name="repo_branch_retry">重试</string>
+    <string name="repo_branch_empty">暂无分支</string>
+    <string name="repo_branch_error_forbidden">没有执行该操作的权限</string>
+    <string name="repo_branch_error_not_found">分支列表不存在</string>
+    <string name="repo_branch_error_network">网络错误，请检查连接</string>
+    <string name="repo_branch_error_unknown">未知错误</string>
+    <string name="repo_branch_snackbar_created">已创建分支 %1$s</string>
+    <string name="repo_branch_snackbar_deleted">已删除分支 %1$s</string>
 </resources>

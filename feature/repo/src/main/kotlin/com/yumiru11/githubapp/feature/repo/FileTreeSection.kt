@@ -37,10 +37,12 @@ import com.composables.icons.materialsymbols.rounded.Text_snippet
 fun FileTreeSection(
     treeState: TreeState,
     defaultBranch: String?,
+    initialRef: String? = null,
     viewModel: RepoFilesViewModel,
     modifier: Modifier = Modifier,
 ) {
-    val ref = defaultBranch ?: DEFAULT_REF
+    // T23：分支切换深链进入时以 initialRef 加载；否则回退默认分支
+    val ref = initialRef?.takeIf { it.isNotBlank() } ?: defaultBranch ?: DEFAULT_REF
     LaunchedEffect(ref) {
         viewModel.loadRootTree(ref)
     }

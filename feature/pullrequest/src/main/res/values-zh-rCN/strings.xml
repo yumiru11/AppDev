@@ -178,4 +178,16 @@
     <string name="pull_request_delete_branch">删除分支</string>
     <string name="pull_request_delete_branch_succeeded">分支已删除</string>
     <string name="pull_request_delete_branch_failed">分支删除失败</string>
+
+    <!-- T23：创建 PR（分支管理全流程） -->
+    <string name="pull_request_create">新建 Pull Request</string>
+    <string name="pull_request_create_title">新建 Pull Request</string>
+    <string name="pull_request_create_submit">创建</string>
+    <string name="pull_request_create_title_label">标题</string>
+    <string name="pull_request_create_body_label">描述（可选）</string>
+    <string name="pull_request_create_base">基础分支（base）</string>
+    <string name="pull_request_create_head">源分支（head）</string>
+    <string name="pull_request_create_select_branch">选择分支</string>
+    <string name="pull_request_create_same_branch_hint">源分支必须与基础分支不同</string>
+    <string name="pull_request_create_no_permission_hint">你没有创建 Pull Request 的权限</string>
 </resources>
