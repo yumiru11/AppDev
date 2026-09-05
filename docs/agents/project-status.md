@@ -58,7 +58,7 @@
 
 | Issue | 标题 | 依赖 |
 |---|---|---|
-| #83 | fix(designsystem): 毛玻璃改为 backdrop 模糊实现 | 无，可立即开工 |
+| #83 | fix(designsystem): 毛玻璃改为 backdrop 模糊实现 | 无，**代码已闭环（`Refs #83`）**；真机「穿越感」复测后手动关票 |
 | #84 | feat(designsystem): 共享状态组件族与动效缩放基建 | 无，**依赖根，最优先** |
 | #85 | fix(issue,pr): 标签混色与状态徽章语义色 | 仅 StatusChip 行等 #84；⚠️ 与 T16 文件冲突错峰 |
 | #86 | perf(list): Paging itemKey 迁移与模型稳定性标注 | 无；Home 屏行与 #89 错峰 |
