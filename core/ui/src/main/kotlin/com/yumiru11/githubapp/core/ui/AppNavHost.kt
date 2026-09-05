@@ -5,6 +5,13 @@
 package com.yumiru11.githubapp.core.ui
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -15,6 +22,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.yumiru11.githubapp.core.designsystem.token.AppMotion
+import com.yumiru11.githubapp.core.designsystem.token.LocalMotionScale
 import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.EditorContentHolder
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
@@ -81,10 +90,20 @@ fun AppNavHost(
     editorScreen: @Composable (initialContent: String, onClose: () -> Unit) -> Unit = { _, _ -> },
     createIssueScreen: @Composable (owner: String, repo: String) -> Unit = { _, _ -> },
 ) {
+    // #90 全局默认转场：push = 右侧 1/4 滑入 + 淡入（EmphasizedDecelerate 400ms），
+    // pop = 当前页缩至 0.9 + 淡出；时长按 LocalMotionScale（设置页动效滑杆 × 系统
+    // 动画缩放）折算。Navigation 2.8.4 的转场 lambda 非 @Composable，须在组合外捕获
+    // 缩放值后以纯函数构造（AppMotion.scaledDuration(base, scale) 可单测重载）。
+    // 底栏三分区是 HOME 内 pager，不经过导航转场（无「弹窗感」）。
+    val motionScale = LocalMotionScale.current
     NavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = modifier,
+        enterTransition = { appEnterTransition(motionScale) },
+        exitTransition = { appExitTransition(motionScale) },
+        popEnterTransition = { appPopEnterTransition(motionScale) },
+        popExitTransition = { appPopExitTransition(motionScale) },
     ) {
         composable(AppRoute.LOGIN) {
             loginScreen()
@@ -354,4 +373,48 @@ fun navigateToParsedUrl(
     val route = AppRoute.fromParsedUrl(parsedUrl) ?: return false
     navController.navigate(route)
     return true
+}
+
+// ── #90 全局转场规格（来源 ui-audit 提案 #6） ──
+//
+// push：新页自右 1/4 宽滑入 + 淡入（M3 EmphasizedDecelerate 400ms）；
+// pop：当前页缩至 0.9 + 淡出。全部时长经 AppMotion.scaledDuration 折算
+// （设置页动效滑杆 × 系统动画缩放，尊重「移除动画」）。转场随预测返回
+// 手势（enableOnBackInvokedCallback）进度驱动，Android 14+ 返回预览同源。
+//
+// ⚠️ Navigation 2.8.4 NavHost 的转场 lambda 为普通（非 @Composable）函数，
+// 故时长在此以纯函数 AppMotion.scaledDuration(base, motionScale) 构造，
+// motionScale 由组合内 LocalMotionScale.current 捕获传入。
+
+/** push 进入：右侧 1/4 宽滑入 + 淡入。 */
+private fun appEnterTransition(motionScale: Float): EnterTransition {
+    val duration = AppMotion.scaledDuration(AppMotion.DURATION_PAGE_ENTER, motionScale)
+    return slideInHorizontally(
+        initialOffsetX = { it / 4 },
+        animationSpec = tween(duration, easing = AppMotion.EmphasizedDecelerate),
+    ) + fadeIn(animationSpec = tween(duration, easing = AppMotion.EmphasizedDecelerate))
+}
+
+/** push 退出（被覆盖页）：淡出（M3 EmphasizedAccelerate 200ms）。 */
+private fun appExitTransition(motionScale: Float): ExitTransition {
+    val duration = AppMotion.scaledDuration(AppMotion.DURATION_PAGE_EXIT, motionScale)
+    return fadeOut(animationSpec = tween(duration, easing = AppMotion.EmphasizedAccelerate))
+}
+
+/** pop 进入（返回时下层页）：左侧 1/4 宽滑入 + 淡入，与 push 对称。 */
+private fun appPopEnterTransition(motionScale: Float): EnterTransition {
+    val duration = AppMotion.scaledDuration(AppMotion.DURATION_PAGE_ENTER, motionScale)
+    return slideInHorizontally(
+        initialOffsetX = { -it / 4 },
+        animationSpec = tween(duration, easing = AppMotion.EmphasizedDecelerate),
+    ) + fadeIn(animationSpec = tween(duration, easing = AppMotion.EmphasizedDecelerate))
+}
+
+/** pop 退出（返回时当前页）：缩至 0.9 + 淡出。 */
+private fun appPopExitTransition(motionScale: Float): ExitTransition {
+    val duration = AppMotion.scaledDuration(AppMotion.DURATION_PAGE_ENTER, motionScale)
+    return scaleOut(
+        targetScale = 0.9f,
+        animationSpec = tween(duration, easing = AppMotion.EmphasizedAccelerate),
+    ) + fadeOut(animationSpec = tween(duration, easing = AppMotion.EmphasizedAccelerate))
 }
