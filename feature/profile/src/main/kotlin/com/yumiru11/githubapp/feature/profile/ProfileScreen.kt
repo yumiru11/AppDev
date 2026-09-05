@@ -60,6 +60,7 @@ import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.ui.sharedTransitionElement
 
 /**
  * 个人主页（T20）。
@@ -329,19 +330,33 @@ private fun RepositoryRow(
     repository: Repository,
     onClick: () -> Unit,
 ) {
-    Column(
+    Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = repository.name,
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        AsyncImage(
+            model = "https://github.com/${repository.ownerLogin}.png",
+            contentDescription = stringResource(R.string.profile_avatar),
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    // #90 共享元素试点：与 RepoDetail RepoHeader 头像同 key，点击仓库平滑放大
+                    .sharedTransitionElement(key = "repo-avatar-${repository.ownerLogin}"),
+            contentScale = ContentScale.Crop,
         )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column {
+            Text(
+                text = repository.name,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         val description = repository.description
         if (!description.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(4.dp))
@@ -376,6 +391,7 @@ private fun RepositoryRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
         }
     }
     HorizontalDivider()

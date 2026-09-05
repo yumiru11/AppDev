@@ -85,6 +85,7 @@ import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.LocalRepoDetailActions
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
+import com.yumiru11.githubapp.core.ui.sharedTransitionElement
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -478,7 +479,9 @@ private fun RepoHeader(
                     modifier =
                         Modifier
                             .size(48.dp)
-                            .clip(MaterialTheme.shapes.extraLarge),
+                            .clip(MaterialTheme.shapes.extraLarge)
+                            // #90 共享元素试点：与列表仓库行头像同 key，返回时平滑回缩
+                            .sharedTransitionElement(key = "repo-avatar-${repo.ownerLogin}"),
                     contentScale = ContentScale.Crop,
                 )
                 Spacer(modifier = Modifier.width(12.dp))
