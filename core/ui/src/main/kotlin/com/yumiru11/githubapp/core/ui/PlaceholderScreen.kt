@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.core.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -25,18 +26,25 @@ import com.yumiru11.githubapp.core.ui.R
  * 页面级占位（T11 等未实现页面，2026-08-14 真机走查替换 SearchScreen 误占位）。
  *
  * 图标 + 标题 + 说明结构，纯信息展示。分区重构后作为「仓库」分区页内容。
+ *
+ * [contentPadding]（issue #83）：玻璃栏避让一律走**内容内边距**而不是把整个节点
+ * 用 `Modifier.padding` 推进去——节点保持 full-bleed 才能与 Home/Profile 分区
+ * 同一形状接 backdrop blur；占位页自身无可滚动内容，玻璃在其背后本就是空的，
+ * 真仓库列表落地时按同一契约填 [contentPadding] 即可直接获得穿越感。
  */
 @Composable
 fun PlaceholderScreen(
     icon: ImageVector = Icons.Default.Star,
     title: String = stringResource(R.string.placeholder_title),
     description: String = stringResource(R.string.placeholder_desc),
+    contentPadding: PaddingValues = PaddingValues(),
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier =
             modifier
                 .fillMaxSize()
+                .padding(contentPadding)
                 .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,

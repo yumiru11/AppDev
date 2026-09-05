@@ -7,12 +7,15 @@ import androidx.compose.ui.unit.dp
 /**
  * 毛玻璃（Glassmorphism）设计令牌。
  *
- * Values sourced from docs/ui-design.md §6: real blur via `RenderEffect`/
- * `BlurEffect` on Android 12+ (API 31+), translucent surface fallback on
+ * Values sourced from docs/ui-design.md §6: backdrop blur via Haze
+ * （RenderEffect，API 31+）on Android 12+，translucent surface fallback on
  * API 26–30 (no bitmap blur, performance first). Glass is restricted to the
  * §6.1 allow-list (top bar / bottom navigation / bottom sheet / full-screen
  * viewer / banner overlay); never inside list items, never stacked beyond
  * 2 layers, no dynamic blur.
+ *
+ * 「本机到底走模糊还是走降级」不在本令牌内判定——见 [GlassRenderPolicy]
+ * （issue #83：判定收敛成纯函数后才能被单测断言）。
  */
 object AppBlur {
     /** 标准模糊半径（ui-design.md §6.3 拍板：中 8dp；CONTEXT.md 玻璃清单同值） */
@@ -26,7 +29,4 @@ object AppBlur {
 
     /** 支持真实模糊（RenderEffect/BlurEffect）的最低 API — Android 12 */
     const val MIN_BLUR_API: Int = Build.VERSION_CODES.S
-
-    /** 当前设备是否支持真实模糊（API 31+）；否则降级为半透明纯色层 */
-    fun isBlurSupported(): Boolean = Build.VERSION.SDK_INT >= MIN_BLUR_API
 }

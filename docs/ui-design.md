@@ -317,6 +317,11 @@
 | 7 | **设置分组头** | ❌ 不用玻璃 | 用不同分组卡片区分（用户拍板） |
 | 8 | **卡片本身** | ❌ 不透明 | 可读性优先；保持不透明 + 主题色点缀（用户拍板） |
 
+> **#83 补充（2026-08-27 用户拍板）**：第 1 项「AppTopBar」的玻璃矩形**含首页小分区条副行**
+> （分区条经 `AppTopBar(sectionBar = …)` 进同一块玻璃，属顶栏点位的内部构成，
+> 不是新增第 5 处玻璃点位）。这是顶栏拿到「滚动穿越感」的几何前提；分区条自身
+> containerColor 保持透明让模糊透上来，文字与指示条在 effect 层保持锐利。
+
 ### 6.2 毛玻璃的「本质」（用户拍板 12b）
 
 - **用户要的是「时刻 3」：macOS 访达侧边栏效果**——内容滚过栏下面时，栏糊掉内容，但能看到「有东西在动」（滚动穿越感）
@@ -329,12 +334,25 @@
 - OLED 主题下：关闭背景图 + 玻璃（用户拍板 F2-1）
 - 高对比主题下：禁用背景/玻璃（用户拍板 F1-3）
 
-### 6.4 技术方案
+### 6.4 技术方案（issue #83 实现回写）
 
-- **Android 12+（API 31+）**：`RenderEffect`（`BlurEffect`）——真实模糊，性能可控
+- **实现载体 = Haze（chrisbanes/haze）**，不是裸 `RenderEffect` API：
+  **内容侧** `Modifier.hazeSource(state)` + **玻璃侧** `Modifier.hazeEffect(state)`，两侧共享一个
+  `HazeState`，经 `LocalHazeState` 在「同时持有栏与内容」的容器里装配（`MainTabPager` 底栏 /
+  `HomeScreen` 顶栏 / `MainActivity` 根级给通知面板）
+- **Android 12+（API 31+）**：Haze 内部走 `RenderEffect`（`BlurEffect`）——真实模糊，性能可控
 - **API 26-30（minSdk 26 起步）**：降级为「半透明纯色 surface 层」（不做 bitmap 模糊，性能优先），视觉近似
-- 封装 `AppBlur(modifier)`：内部按 SDK 分流；模糊半径 token（8dp 标准）
+- 组件 `GlassSurface`（玻璃容器，对外 API 不变）；token `AppBlur`（`blurRadius` 8dp /
+  `SCRIM_ALPHA` / `MIN_BLUR_API`）；模式判定 `GlassRenderPolicy`（纯函数，三条降级路径 + 生效
+  路径 + 31 边界全部单测可断言——Robolectric 不渲染 RenderEffect、CI 模拟器在 API 30，
+  不收敛成纯函数就无从验证）
+- **几何约束（#83 真机踩过的坑，血泪）**：`hazeEffect` 只对**与玻璃矩形相交**的内容采样，于是
+  ① 待模糊内容必须 full-bleed 铺到玻璃背后——insets 走滚动容器的 `contentPadding`，不是把内容
+  整块 `Modifier.padding` 推到栏外；② 常驻在顶栏与列表之间的头部（首页小分区条）**必须进玻璃
+  矩形**（`AppTopBar(sectionBar = …)` 副行插槽），否则它把列表视口整体下推，滚动内容永远进不了
+  顶栏 → 顶栏只剩静止 scrim。两条都不满足时的表现就是「玻璃完全没效果」。
 - 禁止：列表 item 内毛玻璃、多图层叠毛玻璃（≤2 层）、动态模糊（性能红线）
+  ——首页「顶栏 + 小分区条」算**同一块**玻璃（一个 hazeEffect 矩形），不构成第 2 层
 
 ---
 

@@ -15,7 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
-import com.yumiru11.githubapp.core.designsystem.token.AppBlur
+import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
 import com.yumiru11.githubapp.core.navigation.AppRoute
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -57,7 +57,8 @@ fun MainTabPager(
 
     // backdrop blur（issue #83）：底栏 hazeEffect 与分区内容侧 hazeSource 共享本 state
     val hazeState = rememberHazeState()
-    val useHazeSource = blurEnabled && AppBlur.isBlurSupported()
+    // source 侧门禁与 GlassSurface 的 effect 侧同源判定（issue #83，防两侧漂移）
+    val useHazeSource = GlassRenderPolicy.shouldAttachHazeSource(blurEnabled)
 
     // 外部 tab 状态变化（如顶部头像切到我的）→ 联动 pager 滚动
     LaunchedEffect(tabIndex) {
