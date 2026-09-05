@@ -3,33 +3,43 @@
 // 路由数随 feature（T12/T14/T15/T21）增长，圈复杂度随之略超阈值，精准抑制。
 
 package com.yumiru11.githubapp.core.ui
+
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
+import androidx.navigation.toRoute
+import com.yumiru11.githubapp.core.designsystem.token.AppMotion
+import com.yumiru11.githubapp.core.designsystem.token.LocalMotionScale
 import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.EditorContentHolder
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.screens.ProfileScreen
-import java.net.URLEncoder
 import com.yumiru11.githubapp.core.ui.screens.SearchScreen as PlaceholderSearchScreen
 
 /**
- * 应用导航宿主：入口 Composable，内部 Navigation Compose NavHost。
+ * 应用导航宿主：入口 Composable，内部 Navigation Compose NavHost（#90 类型安全路由）。
  *
- * 注册各 route destination；接收 [ParsedUrl] → [AppRoute.fromParsedUrl] 的
+ * 注册各类型安全 destination；接收 [ParsedUrl] → [AppRoute.fromParsedUrl] 的
  * 外链导航能力（供外部消费）。
  *
  * - [startDestination]：起始 destination（T4 Wave2 登录态驱动首屏：Anonymous → 登录页，
- *   由宿主按 AuthState 传入；默认 HOME 保持向后兼容）
+ *   由宿主按 AuthState 传入；默认 [AppRoute.Home] 保持向后兼容）
  * - [homeScreen]：首页动态流页 Composable（宿主注入，避免 core:ui 依赖 feature:home；
  *   blurEnabled 等参数由宿主在 lambda 闭包内直接传给 feature:home HomeScreen）
  * - [loginScreen]：登录页 Composable（宿主注入，避免 core:ui 依赖 feature:auth）
@@ -45,7 +55,7 @@ import com.yumiru11.githubapp.core.ui.screens.SearchScreen as PlaceholderSearchS
 fun AppNavHost(
     navController: NavHostController = rememberNavController(),
     modifier: Modifier = Modifier,
-    startDestination: String = AppRoute.HOME,
+    startDestination: AppRoute = AppRoute.Home,
     homeScreen: @Composable () -> Unit = {},
     loginScreen: @Composable () -> Unit = {},
     searchScreen: @Composable () -> Unit = {},
@@ -81,262 +91,214 @@ fun AppNavHost(
     editorScreen: @Composable (initialContent: String, onClose: () -> Unit) -> Unit = { _, _ -> },
     createIssueScreen: @Composable (owner: String, repo: String) -> Unit = { _, _ -> },
 ) {
-    NavHost(
-        navController = navController,
-        startDestination = startDestination,
-        modifier = modifier,
-    ) {
-        composable(AppRoute.LOGIN) {
-            loginScreen()
-        }
-
-        composable(AppRoute.HOME) {
-            // T10：宿主注入真实首页动态流页（替换 T3 占位 HomeScreen/HomeTabs/HomePager）
-            homeScreen()
-        }
-
-        composable(AppRoute.SEARCH) {
-            // T18 真实搜索屏（feature/search）；此前误挂 core.ui 占位组件致「Coming soon」
-            searchScreen()
-        }
-
-        composable(AppRoute.SETTINGS) {
-            settingsScreen()
-        }
-
-        composable(
-            route = AppRoute.REPO,
-            arguments =
-                listOf(
-                    navArgument("owner") { type = NavType.StringType },
-                    navArgument("repo") { type = NavType.StringType },
-                    // T23：分支切换深链（ref 为 query；Navigation 自动解码）
-                    navArgument("ref") {
-                        type = NavType.StringType
-                        defaultValue = ""
+    // #90 全局默认转场：push = 右侧 1/4 滑入 + 淡入（EmphasizedDecelerate 400ms），
+    // pop = 当前页缩至 0.9 + 淡出；时长按 LocalMotionScale（设置页动效滑杆 × 系统
+    // 动画缩放）折算。Navigation 2.8.4 的转场 lambda 非 @Composable，须在组合外捕获
+    // 缩放值后以纯函数构造（AppMotion.scaledDuration(base, scale) 可单测重载）。
+    // 底栏三分区是 HOME 内 pager，不经过导航转场（无「弹窗感」）。
+    val motionScale = LocalMotionScale.current
+    // #90 共享元素试点：SharedTransitionLayout 包 NavHost，列表/详情头像经
+    // LocalSharedTransitionScope + 各 destination 的 LocalNavTransitionScope 配对
+    SharedTransitionLayout(modifier = modifier) {
+        CompositionLocalProvider(LocalSharedTransitionScope.provides(this)) {
+            NavHost(
+                navController = navController,
+                // 起始 destination 仅可能是 Home/Login（无参路由）：pattern = @SerialName
+                startDestination =
+                    when (startDestination) {
+                        is AppRoute.Home -> AppRoute.startDestinationPattern<AppRoute.Home>()
+                        is AppRoute.Login -> AppRoute.startDestinationPattern<AppRoute.Login>()
+                        else -> error("起始 destination 仅支持无参路由：$startDestination")
                     },
-                ),
-        ) { backStackEntry ->
-            val owner = backStackEntry.arguments?.getString("owner") ?: ""
-            val repo = backStackEntry.arguments?.getString("repo") ?: ""
-            val ref = backStackEntry.arguments?.getString("ref") ?: ""
-            val context = LocalContext.current
-            // T9 验收第 3 条：README 链接接线——内部链接应用内导航，外部链接 CustomTabs
-            CompositionLocalProvider(
-                LocalRepoDetailActions provides
-                    RepoDetailActions(
-                        onNavigateToParsedUrl = { parsed -> navigateToParsedUrl(navController, parsed) },
-                        onOpenExternal = { url ->
-                            CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
-                        },
-                        onEditMarkdown = { content ->
-                            EditorContentHolder.initialContent = content
-                            navController.navigate(AppRoute.EDITOR)
-                        },
-                    ),
+                enterTransition = { appEnterTransition(motionScale) },
+                exitTransition = { appExitTransition(motionScale) },
+                popEnterTransition = { appPopEnterTransition(motionScale) },
+                popExitTransition = { appPopExitTransition(motionScale) },
             ) {
-                repoDetailScreen(owner, repo, ref)
-            }
-        }
+                composable<AppRoute.Login> {
+                    provideNavTransitionScope {
+                        loginScreen()
+                    }
+                }
 
-        composable(AppRoute.EDITOR) {
-            editorScreen(EditorContentHolder.initialContent) { navController.popBackStack() }
-        }
+                composable<AppRoute.Home> {
+                    // T10：宿主注入真实首页动态流页（替换 T3 占位 HomeScreen/HomeTabs/HomePager）
+                    provideNavTransitionScope {
+                        homeScreen()
+                    }
+                }
 
-        composable(
-            route = AppRoute.ISSUES,
-            arguments =
-                listOf(
-                    navArgument("owner") { type = NavType.StringType },
-                    navArgument("repo") { type = NavType.StringType },
-                ),
-        ) { backStackEntry ->
-            val owner = backStackEntry.arguments?.getString("owner") ?: ""
-            val repo = backStackEntry.arguments?.getString("repo") ?: ""
-            // T13：Issue 列表页；点击项 → PR 走 PR 路由，否则走 Issue 详情路由
-            issueListScreen(owner, repo) { o, r, number, isPullRequest ->
-                val routeTemplate = if (isPullRequest) AppRoute.PR else AppRoute.ISSUE
-                navController.navigate(
-                    routeTemplate
-                        .replace("{owner}", o)
-                        .replace("{repo}", r)
-                        .replace("{number}", number.toString()),
-                )
-            }
-        }
+                composable<AppRoute.Search> {
+                    // T18 真实搜索屏（feature/search）；此前误挂 core.ui 占位组件致「Coming soon」
+                    provideNavTransitionScope {
+                        searchScreen()
+                    }
+                }
 
-        composable(
-            route = AppRoute.ISSUE,
-            arguments =
-                listOf(
-                    navArgument("owner") { type = NavType.StringType },
-                    navArgument("repo") { type = NavType.StringType },
-                    navArgument("number") { type = NavType.IntType },
-                ),
-        ) { backStackEntry ->
-            val owner = backStackEntry.arguments?.getString("owner") ?: ""
-            val repo = backStackEntry.arguments?.getString("repo") ?: ""
-            val number = backStackEntry.arguments?.getInt("number") ?: 0
-            // T13：Issue 详情页
-            issueDetailScreen(owner, repo, number)
-        }
+                composable<AppRoute.Settings> {
+                    provideNavTransitionScope {
+                        settingsScreen()
+                    }
+                }
 
-        composable(
-            route = AppRoute.PULLS,
-            arguments =
-                listOf(
-                    navArgument("owner") { type = NavType.StringType },
-                    navArgument("repo") { type = NavType.StringType },
-                ),
-        ) { backStackEntry ->
-            val owner = backStackEntry.arguments?.getString("owner") ?: ""
-            val repo = backStackEntry.arguments?.getString("repo") ?: ""
-            // T15：PR 列表页；点击项 → PR 详情路由
-            pullRequestListScreen(owner, repo) { o, r, number ->
-                navController.navigate(
-                    AppRoute.PR
-                        .replace("{owner}", o)
-                        .replace("{repo}", r)
-                        .replace("{number}", number.toString()),
-                )
-            }
-        }
+                composable<AppRoute.Repo> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.Repo>()
+                    val context = LocalContext.current
+                    // T9 验收第 3 条：README 链接接线——内部链接应用内导航，外部链接 CustomTabs
+                    CompositionLocalProvider(
+                        LocalRepoDetailActions provides
+                            RepoDetailActions(
+                                onNavigateToParsedUrl = { parsed -> navigateToParsedUrl(navController, parsed) },
+                                onOpenExternal = { url ->
+                                    CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(url))
+                                },
+                                onEditMarkdown = { content ->
+                                    EditorContentHolder.initialContent = content
+                                    navController.navigate(AppRoute.Editor)
+                                },
+                            ),
+                    ) {
+                        provideNavTransitionScope {
+                            repoDetailScreen(route.owner, route.repo, route.ref)
+                        }
+                    }
+                }
 
-        composable(
-            route = AppRoute.ISSUE_CREATE,
-            arguments =
-                listOf(
-                    navArgument("owner") { type = NavType.StringType },
-                    navArgument("repo") { type = NavType.StringType },
-                ),
-        ) { backStackEntry ->
-            val owner = backStackEntry.arguments?.getString("owner") ?: ""
-            val repo = backStackEntry.arguments?.getString("repo") ?: ""
-            // T14：创建 Issue 页；成功后返回列表
-            createIssueScreen(owner, repo)
-        }
+                composable<AppRoute.Editor> {
+                    provideNavTransitionScope {
+                        editorScreen(EditorContentHolder.initialContent) { navController.popBackStack() }
+                    }
+                }
 
-        composable(
-            route = AppRoute.PR_CREATE,
-            arguments =
-                listOf(
-                    navArgument("owner") { type = NavType.StringType },
-                    navArgument("repo") { type = NavType.StringType },
-                ),
-        ) { backStackEntry ->
-            val owner = backStackEntry.arguments?.getString("owner") ?: ""
-            val repo = backStackEntry.arguments?.getString("repo") ?: ""
-            // T23：创建 PR 页；成功后清出本页并打开新 PR 详情
-            createPullRequestScreen(owner, repo) { o, r, number ->
-                navController.navigate(
-                    AppRoute.PR
-                        .replace("{owner}", o)
-                        .replace("{repo}", r)
-                        .replace("{number}", number.toString()),
-                ) {
-                    popUpTo(AppRoute.PR_CREATE) { inclusive = true }
+                composable<AppRoute.Issues> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.Issues>()
+                    // T13：Issue 列表页；点击项 → PR 走 PR 路由，否则走 Issue 详情路由
+                    provideNavTransitionScope {
+                        issueListScreen(route.owner, route.repo) { o, r, number, isPullRequest ->
+                            navController.navigate(
+                                if (isPullRequest) {
+                                    AppRoute.Pr(o, r, number)
+                                } else {
+                                    AppRoute.Issue(o, r, number)
+                                },
+                            )
+                        }
+                    }
+                }
+
+                composable<AppRoute.Issue> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.Issue>()
+                    // T13：Issue 详情页
+                    provideNavTransitionScope {
+                        issueDetailScreen(route.owner, route.repo, route.number)
+                    }
+                }
+
+                composable<AppRoute.Pulls> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.Pulls>()
+                    // T15：PR 列表页；点击项 → PR 详情路由
+                    provideNavTransitionScope {
+                        pullRequestListScreen(route.owner, route.repo) { o, r, number ->
+                            navController.navigate(AppRoute.Pr(o, r, number))
+                        }
+                    }
+                }
+
+                composable<AppRoute.IssueCreate> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.IssueCreate>()
+                    // T14：创建 Issue 页；成功后返回列表
+                    provideNavTransitionScope {
+                        createIssueScreen(route.owner, route.repo)
+                    }
+                }
+
+                composable<AppRoute.PrCreate> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.PrCreate>()
+                    // T23：创建 PR 页；成功后清出本页并打开新 PR 详情
+                    provideNavTransitionScope {
+                        createPullRequestScreen(route.owner, route.repo) { o, r, number ->
+                            navController.navigate(AppRoute.Pr(o, r, number)) {
+                                popUpTo(AppRoute.PrCreate(o, r)) { inclusive = true }
+                            }
+                        }
+                    }
+                }
+
+                composable<AppRoute.Branches> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.Branches>()
+                    // T23：分支管理页；切换分支 → 带 ref 重进仓库详情（旧 REPO 页一并弹出）。
+                    // ref/path 等参数在类型安全路由下由 navigation 参数序列化器编码，无需手工 URLEncoder
+                    provideNavTransitionScope {
+                        branchesScreen(
+                            route.owner,
+                            route.repo,
+                            route.ref.ifBlank { null },
+                            { navController.popBackStack() },
+                            { branch ->
+                                navController.navigate(AppRoute.Repo(route.owner, route.repo, branch)) {
+                                    popUpTo(AppRoute.Repo(route.owner, route.repo)) { inclusive = true }
+                                }
+                            },
+                        )
+                    }
+                }
+
+                composable<AppRoute.Pr> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.Pr>()
+                    // T15：PR 详情页（四 Tab）
+                    provideNavTransitionScope {
+                        pullRequestDetailScreen(route.owner, route.repo, route.number)
+                    }
+                }
+
+                composable<AppRoute.User> {
+                    provideNavTransitionScope {
+                        profileScreen(
+                            { navController.navigate(AppRoute.Login) },
+                            { navController.navigate(AppRoute.Settings) },
+                        )
+                    }
+                }
+
+                // T5+ Commit 详情页（真实屏未开发；暂以占位承载，避免悬空路由）
+                composable<AppRoute.Commit> {
+                    provideNavTransitionScope {
+                        PlaceholderSearchScreen()
+                    }
+                }
+
+                // Discussion 深链历史崩溃修复（#90）：GitHubLinkParser 会产出 ParsedUrl.Discussion，
+                // 旧字符串体系下映射出的路由无对应 destination → 导航即崩溃；注册占位与 COMMIT 同策略
+                composable<AppRoute.Discussion> {
+                    provideNavTransitionScope {
+                        PlaceholderSearchScreen()
+                    }
+                }
+
+                composable<AppRoute.Blob> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.Blob>()
+                    // T11：blob 深链直达 FileViewer（此前误挂占位组件致「Coming soon」；
+                    // 多段 path 由参数序列化器编码进 query，Navigation 自动解码）
+                    provideNavTransitionScope {
+                        blobScreen(route.owner, route.repo, route.ref, route.path)
+                    }
                 }
             }
         }
+    }
+}
 
-        composable(
-            route = AppRoute.BRANCHES,
-            arguments =
-                listOf(
-                    navArgument("owner") { type = NavType.StringType },
-                    navArgument("repo") { type = NavType.StringType },
-                    navArgument("ref") {
-                        type = NavType.StringType
-                        defaultValue = ""
-                    },
-                ),
-        ) { backStackEntry ->
-            val owner = backStackEntry.arguments?.getString("owner") ?: ""
-            val repo = backStackEntry.arguments?.getString("repo") ?: ""
-            val ref = backStackEntry.arguments?.getString("ref") ?: ""
-            // T23：分支管理页；切换分支 → 带 ref 深链重进仓库详情（旧 REPO 页一并弹出）
-            branchesScreen(
-                owner,
-                repo,
-                ref.ifBlank { null },
-                { navController.popBackStack() },
-                { branch ->
-                    navController.navigate(
-                        AppRoute.REPO
-                            .replace("{owner}", owner)
-                            .replace("{repo}", repo)
-                            .replace("{ref}", URLEncoder.encode(branch, "UTF-8").replace("+", "%20")),
-                    ) {
-                        popUpTo(AppRoute.REPO) { inclusive = true }
-                    }
-                },
-            )
-        }
-
-        composable(
-            route = AppRoute.PR,
-            arguments =
-                listOf(
-                    navArgument("owner") { type = NavType.StringType },
-                    navArgument("repo") { type = NavType.StringType },
-                    navArgument("number") { type = NavType.IntType },
-                ),
-        ) { backStackEntry ->
-            val owner = backStackEntry.arguments?.getString("owner") ?: ""
-            val repo = backStackEntry.arguments?.getString("repo") ?: ""
-            val number = backStackEntry.arguments?.getInt("number") ?: 0
-            // T15：PR 详情页（四 Tab）
-            pullRequestDetailScreen(owner, repo, number)
-        }
-
-        composable(
-            route = AppRoute.USER,
-            arguments =
-                listOf(
-                    navArgument("login") { type = NavType.StringType },
-                ),
-        ) {
-            profileScreen(
-                { navController.navigate(AppRoute.LOGIN) },
-                { navController.navigate(AppRoute.SETTINGS) },
-            )
-        }
-
-        composable(
-            route = AppRoute.COMMIT,
-            arguments =
-                listOf(
-                    navArgument("owner") { type = NavType.StringType },
-                    navArgument("repo") { type = NavType.StringType },
-                    navArgument("sha") { type = NavType.StringType },
-                ),
-        ) {
-            // T5+ Commit 详情页（真实屏未开发；暂以占位承载，避免悬空路由）
-            PlaceholderSearchScreen()
-        }
-
-        composable(
-            route = AppRoute.BLOB,
-            arguments =
-                listOf(
-                    navArgument("owner") { type = NavType.StringType },
-                    navArgument("repo") { type = NavType.StringType },
-                    navArgument("ref") { type = NavType.StringType },
-                    // query 参数必须带默认值；Navigation 自动完成 %2F/%20 解码
-                    navArgument("path") {
-                        type = NavType.StringType
-                        defaultValue = ""
-                    },
-                ),
-        ) { backStackEntry ->
-            // T11：blob 深链直达 FileViewer（此前误挂占位组件致「Coming soon」；
-            // 多段 path 经 query 参数 ?path= 传入，Navigation 自动解码）
-            val ownerArg = backStackEntry.arguments?.getString("owner") ?: ""
-            val repoArg = backStackEntry.arguments?.getString("repo") ?: ""
-            val ref = backStackEntry.arguments?.getString("ref") ?: ""
-            val path = backStackEntry.arguments?.getString("path") ?: ""
-            blobScreen(ownerArg, repoArg, ref, path)
-        }
+/**
+ * 注入当前 destination 的动画作用域（#90 共享元素试点）。
+ *
+ * 把当前 composable destination 的 [AnimatedVisibilityScope]（Navigation 在
+ * AnimatedContent 内提供）provide 到 [LocalNavTransitionScope]，feature 屏经
+ * [Modifier.sharedTransitionElement] 读取并以相同 key 配对列表/详情头像。
+ */
+@Composable
+private fun AnimatedVisibilityScope.provideNavTransitionScope(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalNavTransitionScope.provides(this)) {
+        content()
     }
 }
 
@@ -344,7 +306,7 @@ fun AppNavHost(
  * 处理 [ParsedUrl] 外链导航。
  *
  * - [ParsedUrl.External] → 返回 false（由 [ExternalLinkHost] 处理）
- * - 其他 → 导航到对应 route 并返回 true
+ * - 其他 → 导航到对应类型安全 route 并返回 true
  */
 fun navigateToParsedUrl(
     navController: NavHostController,
@@ -354,4 +316,48 @@ fun navigateToParsedUrl(
     val route = AppRoute.fromParsedUrl(parsedUrl) ?: return false
     navController.navigate(route)
     return true
+}
+
+// ── #90 全局转场规格（来源 ui-audit 提案 #6） ──
+//
+// push：新页自右 1/4 宽滑入 + 淡入（M3 EmphasizedDecelerate 400ms）；
+// pop：当前页缩至 0.9 + 淡出。全部时长经 AppMotion.scaledDuration 折算
+// （设置页动效滑杆 × 系统动画缩放，尊重「移除动画」）。转场随预测返回
+// 手势（enableOnBackInvokedCallback）进度驱动，Android 14+ 返回预览同源。
+//
+// ⚠️ Navigation 2.8.4 NavHost 的转场 lambda 为普通（非 @Composable）函数，
+// 故时长在此以纯函数 AppMotion.scaledDuration(base, motionScale) 构造，
+// motionScale 由组合内 LocalMotionScale.current 捕获传入。
+
+/** push 进入：右侧 1/4 宽滑入 + 淡入。 */
+private fun appEnterTransition(motionScale: Float): EnterTransition {
+    val duration = AppMotion.scaledDuration(AppMotion.DURATION_PAGE_ENTER, motionScale)
+    return slideInHorizontally(
+        initialOffsetX = { it / 4 },
+        animationSpec = tween(duration, easing = AppMotion.EmphasizedDecelerate),
+    ) + fadeIn(animationSpec = tween(duration, easing = AppMotion.EmphasizedDecelerate))
+}
+
+/** push 退出（被覆盖页）：淡出（M3 EmphasizedAccelerate 200ms）。 */
+private fun appExitTransition(motionScale: Float): ExitTransition {
+    val duration = AppMotion.scaledDuration(AppMotion.DURATION_PAGE_EXIT, motionScale)
+    return fadeOut(animationSpec = tween(duration, easing = AppMotion.EmphasizedAccelerate))
+}
+
+/** pop 进入（返回时下层页）：左侧 1/4 宽滑入 + 淡入，与 push 对称。 */
+private fun appPopEnterTransition(motionScale: Float): EnterTransition {
+    val duration = AppMotion.scaledDuration(AppMotion.DURATION_PAGE_ENTER, motionScale)
+    return slideInHorizontally(
+        initialOffsetX = { -it / 4 },
+        animationSpec = tween(duration, easing = AppMotion.EmphasizedDecelerate),
+    ) + fadeIn(animationSpec = tween(duration, easing = AppMotion.EmphasizedDecelerate))
+}
+
+/** pop 退出（返回时当前页）：缩至 0.9 + 淡出。 */
+private fun appPopExitTransition(motionScale: Float): ExitTransition {
+    val duration = AppMotion.scaledDuration(AppMotion.DURATION_PAGE_ENTER, motionScale)
+    return scaleOut(
+        targetScale = 0.9f,
+        animationSpec = tween(duration, easing = AppMotion.EmphasizedAccelerate),
+    ) + fadeOut(animationSpec = tween(duration, easing = AppMotion.EmphasizedAccelerate))
 }

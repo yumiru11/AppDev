@@ -22,7 +22,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
-import com.yumiru11.githubapp.core.navigation.AppRoute
 
 /**
  * 应用底部导航栏：首页 / 仓库 / 我的。
@@ -50,9 +49,9 @@ fun AppBottomBar(
 
     val tabs =
         listOf(
-            TabItem(AppRoute.HOME, R.string.nav_home, Icons.Filled.Home, Icons.Outlined.Home),
-            TabItem(TAB_REPOS, R.string.nav_repos, Icons.Filled.Star, Icons.Outlined.Star),
-            TabItem(AppRoute.PROFILE, R.string.nav_profile, Icons.Filled.Person, Icons.Outlined.Person),
+            TabItem(MainTab.HOME, R.string.nav_home, Icons.Filled.Home, Icons.Outlined.Home),
+            TabItem(MainTab.REPOS, R.string.nav_repos, Icons.Filled.Star, Icons.Outlined.Star),
+            TabItem(MainTab.PROFILE, R.string.nav_profile, Icons.Filled.Person, Icons.Outlined.Person),
         )
 
     GlassSurface(
@@ -85,16 +84,13 @@ fun AppBottomBar(
     }
 }
 
-/** 仓库 Tab 路由（底部导航专用，非 AppRoute 常量） */
-const val TAB_REPOS = "repos"
-
 // ── @Preview（#86）：底栏 Light/Dark 双主题预览 ──
 
 @Preview(name = "Light", showBackground = true)
 @Composable
 private fun AppBottomBarPreviewLight() {
     AppTheme(darkTheme = false) {
-        AppBottomBar(selectedTab = AppRoute.HOME, onTabSelected = {})
+        AppBottomBar(selectedTab = MainTab.HOME, onTabSelected = {})
     }
 }
 
@@ -102,6 +98,6 @@ private fun AppBottomBarPreviewLight() {
 @Composable
 private fun AppBottomBarPreviewDark() {
     AppTheme(darkTheme = true) {
-        AppBottomBar(selectedTab = TAB_REPOS, onTabSelected = {})
+        AppBottomBar(selectedTab = MainTab.REPOS, onTabSelected = {})
     }
 }

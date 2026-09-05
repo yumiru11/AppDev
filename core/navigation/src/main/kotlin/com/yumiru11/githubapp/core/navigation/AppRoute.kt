@@ -4,110 +4,199 @@
 package com.yumiru11.githubapp.core.navigation
 
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
-import java.net.URLEncoder
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.serializer
 
 /**
- * 应用内导航路由表。
+ * 应用内导航路由表（#90 类型化：Navigation Compose 2.8 的 @Serializable 类型安全路由）。
  *
- * 每个常量是 Navigation Compose 的 route 字符串，含 `{placeholder}` 参数。
- * 纯 Kotlin，不依赖任何 Android / Compose 类型。
+ * - 无参页 = `data object`；带参页 = `data class`（导航时传对象本身，拒绝字符串拼参）
+ * - `@SerialName` 固定路由基路径：Navigation 以 serialName 为 route pattern 的基路径，
+ *   其余占位符由序列化描述符派生（如 `Repo` → `repo/{owner}/{repo}?ref={ref}`，
+ *   带默认值的参数自动成为 optional query）——显式声明后 pattern 与旧字符串路由完全一致
+ * - 纯 Kotlin，不依赖任何 Android / Compose 类型；serialization 为唯一增引（见 build.gradle.kts）
  */
-object AppRoute {
-    const val HOME = "home"
-    const val LOGIN = "login"
+sealed interface AppRoute {
+    @Serializable
+    @SerialName("home")
+    data object Home : AppRoute
+
+    @Serializable
+    @SerialName("login")
+    data object Login : AppRoute
+
+    @Serializable
+    @SerialName("search")
+    data object Search : AppRoute
+
+    @Serializable
+    @SerialName("settings")
+    data object Settings : AppRoute
+
+    @Serializable
+    @SerialName("editor")
+    data object Editor : AppRoute
 
     // ref 为可选 query（T23 分支切换深链：切换后带新 ref 重进仓库详情，文件树按该分支加载）
-    const val REPO = "repo/{owner}/{repo}?ref={ref}"
-    const val ISSUE = "issue/{owner}/{repo}/{number}"
-    const val ISSUES = "issues/{owner}/{repo}"
-    const val PULLS = "pulls/{owner}/{repo}"
-    const val PR_CREATE = "pr_create/{owner}/{repo}"
+    @Serializable
+    @SerialName("repo")
+    data class Repo(
+        val owner: String,
+        val repo: String,
+        val ref: String = "",
+    ) : AppRoute
+
+    @Serializable
+    @SerialName("issues")
+    data class Issues(
+        val owner: String,
+        val repo: String,
+    ) : AppRoute
+
+    @Serializable
+    @SerialName("issue")
+    data class Issue(
+        val owner: String,
+        val repo: String,
+        val number: Int,
+    ) : AppRoute
+
+    @Serializable
+    @SerialName("pulls")
+    data class Pulls(
+        val owner: String,
+        val repo: String,
+    ) : AppRoute
+
+    @Serializable
+    @SerialName("pr_create")
+    data class PrCreate(
+        val owner: String,
+        val repo: String,
+    ) : AppRoute
 
     // ref 可选 query：从仓库文件 Tab 分支 Chip 进入时携带当前分支，分支页高亮
-    const val BRANCHES = "branches/{owner}/{repo}?ref={ref}"
-    const val ISSUE_CREATE = "issue_create/{owner}/{repo}"
-    const val PR = "pr/{owner}/{repo}/{number}"
-    const val COMMIT = "commit/{owner}/{repo}/{sha}"
-    const val DISCUSSION = "discussion/{owner}/{repo}/{number}"
+    @Serializable
+    @SerialName("branches")
+    data class Branches(
+        val owner: String,
+        val repo: String,
+        val ref: String = "",
+    ) : AppRoute
 
-    // path 走 query 参数：文件路径天然多段（a/b/c.kt），单段 {path} 占位符无法匹配
-    // 多段深链，会抛 "Navigation destination cannot be found" 崩溃（CI 截图段 5.11 首次暴露）。
-    // 构造时必须 URLEncoder.encode（见 fromParsedUrl）；目标参数 NavType.StringType 自动解码。
-    const val BLOB = "blob/{owner}/{repo}/{ref}?path={path}"
-    const val USER = "user/{login}"
-    const val SEARCH = "search"
+    @Serializable
+    @SerialName("issue_create")
+    data class IssueCreate(
+        val owner: String,
+        val repo: String,
+    ) : AppRoute
 
-    // NOTIFICATION 路由随 #88 移除：通知改为铃铛触发的覆盖面板（ui-design §3.4），不再进导航栈
-    const val PROFILE = "profile"
-    const val SETTINGS = "settings"
-    const val EXTERNAL = "external"
-    const val EDITOR = "editor"
+    @Serializable
+    @SerialName("pr")
+    data class Pr(
+        val owner: String,
+        val repo: String,
+        val number: Int,
+    ) : AppRoute
 
-    /**
-     * 将 [ParsedUrl] 映射为具体 route 字符串。
-     *
-     * 仅映射有明确路由归属的类型；[ParsedUrl.External] 及无 owner/repo 语境的
-     * 类型（如 [ParsedUrl.IssueRef]、[ParsedUrl.Release]、[ParsedUrl.Tree]、
-     * [ParsedUrl.Search]）返回 null，由调用方决定兜底行为。
-     */
-    fun fromParsedUrl(parsed: ParsedUrl): String? =
-        when (parsed) {
-            is ParsedUrl.Repo -> {
-                "repo/${parsed.owner}/${parsed.repo}"
-            }
+    @Serializable
+    @SerialName("commit")
+    data class Commit(
+        val owner: String,
+        val repo: String,
+        val sha: String,
+    ) : AppRoute
 
-            is ParsedUrl.Issue -> {
-                "issue/${parsed.owner}/${parsed.repo}/${parsed.number}"
-            }
+    @Serializable
+    @SerialName("discussion")
+    data class Discussion(
+        val owner: String,
+        val repo: String,
+        val number: Int,
+    ) : AppRoute
 
-            is ParsedUrl.IssueList -> {
-                "issues/${parsed.owner}/${parsed.repo}"
-            }
+    @Serializable
+    @SerialName("user")
+    data class User(
+        val login: String,
+    ) : AppRoute
 
-            is ParsedUrl.PullRequest -> {
-                "pr/${parsed.owner}/${parsed.repo}/${parsed.number}"
-            }
+    // path 走 query 参数（默认值 → optional query）：文件路径天然多段（a/b/c.kt），
+    // 单段 {path} 占位符无法匹配多段深链（CI 截图段 5.11 首次暴露）。
+    // 类型安全路由下 path 由 navigation 参数序列化器编码，不再需要手工 URLEncoder。
+    @Serializable
+    @SerialName("blob")
+    data class Blob(
+        val owner: String,
+        val repo: String,
+        val ref: String,
+        val path: String = "",
+    ) : AppRoute
 
-            is ParsedUrl.Commit -> {
-                if (parsed.owner == null || parsed.repo == null) {
+    companion object {
+        /**
+         * 将 [ParsedUrl] 映射为类型安全 route 对象。
+         *
+         * 仅映射有明确路由归属的类型；[ParsedUrl.External] 及无 owner/repo 语境的
+         * 类型（如 [ParsedUrl.IssueRef]、[ParsedUrl.Release]、[ParsedUrl.Tree]、
+         * [ParsedUrl.Search]）返回 null，由调用方决定兜底行为。
+         */
+        fun fromParsedUrl(parsed: ParsedUrl): AppRoute? =
+            when (parsed) {
+                is ParsedUrl.Repo -> {
+                    Repo(parsed.owner, parsed.repo)
+                }
+
+                is ParsedUrl.Issue -> {
+                    Issue(parsed.owner, parsed.repo, parsed.number)
+                }
+
+                is ParsedUrl.IssueList -> {
+                    Issues(parsed.owner, parsed.repo)
+                }
+
+                is ParsedUrl.PullRequest -> {
+                    Pr(parsed.owner, parsed.repo, parsed.number)
+                }
+
+                is ParsedUrl.Commit -> {
+                    if (parsed.owner == null || parsed.repo == null) {
+                        null
+                    } else {
+                        Commit(parsed.owner, parsed.repo, parsed.sha)
+                    }
+                }
+
+                is ParsedUrl.Discussion -> {
+                    Discussion(parsed.owner, parsed.repo, parsed.number)
+                }
+
+                is ParsedUrl.Blob -> {
+                    Blob(parsed.owner, parsed.repo, parsed.ref, parsed.path)
+                }
+
+                is ParsedUrl.User -> {
+                    User(parsed.login)
+                }
+
+                is ParsedUrl.External,
+                is ParsedUrl.IssueRef,
+                is ParsedUrl.Release,
+                is ParsedUrl.Tree,
+                is ParsedUrl.Search,
+                -> {
                     null
-                } else {
-                    "commit/${parsed.owner}/${parsed.repo}/${parsed.sha}"
                 }
             }
 
-            is ParsedUrl.Discussion -> {
-                "discussion/${parsed.owner}/${parsed.repo}/${parsed.number}"
-            }
-
-            is ParsedUrl.Blob -> {
-                // path 多段必须整体编码成单段 query 值（'/'→%2F，'+'→%20 防空格歧义）
-                "blob/${parsed.owner}/${parsed.repo}/${parsed.ref}?path=" +
-                    URLEncoder.encode(parsed.path, "UTF-8").replace("+", "%20")
-            }
-
-            is ParsedUrl.User -> {
-                "user/${parsed.login}"
-            }
-
-            is ParsedUrl.External -> {
-                null
-            }
-
-            is ParsedUrl.IssueRef -> {
-                null
-            }
-
-            is ParsedUrl.Release -> {
-                null
-            }
-
-            is ParsedUrl.Tree -> {
-                null
-            }
-
-            is ParsedUrl.Search -> {
-                null
-            }
-        }
+        /**
+         * 无参路由在 Navigation 中的注册 pattern（基路径 = @SerialName 的 serialName）。
+         *
+         * 仅供 NavHost 的 startDestination 使用（本应用仅 Home/Login 两种无参起始路由）。
+         * 带参路由的完整 pattern（`{owner}` 等占位符）由 Navigation 依序列化描述符生成，
+         * 导航一律传 route 对象本身，无需手工拼 pattern。
+         */
+        inline fun <reified T : AppRoute> startDestinationPattern(): String = serializer<T>().descriptor.serialName
+    }
 }

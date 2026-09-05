@@ -10,7 +10,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.yumiru11.githubapp.core.navigation.AppRoute
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -42,7 +41,7 @@ class MainTabPagerGlassSourceTest {
     fun mainTabPager_pageContent_reachesScreenBottom() {
         composeRule.setContent {
             MainTabPager(
-                selectedTab = AppRoute.HOME,
+                selectedTab = MainTab.HOME,
                 onTabSelected = {},
                 homePage = { Box(modifier = Modifier.testTag(PAGE_TAG).fillMaxSize()) },
             )
@@ -62,7 +61,7 @@ class MainTabPagerGlassSourceTest {
         var reportedBottom = Dp.Unspecified
         composeRule.setContent {
             MainTabPager(
-                selectedTab = AppRoute.HOME,
+                selectedTab = MainTab.HOME,
                 onTabSelected = {},
                 homePage = { padding ->
                     reportedBottom = padding.calculateBottomPadding()

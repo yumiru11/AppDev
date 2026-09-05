@@ -16,7 +16,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
 import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
-import com.yumiru11.githubapp.core.navigation.AppRoute
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.launch
@@ -37,7 +36,7 @@ import kotlinx.coroutines.launch
  * 分区页若自持顶栏（如 HomeScreen）应自建一份 state 覆盖本值，避免顶栏 effect
  * 嵌套进底栏 source 子树。
  *
- * @param selectedTab 当前选中分区路由（AppRoute.HOME / repos / AppRoute.PROFILE）
+ * @param selectedTab 当前选中分区键（MainTab.HOME / MainTab.REPOS / MainTab.PROFILE）
  * @param onTabSelected tab 点击回调（宿主无需处理，本组件内部已联动 pager；保留参数供外部感知）
  */
 @Composable
@@ -121,8 +120,8 @@ fun MainTabPager(
 
 private fun tabIndexFor(route: String): Int =
     when (route) {
-        TAB_REPOS -> 1
-        AppRoute.PROFILE -> 2
+        MainTab.REPOS -> 1
+        MainTab.PROFILE -> 2
         else -> 0
     }
 

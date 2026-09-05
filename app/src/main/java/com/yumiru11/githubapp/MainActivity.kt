@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.compose.rememberNavController
 import com.yumiru11.githubapp.auth.authStateToDestination
 import com.yumiru11.githubapp.auth.shouldNavigateForAuthState
@@ -45,6 +46,7 @@ import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppNavHost
+import com.yumiru11.githubapp.core.ui.MainTab
 import com.yumiru11.githubapp.core.ui.MainTabPager
 import com.yumiru11.githubapp.core.ui.PlaceholderScreen
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
@@ -72,7 +74,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.launch
-import java.net.URLEncoder
 import java.util.Locale
 import javax.inject.Inject
 
@@ -125,7 +126,7 @@ class MainActivity : ComponentActivity() {
             // 语言偏好（T24 设置页语言切换）：变化 → 缓存 + recreate 应用 locale
             val languageTag by userPreferencesRepository.languageTag.collectAsStateWithLifecycle(initialValue = null)
             // 底部三分区当前页（分区重构 2026-08-14：tab 切换 = pager 横滑，非导航）
-            var mainTab by rememberSaveable { mutableStateOf(AppRoute.HOME) }
+            var mainTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
 
             AppThemeHost(repository = userPreferencesRepository) {
                 // 根级 HazeState（#88）：通知面板玻璃 backdrop-blur 整个 NavHost 内容。
@@ -156,26 +157,18 @@ class MainActivity : ComponentActivity() {
                                         blurEnabled = blurEnabled,
                                         homePage = { padding ->
                                             HomeScreen(
-                                                onSearchClick = { navController.navigate(AppRoute.SEARCH) },
+                                                onSearchClick = { navController.navigate(AppRoute.Search) },
                                                 onNotificationClick = { notificationPanelVisible = true },
-                                                onProfileClick = { mainTab = AppRoute.PROFILE },
+                                                onProfileClick = { mainTab = MainTab.PROFILE },
                                                 onCreateIssue = { owner, repo ->
-                                                    navController.navigate(
-                                                        AppRoute.ISSUE_CREATE
-                                                            .replace("{owner}", owner)
-                                                            .replace("{repo}", repo),
-                                                    )
+                                                    navController.navigate(AppRoute.IssueCreate(owner, repo))
                                                 },
                                                 onViewPullRequests = { owner, repo ->
-                                                    navController.navigate(
-                                                        AppRoute.PULLS
-                                                            .replace("{owner}", owner)
-                                                            .replace("{repo}", repo),
-                                                    )
+                                                    navController.navigate(AppRoute.Pulls(owner, repo))
                                                 },
                                                 blurEnabled = blurEnabled,
                                                 onLoginClick = {
-                                                    navController.navigate(AppRoute.LOGIN) {
+                                                    navController.navigate(AppRoute.Login) {
                                                         popUpTo(0) { inclusive = true }
                                                     }
                                                 },
@@ -202,23 +195,17 @@ class MainActivity : ComponentActivity() {
                                         profilePage = { padding ->
                                             ProfileScreen(
                                                 onLoginClick = {
-                                                    navController.navigate(AppRoute.LOGIN) {
+                                                    navController.navigate(AppRoute.Login) {
                                                         popUpTo(0) { inclusive = true }
                                                     }
                                                 },
                                                 onOpenRepository = { owner, repo ->
-                                                    navController.navigate(
-                                                        AppRoute.REPO
-                                                            .replace("{owner}", owner)
-                                                            .replace("{repo}", repo),
-                                                    )
+                                                    navController.navigate(AppRoute.Repo(owner, repo))
                                                 },
                                                 onOpenUser = { login ->
-                                                    navController.navigate(
-                                                        AppRoute.USER.replace("{login}", login),
-                                                    )
+                                                    navController.navigate(AppRoute.User(login))
                                                 },
-                                                onSettingsClick = { navController.navigate(AppRoute.SETTINGS) },
+                                                onSettingsClick = { navController.navigate(AppRoute.Settings) },
                                                 bottomContentPadding = padding.calculateBottomPadding(),
                                             )
                                         },
@@ -235,7 +222,7 @@ class MainActivity : ComponentActivity() {
                                     SearchScreen(
                                         onResultClick = { parsed -> navigateToParsedUrl(navController, parsed) },
                                         onLoginClick = {
-                                            navController.navigate(AppRoute.LOGIN) {
+                                            navController.navigate(AppRoute.Login) {
                                                 popUpTo(0) { inclusive = true }
                                             }
                                         },
@@ -258,15 +245,8 @@ class MainActivity : ComponentActivity() {
                                         onBackClick = { navController.popBackStack() },
                                         // T23：文件 Tab 分支 Chip → 分支管理页（带当前分支高亮）
                                         onBranchesClick = { o, r, currentRef ->
-                                            navController.navigate(
-                                                AppRoute.BRANCHES
-                                                    .replace("{owner}", o)
-                                                    .replace("{repo}", r)
-                                                    .replace(
-                                                        "{ref}",
-                                                        URLEncoder.encode(currentRef.orEmpty(), "UTF-8").replace("+", "%20"),
-                                                    ),
-                                            )
+                                            // #90 类型安全路由：ref 由 navigation 参数序列化器编码，不再手工 URLEncoder
+                                            navController.navigate(AppRoute.Branches(o, r, currentRef.orEmpty()))
                                         },
                                     )
                                 },
@@ -274,18 +254,12 @@ class MainActivity : ComponentActivity() {
                                     ProfileScreen(
                                         onLoginClick = onLoginClick,
                                         onOpenRepository = { owner, repo ->
-                                            navController.navigate(
-                                                AppRoute.REPO
-                                                    .replace("{owner}", owner)
-                                                    .replace("{repo}", repo),
-                                            )
+                                            navController.navigate(AppRoute.Repo(owner, repo))
                                         },
                                         onOpenUser = { login ->
-                                            navController.navigate(
-                                                AppRoute.USER.replace("{login}", login),
-                                            )
+                                            navController.navigate(AppRoute.User(login))
                                         },
-                                        onSettingsClick = { navController.navigate(AppRoute.SETTINGS) },
+                                        onSettingsClick = { navController.navigate(AppRoute.Settings) },
                                     )
                                 },
                                 settingsScreen = {
@@ -299,9 +273,7 @@ class MainActivity : ComponentActivity() {
                                         onIssueClick = onIssueClick,
                                         onCreateIssue = {
                                             navController.navigate(
-                                                AppRoute.ISSUE_CREATE
-                                                    .replace("{owner}", owner)
-                                                    .replace("{repo}", repo),
+                                                AppRoute.IssueCreate(owner, repo),
                                             )
                                         },
                                     )
@@ -324,9 +296,7 @@ class MainActivity : ComponentActivity() {
                                         // T23：PR 列表顶栏「新建」→ 创建 PR 页
                                         onCreatePullRequest = { o, r ->
                                             navController.navigate(
-                                                AppRoute.PR_CREATE
-                                                    .replace("{owner}", o)
-                                                    .replace("{repo}", r),
+                                                AppRoute.PrCreate(o, r),
                                             )
                                         },
                                     )
@@ -366,7 +336,7 @@ class MainActivity : ComponentActivity() {
                             visible = notificationPanelVisible,
                             onDismiss = { notificationPanelVisible = false },
                             onLoginClick = {
-                                navController.navigate(AppRoute.LOGIN) {
+                                navController.navigate(AppRoute.Login) {
                                     popUpTo(0) { inclusive = true }
                                 }
                             },
@@ -389,7 +359,8 @@ class MainActivity : ComponentActivity() {
             // 登录态驱动导航：仅状态变化且目标页不符时 navigate，popUpTo(0) 清栈防循环
             LaunchedEffect(authState) {
                 val target = authStateToDestination(authState)
-                if (shouldNavigateForAuthState(navController.currentDestination?.route, target)) {
+                val isOnLogin = navController.currentDestination?.hasRoute<AppRoute.Login>() == true
+                if (shouldNavigateForAuthState(isOnLogin, target)) {
                     navController.navigate(target) {
                         popUpTo(0) { inclusive = true }
                     }
@@ -401,7 +372,7 @@ class MainActivity : ComponentActivity() {
                 authViewModel.navigationEvents.collect { event ->
                     when (event) {
                         AuthNavigation.Home -> {
-                            navController.navigate(AppRoute.HOME) {
+                            navController.navigate(AppRoute.Home) {
                                 popUpTo(0) { inclusive = true }
                             }
                         }
