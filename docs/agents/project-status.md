@@ -42,6 +42,7 @@
 | T22 文件编辑提交 | #23 | Contents API + sha 校验 + 409 三选项（重载/覆盖/保留本地，PR #96） | ✅ |
 | UI 打磨波 | #82 | Home Tab M3 化、PR 评论、Star/Watch 按钮（PR #82） | ✅ |
 | UI 审查修复批·通知面板 | #88 | 面板完整形态：右侧滑入+遮罩+Haze 玻璃、按仓库分组折叠、右滑已读回弹/左滑 done 删除、未读左缘色条、筛选 chips 迁移、三态组件接入；旧独立路由与 T19 分页栈随面板化移除 | ✅ |
+| UI 审查修复批·毛玻璃 backdrop | #83 | 顶栏 backdrop 接线补完：小分区条并入玻璃头（AppTopBar sectionBar 副行）、内容 full-bleed 且玻璃头高度改走 contentPadding、长条按钮随 feed 滚动；渲染模式判定收敛成可单测纯函数 GlassRenderPolicy；app 侧截图基线零变更（PR #108 / merge 8bcaec6）| ✅ 代码合入，票待真机穿越感复测后关 |
 
 ## 3. 剩余 5 票（功能线，依赖已全部满足除注明外）
 
@@ -58,7 +59,7 @@
 
 | Issue | 标题 | 依赖 |
 |---|---|---|
-| #83 | fix(designsystem): 毛玻璃改为 backdrop 模糊实现 | 无，**代码已闭环（`Refs #83`）**；真机「穿越感」复测后手动关票 |
+| #83 | fix(designsystem): 毛玻璃改为 backdrop 模糊实现 | **PR #108 已合入 main（8bcaec6）**；票保持 open —— 关票条件是真机「滚动穿越感」复测 + FEEDBACK #17 闭环（验收卡见 PR #108 / 票上 2026-09-05 评论） |
 | #84 | feat(designsystem): 共享状态组件族与动效缩放基建 | 无，**依赖根，最优先** |
 | #85 | fix(issue,pr): 标签混色与状态徽章语义色 | 仅 StatusChip 行等 #84；⚠️ 与 T16 文件冲突错峰 |
 | #86 | perf(list): Paging itemKey 迁移与模型稳定性标注 | 无；Home 屏行与 #89 错峰 |
@@ -78,6 +79,7 @@
 | 图标候选清单（底部导航实心/空心） | 用户要求选出候选验证批准后才用（ADR-0006） |
 | PiliPlus 卡片风格细节 | 实现时提取参照给两版对比（docs/ui-design.md §11） |
 | Material Symbols 变量字体（wght=300） | ADR-0004 挂账；静态 outlined/filled 变体已可用 |
+| **模块级截图基线不在任何门禁里**（#83 取证发现） | CI 只跑 `:app:verifyRoborazziDebug`。在**干净 main** 上跑 `:core:ui:verifyRoborazziDebug` / `:core:designsystem:verifyRoborazziDebug` 即失败（core:ui 7 张含我完全没碰的 `AppBottomBar_*` 全套；designsystem 2 张 `GlassSurface_*`），且与改动分支渲染出的 `*_actual.png` 逐字节 `cmp` **IDENTICAL** → 属基线录制环境与本机不一致的既有漂移，非改动引入。修法二选一：把模块级 `verifyRoborazziDebug` 纳入 CI，或重录基线并注明录制环境 |
 
 ## 6. 更新规则
 
