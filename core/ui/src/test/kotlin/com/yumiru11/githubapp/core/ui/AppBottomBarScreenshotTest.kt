@@ -1,6 +1,5 @@
 package com.yumiru11.githubapp.core.ui
 
-import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.testing.screenshot.ScreenshotTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,7 +23,7 @@ class AppBottomBarScreenshotTest : ScreenshotTest() {
     fun appBottomBar_lightTheme_matchesBaseline() {
         captureScreenshot(name = "AppBottomBar_light", darkTheme = false) {
             AppBottomBar(
-                selectedTab = AppRoute.HOME,
+                selectedTab = MainTab.HOME,
                 onTabSelected = {},
             )
         }
@@ -34,7 +33,7 @@ class AppBottomBarScreenshotTest : ScreenshotTest() {
     fun appBottomBar_darkTheme_matchesBaseline() {
         captureScreenshot(name = "AppBottomBar_dark", darkTheme = true) {
             AppBottomBar(
-                selectedTab = AppRoute.HOME,
+                selectedTab = MainTab.HOME,
                 onTabSelected = {},
             )
         }
@@ -44,7 +43,7 @@ class AppBottomBarScreenshotTest : ScreenshotTest() {
     fun appBottomBar_reposTabSelected_matchesBaseline() {
         captureScreenshot(name = "AppBottomBar_repos", darkTheme = false) {
             AppBottomBar(
-                selectedTab = TAB_REPOS,
+                selectedTab = MainTab.REPOS,
                 onTabSelected = {},
             )
         }
@@ -54,7 +53,7 @@ class AppBottomBarScreenshotTest : ScreenshotTest() {
     fun appBottomBar_blurDisabled_matchesBaseline() {
         captureScreenshot(name = "AppBottomBar_blurDisabled", darkTheme = false) {
             AppBottomBar(
-                selectedTab = AppRoute.HOME,
+                selectedTab = MainTab.HOME,
                 onTabSelected = {},
                 blurEnabled = false,
             )

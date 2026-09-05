@@ -1,5 +1,7 @@
 plugins {
     id("appdev.android.library")
+    // #90 类型安全路由：@Serializable AppRoute 需要序列化编译器插件生成 serializer
+    alias(libs.plugins.kotlin.serialization)
 }
 
 // 纯 JVM 模块：禁用 Compose 编译器插件。
@@ -29,7 +31,9 @@ afterEvaluate {
 }
 
 dependencies {
-    // 纯逻辑解析器：依赖最小化，禁止引入 Compose/serialization/android
-    // （GitHubLinkParser 走字符串路由，JUnit 可测）
+    // 纯逻辑解析器：依赖最小化，禁止引入 Compose/android。
+    // kotlinx-serialization-core 仅为类型安全路由服务（AppRoute @Serializable，
+    // #90）；GitHubLinkParser 保持纯字符串解析，JUnit 可测。
+    implementation(libs.kotlinx.serialization.core)
     testImplementation(libs.junit)
 }

@@ -6,70 +6,44 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AppRouteTest {
-    // ---- 路由表常量 ----
+    // ---- startDestination pattern（@SerialName 固定基路径，#90 类型安全路由） ----
 
     @Test
-    fun routeTable_homeRoute_isHome() {
-        assertEquals("home", AppRoute.HOME)
+    fun startDestinationPattern_home_isHome() {
+        assertEquals("home", AppRoute.startDestinationPattern<AppRoute.Home>())
     }
 
     @Test
-    fun routeTable_repoRoute_hasOwnerAndRepoPlaceholders() {
-        // T23：ref 为可选 query（分支切换深链）
-        assertEquals("repo/{owner}/{repo}?ref={ref}", AppRoute.REPO)
+    fun startDestinationPattern_login_isLogin() {
+        assertEquals("login", AppRoute.startDestinationPattern<AppRoute.Login>())
+    }
+
+    // ---- 路由对象默认值（带默认值的参数 = optional query） ----
+
+    @Test
+    fun repoRoute_refDefaultsToEmpty() {
+        // T23：分支切换深链的 ref 为可选 query
+        assertEquals("", AppRoute.Repo("owner", "repo").ref)
     }
 
     @Test
-    fun routeTable_issueRoute_hasOwnerRepoNumberPlaceholders() {
-        assertEquals("issue/{owner}/{repo}/{number}", AppRoute.ISSUE)
+    fun branchesRoute_refDefaultsToEmpty() {
+        // 分支页进入时携带当前分支（可选 query）
+        assertEquals("", AppRoute.Branches("owner", "repo").ref)
     }
 
     @Test
-    fun routeTable_prRoute_hasOwnerRepoNumberPlaceholders() {
-        assertEquals("pr/{owner}/{repo}/{number}", AppRoute.PR)
+    fun blobRoute_pathDefaultsToEmpty() {
+        // path 走 query 参数（多段文件路径，T11）
+        assertEquals("", AppRoute.Blob("owner", "repo", "main").path)
     }
 
-    @Test
-    fun routeTable_commitRoute_hasOwnerRepoShaPlaceholders() {
-        assertEquals("commit/{owner}/{repo}/{sha}", AppRoute.COMMIT)
-    }
-
-    @Test
-    fun routeTable_discussionRoute_hasOwnerRepoNumberPlaceholders() {
-        assertEquals("discussion/{owner}/{repo}/{number}", AppRoute.DISCUSSION)
-    }
-
-    @Test
-    fun routeTable_blobRoute_usesQueryPathForMultiSegment() {
-        assertEquals("blob/{owner}/{repo}/{ref}?path={path}", AppRoute.BLOB)
-    }
-
-    @Test
-    fun routeTable_userRoute_hasLoginPlaceholder() {
-        assertEquals("user/{login}", AppRoute.USER)
-    }
-
-    @Test
-    fun routeTable_searchRoute_isSearch() {
-        assertEquals("search", AppRoute.SEARCH)
-    }
-
-    @Test
-    fun routeTable_profileRoute_isProfile() {
-        assertEquals("profile", AppRoute.PROFILE)
-    }
-
-    @Test
-    fun routeTable_externalRoute_isExternal() {
-        assertEquals("external", AppRoute.EXTERNAL)
-    }
-
-    // ---- fromParsedUrl 映射 ----
+    // ---- fromParsedUrl 映射：返回类型安全 route 对象 ----
 
     @Test
     fun fromParsedUrl_repo_buildsRepoRoute() {
         assertEquals(
-            "repo/owner/repo",
+            AppRoute.Repo("owner", "repo"),
             AppRoute.fromParsedUrl(ParsedUrl.Repo("owner", "repo")),
         )
     }
@@ -77,7 +51,7 @@ class AppRouteTest {
     @Test
     fun fromParsedUrl_issue_buildsIssueRoute() {
         assertEquals(
-            "issue/owner/repo/123",
+            AppRoute.Issue("owner", "repo", 123),
             AppRoute.fromParsedUrl(ParsedUrl.Issue("owner", "repo", 123)),
         )
     }
@@ -85,7 +59,7 @@ class AppRouteTest {
     @Test
     fun fromParsedUrl_issueList_buildsIssuesRoute() {
         assertEquals(
-            "issues/yumiru11/AppDev",
+            AppRoute.Issues("yumiru11", "AppDev"),
             AppRoute.fromParsedUrl(ParsedUrl.IssueList("yumiru11", "AppDev")),
         )
     }
@@ -93,7 +67,7 @@ class AppRouteTest {
     @Test
     fun fromParsedUrl_pullRequest_buildsPrRoute() {
         assertEquals(
-            "pr/owner/repo/456",
+            AppRoute.Pr("owner", "repo", 456),
             AppRoute.fromParsedUrl(ParsedUrl.PullRequest("owner", "repo", 456)),
         )
     }
@@ -102,7 +76,7 @@ class AppRouteTest {
     fun fromParsedUrl_commit_buildsCommitRoute() {
         val sha = "0123456789abcdef0123456789abcdef01234567"
         assertEquals(
-            "commit/owner/repo/$sha",
+            AppRoute.Commit("owner", "repo", sha),
             AppRoute.fromParsedUrl(ParsedUrl.Commit("owner", "repo", sha)),
         )
     }
@@ -119,7 +93,7 @@ class AppRouteTest {
     @Test
     fun fromParsedUrl_discussion_buildsDiscussionRoute() {
         assertEquals(
-            "discussion/owner/repo/5",
+            AppRoute.Discussion("owner", "repo", 5),
             AppRoute.fromParsedUrl(ParsedUrl.Discussion("owner", "repo", 5)),
         )
     }
@@ -127,35 +101,27 @@ class AppRouteTest {
     @Test
     fun fromParsedUrl_blob_buildsBlobRoute() {
         assertEquals(
-            "blob/owner/repo/main?path=src%2FMain.kt",
+            AppRoute.Blob("owner", "repo", "main", "src/Main.kt"),
             AppRoute.fromParsedUrl(ParsedUrl.Blob("owner", "repo", "main", "src/Main.kt")),
         )
     }
 
     @Test
-    fun fromParsedUrl_blob_deepMultiSegmentPath_encodesAllSlashes() {
-        // 回归：多段文件路径深链曾因 {path} 单段占位符匹配失败而崩溃
-        // （CI 截图 5.11 MainActivity.kt 六段路径 → IllegalArgumentException）
-        val route =
-            AppRoute.fromParsedUrl(
-                ParsedUrl.Blob(
-                    "yumiru11",
-                    "AppDev",
-                    "main",
-                    "app/src/main/java/com/yumiru11/githubapp/MainActivity.kt",
-                ),
-            )
+    fun fromParsedUrl_blob_deepMultiSegmentPath_keepsRawPath() {
+        // 回归：多段文件路径曾需手工 URLEncoder 编码进 query（单段占位符无法匹配而崩溃，
+        // CI 截图 5.11 六段路径首次暴露）；类型安全路由下编码交给 navigation 参数序列化器，
+        // 映射层直接承载原始 path
+        val path = "app/src/main/java/com/yumiru11/githubapp/MainActivity.kt"
         assertEquals(
-            "blob/yumiru11/AppDev/main?path=" +
-                "app%2Fsrc%2Fmain%2Fjava%2Fcom%2Fyumiru11%2Fgithubapp%2FMainActivity.kt",
-            route,
+            AppRoute.Blob("yumiru11", "AppDev", "main", path),
+            AppRoute.fromParsedUrl(ParsedUrl.Blob("yumiru11", "AppDev", "main", path)),
         )
     }
 
     @Test
-    fun fromParsedUrl_blob_pathWithSpace_encodesSpaceAsPercent20() {
+    fun fromParsedUrl_blob_pathWithSpace_keepsRawPath() {
         assertEquals(
-            "blob/owner/repo/main?path=My%20File.kt",
+            AppRoute.Blob("owner", "repo", "main", "My File.kt"),
             AppRoute.fromParsedUrl(ParsedUrl.Blob("owner", "repo", "main", "My File.kt")),
         )
     }
@@ -163,7 +129,7 @@ class AppRouteTest {
     @Test
     fun fromParsedUrl_user_buildsUserRoute() {
         assertEquals(
-            "user/login",
+            AppRoute.User("login"),
             AppRoute.fromParsedUrl(ParsedUrl.User("login")),
         )
     }

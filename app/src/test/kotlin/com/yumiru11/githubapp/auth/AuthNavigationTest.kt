@@ -15,7 +15,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 登录态 → 导航目标映射测试（T4 Wave2 登录态驱动首屏）。
+ * 登录态 → 导航目标映射测试（T4 Wave2 登录态驱动首屏；#90 类型安全路由适配）。
  *
  * 状态流测试：用 InMemoryTokenStorage（fake TokenStorage）+ 假 TokenEndpointClient
  * 驱动真实 [OAuthSessionManager] 状态流转，断言各状态对应的导航目标
@@ -27,18 +27,18 @@ class AuthNavigationTest {
     @Test
     fun authState_anonymous_mapsToHomeForGuestBrowsing() {
         // 游客直进首页（P0-2 真机走查决策）：登录页仅显式入口可达
-        assertEquals(AppRoute.HOME, authStateToDestination(AuthState.Anonymous))
+        assertEquals(AppRoute.Home, authStateToDestination(AuthState.Anonymous))
     }
 
     @Test
     fun authState_signedIn_mapsToHomeDestination() {
         val session = SessionData(accessToken = "gho_test_access")
-        assertEquals(AppRoute.HOME, authStateToDestination(AuthState.SignedIn(session)))
+        assertEquals(AppRoute.Home, authStateToDestination(AuthState.SignedIn(session)))
     }
 
     @Test
     fun authState_pat_mapsToHomeDestination() {
-        assertEquals(AppRoute.HOME, authStateToDestination(AuthState.PAT))
+        assertEquals(AppRoute.Home, authStateToDestination(AuthState.PAT))
     }
 
     @Test
@@ -48,38 +48,38 @@ class AuthNavigationTest {
             val manager = OAuthSessionManager(storage, NavigationFakeTokenEndpointClient(), OAuthConfig())
 
             // 初始：Anonymous → 主页（游客直进首页，P0-2）
-            assertEquals(AppRoute.HOME, authStateToDestination(manager.authState.value))
+            assertEquals(AppRoute.Home, authStateToDestination(manager.authState.value))
 
             // OAuth 会话落盘 → SignedIn → 主页
             storage.saveSession(SessionData(accessToken = "gho_test_access", refreshToken = "ghr_test_refresh"))
             manager.refreshState()
-            assertEquals(AppRoute.HOME, authStateToDestination(manager.authState.value))
+            assertEquals(AppRoute.Home, authStateToDestination(manager.authState.value))
 
             // PAT 落盘（isRestOnly，ADR-0003）→ PAT → 主页
             storage.saveSession(SessionData(pat = "ghp_test_pat", isRestOnly = true))
             manager.refreshState()
-            assertEquals(AppRoute.HOME, authStateToDestination(manager.authState.value))
+            assertEquals(AppRoute.Home, authStateToDestination(manager.authState.value))
         }
 
     @Test
     fun shouldNavigateForAuthState_atLoginStaysPut_whenTargetIsLogin() {
-        assertFalse(shouldNavigateForAuthState(AppRoute.LOGIN, AppRoute.LOGIN))
+        assertFalse(shouldNavigateForAuthState(isCurrentlyOnLogin = true, target = AppRoute.Login))
     }
 
     @Test
-    fun shouldNavigateForAuthState_atHomeNavigatesToLogin_whenAnonymous() {
-        assertTrue(shouldNavigateForAuthState(AppRoute.HOME, AppRoute.LOGIN))
+    fun shouldNavigateForAuthState_notOnLoginNavigatesToLogin_whenAnonymous() {
+        assertTrue(shouldNavigateForAuthState(isCurrentlyOnLogin = false, target = AppRoute.Login))
     }
 
     @Test
     fun shouldNavigateForAuthState_atLoginNavigatesToHome_whenSignedIn() {
-        assertTrue(shouldNavigateForAuthState(AppRoute.LOGIN, AppRoute.HOME))
+        assertTrue(shouldNavigateForAuthState(isCurrentlyOnLogin = true, target = AppRoute.Home))
     }
 
     @Test
     fun shouldNavigateForAuthState_atDeepLinkedPageStaysPut_whenSignedIn() {
-        // 已登录 + 深链直达详情页：不打断深链导航（防 popUpTo(0) 清掉深链目标）
-        assertFalse(shouldNavigateForAuthState(AppRoute.REPO, AppRoute.HOME))
+        // 已登录 + 深链直达详情页（不在登录页）：不打断深链导航（防 popUpTo(0) 清掉深链目标）
+        assertFalse(shouldNavigateForAuthState(isCurrentlyOnLogin = false, target = AppRoute.Home))
     }
 }
 
