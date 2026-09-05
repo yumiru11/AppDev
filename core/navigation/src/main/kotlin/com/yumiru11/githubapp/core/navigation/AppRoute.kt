@@ -144,33 +144,50 @@ sealed interface AppRoute {
          */
         fun fromParsedUrl(parsed: ParsedUrl): AppRoute? =
             when (parsed) {
-                is ParsedUrl.Repo -> Repo(parsed.owner, parsed.repo)
+                is ParsedUrl.Repo -> {
+                    Repo(parsed.owner, parsed.repo)
+                }
 
-                is ParsedUrl.Issue -> Issue(parsed.owner, parsed.repo, parsed.number)
+                is ParsedUrl.Issue -> {
+                    Issue(parsed.owner, parsed.repo, parsed.number)
+                }
 
-                is ParsedUrl.IssueList -> Issues(parsed.owner, parsed.repo)
+                is ParsedUrl.IssueList -> {
+                    Issues(parsed.owner, parsed.repo)
+                }
 
-                is ParsedUrl.PullRequest -> Pr(parsed.owner, parsed.repo, parsed.number)
+                is ParsedUrl.PullRequest -> {
+                    Pr(parsed.owner, parsed.repo, parsed.number)
+                }
 
-                is ParsedUrl.Commit ->
+                is ParsedUrl.Commit -> {
                     if (parsed.owner == null || parsed.repo == null) {
                         null
                     } else {
                         Commit(parsed.owner, parsed.repo, parsed.sha)
                     }
+                }
 
-                is ParsedUrl.Discussion -> Discussion(parsed.owner, parsed.repo, parsed.number)
+                is ParsedUrl.Discussion -> {
+                    Discussion(parsed.owner, parsed.repo, parsed.number)
+                }
 
-                is ParsedUrl.Blob -> Blob(parsed.owner, parsed.repo, parsed.ref, parsed.path)
+                is ParsedUrl.Blob -> {
+                    Blob(parsed.owner, parsed.repo, parsed.ref, parsed.path)
+                }
 
-                is ParsedUrl.User -> User(parsed.login)
+                is ParsedUrl.User -> {
+                    User(parsed.login)
+                }
 
                 is ParsedUrl.External,
                 is ParsedUrl.IssueRef,
                 is ParsedUrl.Release,
                 is ParsedUrl.Tree,
                 is ParsedUrl.Search,
-                -> null
+                -> {
+                    null
+                }
             }
 
         /**
@@ -180,7 +197,6 @@ sealed interface AppRoute {
          * 带参路由的完整 pattern（`{owner}` 等占位符）由 Navigation 依序列化描述符生成，
          * 导航一律传 route 对象本身，无需手工拼 pattern。
          */
-        inline fun <reified T : AppRoute> startDestinationPattern(): String =
-            serializer<T>().descriptor.serialName
+        inline fun <reified T : AppRoute> startDestinationPattern(): String = serializer<T>().descriptor.serialName
     }
 }

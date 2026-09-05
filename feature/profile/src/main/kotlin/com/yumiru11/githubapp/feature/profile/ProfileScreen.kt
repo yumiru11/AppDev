@@ -357,41 +357,41 @@ private fun RepositoryRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        val description = repository.description
-        if (!description.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Filled.Star,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = repository.stargazerCount.toString(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            val language = repository.language
-            if (!language.isNullOrBlank()) {
-                Spacer(modifier = Modifier.width(12.dp))
+            val description = repository.description
+            if (!description.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = language,
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = repository.stargazerCount.toString(),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                val language = repository.language
+                if (!language.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = language,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-        }
         }
     }
     HorizontalDivider()

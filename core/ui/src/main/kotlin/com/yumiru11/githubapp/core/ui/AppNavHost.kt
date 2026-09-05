@@ -8,8 +8,8 @@ import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -114,7 +114,7 @@ fun AppNavHost(
                 exitTransition = { appExitTransition(motionScale) },
                 popEnterTransition = { appPopEnterTransition(motionScale) },
                 popExitTransition = { appPopExitTransition(motionScale) },
-                    ) {
+            ) {
                 composable<AppRoute.Login> {
                     provideNavTransitionScope {
                         loginScreen()
