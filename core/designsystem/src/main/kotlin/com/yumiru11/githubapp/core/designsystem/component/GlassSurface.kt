@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.token.AppBlur
+import com.yumiru11.githubapp.core.designsystem.token.GlassRenderMode
+import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
 
@@ -20,7 +22,7 @@ import dev.chrisbanes.haze.hazeEffect
  * 玻璃拟真容器（docs/ui-design.md §6；issue #83 改为 backdrop blur）。
  *
  * 顶栏 / 底栏等 §6.1 允许清单场景的毛玻璃背景容器：
- * - **API 31+**（[AppBlur.isBlurSupported]）且上游提供了 [LocalHazeState]：
+ * - **API 31+** 且上游提供了 [LocalHazeState]（模式由 [GlassRenderPolicy] 判定）：
  *   挂 Haze `hazeEffect`（RenderEffect backdrop blur），模糊 **背后滚动内容**
  *   （内容侧须挂 `hazeSource`，由同时持有栏与内容的容器组件接线——MainTabPager /
  *   HomeScreen）。玻璃层自身与栏内文字/图标保持锐利（修复 ui-audit 缺陷 #1：
@@ -66,7 +68,11 @@ fun GlassSurface(
     // 半透明纯色层：模糊层之上叠加，保证内容可读性（§6.1 静止态 / §6.2 降级层）
     val glassColor = surfaceColor.copy(alpha = AppBlur.SCRIM_ALPHA)
     val hazeState = LocalHazeState.current
-    val useHaze = blurEnabled && AppBlur.isBlurSupported() && hazeState != null
+    // 渲染模式判定收敛到 GlassRenderPolicy（issue #83）：三条降级路径（关开关 /
+    // 无 HazeState / API<31）改由纯函数判定并已由单测断言——本组件的分支在
+    // Robolectric 下不可像素断言（不渲染 RenderEffect），此前只能靠真机看。
+    val renderMode = GlassRenderPolicy.resolve(blurEnabled = blurEnabled, hasHazeState = hazeState != null)
+    val useHaze = renderMode == GlassRenderMode.BackdropBlur
 
     Box(
         modifier =

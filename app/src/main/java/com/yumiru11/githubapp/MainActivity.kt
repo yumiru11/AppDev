@@ -13,6 +13,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,7 +36,7 @@ import com.yumiru11.githubapp.auth.authStateToDestination
 import com.yumiru11.githubapp.auth.shouldNavigateForAuthState
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
-import com.yumiru11.githubapp.core.designsystem.token.AppBlur
+import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthCallbackException
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthConfig
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
@@ -138,7 +139,7 @@ class MainActivity : ComponentActivity() {
                                 Modifier
                                     .fillMaxSize()
                                     .then(
-                                        if (blurEnabled && AppBlur.isBlurSupported()) {
+                                        if (GlassRenderPolicy.shouldAttachHazeSource(blurEnabled)) {
                                             Modifier.hazeSource(rootHazeState)
                                         } else {
                                             Modifier
@@ -183,11 +184,19 @@ class MainActivity : ComponentActivity() {
                                             )
                                         },
                                         reposPage = { padding ->
+                                            // #83：玻璃避让走 contentPadding（节点保持 full-bleed），与 Home/Profile
+                                            // 同一契约——真仓库列表落地时内容即可物理滚进底栏玻璃背后
                                             PlaceholderScreen(
-                                                modifier =
-                                                    Modifier
-                                                        .padding(padding)
-                                                        .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()),
+                                                contentPadding =
+                                                    PaddingValues(
+                                                        top =
+                                                            padding
+                                                                .calculateTopPadding() +
+                                                                WindowInsets.statusBars
+                                                                    .asPaddingValues()
+                                                                    .calculateTopPadding(),
+                                                        bottom = padding.calculateBottomPadding(),
+                                                    ),
                                             )
                                         },
                                         profilePage = { padding ->

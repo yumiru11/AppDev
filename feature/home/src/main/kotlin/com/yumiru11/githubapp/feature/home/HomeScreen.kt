@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -22,6 +23,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -50,8 +53,8 @@ import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
 import com.yumiru11.githubapp.core.designsystem.component.LongBarAction
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
-import com.yumiru11.githubapp.core.designsystem.token.AppBlur
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
+import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppTopBar
@@ -67,8 +70,11 @@ import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import java.io.IOException
 
+/** 快捷入口进列表后的稳定 item key（与 feed 条目的数字 id 命名空间不冲突） */
+internal const val QUICK_ACTIONS_KEY = "home-quick-actions"
+
 /**
- * 首页（T10 + #89）：AppTopBar + 小分区条（动态/Issue/PR）+ HorizontalPager 分区内容区。
+ * 首页（T10 + #89 + #83）：玻璃头（顶栏 + 小分区条）+ HorizontalPager 分区内容区。
  *
  * - 登录态驱动：未登录 → 登录引导（T10 验收第 1 条）
  * - #89：分区改 [HorizontalPager] 跟手滑动；点 Tab 弹簧微回弹滚页（ui-design.md §2.1/§4.2 H1-1），
@@ -79,7 +85,26 @@ import java.io.IOException
  *   + 首屏 stagger 进入动效（[rememberStaggerEnterModifier]，经 MotionScale 缩放）
  * - 点击条目 → GitHubLinkParser 解析 html_url → 应用内导航（T10 验收第 4 条）
  * - 空/错/加载态齐全（T10 验收第 5 条）；分页加载错误由 LazyPagingItems.loadState 呈现
- * - backdrop blur（issue #83）：自持顶栏玻璃的 [LocalHazeState]，内容 Box 挂 hazeSource
+ *
+ * ## backdrop blur 几何（issue #83：内容必须物理进入玻璃矩形）
+ *
+ * Haze 的 `hazeEffect` 只对**与玻璃矩形相交**的内容采样，所以本屏的布局约束是几何的：
+ *
+ * 1. **小分区条进玻璃头**（[AppTopBar] 的 `sectionBar` 副行插槽），而不是留在内容列里。
+ *    留在内容列会把列表视口整体下推两行高度，feed 行永远滚不进顶栏矩形——
+ *    玻璃每帧采样空背景，就是 FEEDBACK #17「毛玻璃只糊栏自身、看不出效果」的根因。
+ * 2. **内容 Box 不再吃 Scaffold 的 top inset**（full-bleed），改为把玻璃头总高
+ *    （含状态栏 + 顶栏 + 副行）推进滚动容器的 `contentPadding`：
+ *    静止态首屏仍在玻璃下方，滚动时条目物理穿过玻璃背后 → 模糊 + 可辨「有东西在动」。
+ * 3. **快捷入口（长条按钮）随 feed 一起滚动**（列表首项），否则它会把列表视口顶边
+ *    压到 y=0 之下，第 2 条失效。非列表态（加载/空/错）没有可滚内容，快捷入口保持
+ *    常驻在原位，视觉与改前一致。
+ * 4. 顶栏与分区条共用**同一块** [com.yumiru11.githubapp.core.designsystem.component.GlassSurface]
+ *    → 同一个 hazeEffect 矩形，玻璃层数不增（§6.2「≤2 层」上限由此守住）。
+ * 5. 下拉刷新指示器按 [topGlassPadding] 下移，否则列表视口顶到 y=0 后指示器会藏在玻璃头背后。
+ *
+ * 内容侧 `hazeSource` 挂在本屏自持的 [LocalHazeState] 上（覆盖 MainTabPager 提供的
+ * 底栏 state），避免顶栏 effect 嵌套进底栏 source 子树。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,76 +125,77 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var selectedTab by rememberSaveable { mutableStateOf(HomeTab.FEED) }
 
-    // backdrop blur（issue #83）：顶栏 AppTopBar 的 hazeEffect 与本页内容侧 hazeSource
-    // 共享本 state。自建一份覆盖 MainTabPager 提供的底栏 state，避免顶栏 effect
-    // 嵌套进底栏 source 子树。
+    // backdrop blur（issue #83）：顶栏玻璃的 hazeEffect 与本页内容侧 hazeSource 共享本 state
     val hazeState = rememberHazeState()
-    val useHazeSource = blurEnabled && AppBlur.isBlurSupported()
+    // source 侧门禁与 GlassSurface 的 effect 侧同源判定（防两侧漂移）
+    val useHazeSource = GlassRenderPolicy.shouldAttachHazeSource(blurEnabled)
+
+    // pager 状态上提到这里：分区条已进玻璃头（顶栏插槽），两者要读写同一份状态
+    val pagerState = rememberPagerState { HomeTab.entries.size }
 
     CompositionLocalProvider(LocalHazeState provides hazeState) {
         Scaffold(
             modifier = modifier,
-            // 内容必须延伸到顶/底玻璃栏背后（Haze source 需真实像素；否则毛玻璃
-            // 每帧采样到空背景＝真机「无效果」根因），insets 由本组件手工分配
+            // 内容 full-bleed（insets 由本组件手工分配到滚动容器 contentPadding）
             contentWindowInsets = WindowInsets(0.dp),
             topBar = {
-                // zIndex 保证顶栏在内容之后绘制——Haze 要求 source 先于 effect 绘制
-                Box(modifier = Modifier.zIndex(1f)) {
-                    AppTopBar(
-                        onSearchClick = onSearchClick,
-                        onNotificationClick = onNotificationClick,
-                        onProfileClick = onProfileClick,
-                        blurEnabled = blurEnabled,
-                    )
-                }
+                HomeGlassHeader(
+                    pagerState = pagerState,
+                    blurEnabled = blurEnabled,
+                    onSearchClick = onSearchClick,
+                    onNotificationClick = onNotificationClick,
+                    onProfileClick = onProfileClick,
+                )
             },
         ) { paddingValues ->
+            // 玻璃头总高（状态栏 + 顶栏 + 副行分区条）：内容视口铺到 y=0，由此高度避让
+            val topGlassPadding = paddingValues.calculateTopPadding()
             Box(
                 modifier =
                     Modifier
                         .fillMaxSize()
                         .then(
                             if (useHazeSource) {
-                                // 顶栏玻璃的模糊源：feed/分区条等内容区
+                                // 顶栏玻璃的模糊源：feed 列表等内容（含玻璃头背后的区域）
                                 Modifier.hazeSource(hazeState)
                             } else {
                                 Modifier
                             },
-                        ).padding(top = paddingValues.calculateTopPadding()),
+                        ),
             ) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    when (val state = uiState) {
-                        is HomeUiState.Loading -> {
-                            LoadingContent(modifier = Modifier.fillMaxSize())
-                        }
+                when (val state = uiState) {
+                    is HomeUiState.Loading -> {
+                        LoadingContent(
+                            modifier = Modifier.fillMaxSize().padding(top = topGlassPadding),
+                        )
+                    }
 
-                        is HomeUiState.Unauthenticated -> {
-                            UnauthenticatedContent(
-                                onLoginClick = onLoginClick,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
+                    is HomeUiState.Unauthenticated -> {
+                        UnauthenticatedContent(
+                            onLoginClick = onLoginClick,
+                            modifier = Modifier.fillMaxSize().padding(top = topGlassPadding),
+                        )
+                    }
 
-                        is HomeUiState.Error -> {
-                            ErrorContent(
-                                errorType = state.errorType,
-                                onRetry = { viewModel.retry() },
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
+                    is HomeUiState.Error -> {
+                        ErrorContent(
+                            errorType = state.errorType,
+                            onRetry = { viewModel.retry() },
+                            modifier = Modifier.fillMaxSize().padding(top = topGlassPadding),
+                        )
+                    }
 
-                        is HomeUiState.Success -> {
-                            HomeSuccessContent(
-                                feed = state.feed,
-                                selectedTab = selectedTab,
-                                onFeedItemClick = onFeedItemClick,
-                                bottomContentPadding = bottomContentPadding,
-                                onCreateIssue = onCreateIssue,
-                                onViewPullRequests = onViewPullRequests,
-                            )
-                        }
+                    is HomeUiState.Success -> {
+                        HomeSuccessContent(
+                            feed = state.feed,
+                            pagerState = pagerState,
+                            onFeedItemClick = onFeedItemClick,
+                            topGlassPadding = topGlassPadding,
+                            bottomContentPadding = bottomContentPadding,
+                            onCreateIssue = onCreateIssue,
+                            onViewPullRequests = onViewPullRequests,
+                        )
                     }
                 }
             }
@@ -177,12 +203,64 @@ fun HomeScreen(
     }
 }
 
-/** 登录成功后的分区内容（#89）：选择器状态 + TabRow↔Pager 双向联动 + 选择器宿主。 */
+/**
+ * 首页玻璃头（issue #83）：顶栏 + 小分区条，同处一块 [GlassSurface] 矩形。
+ *
+ * - `zIndex` 让玻璃头在内容（hazeSource）之后绘制——Haze 要求 source 先画
+ * - 分区条走 [AppTopBar] 的 `sectionBar` 副行插槽，因此它**在玻璃矩形之内**：
+ *   Scaffold 交给内容区的 top inset 自动含两行高度，feed 视口才铺得到玻璃背后
+ * - 点 Tab 弹簧微回弹滚页（#89 H1-1，令牌走 [AppMotion]）
+ */
+@Composable
+private fun HomeGlassHeader(
+    pagerState: PagerState,
+    blurEnabled: Boolean,
+    onSearchClick: () -> Unit,
+    onNotificationClick: () -> Unit,
+    onProfileClick: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    Box(modifier = Modifier.zIndex(1f)) {
+        AppTopBar(
+            onSearchClick = onSearchClick,
+            onNotificationClick = onNotificationClick,
+            onProfileClick = onProfileClick,
+            blurEnabled = blurEnabled,
+            sectionBar = {
+                HomeTabBar(
+                    selectedTabIndex = pagerState.targetPage.coerceIn(0, HomeTab.entries.lastIndex),
+                    onTabSelected = { tab ->
+                        if (tab.ordinal != pagerState.targetPage) {
+                            scope.launch {
+                                pagerState.animateScrollToPage(
+                                    page = tab.ordinal,
+                                    animationSpec =
+                                        spring(
+                                            dampingRatio = AppMotion.DampingRatioHighBouncy,
+                                            stiffness = AppMotion.StiffnessMedium,
+                                        ),
+                                )
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+        )
+    }
+}
+
+/**
+ * 登录成功后的分区内容（#89）：Pager 分页 + 仓库选择器宿主。
+ *
+ * 小分区条已上移到玻璃头副行（issue #83），这里只剩 pager 本体。
+ */
 @Composable
 private fun HomeSuccessContent(
     feed: Flow<PagingData<FeedItem>>,
-    selectedTab: HomeTab,
+    pagerState: PagerState,
     onFeedItemClick: (ParsedUrl) -> Unit,
+    topGlassPadding: Dp,
     bottomContentPadding: Dp,
     onCreateIssue: (owner: String, repo: String) -> Unit,
     onViewPullRequests: (owner: String, repo: String) -> Unit,
@@ -192,32 +270,6 @@ private fun HomeSuccessContent(
     var pickerVisible by rememberSaveable { mutableStateOf(false) }
     var pickerTarget by rememberSaveable { mutableStateOf(PickerTarget.CREATE_ISSUE) }
 
-    val pagerState =
-        rememberPagerState(initialPage = selectedTab.ordinal) {
-            HomeTab.entries.size
-        }
-    val scope = rememberCoroutineScope()
-
-    // 顶部小分区条 ↔ Pager 双向联动：拖页时 targetPage 即时跟随；
-    // 点 Tab 弹簧微回弹滚页（H1-1「过冲一点回弹」，令牌走 AppMotion）
-    HomeTabBar(
-        selectedTabIndex = pagerState.targetPage.coerceIn(0, HomeTab.entries.lastIndex),
-        onTabSelected = { tab ->
-            if (tab.ordinal != pagerState.targetPage) {
-                scope.launch {
-                    pagerState.animateScrollToPage(
-                        page = tab.ordinal,
-                        animationSpec =
-                            spring(
-                                dampingRatio = AppMotion.DampingRatioHighBouncy,
-                                stiffness = AppMotion.StiffnessMedium,
-                            ),
-                    )
-                }
-            }
-        },
-        modifier = Modifier.fillMaxWidth(),
-    )
     HorizontalPager(
         state = pagerState,
         modifier = Modifier.fillMaxSize(),
@@ -226,6 +278,7 @@ private fun HomeSuccessContent(
             page = page,
             feed = feed,
             onFeedItemClick = onFeedItemClick,
+            topGlassPadding = topGlassPadding,
             bottomContentPadding = bottomContentPadding,
             onCreateIssueClick = {
                 pickerTarget = PickerTarget.CREATE_ISSUE
@@ -259,6 +312,7 @@ private fun HomePage(
     page: Int,
     feed: Flow<PagingData<FeedItem>>,
     onFeedItemClick: (ParsedUrl) -> Unit,
+    topGlassPadding: Dp,
     bottomContentPadding: Dp,
     onCreateIssueClick: () -> Unit,
     onViewPullRequestsClick: () -> Unit,
@@ -268,6 +322,7 @@ private fun HomePage(
             FeedPage(
                 feed = feed,
                 onFeedItemClick = onFeedItemClick,
+                topGlassPadding = topGlassPadding,
                 bottomContentPadding = bottomContentPadding,
                 onCreateIssueClick = onCreateIssueClick,
                 onViewPullRequestsClick = onViewPullRequestsClick,
@@ -277,12 +332,12 @@ private fun HomePage(
 
         HomeTab.ISSUES -> {
             // Issue 列表占位（列表页属后续功能票；详情页 T14 已合入）
-            EmptyContent(modifier = Modifier.fillMaxSize())
+            EmptyContent(modifier = Modifier.fillMaxSize().padding(top = topGlassPadding))
         }
 
         HomeTab.PULL_REQUESTS -> {
             // PR 列表占位（列表页属后续功能票；详情页 T15 已合入）
-            EmptyContent(modifier = Modifier.fillMaxSize())
+            EmptyContent(modifier = Modifier.fillMaxSize().padding(top = topGlassPadding))
         }
     }
 }
@@ -296,7 +351,7 @@ private fun QuickActionsSection(
 ) {
     val comingSoon = stringResource(R.string.home_action_create_repo_cd)
     Column(
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.padding(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
@@ -327,59 +382,73 @@ private fun QuickActionsSection(
     }
 }
 
-/** 动态页（#89）：快捷入口区 + feed 状态区；下拉刷新只作用于本分区（B1-4 只刷新当前分区）。 */
+/**
+ * 动态页（#89）：快捷入口区 + feed 状态区；下拉刷新只作用于本分区（B1-4 只刷新当前分区）。
+ *
+ * issue #83 几何：**有 feed 条目时**快捷入口进列表首项（随内容滚走），列表视口顶到 y=0，
+ * 条目才会物理穿过玻璃背后；**无条目时**（加载/空/错）没有可滚内容，快捷入口保持常驻。
+ */
 @Composable
 private fun FeedPage(
     feed: Flow<PagingData<FeedItem>>,
     onFeedItemClick: (ParsedUrl) -> Unit,
+    topGlassPadding: Dp,
     bottomContentPadding: Dp,
     onCreateIssueClick: () -> Unit,
     onViewPullRequestsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lazyItems = feed.collectAsLazyPagingItems()
-    Column(modifier = modifier) {
+    val refreshState = lazyItems.loadState.refresh
+    val quickActions: @Composable () -> Unit = {
         QuickActionsSection(
             onCreateIssueClick = onCreateIssueClick,
             onViewPullRequestsClick = onViewPullRequestsClick,
             modifier = Modifier.fillMaxWidth(),
         )
-        Box(modifier = Modifier.weight(1f)) {
-            when {
-                lazyItems.loadState.refresh is LoadState.Error -> {
-                    PagingErrorContent(
-                        error = (lazyItems.loadState.refresh as LoadState.Error).error,
-                        onRetry = { lazyItems.retry() },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+    }
+    val hasFeedRows = refreshState !is LoadState.Error && lazyItems.itemCount > 0
 
-                lazyItems.loadState.refresh is LoadState.Loading && lazyItems.itemCount == 0 -> {
-                    LoadingContent(modifier = Modifier.fillMaxSize())
-                }
-
-                lazyItems.itemCount == 0 -> {
-                    PullToRefreshBox(
-                        isRefreshing = lazyItems.loadState.refresh is LoadState.Loading,
-                        onRefresh = { lazyItems.refresh() },
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        EmptyContent(modifier = Modifier.fillMaxSize())
-                    }
-                }
-
-                else -> {
-                    PullToRefreshBox(
-                        isRefreshing = lazyItems.loadState.refresh is LoadState.Loading,
-                        onRefresh = { lazyItems.refresh() },
-                        modifier = Modifier.fillMaxSize(),
-                    ) {
-                        FeedList(
-                            lazyItems = lazyItems,
-                            onFeedItemClick = onFeedItemClick,
-                            bottomContentPadding = bottomContentPadding,
+    if (hasFeedRows) {
+        FeedList(
+            lazyItems = lazyItems,
+            onFeedItemClick = onFeedItemClick,
+            topGlassPadding = topGlassPadding,
+            bottomContentPadding = bottomContentPadding,
+            quickActions = quickActions,
+            modifier = modifier,
+        )
+    } else {
+        // 无条目（加载 / 空 / 错）：没有可滚内容，快捷入口保持常驻，
+        // 整块按玻璃头高度整体避让（此处用布局 padding 是安全的——不参与穿越）
+        Column(modifier = modifier.padding(top = topGlassPadding)) {
+            // 列表态横向 16dp 由 contentPadding 给；这里没有列表，横向自己补
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                quickActions()
+            }
+            Box(modifier = Modifier.weight(1f)) {
+                when {
+                    refreshState is LoadState.Error -> {
+                        PagingErrorContent(
+                            error = (refreshState as LoadState.Error).error,
+                            onRetry = { lazyItems.retry() },
                             modifier = Modifier.fillMaxSize(),
                         )
+                    }
+
+                    refreshState is LoadState.Loading -> {
+                        LoadingContent(modifier = Modifier.fillMaxSize())
+                    }
+
+                    else -> {
+                        // 空态保留下拉刷新（T10 B1-4）
+                        PullToRefreshBox(
+                            isRefreshing = refreshState is LoadState.Loading,
+                            onRefresh = { lazyItems.refresh() },
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            EmptyContent(modifier = Modifier.fillMaxSize())
+                        }
                     }
                 }
             }
@@ -387,32 +456,52 @@ private fun FeedPage(
     }
 }
 
-/** 动态列表：PullToRefreshBox 下拉触发 paging refresh + 首屏 stagger（#89）。 */
+/**
+ * 动态列表：full-bleed 视口 + 快捷入口首项 + 首屏 stagger（#89）。
+ *
+ * issue #83：`contentPadding` 顶部给玻璃头高度（静止态首屏在玻璃下、滚动穿过玻璃），
+ * 底部追加底栏玻璃高度（末条可滚出玻璃区）；下拉刷新指示器同步下移避让玻璃头。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FeedList(
     lazyItems: LazyPagingItems<FeedItem>,
     onFeedItemClick: (ParsedUrl) -> Unit,
+    topGlassPadding: Dp,
     bottomContentPadding: Dp,
+    quickActions: @Composable () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val pullState = rememberPullToRefreshState()
+    val isRefreshing = lazyItems.loadState.refresh is LoadState.Loading
     PullToRefreshBox(
-        isRefreshing = lazyItems.loadState.refresh is LoadState.Loading,
+        isRefreshing = isRefreshing,
         onRefresh = { lazyItems.refresh() },
         modifier = modifier,
+        state = pullState,
+        indicator = {
+            Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = topGlassPadding)) {
+                PullToRefreshDefaults.Indicator(
+                    state = pullState,
+                    isRefreshing = isRefreshing,
+                )
+            }
+        },
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            // bottom 追加底栏玻璃高度：末条可滚出玻璃区，内容全程延伸到栏背后
             contentPadding =
                 PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
-                    top = 8.dp,
+                    top = topGlassPadding,
                     bottom = 8.dp + bottomContentPadding,
                 ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            item(key = QUICK_ACTIONS_KEY) {
+                quickActions()
+            }
             items(
                 count = lazyItems.itemCount,
                 // itemKey 内部用 peek(index)（不触发页加载，未加载区回退占位 key），
@@ -519,7 +608,12 @@ private fun errorMessage(errorType: HomeErrorType): String =
         HomeErrorType.UNKNOWN -> stringResource(R.string.feed_error_unknown)
     }
 
-/** 首页顶部小分区条（动态/Issue/PR）—— ui-design.md §2.1；#89 起与 Pager 双向联动 */
+/**
+ * 首页顶部小分区条（动态/Issue/PR）—— ui-design.md §2.1；#89 起与 Pager 双向联动。
+ *
+ * issue #83：由 [AppTopBar] 的 `sectionBar` 插槽渲染在**玻璃头副行**内（不再是内容列首项），
+ * containerColor 保持透明让背后模糊透得上来；文字/指示条在 effect 层，自身保持锐利。
+ */
 @Composable
 private fun HomeTabBar(
     selectedTabIndex: Int,
