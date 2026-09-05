@@ -42,6 +42,7 @@
 | T22 文件编辑提交 | #23 | Contents API + sha 校验 + 409 三选项（重载/覆盖/保留本地，PR #96） | ✅ |
 | UI 打磨波 | #82 | Home Tab M3 化、PR 评论、Star/Watch 按钮（PR #82） | ✅ |
 | UI 审查修复批·通知面板 | #88 | 面板完整形态：右侧滑入+遮罩+Haze 玻璃、按仓库分组折叠、右滑已读回弹/左滑 done 删除、未读左缘色条、筛选 chips 迁移、三态组件接入；旧独立路由与 T19 分页栈随面板化移除 | ✅ |
+| UI 审查修复批·导航现代化 | #90 | 全局转场（slideX+fadeIn/scaleOut，LocalMotionScale 缩放）+ 预测返回（enableOnBackInvokedCallback）+ AppRoute 迁移 @Serializable 类型安全路由 + 共享元素试点（仓库头像→RepoHeader）；MainTab 分区键与导航路由解耦（PR #110） | ✅ |
 | UI 审查修复批·毛玻璃 backdrop | #83 | 顶栏 backdrop 接线补完：小分区条并入玻璃头（AppTopBar sectionBar 副行）、内容 full-bleed 且玻璃头高度改走 contentPadding、长条按钮随 feed 滚动；渲染模式判定收敛成可单测纯函数 GlassRenderPolicy；app 侧截图基线零变更（PR #108 / merge 8bcaec6）| ✅ 代码合入，票待真机穿越感复测后关 |
 
 ## 3. 剩余 5 票（功能线，依赖已全部满足除注明外）
@@ -65,7 +66,7 @@
 | #86 | perf(list): Paging itemKey 迁移与模型稳定性标注 | 无；Home 屏行与 #89 错峰 |
 | #87 | feat(settings): 设置页分组重构与个性化项接线 | blocked_by #84 |
 | #89 | feat(home): 首页分区 Pager 与长条按钮 | blocked_by #84 |
-| #90 | feat(navigation): 全局转场、预测返回与路由现代化 | blocked_by #84；路由迁移行等 T16-T23 合入 |
+| #90 | feat(navigation): 全局转场、预测返回与路由现代化 | **PR #110 已合入 main（a0ea8b6）**；票已关闭——真机预测返回手势复测见 PR #110 验收卡 |
 
 待用户决策（不建 issue，见 audit 文档 §3.0）：图标候选批准 / 卡片两版对比 / 背景图 grill / README 收起动画构思。
 
