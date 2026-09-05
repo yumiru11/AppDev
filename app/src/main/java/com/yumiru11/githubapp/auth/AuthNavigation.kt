@@ -7,8 +7,10 @@ import com.yumiru11.githubapp.core.navigation.AppRoute
  * 登录态 → 导航目标映射（T4 Wave2 登录态驱动首屏）。
  *
  * 游客直进首页为真机走查决策（P0-2）；登录页仅显式入口可达。
- * #90 起返回类型安全路由对象 [AppRoute.Home]。
+ * #90 起返回类型安全路由对象 [AppRoute.Home]；当前三态同归 Home（游客直进首页，
+ * P0-2 真机走查决策），参数语义保留以容纳未来差异化映射。
  */
+@Suppress("UnusedParameter") // 登录态 → 起始页映射参数为语义保留
 fun authStateToDestination(authState: AuthState): AppRoute = AppRoute.Home
 
 /**

@@ -35,5 +35,7 @@ dependencies {
     // kotlinx-serialization-core 仅为类型安全路由服务（AppRoute @Serializable，
     // #90）；GitHubLinkParser 保持纯字符串解析，JUnit 可测。
     implementation(libs.kotlinx.serialization.core)
+    // #90 路由序列化 round-trip 测试驱动生成 serializer（与 github-rest DTO 测试同口径）
+    testImplementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)
 }
