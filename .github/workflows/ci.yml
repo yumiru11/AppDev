@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
@@ -245,7 +245,7 @@ jobs:
       # quality job 已构建并上传 APK——本 job 不再重复编译（曾花 ~150s 全量重打，
       # 纯重复劳动：needs: quality 保证构件必已存在）。下载到脚本安装路径原位。
       - name: Download debug APK from quality job
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: app-debug-apk
           path: app/build/outputs/apk/debug
