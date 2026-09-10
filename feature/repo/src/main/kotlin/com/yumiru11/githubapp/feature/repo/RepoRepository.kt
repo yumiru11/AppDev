@@ -323,6 +323,28 @@ class RepoRepository
             }
 
         /**
+         * 仓库管理权限（L04：删除仓库入口显隐）。
+         *
+         * 复用 [branchControl] 同款端点（GET /repos/{o}/{r} 的 permissions 对象），
+         * permissions 缺失（游客/未知）或请求失败 → 保守返回 [RepositoryPermissions] 全 false。
+         */
+        suspend fun repositoryPermissions(
+            owner: String,
+            repo: String,
+        ): RepositoryPermissions =
+            try {
+                val dto = repositoryApi.getRepository(owner, repo)
+                RepositoryPermissions(
+                    canAdmin = dto.permissions?.admin == true,
+                    canPush = dto.permissions?.push == true,
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                RepositoryPermissions()
+            }
+
+        /**
          * 仓库写控制（T23：新建/删除分支显隐；permissions 缺失/网络失败 → 保守隐藏写入口）。
          */
         suspend fun branchControl(
@@ -406,6 +428,14 @@ class RepoRepository
             const val TAG = "ReadmeRender"
         }
     }
+
+/**
+ * 仓库权限位（L04；当前会话视角，缺失即保守隐藏写入口）。
+ */
+data class RepositoryPermissions(
+    val canAdmin: Boolean = false,
+    val canPush: Boolean = false,
+)
 
 /**
  * README 内容（渲染通道判定结果）。

@@ -24,6 +24,10 @@ sealed interface RepoDetailUiState {
      * @param expandedReleaseId 展开中的 Release 详情（null = 列表态）
      * @param releaseDetailState Release 详情状态
      * @param languages 语言 → 字节数（Linguist 数据，语言栏渲染源）
+     * @param topics 仓库 Topics（L06；空列表 → 简介区不渲染 chip 行）
+     * @param canDeleteRepo 当前会话是否有 admin 权限（L04 删除仓库入口显隐；缺失 → 保守隐藏）
+     * @param canPushRepo 当前会话是否有 push 权限（L05「新建 Release」/上传附件入口显隐）
+     * @param pendingAssetUpload Release 附件上传进行中（L05 防重入）
      */
     data class Success(
         val repo: Repository,
@@ -37,6 +41,10 @@ sealed interface RepoDetailUiState {
         val expandedReleaseId: Long? = null,
         val releaseDetailState: ReleaseDetailState = ReleaseDetailState.Idle,
         val languages: Map<String, Long> = emptyMap(),
+        val topics: List<String> = emptyList(),
+        val canDeleteRepo: Boolean = false,
+        val canPushRepo: Boolean = false,
+        val pendingAssetUpload: Boolean = false,
     ) : RepoDetailUiState
 
     /** 加载失败（错误类型驱动文案，UI 层 stringResource 映射，ViewModel 不产英文） */
@@ -107,6 +115,9 @@ enum class RepoAction {
 
     /** Fork */
     FORK,
+
+    /** 删除仓库（L04） */
+    DELETE,
 }
 
 /**
@@ -161,9 +172,10 @@ sealed interface ReleaseDetailState {
     /** 详情加载中 */
     data object Loading : ReleaseDetailState
 
-    /** 详情加载成功 */
+    /** 详情加载成功（L05：含附件列表） */
     data class Loaded(
         val release: Release,
+        val assets: List<ReleaseAsset> = emptyList(),
     ) : ReleaseDetailState
 
     /** 详情加载失败（错误类型驱动文案） */
@@ -190,4 +202,21 @@ sealed interface RepoEvent {
 
     /** Star/Watch 切换失败（已回滚） */
     data object ToggleFailed : RepoEvent
+
+    /** 仓库删除成功（L04；UI 收到后返回上一页） */
+    data object RepositoryDeleted : RepoEvent
+
+    /** 仓库删除无权限（L04；403 非 admin） */
+    data object RepositoryDeleteForbidden : RepoEvent
+
+    /** 仓库删除失败（L04；网络/未知） */
+    data object RepositoryDeleteFailed : RepoEvent
+
+    /** Release 附件上传成功（L05） */
+    data class AssetUploaded(
+        val name: String,
+    ) : RepoEvent
+
+    /** Release 附件上传失败（L05；403/422/网络） */
+    data object AssetUploadFailed : RepoEvent
 }

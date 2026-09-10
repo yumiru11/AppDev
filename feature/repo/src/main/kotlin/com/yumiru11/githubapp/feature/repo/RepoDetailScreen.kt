@@ -7,7 +7,11 @@ package com.yumiru11.githubapp.feature.repo
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,13 +32,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -43,6 +53,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -56,6 +67,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -66,6 +78,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -79,6 +93,8 @@ import com.composables.icons.materialsymbols.rounded.Visibility
 import com.composables.icons.materialsymbols.rounded.Visibility_off
 import com.yumiru11.githubapp.core.data.model.Release
 import com.yumiru11.githubapp.core.data.model.Repository
+import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
+import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
 import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
@@ -86,11 +102,15 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.LocalRepoDetailActions
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
 import com.yumiru11.githubapp.core.ui.sharedTransitionElement
+import java.io.IOException
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private const val TAG = "ReadmeRender"
+
+/** 剪贴板条目名（文件编辑「保留本地更改」） */
+private const val CLIP_LABEL_FILE_EDIT = "file-edit"
 
 /**
  * 仓库详情页（T9 README 浏览 tracer bullet + T12 仓库管理）。
@@ -112,6 +132,10 @@ fun RepoDetailScreen(
     onBackClick: () -> Unit = {},
     initialRef: String? = null,
     onBranchesClick: (owner: String, repo: String, currentRef: String?) -> Unit = { _, _, _ -> },
+    /** L05：新建 Release 表单页（Releases Tab 入口） */
+    onCreateRelease: (owner: String, repo: String) -> Unit = { _, _ -> },
+    /** L06：点击 Topic chip → 搜索页（query = topic:xxx） */
+    onTopicClick: (topic: String) -> Unit = {},
     viewModel: RepoDetailViewModel = hiltViewModel(),
     actions: RepoDetailActions = LocalRepoDetailActions.current,
 ) {
@@ -120,14 +144,29 @@ fun RepoDetailScreen(
     val filesState by filesViewModel.uiState.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
-    RepoEventSnackbar(viewModel = viewModel, snackbarHostState = snackbarHostState)
+    var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
+    RepoEventSnackbar(
+        viewModel = viewModel,
+        snackbarHostState = snackbarHostState,
+        onDeleted = onBackClick,
+    )
     // T22：文件编辑事件（提交/删除成功、保留本地剪贴板、失败文案）
     FileEditEventSnackbar(viewModel = filesViewModel, snackbarHostState = snackbarHostState)
+
+    // L04：删除仓库入口仅 owner/admin 可见（permissions 缺失 → 保守隐藏）
+    val canDeleteRepo = (uiState as? RepoDetailUiState.Success)?.canDeleteRepo == true
+    val deleteInProgress = (uiState as? RepoDetailUiState.Success)?.pendingAction == RepoAction.DELETE
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            RepoTopBar(owner = owner, repo = repo, onBackClick = onBackClick)
+            RepoTopBar(
+                owner = owner,
+                repo = repo,
+                onBackClick = onBackClick,
+                canDelete = canDeleteRepo,
+                onDeleteClick = { showDeleteDialog = true },
+            )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
@@ -184,6 +223,7 @@ fun RepoDetailScreen(
                             onRetryReadme = { viewModel.retry() },
                             initialRef = initialRef,
                             onBranchesClick = { onBranchesClick(owner, repo, filesState.currentRef) },
+                            onTopicClick = onTopicClick,
                             managementCallbacks =
                                 RepoManagementCallbacks(
                                     onToggleStar = { viewModel.toggleStar() },
@@ -193,6 +233,11 @@ fun RepoDetailScreen(
                                     onEnsureTagsLoaded = { viewModel.ensureTagsLoaded() },
                                     onReleaseClick = { viewModel.loadReleaseDetail(it) },
                                     onCollapseRelease = { viewModel.collapseReleaseDetail() },
+                                    onDeleteRepository = { viewModel.deleteRepository() },
+                                    onCreateRelease = { onCreateRelease(owner, repo) },
+                                    onUploadAsset = { releaseId, fileName, content ->
+                                        viewModel.uploadAsset(releaseId, fileName, content)
+                                    },
                                 ),
                         )
                     }
@@ -200,30 +245,128 @@ fun RepoDetailScreen(
             }
         }
     }
+
+    if (showDeleteDialog) {
+        DeleteRepoDialog(
+            fullName = "$owner/$repo",
+            inProgress = deleteInProgress,
+            onConfirm = {
+                showDeleteDialog = false
+                viewModel.deleteRepository()
+            },
+            onDismiss = { showDeleteDialog = false },
+        )
+    }
 }
 
 /**
  * 仓库管理事件 → Snackbar（UI 层 stringResource 映射，ViewModel 不产文案）。
+ *
+ * @param onDeleted 删除成功回调（UI 返回上一页；页面数据已不存在）
  */
 @Composable
 private fun RepoEventSnackbar(
     viewModel: RepoDetailViewModel,
     snackbarHostState: SnackbarHostState,
+    onDeleted: () -> Unit = {},
 ) {
     val context = LocalContext.current
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             val message =
                 when (event) {
-                    RepoEvent.Forked -> context.getString(R.string.repo_snackbar_forked)
-                    RepoEvent.ForkPermissionDenied -> context.getString(R.string.repo_snackbar_fork_permission_denied)
-                    RepoEvent.ForkAlreadyExists -> context.getString(R.string.repo_snackbar_fork_already_exists)
-                    RepoEvent.ForkFailed -> context.getString(R.string.repo_snackbar_fork_failed)
-                    RepoEvent.ToggleFailed -> context.getString(R.string.repo_snackbar_toggle_failed)
+                    RepoEvent.Forked -> {
+                        context.getString(R.string.repo_snackbar_forked)
+                    }
+
+                    RepoEvent.ForkPermissionDenied -> {
+                        context.getString(R.string.repo_snackbar_fork_permission_denied)
+                    }
+
+                    RepoEvent.ForkAlreadyExists -> {
+                        context.getString(R.string.repo_snackbar_fork_already_exists)
+                    }
+
+                    RepoEvent.ForkFailed -> {
+                        context.getString(R.string.repo_snackbar_fork_failed)
+                    }
+
+                    RepoEvent.ToggleFailed -> {
+                        context.getString(R.string.repo_snackbar_toggle_failed)
+                    }
+
+                    RepoEvent.RepositoryDeleted -> {
+                        onDeleted()
+                        context.getString(R.string.repo_delete_snackbar_deleted)
+                    }
+
+                    RepoEvent.RepositoryDeleteForbidden -> {
+                        context.getString(R.string.repo_delete_snackbar_forbidden)
+                    }
+
+                    RepoEvent.RepositoryDeleteFailed -> {
+                        context.getString(R.string.repo_delete_snackbar_failed)
+                    }
+
+                    is RepoEvent.AssetUploaded -> {
+                        context.getString(R.string.repo_release_asset_uploaded, event.name)
+                    }
+
+                    RepoEvent.AssetUploadFailed -> {
+                        context.getString(R.string.repo_release_asset_upload_failed)
+                    }
                 }
             snackbarHostState.showSnackbar(message)
         }
     }
+}
+
+/**
+ * 删除仓库二次确认对话框（L04）。
+ *
+ * 危险操作防误触：必须逐字输入完整 `owner/repo` 才能启用「永久删除」。
+ */
+@Composable
+private fun DeleteRepoDialog(
+    fullName: String,
+    inProgress: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var typed by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.repo_delete_title)) },
+        text = {
+            Column {
+                Text(
+                    text = stringResource(R.string.repo_delete_message, fullName),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = typed,
+                    onValueChange = { typed = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(text = stringResource(R.string.repo_delete_confirm_label, fullName)) },
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = typed.trim() == fullName && !inProgress,
+            ) {
+                Text(text = stringResource(R.string.repo_delete_confirm_action))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.repo_delete_cancel))
+            }
+        },
+    )
 }
 
 /** 文件编辑事件 → Snackbar/剪贴板（UI 层 stringResource 映射，ViewModel 不产文案）。 */
@@ -255,7 +398,7 @@ private fun FileEditEventSnackbar(
                 }
 
                 is FileEditEvent.KeepLocal -> {
-                    copyToClipboard(context, event.text)
+                    copyToClipboard(context, event.text, CLIP_LABEL_FILE_EDIT)
                     snackbarHostState.showSnackbar(context.getString(R.string.repo_file_snackbar_keep_local))
                 }
 
@@ -279,23 +422,36 @@ private fun editErrorText(
         RepoErrorType.UNKNOWN -> context.getString(R.string.repo_error_unknown)
     }
 
-/** 复制文本到系统剪贴板（409「保留本地更改」）。 */
-private fun copyToClipboard(
+/**
+ * 复制文本到系统剪贴板（409「保留本地更改」/ L09 复制完整 SHA）。
+ *
+ * @param label 剪贴板条目名（系统剪贴板 UI 展示用；非界面文案）
+ */
+internal fun copyToClipboard(
     context: Context,
     text: String,
+    label: String,
 ) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText("file-edit", text))
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
 }
 
-/** 顶栏：返回 + 仓库名。 */
+/**
+ * 顶栏：返回 + 仓库名 + 「更多」菜单（L04 删除仓库；此处是后续更多操作的统一挂载点）。
+ *
+ * [canDelete] = false（游客/非 admin/permissions 缺失）时菜单不渲染——入口不可见而非禁用，
+ * 避免把「可能有但没权限」暴露成可点击的空壳。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RepoTopBar(
     owner: String,
     repo: String,
     onBackClick: () -> Unit,
+    canDelete: Boolean = false,
+    onDeleteClick: () -> Unit = {},
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
     TopAppBar(
         title = {
             Text(
@@ -310,6 +466,30 @@ private fun RepoTopBar(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = stringResource(R.string.repo_back),
                 )
+            }
+        },
+        actions = {
+            if (canDelete) {
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = stringResource(R.string.repo_more),
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(text = stringResource(R.string.repo_delete)) },
+                            onClick = {
+                                menuExpanded = false
+                                onDeleteClick()
+                            },
+                        )
+                    }
+                }
             }
         },
         colors =
@@ -328,6 +508,7 @@ private fun RepoDetailContent(
     onRetryReadme: () -> Unit,
     initialRef: String? = null,
     onBranchesClick: () -> Unit,
+    onTopicClick: (String) -> Unit = {},
     managementCallbacks: RepoManagementCallbacks,
     modifier: Modifier = Modifier,
 ) {
@@ -347,6 +528,7 @@ private fun RepoDetailContent(
                 onToggleStar = managementCallbacks.onToggleStar,
                 onToggleWatch = managementCallbacks.onToggleWatch,
                 onFork = managementCallbacks.onFork,
+                onTopicClick = onTopicClick,
             )
         }
 
@@ -462,6 +644,7 @@ private fun RepoHeader(
     onToggleStar: () -> Unit,
     onToggleWatch: () -> Unit,
     onFork: () -> Unit,
+    onTopicClick: (String) -> Unit = {},
 ) {
     val repo = state.repo
     Card(
@@ -502,6 +685,12 @@ private fun RepoHeader(
                 }
             }
 
+            // L06：Topics chip 行（空列表不渲染该行；点击 → 搜索页 query=topic:xxx）
+            if (state.topics.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                TopicsRow(topics = state.topics, onTopicClick = onTopicClick)
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
 
             RepoStatsRow(repo = repo)
@@ -524,6 +713,48 @@ private fun RepoHeader(
                 Spacer(modifier = Modifier.height(12.dp))
                 LanguageBar(languages = state.languages)
             }
+        }
+    }
+}
+
+/**
+ * Topics chip 行（L06）。
+ *
+ * 容器色复用 designsystem 的 [labelChipContainerColor] / [labelChipContentColor]
+ * （labelColor 与 surface 按 55/45 混合 → 低饱和底 + 可控对比度）；组件本体用 M3
+ * [AssistChip]——designsystem 只提供颜色令牌、没有现成 LabelChip 组件（issue #85 现状）。
+ * 点击 → 搜索页 query=`topic:xxx`（宿主接线）。
+ */
+@Composable
+private fun TopicsRow(
+    topics: List<String>,
+    onTopicClick: (String) -> Unit,
+) {
+    val surface = MaterialTheme.colorScheme.surface
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        topics.forEach { topic ->
+            val container = labelChipContainerColor(labelColor = MaterialTheme.colorScheme.primaryContainer, surface = surface)
+            val contentColor =
+                labelChipContentColor(
+                    container = container,
+                    onSurface = MaterialTheme.colorScheme.onSurface,
+                    surface = surface,
+                )
+            val description = stringResource(R.string.repo_topic_search_cd, topic)
+            AssistChip(
+                onClick = { onTopicClick(topic) },
+                label = {
+                    Text(
+                        text = topic,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                },
+                colors = AssistChipDefaults.assistChipColors(containerColor = container, labelColor = contentColor),
+                modifier = Modifier.semantics { contentDescription = description },
+            )
         }
     }
 }
@@ -739,8 +970,11 @@ private fun ReleasesSection(
             detailState = state.releaseDetailState,
             baseRepoUrl = buildRepoUrl(state.repo),
             actions = actions,
+            canUpload = state.canPushRepo,
+            uploading = state.pendingAssetUpload,
             onBack = callbacks.onCollapseRelease,
             onRetry = { callbacks.onReleaseClick(state.expandedReleaseId) },
+            onUploadAsset = callbacks.onUploadAsset,
         )
         return
     }
@@ -748,17 +982,35 @@ private fun ReleasesSection(
     var subTab by rememberSaveable { mutableIntStateOf(0) }
 
     Column {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = subTab == 0,
-                onClick = { subTab = 0 },
-                label = { Text(text = stringResource(R.string.repo_subtab_releases)) },
-            )
-            FilterChip(
-                selected = subTab == 1,
-                onClick = { subTab = 1 },
-                label = { Text(text = stringResource(R.string.repo_subtab_tags)) },
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = subTab == 0,
+                    onClick = { subTab = 0 },
+                    label = { Text(text = stringResource(R.string.repo_subtab_releases)) },
+                )
+                FilterChip(
+                    selected = subTab == 1,
+                    onClick = { subTab = 1 },
+                    label = { Text(text = stringResource(R.string.repo_subtab_tags)) },
+                )
+            }
+            // L05：写权限才显示「新建 Release」（permissions 缺失 → 保守隐藏）
+            if (state.canPushRepo) {
+                TextButton(onClick = callbacks.onCreateRelease) {
+                    Icon(
+                        imageVector = MaterialSymbols.Rounded.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = stringResource(R.string.repo_release_new))
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -966,8 +1218,11 @@ private fun ReleaseDetailView(
     detailState: ReleaseDetailState,
     baseRepoUrl: String,
     actions: RepoDetailActions,
+    canUpload: Boolean = false,
+    uploading: Boolean = false,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onUploadAsset: (Long, String, ByteArray) -> Unit = { _, _, _ -> },
 ) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1004,22 +1259,34 @@ private fun ReleaseDetailView(
 
             is ReleaseDetailState.Loaded -> {
                 ReleaseDetailContent(
-                    release = detailState.release,
+                    detail = detailState,
                     baseRepoUrl = baseRepoUrl,
                     actions = actions,
+                    canUpload = canUpload,
+                    uploading = uploading,
+                    onUploadAsset = onUploadAsset,
                 )
             }
         }
     }
 }
 
-/** Release 详情正文（标题/徽章/元信息/正文 Markdown）。 */
+/**
+ * Release 详情正文（标题/徽章/元信息/正文 Markdown + L05 附件列表）。
+ *
+ * 附件点击 → Custom Tabs 下载（[RepoDetailActions.onOpenExternal]，复用 T3 已落地的外部链接通道）；
+ * [canUpload] 时提供「上传附件」入口（SAF 选文件 → 字节经 ViewModel 上传）。
+ */
 @Composable
 private fun ReleaseDetailContent(
-    release: Release,
+    detail: ReleaseDetailState.Loaded,
     baseRepoUrl: String,
     actions: RepoDetailActions,
+    canUpload: Boolean = false,
+    uploading: Boolean = false,
+    onUploadAsset: (Long, String, ByteArray) -> Unit = { _, _, _ -> },
 ) {
+    val release = detail.release
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -1067,11 +1334,159 @@ private fun ReleaseDetailContent(
                 baseRepoUrl = baseRepoUrl,
             )
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        ReleaseAssetsSection(
+            assets = detail.assets,
+            releaseId = release.id,
+            canUpload = canUpload,
+            uploading = uploading,
+            actions = actions,
+            onUploadAsset = onUploadAsset,
+        )
     }
 }
 
+/**
+ * Release 附件区（L05）：名称 / 大小 / 下载数，点击 → Custom Tabs 下载；写权限时提供上传入口。
+ */
 @Composable
-private fun EmptyHint(text: String) {
+private fun ReleaseAssetsSection(
+    assets: List<ReleaseAsset>,
+    releaseId: Long,
+    canUpload: Boolean,
+    uploading: Boolean,
+    actions: RepoDetailActions,
+    onUploadAsset: (Long, String, ByteArray) -> Unit,
+) {
+    val context = LocalContext.current
+    val picker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                val bytes = readAssetBytes(context, uri)
+                if (bytes != null) {
+                    onUploadAsset(releaseId, queryDisplayName(context, uri), bytes)
+                }
+            }
+        }
+
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(R.string.repo_release_assets),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            if (canUpload) {
+                TextButton(
+                    onClick = { picker.launch(arrayOf("*/*")) },
+                    enabled = !uploading,
+                ) {
+                    if (uploading) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(
+                            imageVector = MaterialSymbols.Rounded.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = stringResource(R.string.repo_release_asset_upload))
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (assets.isEmpty()) {
+            EmptyHint(text = stringResource(R.string.repo_release_assets_empty))
+        } else {
+            assets.forEach { asset ->
+                Card(
+                    onClick = { asset.downloadUrl?.let(actions.onOpenExternal) },
+                    // 无直链（异常数据）时不可点，避免"点了没反应"
+                    enabled = asset.downloadUrl != null,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        ),
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = asset.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text =
+                                stringResource(
+                                    R.string.repo_release_asset_meta,
+                                    formatFileSize(asset.size),
+                                    asset.downloadCount,
+                                ),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 字节数 → 人类可读大小（单位文案走 stringResource，零硬编码文案）。 */
+@Composable
+internal fun formatFileSize(bytes: Long): String =
+    when {
+        bytes < KIB -> stringResource(R.string.repo_release_asset_size_b, bytes)
+        bytes < KIB * KIB -> stringResource(R.string.repo_release_asset_size_kb, bytes / KIB)
+        bytes < KIB * KIB * KIB -> stringResource(R.string.repo_release_asset_size_mb, bytes / (KIB * KIB))
+        else -> stringResource(R.string.repo_release_asset_size_gb, bytes / (KIB * KIB * KIB))
+    }
+
+/** 1 KiB（单位换算常量） */
+private const val KIB = 1024L
+
+/** SAF Uri → 显示文件名（OpenableColumns 查询失败时回退路径末段）。 */
+internal fun queryDisplayName(
+    context: Context,
+    uri: Uri,
+): String {
+    val cursor = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+    cursor?.use { c ->
+        if (c.moveToFirst() && !c.isNull(0)) {
+            return c.getString(0)
+        }
+    }
+    return uri.lastPathSegment ?: DEFAULT_ASSET_NAME
+}
+
+/** SAF Uri → 字节内容（读取失败返回 null，UI 忽略该次选择）。 */
+internal fun readAssetBytes(
+    context: Context,
+    uri: Uri,
+): ByteArray? =
+    try {
+        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+    } catch (e: IOException) {
+        // SAF 读取失败（文件被删/撤销授权）：记日志后按「未选择」处理，UI 不弹错
+        Log.w(TAG, "附件读取失败: ${e.message}")
+        null
+    }
+
+/** 附件名兜底 */
+private const val DEFAULT_ASSET_NAME = "asset"
+
+@Composable
+internal fun EmptyHint(text: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors =

@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.core.githubrest.di
 
 import com.yumiru11.githubapp.core.common.GitHubApiConfig
 import com.yumiru11.githubapp.core.githubrest.BuildConfig
+import com.yumiru11.githubapp.core.githubrest.api.CommitApi
 import com.yumiru11.githubapp.core.githubrest.api.ContentApi
 import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
 import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
@@ -108,4 +109,8 @@ object RestNetworkModule {
     @Provides
     @Singleton
     fun provideSearchApi(retrofit: Retrofit): SearchApi = retrofit.create(SearchApi::class.java)
+
+    @Provides
+    @Singleton
+    fun provideCommitApi(retrofit: Retrofit): CommitApi = retrofit.create(CommitApi::class.java)
 }

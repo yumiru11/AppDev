@@ -44,6 +44,9 @@ import com.yumiru11.githubapp.core.ui.screens.SearchScreen as PlaceholderSearchS
  *   blurEnabled 等参数由宿主在 lambda 闭包内直接传给 feature:home HomeScreen）
  * - [loginScreen]：登录页 Composable（宿主注入，避免 core:ui 依赖 feature:auth）
  * - [repoDetailScreen]：仓库详情页 Composable（宿主注入，避免 core:ui 依赖 feature:repo）
+ * - [createRepoScreen]：新建仓库页 Composable（宿主注入，避免 core:ui 依赖 feature:repo；L04）
+ * - [releaseCreateScreen]：新建 Release 表单页 Composable（宿主注入；L05）
+ * - [commitScreen]：COMMIT 详情页 Composable（宿主注入；L09，替换此前占位屏）
  * - 通知自 #88 起为铃铛触发的覆盖面板（ui-design §3.4），不再有导航 destination
  * - [profileScreen]：个人主页 Composable（宿主注入，避免 core:ui 依赖 feature:profile；
  *   onLoginClick 由宿主接线到 LOGIN 路由）。**只服务 USER 路由**（他人主页，L10）：
@@ -61,8 +64,16 @@ fun AppNavHost(
     startDestination: AppRoute = AppRoute.Home,
     homeScreen: @Composable () -> Unit = {},
     loginScreen: @Composable () -> Unit = {},
-    searchScreen: @Composable () -> Unit = {},
+    searchScreen: @Composable (initialQuery: String) -> Unit = {},
     repoDetailScreen: @Composable (owner: String, repo: String, ref: String) -> Unit = { _, _, _ -> },
+    createRepoScreen: @Composable (onCreated: (owner: String, repo: String) -> Unit) -> Unit = {},
+    releaseCreateScreen: @Composable (
+        owner: String,
+        repo: String,
+        ref: String,
+        onCreated: () -> Unit,
+    ) -> Unit = { _, _, _, _ -> },
+    commitScreen: @Composable (owner: String, repo: String, sha: String) -> Unit = { _, _, _ -> },
     blobScreen:
         @Composable (owner: String, repo: String, ref: String, path: String) -> Unit = { _, _, _, _ -> },
     profileScreen: @Composable (onLoginClick: () -> Unit, onBackClick: () -> Unit) -> Unit = { _, _ -> },
@@ -132,10 +143,12 @@ fun AppNavHost(
                     }
                 }
 
-                composable<AppRoute.Search> {
-                    // T18 真实搜索屏（feature/search）；此前误挂 core.ui 占位组件致「Coming soon」
+                composable<AppRoute.Search> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.Search>()
+                    // T18 真实搜索屏（feature/search）；此前误挂 core.ui 占位组件致「Coming soon」。
+                    // L06：query 由 Topic chip 带入（空串 = 普通入口）
                     provideNavTransitionScope {
-                        searchScreen()
+                        searchScreen(route.query)
                     }
                 }
 
@@ -164,6 +177,30 @@ fun AppNavHost(
                     ) {
                         provideNavTransitionScope {
                             repoDetailScreen(route.owner, route.repo, route.ref)
+                        }
+                    }
+                }
+
+                // L04：新建仓库页；成功后清出本页并打开新仓库详情
+                composable<AppRoute.CreateRepo> {
+                    provideNavTransitionScope {
+                        createRepoScreen { owner, repo ->
+                            navController.navigate(AppRoute.Repo(owner, repo)) {
+                                popUpTo(AppRoute.CreateRepo) { inclusive = true }
+                            }
+                        }
+                    }
+                }
+
+                // L05：新建 Release 表单页；成功后重进仓库详情（新 VM → Releases 列表刷新）
+                composable<AppRoute.ReleaseCreate> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.ReleaseCreate>()
+                    provideNavTransitionScope {
+                        releaseCreateScreen(route.owner, route.repo, route.ref) {
+                            // 重进仓库详情（popUpTo inclusive）：新 RepoDetailViewModel 会重新拉 Releases
+                            navController.navigate(AppRoute.Repo(route.owner, route.repo)) {
+                                popUpTo(AppRoute.Repo(route.owner, route.repo)) { inclusive = true }
+                            }
                         }
                     }
                 }
@@ -276,10 +313,11 @@ fun AppNavHost(
                     }
                 }
 
-                // T5+ Commit 详情页（真实屏未开发；暂以占位承载，避免悬空路由）
-                composable<AppRoute.Commit> {
+                // L09：COMMIT 详情页（真实屏；替换此前的占位，深链/时间线入口均落到此）
+                composable<AppRoute.Commit> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.Commit>()
                     provideNavTransitionScope {
-                        PlaceholderSearchScreen()
+                        commitScreen(route.owner, route.repo, route.sha)
                     }
                 }
 

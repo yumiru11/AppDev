@@ -1,18 +1,23 @@
 package com.yumiru11.githubapp.feature.repo
 
 import com.yumiru11.githubapp.core.githubrest.api.RepoManagementApi
+import com.yumiru11.githubapp.core.githubrest.model.CreateReleaseRequest
+import com.yumiru11.githubapp.core.githubrest.model.ReleaseAssetDto
 import com.yumiru11.githubapp.core.githubrest.model.ReleaseDto
 import com.yumiru11.githubapp.core.githubrest.model.RepositoryDto
 import com.yumiru11.githubapp.core.githubrest.model.SubscriptionDto
 import com.yumiru11.githubapp.core.githubrest.model.SubscriptionRequest
 import com.yumiru11.githubapp.core.githubrest.model.TagCommitDto
 import com.yumiru11.githubapp.core.githubrest.model.TagDto
+import com.yumiru11.githubapp.core.githubrest.model.TopicsDto
 import com.yumiru11.githubapp.core.githubrest.model.UserDto
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -272,8 +277,8 @@ class RepoManagementRepositoryTest {
             val result = repository.getRelease("octocat", "Hello-World", 42)
 
             assertTrue(result.isSuccess)
-            val release = result.getOrThrow()
-            assertEquals(42, release.id)
+            val release = result.getOrThrow().release
+            assertEquals(42L, release.id)
             assertEquals("v2.0.0", release.tagName)
             assertTrue(release.prerelease)
         }
@@ -312,5 +317,171 @@ class RepoManagementRepositoryTest {
             assertTrue(result.isSuccess)
             assertEquals(102400L, result.getOrThrow()["Kotlin"])
             assertEquals(51200L, result.getOrThrow()["Java"])
+        }
+
+    // ---- L06 Topics ----
+
+    @Test
+    fun getTopics_success_returnsNames() =
+        runTest {
+            coEvery { api.getTopics("octocat", "Hello-World") } returns TopicsDto(names = listOf("kotlin", "android"))
+
+            val result = repository.getTopics("octocat", "Hello-World")
+
+            assertEquals(listOf("kotlin", "android"), result.getOrThrow())
+        }
+
+    @Test
+    fun getTopics_emptyNames_returnsEmptyList() =
+        runTest {
+            coEvery { api.getTopics(any(), any()) } returns TopicsDto()
+
+            val result = repository.getTopics("octocat", "Hello-World")
+
+            assertTrue(result.getOrThrow().isEmpty())
+        }
+
+    @Test
+    fun getTopics_failure_returnsFailure() =
+        runTest {
+            coEvery { api.getTopics(any(), any()) } throws httpException(404)
+
+            val result = repository.getTopics("octocat", "Hello-World")
+
+            assertTrue(result.isFailure)
+        }
+
+    // ---- L05 Release 详情（附件映射）----
+
+    @Test
+    fun getRelease_success_mapsAssetsAndTargetCommitish() =
+        runTest {
+            coEvery { api.getRelease("octocat", "Hello-World", 7L) } returns
+                ReleaseDto(
+                    id = 7,
+                    tagName = "v1.0.0",
+                    targetCommitish = "main",
+                    assets =
+                        listOf(
+                            ReleaseAssetDto(
+                                id = 11,
+                                name = "app.apk",
+                                browserDownloadUrl = "https://example.com/app.apk",
+                                size = 2048,
+                                downloadCount = 3,
+                            ),
+                        ),
+                )
+
+            val detail = repository.getRelease("octocat", "Hello-World", 7L).getOrThrow()
+
+            assertEquals("v1.0.0", detail.release.tagName)
+            assertEquals(1, detail.assets.size)
+            val asset = detail.assets.single()
+            assertEquals(11L, asset.id)
+            assertEquals("app.apk", asset.name)
+            assertEquals("https://example.com/app.apk", asset.downloadUrl)
+            assertEquals(2048L, asset.size)
+            assertEquals(3, asset.downloadCount)
+        }
+
+    @Test
+    fun getRelease_noAssets_returnsEmptyAssetList() =
+        runTest {
+            coEvery { api.getRelease(any(), any(), any()) } returns ReleaseDto(id = 1, tagName = "v1")
+
+            val detail = repository.getRelease("octocat", "Hello-World", 1L).getOrThrow()
+
+            assertTrue(detail.assets.isEmpty())
+        }
+
+    // ---- L05 创建 Release ----
+
+    @Test
+    fun createRelease_success_sendsRequestAndMapsRelease() =
+        runTest {
+            val requestSlot = slot<CreateReleaseRequest>()
+            coEvery { api.createRelease("octocat", "Hello-World", capture(requestSlot)) } returns
+                ReleaseDto(id = 9, tagName = "v2.0.0", draft = true, prerelease = true, targetCommitish = "dev")
+
+            val result =
+                repository.createRelease(
+                    owner = "octocat",
+                    repo = "Hello-World",
+                    release =
+                        NewRelease(
+                            tagName = "v2.0.0",
+                            targetCommitish = "dev",
+                            name = "2.0.0",
+                            body = "notes",
+                            draft = true,
+                            prerelease = true,
+                        ),
+                )
+
+            val release = result.getOrThrow()
+            assertEquals(9L, release.id)
+            assertEquals("v2.0.0", release.tagName)
+            assertTrue(release.draft)
+            assertTrue(release.prerelease)
+            assertEquals("v2.0.0", requestSlot.captured.tagName)
+            assertEquals("dev", requestSlot.captured.targetCommitish)
+            assertTrue(requestSlot.captured.draft)
+        }
+
+    @Test
+    fun createRelease_422_failure() =
+        runTest {
+            coEvery { api.createRelease(any(), any(), any()) } throws httpException(422)
+
+            val result =
+                repository.createRelease("octocat", "Hello-World", NewRelease(tagName = "bad tag"))
+
+            assertTrue(result.isFailure)
+        }
+
+    @Test
+    fun createRelease_403_failure() =
+        runTest {
+            coEvery { api.createRelease(any(), any(), any()) } throws httpException(403)
+
+            val result = repository.createRelease("octocat", "Hello-World", NewRelease(tagName = "v1"))
+
+            assertTrue(result.isFailure)
+        }
+
+    // ---- L05 上传附件（multipart）----
+
+    @Test
+    fun uploadReleaseAsset_success_buildsMultipartWithFileNameAndQuery() =
+        runTest {
+            val partSlot = slot<MultipartBody.Part>()
+            val nameSlot = slot<String>()
+            coEvery {
+                api.uploadReleaseAsset("octocat", "Hello-World", 7L, capture(nameSlot), capture(partSlot))
+            } returns ReleaseAssetDto(id = 12, name = "app.apk", size = 3, downloadCount = 0)
+
+            val result =
+                repository.uploadReleaseAsset(
+                    owner = "octocat",
+                    repo = "Hello-World",
+                    releaseId = 7L,
+                    fileName = "app.apk",
+                    content = byteArrayOf(1, 2, 3),
+                )
+
+            assertEquals("app.apk", result.getOrThrow().name)
+            assertEquals("app.apk", nameSlot.captured)
+            assertEquals("form-data; name=\"file\"; filename=\"app.apk\"", partSlot.captured.headers?.get("Content-Disposition"))
+        }
+
+    @Test
+    fun uploadReleaseAsset_failure_returnsFailure() =
+        runTest {
+            coEvery { api.uploadReleaseAsset(any(), any(), any(), any(), any()) } throws httpException(422)
+
+            val result = repository.uploadReleaseAsset("octocat", "Hello-World", 7L, "a.bin", byteArrayOf(1))
+
+            assertTrue(result.isFailure)
         }
 }

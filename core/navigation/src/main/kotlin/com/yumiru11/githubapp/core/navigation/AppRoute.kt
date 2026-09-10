@@ -26,9 +26,14 @@ sealed interface AppRoute {
     @SerialName("login")
     data object Login : AppRoute
 
+    // L06：Topic chip 点击 → 搜索页带 query（空串 = 普通入口，用户自行输入）。
+    // 由 data object 升级为带默认参数的 data class：Navigation 侧 pattern 变为
+    // `search?query={query}`，既有 `AppRoute.Search` 调用点改为 `AppRoute.Search()`。
     @Serializable
     @SerialName("search")
-    data object Search : AppRoute
+    data class Search(
+        val query: String = "",
+    ) : AppRoute
 
     @Serializable
     @SerialName("settings")
@@ -37,6 +42,21 @@ sealed interface AppRoute {
     @Serializable
     @SerialName("editor")
     data object Editor : AppRoute
+
+    // L04 新建仓库页（Home 第三条长条按钮 / 未登录则先引导登录）
+    @Serializable
+    @SerialName("create_repo")
+    data object CreateRepo : AppRoute
+
+    // L05 新建 Release 表单页（仓库详情 Releases Tab「新建 Release」入口）；
+    // ref 为可选 query：宿主传仓库默认分支，表单「目标分支」预填（空 → 服务端按默认分支处理）
+    @Serializable
+    @SerialName("release_create")
+    data class ReleaseCreate(
+        val owner: String,
+        val repo: String,
+        val ref: String = "",
+    ) : AppRoute
 
     // ref 为可选 query（T23 分支切换深链：切换后带新 ref 重进仓库详情，文件树按该分支加载）
     @Serializable

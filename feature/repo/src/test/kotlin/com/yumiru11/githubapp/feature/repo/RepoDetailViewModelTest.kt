@@ -1,3 +1,7 @@
+@file:Suppress("LargeClass")
+// 单类单 VM 的完整行为契约（T9/T12 + L04/L05/L06）：拆文件会让共享桩（repoRepositoryWithReadme/
+// mockkRepoManagement）跨文件重复，测试可读性反而下降。
+
 package com.yumiru11.githubapp.feature.repo
 
 import androidx.lifecycle.SavedStateHandle
@@ -5,6 +9,8 @@ import app.cash.turbine.test
 import com.yumiru11.githubapp.core.data.model.Release
 import com.yumiru11.githubapp.core.githubauth.auth.AuthState
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
+import com.yumiru11.githubapp.core.githubdata.error.GitHubError
+import com.yumiru11.githubapp.core.githubdata.error.GitHubRequestException
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownThemeTokens
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
@@ -20,6 +26,7 @@ import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -47,6 +54,7 @@ class RepoDetailViewModelTest {
         repoRepository: RepoRepository,
         repoManagementRepository: RepoManagementRepository = mockkRepoManagement(),
         authStateValue: AuthState = AuthState.Anonymous,
+        repoAdminRepository: RepoAdminRepository = mockk(relaxed = true),
     ): RepoDetailViewModel {
         val sessionManager =
             mockk<OAuthSessionManager> {
@@ -56,6 +64,7 @@ class RepoDetailViewModelTest {
             savedStateHandle = savedStateHandle,
             repoRepository = repoRepository,
             repoManagementRepository = repoManagementRepository,
+            repoAdminRepository = repoAdminRepository,
             sessionManager = sessionManager,
         )
     }
@@ -679,7 +688,7 @@ class RepoDetailViewModelTest {
                 mockk<RepoManagementRepository> {
                     coEvery { getLanguages(any(), any()) } returns Result.success(emptyMap())
                     coEvery { getReleases(any(), any()) } returns Result.success(listOf(release))
-                    coEvery { getRelease("octocat", "Hello-World", 1) } returns Result.success(release)
+                    coEvery { getRelease("octocat", "Hello-World", 1) } returns Result.success(ReleaseDetail(release))
                 }
             val viewModel = viewModel(repoRepositoryWithReadme(), repoManagementRepository)
             viewModel.ensureReleasesLoaded()
@@ -705,7 +714,7 @@ class RepoDetailViewModelTest {
                 mockk<RepoManagementRepository> {
                     coEvery { getLanguages(any(), any()) } returns Result.success(emptyMap())
                     coEvery { getReleases(any(), any()) } returns Result.success(listOf(release))
-                    coEvery { getRelease(any(), any(), any()) } returns Result.failure(IOException("boom"))
+                    coEvery { getRelease(any(), any(), any()) } returns Result.failure<ReleaseDetail>(IOException("boom"))
                 }
             val viewModel = viewModel(repoRepositoryWithReadme(), repoManagementRepository)
             viewModel.ensureReleasesLoaded()
@@ -716,5 +725,211 @@ class RepoDetailViewModelTest {
                 ReleaseDetailState.Error(RepoErrorType.NETWORK),
                 (viewModel.uiState.value as RepoDetailUiState.Success).releaseDetailState,
             )
+        }
+
+    // ---- L05 草稿可见性 ----
+
+    @Test
+    fun ensureReleasesLoaded_withoutPushPermission_hidesDraftReleases() =
+        runTest {
+            val draft = Release(id = 1, tagName = "v0.1", draft = true)
+            val published = Release(id = 2, tagName = "v1.0")
+            val repoManagementRepository =
+                mockk<RepoManagementRepository> {
+                    coEvery { getLanguages(any(), any()) } returns Result.success(emptyMap())
+                    coEvery { getReleases(any(), any()) } returns Result.success(listOf(draft, published))
+                }
+            val viewModel = viewModel(repoRepositoryWithReadme(), repoManagementRepository)
+
+            viewModel.ensureReleasesLoaded()
+
+            val loaded = (viewModel.uiState.value as RepoDetailUiState.Success).releasesState as ReleasesState.Loaded
+            assertEquals(listOf(published), loaded.releases)
+        }
+
+    @Test
+    fun ensureReleasesLoaded_withPushPermission_showsDraftReleases() =
+        runTest {
+            val draft = Release(id = 1, tagName = "v0.1", draft = true)
+            val repoManagementRepository =
+                mockk<RepoManagementRepository> {
+                    coEvery { getLanguages(any(), any()) } returns Result.success(emptyMap())
+                    coEvery { getReleases(any(), any()) } returns Result.success(listOf(draft))
+                }
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getRepository(any(), any()) } returns GitHubFakes.fakeRepository()
+                    coEvery { getReadme(any(), any(), any<String>()) } returns
+                        Result.success(ReadmeContent(markdown = "# H", html = "<p>h</p>", renderMode = ReadmeRenderMode.WEBVIEW))
+                    coEvery { repositoryPermissions(any(), any()) } returns RepositoryPermissions(canAdmin = true, canPush = true)
+                }
+            val viewModel = viewModel(repoRepository, repoManagementRepository)
+
+            viewModel.ensureReleasesLoaded()
+
+            val loaded = (viewModel.uiState.value as RepoDetailUiState.Success).releasesState as ReleasesState.Loaded
+            assertEquals(listOf(draft), loaded.releases)
+        }
+
+    // ---- L06 Topics ----
+
+    @Test
+    fun loadRepoDetail_topicsLoaded_exposedInState() =
+        runTest {
+            val repoManagementRepository =
+                mockk<RepoManagementRepository> {
+                    coEvery { getLanguages(any(), any()) } returns Result.success(emptyMap())
+                    coEvery { getTopics(any(), any()) } returns Result.success(listOf("kotlin", "android"))
+                }
+
+            val state = viewModel(repoRepositoryWithReadme(), repoManagementRepository).uiState.value
+
+            assertEquals(listOf("kotlin", "android"), (state as RepoDetailUiState.Success).topics)
+        }
+
+    @Test
+    fun loadRepoDetail_topicsFailure_topicsStayEmpty() =
+        runTest {
+            val repoManagementRepository =
+                mockk<RepoManagementRepository> {
+                    coEvery { getLanguages(any(), any()) } returns Result.success(emptyMap())
+                    coEvery { getTopics(any(), any()) } returns Result.failure(IOException("boom"))
+                }
+
+            val state = viewModel(repoRepositoryWithReadme(), repoManagementRepository).uiState.value
+
+            assertTrue((state as RepoDetailUiState.Success).topics.isEmpty())
+        }
+
+    // ---- L04 权限位与删除仓库 ----
+
+    @Test
+    fun loadRepoDetail_adminPermissions_exposesDeleteAndPushFlags() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getRepository(any(), any()) } returns GitHubFakes.fakeRepository()
+                    coEvery { getReadme(any(), any(), any<String>()) } returns
+                        Result.success(ReadmeContent(markdown = "# H", html = "<p>h</p>", renderMode = ReadmeRenderMode.WEBVIEW))
+                    coEvery { repositoryPermissions(any(), any()) } returns RepositoryPermissions(canAdmin = true, canPush = true)
+                }
+
+            val state = viewModel(repoRepository).uiState.value as RepoDetailUiState.Success
+
+            assertTrue(state.canDeleteRepo)
+            assertTrue(state.canPushRepo)
+        }
+
+    @Test
+    fun loadRepoDetail_noPermissions_hidesWriteEntryPoints() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getRepository(any(), any()) } returns GitHubFakes.fakeRepository()
+                    coEvery { getReadme(any(), any(), any<String>()) } returns
+                        Result.success(ReadmeContent(markdown = "# H", html = "<p>h</p>", renderMode = ReadmeRenderMode.WEBVIEW))
+                    coEvery { repositoryPermissions(any(), any()) } returns RepositoryPermissions()
+                }
+
+            val state = viewModel(repoRepository).uiState.value as RepoDetailUiState.Success
+
+            assertFalse(state.canDeleteRepo)
+            assertFalse(state.canPushRepo)
+        }
+
+    @Test
+    fun deleteRepository_success_emitsDeletedEvent() =
+        runTest {
+            val adminRepository =
+                mockk<RepoAdminRepository> {
+                    coEvery { deleteRepository(any(), any()) } returns Result.success(Unit)
+                }
+            val viewModel = viewModel(repoRepositoryWithReadme(), repoAdminRepository = adminRepository)
+
+            viewModel.events.test {
+                viewModel.deleteRepository()
+
+                assertEquals(RepoEvent.RepositoryDeleted, awaitItem())
+            }
+            assertEquals(null, (viewModel.uiState.value as RepoDetailUiState.Success).pendingAction)
+        }
+
+    @Test
+    fun deleteRepository_forbidden_emitsForbiddenEvent() =
+        runTest {
+            val adminRepository =
+                mockk<RepoAdminRepository> {
+                    coEvery { deleteRepository(any(), any()) } returns
+                        Result.failure(GitHubRequestException(GitHubError.Forbidden, null))
+                }
+            val viewModel = viewModel(repoRepositoryWithReadme(), repoAdminRepository = adminRepository)
+
+            viewModel.events.test {
+                viewModel.deleteRepository()
+
+                assertEquals(RepoEvent.RepositoryDeleteForbidden, awaitItem())
+            }
+        }
+
+    @Test
+    fun deleteRepository_failure_emitsFailedEvent() =
+        runTest {
+            val adminRepository =
+                mockk<RepoAdminRepository> {
+                    coEvery { deleteRepository(any(), any()) } returns Result.failure(IOException("boom"))
+                }
+            val viewModel = viewModel(repoRepositoryWithReadme(), repoAdminRepository = adminRepository)
+
+            viewModel.events.test {
+                viewModel.deleteRepository()
+
+                assertEquals(RepoEvent.RepositoryDeleteFailed, awaitItem())
+            }
+        }
+
+    // ---- L05 附件上传 ----
+
+    @Test
+    fun uploadAsset_success_emitsUploadedEventAndRefreshesDetail() =
+        runTest {
+            val release = Release(id = 3, tagName = "v1")
+            val asset = ReleaseAsset(id = 9, name = "app.apk", size = 10, downloadCount = 0)
+            val repoManagementRepository =
+                mockk<RepoManagementRepository> {
+                    coEvery { getLanguages(any(), any()) } returns Result.success(emptyMap())
+                    coEvery { getReleases(any(), any()) } returns Result.success(listOf(release))
+                    coEvery { getRelease(any(), any(), any()) } returns Result.success(ReleaseDetail(release, listOf(asset)))
+                    coEvery { uploadReleaseAsset(any(), any(), any(), any(), any()) } returns Result.success(asset)
+                }
+            val viewModel = viewModel(repoRepositoryWithReadme(), repoManagementRepository)
+            viewModel.ensureReleasesLoaded()
+            viewModel.loadReleaseDetail(3)
+
+            viewModel.events.test {
+                viewModel.uploadAsset(3, "app.apk", byteArrayOf(1, 2, 3))
+
+                assertEquals(RepoEvent.AssetUploaded("app.apk"), awaitItem())
+            }
+            val detail = (viewModel.uiState.value as RepoDetailUiState.Success).releaseDetailState
+            assertEquals(listOf(asset), (detail as ReleaseDetailState.Loaded).assets)
+            assertFalse((viewModel.uiState.value as RepoDetailUiState.Success).pendingAssetUpload)
+        }
+
+    @Test
+    fun uploadAsset_failure_emitsUploadFailedEvent() =
+        runTest {
+            val repoManagementRepository =
+                mockk<RepoManagementRepository> {
+                    coEvery { getLanguages(any(), any()) } returns Result.success(emptyMap())
+                    coEvery { uploadReleaseAsset(any(), any(), any(), any(), any()) } returns Result.failure(IOException("boom"))
+                }
+            val viewModel = viewModel(repoRepositoryWithReadme(), repoManagementRepository)
+
+            viewModel.events.test {
+                viewModel.uploadAsset(3, "app.apk", byteArrayOf(1))
+
+                assertEquals(RepoEvent.AssetUploadFailed, awaitItem())
+            }
+            assertFalse((viewModel.uiState.value as RepoDetailUiState.Success).pendingAssetUpload)
         }
 }
