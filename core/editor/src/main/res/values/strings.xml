@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Markdown 编辑器/评论输入的共用组合器（MarkdownComposer，#166 / UI05）。
+         这些 key 原本在 feature:editor，为了 issue 评论输入 Sheet 复用同一套工具栏，
+         下沉到 core:editor —— 资源 key 在 Android 里是全局命名空间，同一个 key 不能在两处
+         各定义一份（合并期 last-wins，极易静默串味）。 -->
+    <string name="editor_tab_edit">Edit</string>
+    <string name="editor_tab_preview">Preview</string>
+    <string name="editor_bold">Bold</string>
+    <string name="editor_italic">Italic</string>
+    <string name="editor_inline_code">Inline code</string>
+    <string name="editor_code_block">Code block</string>
+    <string name="editor_heading">Heading</string>
+    <string name="editor_unordered_list">Bulleted list</string>
+    <string name="editor_ordered_list">Numbered list</string>
+    <string name="editor_task_list">Task list</string>
+    <string name="editor_link">Link</string>
+    <string name="editor_image">Image</string>
+    <string name="editor_quote">Quote</string>
+</resources>

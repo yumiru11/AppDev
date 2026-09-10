@@ -55,6 +55,9 @@
     <string name="issue_comment_added">评论已添加</string>
     <string name="issue_comment_updated">评论已更新</string>
     <string name="issue_comment_deleted">评论已删除</string>
+    <!-- 评论输入完整形态（#166 / UI05） -->
+    <string name="issue_comment_cancel">取消</string>
+    <string name="issue_comment_preview_empty">还没有可预览的内容。</string>
     <string name="issue_reaction_added">反应已添加</string>
     <string name="issue_reaction_removed">反应已移除</string>
     <string name="issue_closed_snackbar">Issue 已关闭</string>

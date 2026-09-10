@@ -41,7 +41,15 @@ class MarkdownEditorViewModel(
         _uiState.update { it.copy(text = text) }
     }
 
-    /** 切换编辑/预览 Tab。 */
+    // 显式设置预览态（#166 / UI05）：
+    // MarkdownComposer 的回调带目标态参数（点"编辑"就是 false、点"预览"就是 true），
+    // 直接 set 比"再 toggle 一次"更稳 —— 不会因为重复点击/重组时序把状态翻反。
+    // 注：成员函数上用行注释而不是 KDoc —— ktlint 的 standard:kdoc 规则禁止 class_body 内出现 KDoc。
+    fun setPreview(preview: Boolean) {
+        _uiState.update { it.copy(isPreview = preview) }
+    }
+
+    /** 切换编辑/预览 Tab（保留给"没有目标态"的调用方）。 */
     fun togglePreview() {
         _uiState.update { it.copy(isPreview = !it.isPreview) }
     }
