@@ -77,6 +77,8 @@ class IssueDetailScreenScreenshotTest : ScreenshotTest() {
                         viewerPermission = IssueViewerPermission.WRITE,
                         issueNodeId = "I_kwDOA",
                     )
+                // #163：已登录 + 未订阅 → HeaderCard 展示 Subscribe 按钮（订阅态探测固定为 false）
+                coEvery { isSubscribed("octocat", "Hello-World", 42) } returns false
             }
         return IssueDetailViewModel(
             SavedStateHandle(mapOf("owner" to "octocat", "repo" to "Hello-World", "number" to 42)),

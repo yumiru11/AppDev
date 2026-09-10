@@ -22,6 +22,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import retrofit2.HttpException
 import java.io.IOException
 
 /**
@@ -286,4 +287,195 @@ class IssueRepositoryWriteTest {
         assertNull(context.viewerLogin)
         assertNull(context.issueNodeId)
     }
+
+    // ── #163 L01：Issue 级订阅 ─────────────────────────────────────
+
+    @Test
+    fun isSubscribed_subscribedResponse_returnsTrue() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"subscribed": true, "ignored": false}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val subscribed = repository().isSubscribed("octocat", "Hello-World", 42)
+
+            assertTrue(subscribed)
+            assertEquals(
+                "/repos/octocat/Hello-World/issues/42/subscription",
+                server.takeRequest().url.encodedPath,
+            )
+        }
+
+    @Test
+    fun isSubscribed_404Response_returnsFalse() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 404 Not Found")
+                    .body("""{"message":"Not Found"}""")
+                    .build(),
+            )
+
+            assertTrue("404 = 未订阅（GitHub 语义）", !repository().isSubscribed("octocat", "Hello-World", 42))
+        }
+
+    @Test
+    fun isSubscribed_403Response_propagatesHttpException() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 403 Forbidden")
+                    .body("""{"message":"Forbidden"}""")
+                    .build(),
+            )
+
+            try {
+                repository().isSubscribed("octocat", "Hello-World", 42)
+                throw AssertionError("403 应抛 HttpException（由 ViewModel 归一）")
+            } catch (e: HttpException) {
+                assertEquals(403, e.code())
+            }
+        }
+
+    @Test
+    fun subscribe_sendsPutWithSubscribedTrue() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"subscribed": true}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            repository().subscribe("octocat", "Hello-World", 42)
+
+            val request = server.takeRequest()
+            assertEquals("PUT", request.method)
+            assertEquals("/repos/octocat/Hello-World/issues/42/subscription", request.url.encodedPath)
+            assertEquals("""{"subscribed":true}""", request.body?.utf8())
+        }
+
+    @Test
+    fun unsubscribe_sendsDelete() =
+        runTest {
+            server.enqueue(MockResponse.Builder().status("HTTP/1.1 204 No Content").build())
+
+            repository().unsubscribe("octocat", "Hello-World", 42)
+
+            val request = server.takeRequest()
+            assertEquals("DELETE", request.method)
+            assertEquals("/repos/octocat/Hello-World/issues/42/subscription", request.url.encodedPath)
+        }
+
+    // ── #163 L02：元数据候选读取与 PATCH 变更字段 ────────────────────
+
+    @Test
+    fun getLabels_mapsNameColorDescription() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""[{"name": "bug", "color": "d73a4a", "description": "Broken"}]""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val labels = repository().getLabels("octocat", "Hello-World")
+
+            assertEquals(1, labels.size)
+            assertEquals("bug", labels.first().name)
+            assertEquals("d73a4a", labels.first().color)
+            assertEquals("Broken", labels.first().description)
+        }
+
+    @Test
+    fun getAssignees_mapsLoginAndAvatar() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""[{"login": "hubot", "id": 2, "avatar_url": "https://a/h.png"}]""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val assignees = repository().getAssignees("octocat", "Hello-World")
+
+            assertEquals("hubot", assignees.first().login)
+            assertEquals("https://a/h.png", assignees.first().avatarUrl)
+        }
+
+    @Test
+    fun getMilestones_mapsNumberStateAndDueOn() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""[{"number": 3, "title": "v1.0", "state": "closed", "due_on": "2026-12-31T00:00:00Z"}]""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val milestones = repository().getMilestones("octocat", "Hello-World")
+
+            assertEquals(3L, milestones.first().number)
+            assertEquals("v1.0", milestones.first().title)
+            assertEquals(IssueState.CLOSED, milestones.first().state)
+            assertEquals("2026-12-31T00:00:00Z", milestones.first().dueOn)
+        }
+
+    @Test
+    fun updateIssueMeta_allFieldsChanged_sendsAllThreeFields() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"id": 1, "number": 42, "title": "t", "state": "open"}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            repository().updateIssueMeta(
+                "octocat",
+                "Hello-World",
+                42,
+                labels = listOf("bug"),
+                assignees = listOf("hubot"),
+                milestone = 3L,
+            )
+
+            val body =
+                server
+                    .takeRequest()
+                    .body
+                    ?.utf8()
+                    .orEmpty()
+            assertEquals(
+                """{"labels":["bug"],"assignees":["hubot"],"milestone":3}""",
+                body,
+            )
+        }
+
+    @Test
+    fun updateIssueMeta_clearMilestone_sendsExplicitNull() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"id": 1, "number": 42, "title": "t", "state": "open"}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            repository().updateIssueMeta("octocat", "Hello-World", 42, clearMilestone = true)
+
+            assertEquals("""{"milestone":null}""", server.takeRequest().body?.utf8())
+        }
 }

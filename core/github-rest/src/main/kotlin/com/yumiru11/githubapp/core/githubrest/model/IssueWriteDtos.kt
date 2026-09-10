@@ -7,6 +7,7 @@ import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.descriptors.element
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
@@ -53,6 +54,12 @@ data class UpdateIssueRequest(
     val labels: List<String>? = null,
     val assignees: List<String>? = null,
     val milestone: Long? = null,
+    /**
+     * 显式清空里程碑（#163 L02）：GitHub 以 `"milestone": null` 表达「移除里程碑」，
+     * 与「字段未变更 → 不携带」语义互斥，故需独立开关（[milestone] = null 只表示不携带）。
+     * 该开关本身**不序列化为 JSON 字段**，仅控制 [UpdateIssueRequestSerializer] 是否写入 null。
+     */
+    val clearMilestone: Boolean = false,
 )
 
 /** [UpdateIssueRequest] 序列化器：跳过 null 字段（GitHub null 语义 = 清空，见上）。 */
@@ -83,7 +90,12 @@ internal object UpdateIssueRequestSerializer : KSerializer<UpdateIssueRequest> {
             state?.let { put("state", it) }
             labels?.let { putJsonArray("labels", it) }
             assignees?.let { putJsonArray("assignees", it) }
-            milestone?.let { put("milestone", it) }
+            when {
+                // 显式清空（null）优先于「不携带」；两者不会同时成立（VM 侧互斥）
+                clearMilestone -> put("milestone", JsonNull)
+
+                milestone != null -> put("milestone", milestone)
+            }
         }
 
     private fun JsonObjectBuilder.putJsonArray(

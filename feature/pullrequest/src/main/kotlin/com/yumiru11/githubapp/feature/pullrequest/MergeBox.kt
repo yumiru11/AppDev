@@ -60,6 +60,11 @@ internal data class ConversationActions(
     val headSameRepo: Boolean,
     val pendingAction: PullRequestWriteAction? = null,
     val prTitle: String = "",
+    /**
+     * #163 L03：MergeBox 可见（WRITE 且未合并）。关闭态仍渲染卡片，但合并按钮由
+     * [canMerge]（PR 必须打开）禁用——失败重开后可立即恢复可用。
+     */
+    val canMergeBox: Boolean = canMerge,
     val onOpenReview: () -> Unit = {},
     val onMerge: (PullRequestMergeMethod, String, String, Boolean) -> Unit = { _, _, _, _ -> },
     val onUpdateBranch: () -> Unit = {},
@@ -68,8 +73,11 @@ internal data class ConversationActions(
     /** 是否有任何可见动作（避免空 item 占位） */
     val hasVisibleContent: Boolean
         get() =
-            (state == PullRequestState.OPEN && (canReview || canMerge)) ||
-                (state == PullRequestState.MERGED && canDeleteHeadBranch)
+            if (state == PullRequestState.MERGED) {
+                canDeleteHeadBranch
+            } else {
+                canMergeBox || (state == PullRequestState.OPEN && canReview)
+            }
 }
 
 /** 对话页动作区：Review 入口 + MergeBox（打开态）/ 删除分支（已合并态） */
@@ -83,15 +91,22 @@ internal fun PullRequestActionItems(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (actions.state == PullRequestState.OPEN) {
-            if (actions.canReview) {
-                ReviewEntryRow(onOpenReview = actions.onOpenReview)
+        when (actions.state) {
+            PullRequestState.MERGED -> {
+                if (actions.canDeleteHeadBranch) {
+                    MergedBranchActionsRow(actions = actions)
+                }
             }
-            if (actions.canMerge) {
-                MergeBoxCard(actions = actions)
+
+            else -> {
+                if (actions.state == PullRequestState.OPEN && actions.canReview) {
+                    ReviewEntryRow(onOpenReview = actions.onOpenReview)
+                }
+                // #163 L03：关闭态保留 MergeBox（按钮 disabled + 关闭提示）
+                if (actions.canMergeBox) {
+                    MergeBoxCard(actions = actions)
+                }
             }
-        } else if (actions.state == PullRequestState.MERGED && actions.canDeleteHeadBranch) {
-            MergedBranchActionsRow(actions = actions)
         }
     }
 }
@@ -109,6 +124,7 @@ private fun MergeBoxCard(
     var methodMenuExpanded by remember { mutableStateOf(false) }
     val busy = actions.pendingAction != null
     val mergeable = actions.mergeableState == MergeableState.MERGEABLE
+    val open = actions.state == PullRequestState.OPEN
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = MaterialTheme.shapes.medium,
@@ -123,7 +139,8 @@ private fun MergeBoxCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Button(
                     onClick = { actions.onMerge(method, commitTitle, commitMessage, deleteBranch) },
-                    enabled = mergeable && !busy && commitTitle.isNotBlank(),
+                    // #163 L03：关闭态（canMerge=false）合并按钮 disabled
+                    enabled = actions.canMerge && mergeable && !busy && commitTitle.isNotBlank(),
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(text = stringResource(R.string.pull_request_merge_box_title))
@@ -132,7 +149,7 @@ private fun MergeBoxCard(
                 Box {
                     FilledTonalIconButton(
                         onClick = { methodMenuExpanded = true },
-                        enabled = !busy,
+                        enabled = open && !busy,
                     ) {
                         Icon(
                             imageVector = Icons.Filled.KeyboardArrowDown,
@@ -153,6 +170,15 @@ private fun MergeBoxCard(
                 }
             }
             when {
+                !open -> {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.pull_request_merge_closed_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
                 actions.mergeableState == MergeableState.CONFLICTING -> {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -185,7 +211,7 @@ private fun MergeBoxCard(
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(text = stringResource(R.string.pull_request_merge_commit_message)) },
             )
-            if (actions.canDeleteHeadBranch) {
+            if (open && actions.canDeleteHeadBranch) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
@@ -195,7 +221,7 @@ private fun MergeBoxCard(
                     Text(text = stringResource(R.string.pull_request_merge_delete_branch))
                 }
             }
-            if (actions.headSameRepo) {
+            if (open && actions.headSameRepo) {
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = actions.onUpdateBranch,

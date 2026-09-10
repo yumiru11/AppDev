@@ -4,18 +4,23 @@ package com.yumiru11.githubapp.feature.issue
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,10 +44,13 @@ import com.yumiru11.githubapp.feature.issue.model.IssueErrorType
 /**
  * 创建 Issue 页（T14 验收 1：标题/正文/标签全流程）。
  *
- * 标题必填；正文与标签（逗号分隔）可选。提交后 [CreateIssueViewModel] 调 REST 创建，
+ * 标题必填；正文与标签可选。提交后 [CreateIssueViewModel] 调 REST 创建，
  * 成功 emit Created → [onCreated] 返回列表页（下拉刷新可见新 Issue）。
+ *
+ * #163 L02：标签由「逗号分隔手输」升级为与详情页编辑 Sheet 同一套多选 chips
+ * （候选项来自 GET /repos/{owner}/{repo}/labels；加载失败 → 空态提示，仍可无标签提交）。
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CreateIssueScreen(
     owner: String,
@@ -54,8 +62,9 @@ fun CreateIssueScreen(
 ) {
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
-    var labels by remember { mutableStateOf("") }
+    var selectedLabels by remember { mutableStateOf(emptySet<String>()) }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val availableLabels by viewModel.availableLabels.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -110,16 +119,49 @@ fun CreateIssueScreen(
                 minLines = 6,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = labels,
-                onValueChange = { labels = it },
-                label = { Text(text = stringResource(R.string.issue_create_labels_label)) },
-                supportingText = { Text(text = stringResource(R.string.issue_create_labels_hint)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+            Text(
+                text = stringResource(R.string.issue_create_labels_label),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (availableLabels.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.issue_create_labels_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    availableLabels.forEach { label ->
+                        val selected = label.name in selectedLabels
+                        FilterChip(
+                            selected = selected,
+                            onClick = {
+                                selectedLabels =
+                                    if (selected) selectedLabels - label.name else selectedLabels + label.name
+                            },
+                            label = { Text(text = label.name) },
+                            leadingIcon =
+                                if (selected) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Filled.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
+                        )
+                    }
+                }
+            }
             Button(
-                onClick = { viewModel.createIssue(title, body, labels) },
+                onClick = { viewModel.createIssue(title, body, selectedLabels.toList()) },
                 enabled = title.isNotBlank() && uiState != CreateIssueUiState.Submitting,
                 modifier = Modifier.fillMaxWidth(),
             ) {

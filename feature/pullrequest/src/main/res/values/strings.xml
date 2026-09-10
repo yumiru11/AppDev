@@ -190,4 +190,22 @@
     <string name="pull_request_create_select_branch">Select a branch</string>
     <string name="pull_request_create_same_branch_hint">The head branch must be different from the base branch</string>
     <string name="pull_request_create_no_permission_hint">You do not have permission to create a pull request</string>
+
+    <!-- #163 L03：编辑 / 关闭 / 重开 PR -->
+    <string name="pull_request_edit">Edit pull request</string>
+    <string name="pull_request_edit_title">Edit pull request</string>
+    <string name="pull_request_edit_title_label">Title</string>
+    <string name="pull_request_edit_body_label">Description</string>
+    <string name="pull_request_edit_save">Save</string>
+    <string name="pull_request_edit_succeeded">Pull request updated</string>
+    <string name="pull_request_edit_failed">Failed to update pull request</string>
+    <string name="pull_request_close">Close pull request</string>
+    <string name="pull_request_close_confirm_title">Close pull request?</string>
+    <string name="pull_request_close_confirm_message">This pull request will be closed without merging. You can reopen it later.</string>
+    <string name="pull_request_close_succeeded">Pull request closed</string>
+    <string name="pull_request_close_failed">Failed to close pull request</string>
+    <string name="pull_request_reopen">Reopen pull request</string>
+    <string name="pull_request_reopen_succeeded">Pull request reopened</string>
+    <string name="pull_request_reopen_failed">Failed to reopen pull request</string>
+    <string name="pull_request_merge_closed_hint">This pull request is closed</string>
 </resources>

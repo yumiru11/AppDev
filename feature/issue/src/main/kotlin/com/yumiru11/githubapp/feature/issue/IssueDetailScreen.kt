@@ -18,11 +18,15 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.util.Log
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,24 +39,34 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -84,6 +98,7 @@ import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
+import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
@@ -92,6 +107,7 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueLabel
+import com.yumiru11.githubapp.feature.issue.model.IssueMilestone
 import com.yumiru11.githubapp.feature.issue.model.IssueReactions
 import com.yumiru11.githubapp.feature.issue.model.IssueState
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineEventType
@@ -108,6 +124,10 @@ import java.util.Locale
  * 反向同步（WebView bridge → ViewModel）。操作可见性按 viewerPermission 决定
  * （[IssueDetailUiState.Success.canEditIssue]/[canCloseReopen]/[canComment]）。
  * 写失败经事件通道 Snackbar 提示（乐观更新 + 回滚在 ViewModel）。
+ *
+ * #163：HeaderCard 操作区补 Subscribe/Unsubscribe（登录态可见，pending 防连点）与
+ * Labels/Assignees/Milestone 编辑 Sheet（TRIAGE+ 可见，Sheet 状态由 ViewModel 的
+ * [IssueDetailViewModel.editState] 驱动）。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -125,6 +145,8 @@ fun IssueDetailScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val currentUrl = (uiState as? IssueDetailUiState.Success)?.issue?.htmlUrl
+
+    val editState by viewModel.editState.collectAsStateWithLifecycle()
 
     var showCommentSheet by remember { mutableStateOf(false) }
     var editingIssue by remember { mutableStateOf(false) }
@@ -209,6 +231,8 @@ fun IssueDetailScreen(
                         baseRepoUrl = "https://github.com/$owner/$repo",
                         onCloseReopen = { if (state.issue.state == IssueState.OPEN) viewModel.closeIssue() else viewModel.reopenIssue() },
                         onEditIssue = { editingIssue = true },
+                        onEditMeta = viewModel::openMetaEditor,
+                        onToggleSubscription = viewModel::toggleSubscription,
                         onToggleIssueReaction = viewModel::toggleIssueReaction,
                         onToggleCommentReaction = viewModel::toggleCommentReaction,
                         onEditComment = { editingComment = it },
@@ -242,6 +266,19 @@ fun IssueDetailScreen(
                 editingIssue = false
                 viewModel.updateIssue(title, body)
             },
+        )
+    }
+
+    // #163 L02：Labels/Assignees/Milestone 编辑 Sheet（状态由 ViewModel 持有，保存成功自动关闭）
+    editState?.let { edit ->
+        IssueMetaEditSheet(
+            state = edit,
+            onDismiss = viewModel::dismissMetaEditor,
+            onToggleLabel = viewModel::toggleLabelSelection,
+            onToggleAssignee = viewModel::toggleAssigneeSelection,
+            onSelectMilestone = viewModel::selectMilestone,
+            onRetry = viewModel::openMetaEditor,
+            onSave = viewModel::saveIssueMeta,
         )
     }
 
@@ -337,6 +374,8 @@ private fun SuccessContent(
     baseRepoUrl: String,
     onCloseReopen: () -> Unit,
     onEditIssue: () -> Unit,
+    onEditMeta: () -> Unit,
+    onToggleSubscription: () -> Unit,
     onToggleIssueReaction: (String) -> Unit,
     onToggleCommentReaction: (Long, String) -> Unit,
     onEditComment: (IssueTimelineItem.Comment) -> Unit,
@@ -355,10 +394,16 @@ private fun SuccessContent(
                 issue = issue,
                 canCloseReopen = state.canCloseReopen,
                 canEditIssue = state.canEditIssue,
+                canManageMeta = state.canManageMeta,
+                canSubscribe = state.canSubscribe,
+                isSubscribed = state.isSubscribed,
+                subscriptionPending = state.subscriptionPending,
                 canReact = state.canComment,
                 myReactions = state.myReactions[issue.id].orEmpty(),
                 onCloseReopen = onCloseReopen,
                 onEditIssue = onEditIssue,
+                onEditMeta = onEditMeta,
+                onToggleSubscription = onToggleSubscription,
                 onToggleReaction = onToggleIssueReaction,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -447,23 +492,33 @@ private fun createIssueBridgeCallback(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun IssueHeader(
     issue: Issue,
     canCloseReopen: Boolean,
     canEditIssue: Boolean,
+    canManageMeta: Boolean,
+    canSubscribe: Boolean,
+    isSubscribed: Boolean,
+    subscriptionPending: Boolean,
     canReact: Boolean,
     myReactions: Map<String, Long>,
     onCloseReopen: () -> Unit,
     onEditIssue: () -> Unit,
+    onEditMeta: () -> Unit,
+    onToggleSubscription: () -> Unit,
     onToggleReaction: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        // 操作区随权限增减按钮，窄屏自动换行（FlowRow；RTL 由 start/end 语义保证）
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             StatusChip(state = issue.state)
             if (canCloseReopen) {
-                Spacer(modifier = Modifier.width(8.dp))
                 OutlinedButton(onClick = onCloseReopen) {
                     Text(
                         text =
@@ -476,7 +531,6 @@ private fun IssueHeader(
                 }
             }
             if (canEditIssue) {
-                Spacer(modifier = Modifier.width(8.dp))
                 OutlinedButton(onClick = onEditIssue) {
                     Icon(
                         imageVector = Icons.Filled.Edit,
@@ -486,6 +540,24 @@ private fun IssueHeader(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(text = stringResource(R.string.issue_edit))
                 }
+            }
+            if (canManageMeta) {
+                OutlinedButton(onClick = onEditMeta) {
+                    Icon(
+                        imageVector = AppDevOcticons.Tag,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = stringResource(R.string.issue_edit_meta))
+                }
+            }
+            if (canSubscribe) {
+                IssueSubscriptionButton(
+                    isSubscribed = isSubscribed,
+                    pending = subscriptionPending,
+                    onClick = onToggleSubscription,
+                )
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -532,6 +604,53 @@ private fun IssueHeader(
                 onToggle = onToggleReaction,
             )
         }
+    }
+}
+
+/**
+ * 订阅/取消订阅按钮（#163 L01）。
+ *
+ * 未订阅 → OutlinedButton（与同排操作一致）；已订阅 → FilledTonalButton（状态强调，点击即退订）。
+ * [pending] 期间禁用并显示进度圈（防连点），文案同步切换为进行中语义（保持可读文案）。
+ */
+@Composable
+private fun IssueSubscriptionButton(
+    isSubscribed: Boolean,
+    pending: Boolean,
+    onClick: () -> Unit,
+) {
+    val label =
+        stringResource(
+            if (isSubscribed) R.string.issue_unsubscribe else R.string.issue_subscribe,
+        )
+    val content: @Composable RowScope.() -> Unit = {
+        if (pending) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Filled.Notifications,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(text = label)
+    }
+    if (isSubscribed) {
+        FilledTonalButton(
+            onClick = onClick,
+            enabled = !pending,
+            content = content,
+        )
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            enabled = !pending,
+            content = content,
+        )
     }
 }
 
@@ -783,6 +902,237 @@ private fun CommentMenu(
     }
 }
 
+/**
+ * Labels / Assignees / Milestone 编辑 Sheet（#163 L02，ui-design §3.9 IssueHeaderCard 三区）。
+ *
+ * 三区：标签多选 chips（FilterChip）、Assignee 多选行（ListItem + 头像 + Checkbox）、
+ * Milestone 单选卡（Surface 卡片 + RadioButton，含「无里程碑」以支持清除）。
+ * 加载态/失败态由 [IssueEditUiState.loading]/[errorType] 驱动；保存 pending 时按钮禁用。
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+private fun IssueMetaEditSheet(
+    state: IssueEditUiState,
+    onDismiss: () -> Unit,
+    onToggleLabel: (String) -> Unit,
+    onToggleAssignee: (String) -> Unit,
+    onSelectMilestone: (Long?) -> Unit,
+    onRetry: () -> Unit,
+    onSave: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.issue_meta_sheet_title),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            when {
+                state.loading -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.issue_loading),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                state.errorType != null -> {
+                    Text(
+                        text = stringResource(R.string.issue_meta_load_failed),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    TextButton(onClick = onRetry) {
+                        Text(text = stringResource(R.string.issue_retry))
+                    }
+                }
+
+                else -> {
+                    MetaSection(title = stringResource(R.string.issue_meta_section_labels)) {
+                        if (state.labels.isEmpty()) {
+                            MetaEmptyHint()
+                        } else {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                state.labels.forEach { label ->
+                                    val selected = label.name in state.selectedLabels
+                                    FilterChip(
+                                        selected = selected,
+                                        onClick = { onToggleLabel(label.name) },
+                                        label = { Text(text = label.name) },
+                                        leadingIcon =
+                                            if (selected) {
+                                                {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Check,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(16.dp),
+                                                    )
+                                                }
+                                            } else {
+                                                null
+                                            },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    MetaSection(title = stringResource(R.string.issue_meta_section_assignees)) {
+                        if (state.assignees.isEmpty()) {
+                            MetaEmptyHint()
+                        } else {
+                            state.assignees.forEach { user ->
+                                ListItem(
+                                    headlineContent = { Text(text = user.login) },
+                                    leadingContent = {
+                                        AsyncImage(
+                                            model = user.avatarUrl,
+                                            contentDescription = user.login,
+                                            modifier =
+                                                Modifier
+                                                    .size(32.dp)
+                                                    .clip(CircleShape),
+                                        )
+                                    },
+                                    trailingContent = {
+                                        Checkbox(
+                                            checked = user.login in state.selectedAssignees,
+                                            onCheckedChange = { onToggleAssignee(user.login) },
+                                        )
+                                    },
+                                    modifier = Modifier.clickable { onToggleAssignee(user.login) },
+                                )
+                            }
+                        }
+                    }
+                    MetaSection(title = stringResource(R.string.issue_meta_section_milestone)) {
+                        MilestoneOptionCard(
+                            title = stringResource(R.string.issue_meta_milestone_none),
+                            selected = state.selectedMilestone == null,
+                            onClick = { onSelectMilestone(null) },
+                        )
+                        state.milestones.forEach { milestone ->
+                            MilestoneOptionCard(
+                                title = milestone.title,
+                                dueOn = milestone.dueOn,
+                                closed = milestone.state == IssueState.CLOSED,
+                                selected = milestone.number != null && milestone.number == state.selectedMilestone,
+                                onClick = { onSelectMilestone(milestone.number) },
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = onSave,
+                        enabled = !state.saving,
+                        modifier = Modifier.align(Alignment.End),
+                    ) {
+                        if (state.saving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(text = stringResource(R.string.issue_save))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Sheet 内分区：标题 + 内容（统一间距） */
+@Composable
+private fun MetaSection(
+    title: String,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        content()
+    }
+}
+
+/** 候选项为空提示 */
+@Composable
+private fun MetaEmptyHint() {
+    Text(
+        text = stringResource(R.string.issue_meta_empty),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** Milestone 单选卡：标题 + 截止日期/已关闭标记 + RadioButton（整卡可点） */
+@Composable
+private fun MilestoneOptionCard(
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    dueOn: String? = null,
+    closed: Boolean = false,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color =
+            if (selected) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerLow
+            },
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+        ) {
+            RadioButton(selected = selected, onClick = null)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                val dueText = dueOn?.let { stringResource(R.string.issue_meta_milestone_due, it) }
+                val closedText = if (closed) stringResource(R.string.issue_state_closed) else null
+                val caption = listOfNotNull(dueText, closedText).joinToString(" · ")
+                if (caption.isNotEmpty()) {
+                    Text(
+                        text = caption,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
 /** 评论输入 BottomSheet（ui-design §3.9：圆角 + 输入区 + 提交） */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1016,6 +1366,9 @@ internal fun IssueSnackbarMessage.toRes(): Int =
         IssueSnackbarMessage.ISSUE_REOPENED -> R.string.issue_reopened_snackbar
         IssueSnackbarMessage.ISSUE_UPDATED -> R.string.issue_updated
         IssueSnackbarMessage.TASK_LIST_UPDATED -> R.string.issue_task_list_updated
+        IssueSnackbarMessage.SUBSCRIBED -> R.string.issue_subscribed_snackbar
+        IssueSnackbarMessage.UNSUBSCRIBED -> R.string.issue_unsubscribed_snackbar
+        IssueSnackbarMessage.ISSUE_META_UPDATED -> R.string.issue_meta_updated
         IssueSnackbarMessage.ERROR_NETWORK -> R.string.issue_error_network
         IssueSnackbarMessage.ERROR_FORBIDDEN -> R.string.issue_error_forbidden
         IssueSnackbarMessage.ERROR_NOT_FOUND -> R.string.issue_error_not_found

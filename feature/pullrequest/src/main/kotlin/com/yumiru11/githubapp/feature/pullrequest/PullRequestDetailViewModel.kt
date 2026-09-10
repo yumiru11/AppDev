@@ -53,6 +53,7 @@ import javax.inject.Inject
  * 错误一律映射为 [PullRequestErrorType]（UI 层 stringResource 本地化，ViewModel 不产英文文案）。
  */
 @HiltViewModel
+@Suppress("TooManyFunctions") // T15/T16/T17 读 + 四 Tab 状态机 + #163 编辑/关闭重开（23 个方法），拆类会牺牲单页状态机内聚
 class PullRequestDetailViewModel
     @Inject
     constructor(
@@ -338,6 +339,113 @@ class PullRequestDetailViewModel
             _events.tryEmit(PullRequestDetailEvent.DeleteBranchSucceeded)
         }
 
+        // ---- #163 L03：编辑 / 关闭 / 重开 ----
+
+        /**
+         * 编辑 PR 标题/正文（#163 L03）：乐观更新 → 成功用服务端响应回填 + 刷新详情/时间线 /
+         * 失败回滚 + Snackbar。写权限（[PullRequestDetailUiState.Success.canEditPr]）与时序防重入。
+         */
+        fun editPullRequest(
+            title: String,
+            body: String,
+        ) {
+            val original = _uiState.value as? PullRequestDetailUiState.Success ?: return
+            if (!original.canEditPr || original.pendingAction != null) return
+            if (title.isBlank()) return
+            val targetTitle = title.trim()
+            _uiState.value =
+                original.copy(
+                    pullRequest = original.pullRequest.copy(title = targetTitle, body = body),
+                    pendingAction = PullRequestWriteAction.EDIT,
+                )
+            viewModelScope.launch {
+                try {
+                    val updated = repository.updatePr(owner, repo, number, title = targetTitle, body = body)
+                    val current = _uiState.value as? PullRequestDetailUiState.Success ?: return@launch
+                    _uiState.value =
+                        current.copy(
+                            pullRequest = current.pullRequest.copy(title = updated.title, body = updated.body),
+                            pendingAction = null,
+                        )
+                    _events.tryEmit(PullRequestDetailEvent.EditSucceeded)
+                    refreshPullRequestAndTimeline()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    val current = _uiState.value as? PullRequestDetailUiState.Success ?: return@launch
+                    _uiState.value = current.copy(pullRequest = original.pullRequest, pendingAction = null)
+                    _events.tryEmit(PullRequestDetailEvent.EditFailed)
+                }
+            }
+        }
+
+        /**
+         * 关闭 PR（#163 L03）：乐观置 CLOSED（合并入口随之禁用）→ 成功刷新详情 / 失败回滚 + Snackbar。
+         */
+        fun closePullRequest() = setPullRequestState(PullRequestState.CLOSED)
+
+        /** 重开 PR（#163 L03）：乐观置 OPEN → 成功刷新详情 / 失败回滚 + Snackbar。 */
+        fun reopenPullRequest() = setPullRequestState(PullRequestState.OPEN)
+
+        /** 关闭/重开共用实现：状态徽章乐观更新 + 合并入口联动 + 服务端刷新 */
+        private fun setPullRequestState(target: PullRequestState) {
+            val original = _uiState.value as? PullRequestDetailUiState.Success ?: return
+            if (!original.canCloseReopenPr || original.pendingAction != null) return
+            if (original.pullRequest.state == target) return
+            val pending =
+                if (target == PullRequestState.CLOSED) PullRequestWriteAction.CLOSE else PullRequestWriteAction.REOPEN
+            _uiState.value =
+                original.copy(
+                    pullRequest = original.pullRequest.copy(state = target),
+                    // 关闭 → 合并按钮禁用（canMerge=false）；重开 → 恢复 WRITE 下的合并入口
+                    canMerge = target == PullRequestState.OPEN && original.viewerPermission == ViewerPermission.WRITE,
+                    canMergeBox = original.viewerPermission == ViewerPermission.WRITE,
+                    pendingAction = pending,
+                )
+            viewModelScope.launch {
+                try {
+                    val updated =
+                        if (target == PullRequestState.CLOSED) {
+                            repository.closePr(owner, repo, number)
+                        } else {
+                            repository.reopenPr(owner, repo, number)
+                        }
+                    val current = _uiState.value as? PullRequestDetailUiState.Success ?: return@launch
+                    _uiState.value =
+                        current.copy(
+                            pullRequest = current.pullRequest.copy(state = updated.state),
+                            pendingAction = null,
+                        )
+                    _events.tryEmit(
+                        if (target == PullRequestState.CLOSED) {
+                            PullRequestDetailEvent.CloseSucceeded
+                        } else {
+                            PullRequestDetailEvent.ReopenSucceeded
+                        },
+                    )
+                    refreshPullRequestAndTimeline()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    val current = _uiState.value as? PullRequestDetailUiState.Success ?: return@launch
+                    _uiState.value =
+                        current.copy(
+                            pullRequest = original.pullRequest,
+                            canMerge = original.canMerge,
+                            canMergeBox = original.canMergeBox,
+                            pendingAction = null,
+                        )
+                    _events.tryEmit(
+                        if (target == PullRequestState.CLOSED) {
+                            PullRequestDetailEvent.CloseFailed
+                        } else {
+                            PullRequestDetailEvent.ReopenFailed
+                        },
+                    )
+                }
+            }
+        }
+
         /**
          * Update branch（T17）：无本地状态可乐观，pending 防重入 + 成功/失败 Snackbar。
          * 仅同仓库 + 打开 + WRITE（canMerge 已含）可触发。
@@ -384,13 +492,26 @@ class PullRequestDetailViewModel
             }
         }
 
-        /** 合并/相关写操作后的静默刷新（保留 Tab 与展开状态，仅替换详情与时间线数据） */
+        /**
+         * 合并/相关写操作后的静默刷新（保留 Tab 与展开状态，仅替换详情与时间线数据）。
+         *
+         * #163 L03：状态可能被本次操作改变（关闭/重开/合并）→ 同步重算合并入口旗标，
+         * 保证「关闭后 MergeBox 合并按钮 disabled」在刷新后依然成立。
+         */
         private suspend fun refreshPullRequestAndTimeline() {
             try {
                 val pullRequest = repository.getPullRequest(owner, repo, number)
                 val timeline = repository.timeline(owner, repo, number)
                 val current = _uiState.value as? PullRequestDetailUiState.Success ?: return
-                _uiState.value = current.copy(pullRequest = pullRequest, timeline = timeline)
+                val canWrite = current.viewerPermission == ViewerPermission.WRITE
+                _uiState.value =
+                    current.copy(
+                        pullRequest = pullRequest,
+                        timeline = timeline,
+                        canMerge = pullRequest.state == PullRequestState.OPEN && canWrite,
+                        canMergeBox = pullRequest.state != PullRequestState.MERGED && canWrite,
+                        canCloseReopenPr = pullRequest.state != PullRequestState.MERGED && canWrite,
+                    )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -457,6 +578,8 @@ class PullRequestDetailViewModel
                     val prHead = pullRequest.head
                     val headSameRepo = prHead?.repoFullName == "$owner/$repo"
                     val headIsDefaultBranch = control.defaultBranch != null && prHead?.ref == control.defaultBranch
+                    val canWrite = control.viewerPermission == ViewerPermission.WRITE
+                    val merged = pullRequest.state == PullRequestState.MERGED
                     _uiState.value =
                         PullRequestDetailUiState.Success(
                             pullRequest = pullRequest,
@@ -472,7 +595,11 @@ class PullRequestDetailViewModel
                             defaultBranch = control.defaultBranch,
                             canReview = control.viewerPermission != ViewerPermission.UNKNOWN,
                             canApprove = control.viewerPermission == ViewerPermission.WRITE,
-                            canMerge = pullRequest.state == PullRequestState.OPEN && control.viewerPermission == ViewerPermission.WRITE,
+                            canMerge = pullRequest.state == PullRequestState.OPEN && canWrite,
+                            // #163 L03：关闭态仍展示 MergeBox（按钮 disabled）；编辑/关闭重开需 WRITE
+                            canMergeBox = !merged && canWrite,
+                            canEditPr = canWrite,
+                            canCloseReopenPr = !merged && canWrite,
                             headSameRepo = headSameRepo,
                             headIsDefaultBranch = headIsDefaultBranch,
                             canDeleteHeadBranch =
