@@ -16,11 +16,13 @@ import com.yumiru11.githubapp.core.githubgraphql.generated.UnresolveReviewThread
 import com.yumiru11.githubapp.core.githubgraphql.generated.type.ResolveReviewThreadInput
 import com.yumiru11.githubapp.core.githubgraphql.generated.type.UnresolveReviewThreadInput
 import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
+import com.yumiru11.githubapp.core.githubrest.api.IssueApi
 import com.yumiru11.githubapp.core.githubrest.api.PullRequestApi
 import com.yumiru11.githubapp.core.githubrest.api.RepoManagementApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.model.CheckRunDto
 import com.yumiru11.githubapp.core.githubrest.model.CombinedStatusDto
+import com.yumiru11.githubapp.core.githubrest.model.CreateCommentRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreatePullRequestRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreateReviewCommentRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreateReviewRequest
@@ -89,6 +91,7 @@ class PullRequestRepository
         private val repositoryApi: RepositoryApi,
         private val repoManagementApi: RepoManagementApi,
         private val gitRefApi: GitRefApi,
+        private val issueApi: IssueApi,
         private val apolloClient: ApolloClient,
     ) {
         /** PR 分页流（按 [filter] 过滤 open/closed/all） */
@@ -101,6 +104,22 @@ class PullRequestRepository
                 config = PagingConfig(pageSize = PAGE_SIZE),
                 pagingSourceFactory = { PullRequestPagingSource(pullRequestApi, owner, repo, filter) },
             ).flow
+
+        /**
+         * 新增 PR 会话评论（#166 / 审计发现的功能缺口）。
+         *
+         * PR 在 GitHub 的 REST 语义里**就是 issue**：会话评论走
+         * POST /repos/{owner}/{repo}/issues/{number}/comments —— 与 Issue 评论是同一个端点，
+         * 所以复用 IssueApi，不需要新的 API 类。
+         */
+        suspend fun addComment(
+            owner: String,
+            repo: String,
+            number: Int,
+            body: String,
+        ) {
+            issueApi.createComment(owner, repo, number, CreateCommentRequest(body = body))
+        }
 
         /** 单个 PR 详情 */
         suspend fun getPullRequest(
