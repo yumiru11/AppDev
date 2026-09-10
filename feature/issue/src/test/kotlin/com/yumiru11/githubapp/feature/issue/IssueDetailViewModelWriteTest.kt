@@ -1,3 +1,5 @@
+@file:Suppress("LargeClass") // T14 写操作 + #163 订阅/元数据编辑测试聚合在同一 VM 测试类（文件内按票分段），拆分反损可读性
+
 package com.yumiru11.githubapp.feature.issue
 
 import androidx.lifecycle.SavedStateHandle
@@ -6,6 +8,9 @@ import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.feature.issue.data.IssueRepository
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueComment
+import com.yumiru11.githubapp.feature.issue.model.IssueErrorType
+import com.yumiru11.githubapp.feature.issue.model.IssueLabel
+import com.yumiru11.githubapp.feature.issue.model.IssueMilestone
 import com.yumiru11.githubapp.feature.issue.model.IssueReaction
 import com.yumiru11.githubapp.feature.issue.model.IssueState
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineItem
@@ -13,6 +18,7 @@ import com.yumiru11.githubapp.feature.issue.model.IssueUser
 import com.yumiru11.githubapp.feature.issue.model.IssueViewerPermission
 import com.yumiru11.githubapp.feature.issue.model.IssueWriteContext
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -21,6 +27,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -429,5 +436,387 @@ class IssueDetailViewModelWriteTest {
             val state = successState(vm)
             assertEquals("写上下文权限应合并进 Issue", IssueViewerPermission.ADMIN, state.issue.viewerPermission)
             assertEquals("写上下文 node id 应合并进 Issue", "I_kwDOA", state.issue.graphqlId)
+        }
+
+    // ── #163 L01：Issue 订阅 ───────────────────────────────────────
+
+    @Test
+    fun loadIssueDetail_subscriptionProbeSucceeds_mapsSubscribedFlag() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.isSubscribed(owner, repo, number) } returns true
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+
+            assertTrue(successState(vm).isSubscribed)
+            assertTrue(successState(vm).canSubscribe)
+        }
+
+    @Test
+    fun loadIssueDetail_subscriptionProbeFails_degradesToUnsubscribed() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.isSubscribed(owner, repo, number) } throws IOException("network down")
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+
+            assertTrue("订阅态探测失败不阻塞详情页", vm.uiState.value is IssueDetailUiState.Success)
+            assertFalse(successState(vm).isSubscribed)
+        }
+
+    @Test
+    fun toggleSubscription_subscribeSuccess_optimisticThenKeeps_emitsSubscribed() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val mockRepo = repository()
+            coEvery { mockRepo.subscribe(owner, repo, number) } coAnswers { gate.await() }
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+
+            vm.events.test {
+                vm.toggleSubscription()
+                runCurrent()
+                // 乐观更新：按钮立即切到已订阅 + pending 防连点（仓库调用未返回）
+                assertTrue(successState(vm).isSubscribed)
+                assertTrue(successState(vm).subscriptionPending)
+                gate.complete(Unit)
+                advanceUntilIdle()
+                assertTrue(successState(vm).isSubscribed)
+                assertFalse("完成后解除 pending", successState(vm).subscriptionPending)
+                assertEquals(IssueDetailEvent.ShowSnackbar(IssueSnackbarMessage.SUBSCRIBED), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun toggleSubscription_pending_ignoresSecondClick() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val mockRepo = repository()
+            coEvery { mockRepo.subscribe(owner, repo, number) } coAnswers { gate.await() }
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+
+            vm.toggleSubscription()
+            runCurrent()
+            vm.toggleSubscription()
+            runCurrent()
+
+            gate.complete(Unit)
+            advanceUntilIdle()
+            coVerify(exactly = 1) { mockRepo.subscribe(owner, repo, number) }
+        }
+
+    @Test
+    fun toggleSubscription_unsubscribeSuccess_emitsUnsubscribed() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.isSubscribed(owner, repo, number) } returns true
+            coEvery { mockRepo.unsubscribe(owner, repo, number) } returns Unit
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+
+            vm.events.test {
+                vm.toggleSubscription()
+                advanceUntilIdle()
+                assertFalse(successState(vm).isSubscribed)
+                assertEquals(IssueDetailEvent.ShowSnackbar(IssueSnackbarMessage.UNSUBSCRIBED), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+            coVerify(exactly = 1) { mockRepo.unsubscribe(owner, repo, number) }
+        }
+
+    @Test
+    fun toggleSubscription_failure_rollsBack_emitsErrorSnackbar() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.subscribe(owner, repo, number) } throws IOException("network down")
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+
+            vm.events.test {
+                vm.toggleSubscription()
+                advanceUntilIdle()
+                assertFalse("失败回滚为未订阅", successState(vm).isSubscribed)
+                assertFalse(successState(vm).subscriptionPending)
+                assertEquals(IssueDetailEvent.ShowSnackbar(IssueSnackbarMessage.ERROR_NETWORK), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun toggleSubscription_anonymous_doesNothing() =
+        runTest {
+            val mockRepo =
+                repository(context = IssueWriteContext(viewerLogin = null, viewerPermission = IssueViewerPermission.NONE))
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+
+            vm.events.test {
+                vm.toggleSubscription()
+                advanceUntilIdle()
+                expectNoEvents()
+                cancelAndIgnoreRemainingEvents()
+            }
+            coVerify(exactly = 0) { mockRepo.subscribe(any(), any(), any()) }
+        }
+
+    // ── #163 L02：Labels / Assignees / Milestone 编辑 ────────────────
+
+    private fun issueWithMeta(): Issue =
+        issue().copy(
+            labels = listOf(IssueLabel(name = "bug", color = "d73a4a")),
+            assignees = listOf(IssueUser(login = "hubot")),
+            milestone = IssueMilestone(title = "v1.0", number = 3L),
+        )
+
+    private fun candidateRepository(issue: Issue = issueWithMeta()): IssueRepository =
+        repository(issue = issue).also { mockRepo ->
+            coEvery { mockRepo.getLabels(owner, repo) } returns
+                listOf(IssueLabel(name = "bug", color = "d73a4a"), IssueLabel(name = "ui", color = "1d76db"))
+            coEvery { mockRepo.getAssignees(owner, repo) } returns
+                listOf(IssueUser(login = "hubot", avatarUrl = "https://a/h.png"), IssueUser(login = "octocat"))
+            coEvery { mockRepo.getMilestones(owner, repo) } returns
+                listOf(IssueMilestone(title = "v1.0", number = 3L), IssueMilestone(title = "v2.0", number = 4L))
+        }
+
+    @Test
+    fun openMetaEditor_withoutTriagePermission_doesNotLoadCandidates() =
+        runTest {
+            val mockRepo = repository(context = writeContext(IssueViewerPermission.READ))
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+
+            assertFalse("READ 无元数据编辑入口", successState(vm).canManageMeta)
+            vm.openMetaEditor()
+            advanceUntilIdle()
+
+            assertNull("无 TRIAGE+ 权限不打开编辑入口", vm.editState.value)
+            coVerify(exactly = 0) { mockRepo.getLabels(any(), any()) }
+            coVerify(exactly = 0) { mockRepo.getAssignees(any(), any()) }
+            coVerify(exactly = 0) { mockRepo.getMilestones(any(), any()) }
+        }
+
+    @Test
+    fun openMetaEditor_withPermission_loadsCandidatesAndPreselectsCurrent() =
+        runTest {
+            val mockRepo = candidateRepository()
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+
+            vm.openMetaEditor()
+            advanceUntilIdle()
+
+            val edit = requireNotNull(vm.editState.value)
+            assertFalse(edit.loading)
+            assertNull(edit.errorType)
+            assertEquals(listOf("bug", "ui"), edit.labels.map { it.name })
+            assertEquals(listOf("hubot", "octocat"), edit.assignees.map { it.login })
+            assertEquals(listOf(3L, 4L), edit.milestones.map { it.number })
+            assertEquals(setOf("bug"), edit.selectedLabels)
+            assertEquals(setOf("hubot"), edit.selectedAssignees)
+            assertEquals(3L, edit.selectedMilestone)
+        }
+
+    @Test
+    fun openMetaEditor_labelsLoadFails_setsErrorStateWithRetry() =
+        runTest {
+            val mockRepo = repository(issue = issueWithMeta())
+            coEvery { mockRepo.getLabels(owner, repo) } throws IOException("network down")
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+
+            vm.openMetaEditor()
+            advanceUntilIdle()
+
+            val edit = requireNotNull(vm.editState.value)
+            assertFalse(edit.loading)
+            assertEquals(IssueErrorType.NETWORK, edit.errorType)
+        }
+
+    @Test
+    fun openMetaEditor_assigneesFail_degradeToEmptyCandidates() =
+        runTest {
+            val mockRepo = repository(issue = issueWithMeta())
+            coEvery { mockRepo.getLabels(owner, repo) } returns listOf(IssueLabel(name = "bug"))
+            coEvery { mockRepo.getAssignees(owner, repo) } throws IOException("404 no permission")
+            coEvery { mockRepo.getMilestones(owner, repo) } throws IOException("not found")
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+
+            vm.openMetaEditor()
+            advanceUntilIdle()
+
+            val edit = requireNotNull(vm.editState.value)
+            assertNull("标签加载成功 → 不进入错误态", edit.errorType)
+            assertTrue("Assignee 失败降级为空候选", edit.assignees.isEmpty())
+            assertTrue("Milestone 失败降级为空候选", edit.milestones.isEmpty())
+        }
+
+    @Test
+    fun selectionToggles_labelAssigneeMilestone_flipSelection() =
+        runTest {
+            val mockRepo = candidateRepository()
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+            vm.openMetaEditor()
+            advanceUntilIdle()
+
+            vm.toggleLabelSelection("ui")
+            vm.toggleAssigneeSelection("octocat")
+            vm.selectMilestone(4L)
+
+            val edit = requireNotNull(vm.editState.value)
+            assertEquals(setOf("bug", "ui"), edit.selectedLabels)
+            assertEquals(setOf("hubot", "octocat"), edit.selectedAssignees)
+            assertEquals(4L, edit.selectedMilestone)
+
+            // 再次点击 = 取消选择；Milestone 再点已选项 = 清除（null）
+            vm.toggleLabelSelection("ui")
+            vm.toggleAssigneeSelection("octocat")
+            vm.selectMilestone(4L)
+            val toggledBack = requireNotNull(vm.editState.value)
+            assertEquals(setOf("bug"), toggledBack.selectedLabels)
+            assertEquals(setOf("hubot"), toggledBack.selectedAssignees)
+            assertNull(toggledBack.selectedMilestone)
+        }
+
+    @Test
+    fun saveIssueMeta_onlyChangedFields_passedToRepository() =
+        runTest {
+            val mockRepo = candidateRepository()
+            coEvery { mockRepo.updateIssueMeta(any(), any(), any(), any(), any(), any(), any()) } returns
+                issueWithMeta().copy(labels = listOf(IssueLabel(name = "bug"), IssueLabel(name = "ui")))
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+            vm.openMetaEditor()
+            advanceUntilIdle()
+
+            vm.toggleLabelSelection("ui")
+            vm.saveIssueMeta()
+            advanceUntilIdle()
+
+            coVerify {
+                mockRepo.updateIssueMeta(
+                    owner = owner,
+                    repo = repo,
+                    number = number,
+                    labels = listOf("bug", "ui"),
+                    assignees = null,
+                    milestone = null,
+                    clearMilestone = false,
+                )
+            }
+        }
+
+    @Test
+    fun saveIssueMeta_clearingMilestone_sendsClearFlag() =
+        runTest {
+            val mockRepo = candidateRepository()
+            coEvery { mockRepo.updateIssueMeta(any(), any(), any(), any(), any(), any(), any()) } returns
+                issueWithMeta().copy(milestone = null)
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+            vm.openMetaEditor()
+            advanceUntilIdle()
+
+            vm.selectMilestone(null)
+            vm.saveIssueMeta()
+            advanceUntilIdle()
+
+            coVerify {
+                mockRepo.updateIssueMeta(
+                    owner = owner,
+                    repo = repo,
+                    number = number,
+                    labels = null,
+                    assignees = null,
+                    milestone = null,
+                    clearMilestone = true,
+                )
+            }
+        }
+
+    @Test
+    fun saveIssueMeta_success_optimisticHeaderThenServer_emitsMetaUpdated() =
+        runTest {
+            val mockRepo = candidateRepository()
+            val updated = issueWithMeta().copy(assignees = listOf(IssueUser(login = "hubot"), IssueUser(login = "octocat")))
+            val gate = CompletableDeferred<Issue>()
+            coEvery { mockRepo.updateIssueMeta(any(), any(), any(), any(), any(), any(), any()) } coAnswers { gate.await() }
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+            vm.openMetaEditor()
+            advanceUntilIdle()
+
+            vm.events.test {
+                vm.toggleAssigneeSelection("octocat")
+                vm.saveIssueMeta()
+                runCurrent()
+                // 乐观更新：HeaderCard 立即出现新 assignee + Sheet 进入保存态
+                assertEquals(listOf("hubot", "octocat"), successState(vm).issue.assignees.map { it.login })
+                assertTrue(requireNotNull(vm.editState.value).saving)
+                gate.complete(updated)
+                advanceUntilIdle()
+                assertEquals(listOf("hubot", "octocat"), successState(vm).issue.assignees.map { it.login })
+                assertNull("保存成功关闭 Sheet", vm.editState.value)
+                assertEquals(IssueDetailEvent.ShowSnackbar(IssueSnackbarMessage.ISSUE_META_UPDATED), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun saveIssueMeta_failure_rollsBackHeaderAndKeepsSheetOpen() =
+        runTest {
+            val mockRepo = candidateRepository()
+            coEvery { mockRepo.updateIssueMeta(any(), any(), any(), any(), any(), any(), any()) } throws
+                IOException("network down")
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+            vm.openMetaEditor()
+            advanceUntilIdle()
+
+            vm.events.test {
+                vm.toggleLabelSelection("ui")
+                vm.saveIssueMeta()
+                advanceUntilIdle()
+                assertEquals("失败回滚为服务端状态", listOf("bug"), successState(vm).issue.labels.map { it.name })
+                val edit = requireNotNull(vm.editState.value)
+                assertFalse("失败后解除保存态，保留用户选择", edit.saving)
+                assertEquals(setOf("bug", "ui"), edit.selectedLabels)
+                assertEquals(IssueDetailEvent.ShowSnackbar(IssueSnackbarMessage.ERROR_NETWORK), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun saveIssueMeta_noChanges_closesSheetWithoutRequest() =
+        runTest {
+            val mockRepo = candidateRepository()
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+            vm.openMetaEditor()
+            advanceUntilIdle()
+
+            vm.saveIssueMeta()
+            advanceUntilIdle()
+
+            assertNull(vm.editState.value)
+            coVerify(exactly = 0) { mockRepo.updateIssueMeta(any(), any(), any(), any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun dismissMetaEditor_discardsSelection() =
+        runTest {
+            val mockRepo = candidateRepository()
+            val vm = viewModel(mockRepo)
+            advanceUntilIdle()
+            vm.openMetaEditor()
+            advanceUntilIdle()
+
+            vm.toggleLabelSelection("ui")
+            vm.dismissMetaEditor()
+
+            assertNull(vm.editState.value)
         }
 }

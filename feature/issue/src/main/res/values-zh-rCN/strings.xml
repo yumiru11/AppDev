@@ -72,7 +72,6 @@
     <string name="issue_create_title_label">标题</string>
     <string name="issue_create_body_label">正文</string>
     <string name="issue_create_labels_label">标签</string>
-    <string name="issue_create_labels_hint">逗号分隔的标签名（可选）</string>
     <string name="issue_create_submit">创建 Issue</string>
 
     <!-- 时间线事件文案（%1$s = actor login） -->
@@ -91,4 +90,23 @@
 
     <!-- 反应条已反应态（issue #85 / audit #18） -->
     <string name="issue_reaction_reacted">已反应</string>
+
+    <!-- #163 L01：Issue 订阅 -->
+    <string name="issue_subscribe">订阅</string>
+    <string name="issue_unsubscribe">取消订阅</string>
+    <string name="issue_subscribed_snackbar">已订阅此 Issue</string>
+    <string name="issue_unsubscribed_snackbar">已取消订阅此 Issue</string>
+
+    <!-- #163 L02：Labels / Assignees / Milestone 编辑 -->
+    <string name="issue_edit_meta">标签与指派</string>
+    <string name="issue_meta_sheet_title">标签、指派与里程碑</string>
+    <string name="issue_meta_section_labels">标签</string>
+    <string name="issue_meta_section_assignees">指派给</string>
+    <string name="issue_meta_section_milestone">里程碑</string>
+    <string name="issue_meta_empty">暂无可选项</string>
+    <string name="issue_meta_milestone_none">无里程碑</string>
+    <string name="issue_meta_milestone_due">截止 %1$s</string>
+    <string name="issue_meta_load_failed">无法加载候选项</string>
+    <string name="issue_meta_updated">标签、指派与里程碑已更新</string>
+    <string name="issue_create_labels_empty">暂无可用标签</string>
 </resources>

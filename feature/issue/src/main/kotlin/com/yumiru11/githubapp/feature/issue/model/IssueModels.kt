@@ -53,6 +53,8 @@ data class IssueUser(
 data class IssueLabel(
     val name: String,
     val color: String? = null,
+    /** 标签说明（标签选择器展示；#163 L02） */
+    val description: String? = null,
 )
 
 /** 里程碑 */
@@ -60,6 +62,10 @@ data class IssueLabel(
 data class IssueMilestone(
     val title: String,
     val state: IssueState? = null,
+    /** 里程碑编号（PATCH issue 的 milestone 值；选择器按编号单选；#163 L02） */
+    val number: Long? = null,
+    /** 截止日期（ISO8601；#163 L02） */
+    val dueOn: String? = null,
 )
 
 /** 反应计数（ReactionBar 展示） */

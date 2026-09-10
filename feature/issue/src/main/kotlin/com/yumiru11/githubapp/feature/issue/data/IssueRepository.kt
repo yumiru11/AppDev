@@ -23,6 +23,7 @@ import com.yumiru11.githubapp.core.githubrest.model.IssueDto
 import com.yumiru11.githubapp.core.githubrest.model.IssueEventDto
 import com.yumiru11.githubapp.core.githubrest.model.ReactionDto
 import com.yumiru11.githubapp.core.githubrest.model.ReactionsDto
+import com.yumiru11.githubapp.core.githubrest.model.SubscriptionRequest
 import com.yumiru11.githubapp.core.githubrest.model.UpdateIssueRequest
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueComment
@@ -39,6 +40,7 @@ import com.yumiru11.githubapp.feature.issue.model.IssueViewerPermission
 import com.yumiru11.githubapp.feature.issue.model.IssueWriteContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -52,6 +54,7 @@ import javax.inject.Singleton
  * 全部写操作由 ViewModel 层做乐观更新 + 失败回滚。
  */
 @Singleton
+@Suppress("TooManyFunctions") // #163 新增订阅/元数据读写后 21 个职责相关方法（读/写/订阅/GraphQL 通道），拆类反损内聚（PullRequestRepository 同款先例）
 class IssueRepository
     @Inject
     constructor(
@@ -104,7 +107,13 @@ class IssueRepository
             state: String? = null,
         ): Issue = issueApi.updateIssue(owner, repo, number, UpdateIssueRequest(title = title, body = body, state = state)).toDomain()
 
-        /** 编辑 Issue 元数据（Labels/Assignees/Milestone，权限决定可见性） */
+        /**
+         * 编辑 Issue 元数据（Labels/Assignees/Milestone，权限决定可见性；#163 L02）。
+         *
+         * **只把变更字段交给 PATCH**：未变更字段保持 null → [UpdateIssueRequest] 序列化器不携带；
+         * 清空语义——labels/assignees 传空列表（GitHub 支持 `[]` 清空），milestone 传
+         * [clearMilestone] = true（GitHub 需显式 `"milestone": null`）。
+         */
         suspend fun updateIssueMeta(
             owner: String,
             repo: String,
@@ -112,14 +121,77 @@ class IssueRepository
             labels: List<String>? = null,
             assignees: List<String>? = null,
             milestone: Long? = null,
+            clearMilestone: Boolean = false,
         ): Issue =
             issueApi
                 .updateIssue(
                     owner,
                     repo,
                     number,
-                    UpdateIssueRequest(labels = labels, assignees = assignees, milestone = milestone),
+                    UpdateIssueRequest(
+                        labels = labels,
+                        assignees = assignees,
+                        milestone = milestone,
+                        clearMilestone = clearMilestone,
+                    ),
                 ).toDomain()
+
+        // ---- #163 L01：Issue 级订阅（Subscribe / Unsubscribe） ----
+
+        /**
+         * Issue 订阅态：200 → `subscribed`；**404 = 未订阅**（GitHub 语义）→ false。
+         *
+         * 401/403 等其余 [HttpException] 正常抛出，由 ViewModel 经既有 GitHubError 归一
+         * 兜底为「未订阅 + 不阻塞详情页」（[retrofit2.HttpException] 之外的异常同样抛出）。
+         */
+        suspend fun isSubscribed(
+            owner: String,
+            repo: String,
+            number: Int,
+        ): Boolean =
+            try {
+                issueApi.getIssueSubscription(owner, repo, number).subscribed
+            } catch (e: HttpException) {
+                if (e.code() == HTTP_NOT_FOUND) false else throw e
+            }
+
+        /** 订阅 Issue（PUT .../subscription，body `{"subscribed": true}`） */
+        suspend fun subscribe(
+            owner: String,
+            repo: String,
+            number: Int,
+        ) {
+            issueApi.subscribeIssue(owner, repo, number, SubscriptionRequest(subscribed = true))
+        }
+
+        /** 取消订阅 Issue（DELETE .../subscription，204） */
+        suspend fun unsubscribe(
+            owner: String,
+            repo: String,
+            number: Int,
+        ) {
+            issueApi.unsubscribeIssue(owner, repo, number)
+        }
+
+        // ---- #163 L02：元数据编辑候选项（只读端点） ----
+
+        /** 仓库标签列表（标签选择器候选项） */
+        suspend fun getLabels(
+            owner: String,
+            repo: String,
+        ): List<IssueLabel> = issueApi.listLabels(owner, repo).map { it.toDomain() }
+
+        /** 可指派用户列表（Assignee 选择器候选项） */
+        suspend fun getAssignees(
+            owner: String,
+            repo: String,
+        ): List<IssueUser> = issueApi.listAssignees(owner, repo).map { it.toDomain() }
+
+        /** 里程碑列表（含已关闭 → state=all；Milestone 单选候选项） */
+        suspend fun getMilestones(
+            owner: String,
+            repo: String,
+        ): List<IssueMilestone> = issueApi.listMilestones(owner, repo).map { it.toDomain() }
 
         /** 新增评论 */
         suspend fun createComment(
@@ -253,6 +325,9 @@ class IssueRepository
 
         private companion object {
             const val PAGE_SIZE = 30
+
+            /** GitHub 未订阅语义（GET .../subscription 返回 404） */
+            const val HTTP_NOT_FOUND = 404
         }
     }
 
@@ -349,10 +424,16 @@ internal fun IssueEventDto.toTimelineItem(ordinal: Int): IssueTimelineItem {
 
 private fun com.yumiru11.githubapp.core.githubrest.model.UserDto.toDomain(): IssueUser = IssueUser(login = login, avatarUrl = avatarUrl)
 
-private fun com.yumiru11.githubapp.core.githubrest.model.LabelDto.toDomain(): IssueLabel = IssueLabel(name = name, color = color)
+private fun com.yumiru11.githubapp.core.githubrest.model.LabelDto.toDomain(): IssueLabel =
+    IssueLabel(name = name, color = color, description = description)
 
 private fun com.yumiru11.githubapp.core.githubrest.model.MilestoneDto.toDomain(): IssueMilestone =
-    IssueMilestone(title = title, state = state?.let { IssueState.fromRaw(it) })
+    IssueMilestone(
+        title = title,
+        state = state?.let { IssueState.fromRaw(it) },
+        number = number,
+        dueOn = dueOn,
+    )
 
 private fun ReactionsDto.toDomain(): IssueReactions =
     IssueReactions(

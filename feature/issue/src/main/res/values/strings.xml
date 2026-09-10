@@ -72,7 +72,6 @@
     <string name="issue_create_title_label">Title</string>
     <string name="issue_create_body_label">Body</string>
     <string name="issue_create_labels_label">Labels</string>
-    <string name="issue_create_labels_hint">Comma-separated label names (optional)</string>
     <string name="issue_create_submit">Create issue</string>
 
     <!-- 时间线事件文案（%1$s = actor login） -->
@@ -91,4 +90,23 @@
 
     <!-- 反应条已反应态（issue #85 / audit #18） -->
     <string name="issue_reaction_reacted">Reacted</string>
+
+    <!-- #163 L01：Issue 订阅 -->
+    <string name="issue_subscribe">Subscribe</string>
+    <string name="issue_unsubscribe">Unsubscribe</string>
+    <string name="issue_subscribed_snackbar">Subscribed to this issue</string>
+    <string name="issue_unsubscribed_snackbar">Unsubscribed from this issue</string>
+
+    <!-- #163 L02：Labels / Assignees / Milestone 编辑 -->
+    <string name="issue_edit_meta">Labels &amp; assignees</string>
+    <string name="issue_meta_sheet_title">Labels, assignees and milestone</string>
+    <string name="issue_meta_section_labels">Labels</string>
+    <string name="issue_meta_section_assignees">Assignees</string>
+    <string name="issue_meta_section_milestone">Milestone</string>
+    <string name="issue_meta_empty">Nothing available</string>
+    <string name="issue_meta_milestone_none">No milestone</string>
+    <string name="issue_meta_milestone_due">Due %1$s</string>
+    <string name="issue_meta_load_failed">Couldn\'t load options</string>
+    <string name="issue_meta_updated">Labels, assignees and milestone updated</string>
+    <string name="issue_create_labels_empty">No labels available</string>
 </resources>
