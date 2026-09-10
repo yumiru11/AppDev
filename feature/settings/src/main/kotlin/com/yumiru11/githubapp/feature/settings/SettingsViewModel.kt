@@ -56,10 +56,21 @@ class SettingsViewModel
                 ) { cornerScale, motionScale, iconStyle, codeFont, lineNumbers ->
                     StylePrefs(cornerScale, motionScale, iconStyle, codeFont, lineNumbers)
                 },
-                preferences.languageTag,
-                preferences.blurEnabled,
-                sessionManager.authState,
-            ) { theme, style, languageTag, blurEnabled, authState ->
+                // 毛玻璃组（#167 / UI03）：总开关 + 四个点位开关
+                combine(
+                    preferences.blurEnabled,
+                    preferences.glassTopBar,
+                    preferences.glassBottomBar,
+                    preferences.glassPanel,
+                    preferences.glassBottomSheet,
+                ) { blur, topBar, bottomBar, panel, bottomSheet ->
+                    GlassPrefs(blur, topBar, bottomBar, panel, bottomSheet)
+                },
+                combine(
+                    preferences.languageTag,
+                    sessionManager.authState,
+                ) { languageTag, authState -> MiscPrefs(languageTag, authState) },
+            ) { theme, style, glass, misc ->
                 SettingsUiState(
                     themeMode = theme.themeMode,
                     dynamicColorEnabled = theme.dynamicColorEnabled,
@@ -71,9 +82,13 @@ class SettingsViewModel
                     iconStyle = style.iconStyle,
                     codeFont = style.codeFont,
                     codeLineNumbers = style.codeLineNumbers,
-                    languageTag = languageTag,
-                    blurEnabled = blurEnabled,
-                    authState = authState,
+                    languageTag = misc.languageTag,
+                    blurEnabled = glass.blurEnabled,
+                    glassTopBar = glass.topBar,
+                    glassBottomBar = glass.bottomBar,
+                    glassPanel = glass.panel,
+                    glassBottomSheet = glass.bottomSheet,
+                    authState = misc.authState,
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -125,6 +140,23 @@ class SettingsViewModel
             persist { preferences.setBlurEnabled(enabled) }
         }
 
+        // ── 毛玻璃逐项开关（#167 / UI03：ui-design §6.3 四条允许点位）──────────────
+        fun setGlassTopBar(enabled: Boolean) {
+            persist { preferences.setGlassTopBar(enabled) }
+        }
+
+        fun setGlassBottomBar(enabled: Boolean) {
+            persist { preferences.setGlassBottomBar(enabled) }
+        }
+
+        fun setGlassPanel(enabled: Boolean) {
+            persist { preferences.setGlassPanel(enabled) }
+        }
+
+        fun setGlassBottomSheet(enabled: Boolean) {
+            persist { preferences.setGlassBottomSheet(enabled) }
+        }
+
         /** null 表示回退系统语言。 */
         fun setLanguageTag(tag: String?) {
             persist { preferences.setLanguageTag(tag) }
@@ -170,4 +202,19 @@ private data class StylePrefs(
     val iconStyle: IconStyle,
     val codeFont: CodeFont,
     val codeLineNumbers: Boolean,
+)
+
+/** 毛玻璃偏好中间聚合（#167 / UI03：总开关 + 四条点位开关）。 */
+private data class GlassPrefs(
+    val blurEnabled: Boolean,
+    val topBar: Boolean,
+    val bottomBar: Boolean,
+    val panel: Boolean,
+    val bottomSheet: Boolean,
+)
+
+/** 语言 / 登录态中间聚合（与毛玻璃组凑成外层 combine 的 4 个槽位）。 */
+private data class MiscPrefs(
+    val languageTag: String?,
+    val authState: com.yumiru11.githubapp.core.githubauth.auth.AuthState,
 )

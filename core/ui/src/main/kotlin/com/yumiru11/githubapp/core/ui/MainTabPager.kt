@@ -16,6 +16,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
 import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
+import com.yumiru11.githubapp.core.designsystem.token.GlassScope
+import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.launch
@@ -43,7 +45,6 @@ import kotlinx.coroutines.launch
 fun MainTabPager(
     selectedTab: String,
     onTabSelected: (String) -> Unit,
-    blurEnabled: Boolean = true,
     homePage: @Composable (PaddingValues) -> Unit = {},
     reposPage: @Composable (PaddingValues) -> Unit = {},
     profilePage: @Composable (PaddingValues) -> Unit = {},
@@ -56,7 +57,9 @@ fun MainTabPager(
 
     // backdrop blur（issue #83）：底栏 hazeEffect 与分区内容侧 hazeSource 共享本 state
     val hazeState = rememberHazeState()
-    // source 侧门禁与 GlassSurface 的 effect 侧同源判定（issue #83，防两侧漂移）
+    // source 侧门禁与 GlassSurface 的 effect 侧同源判定（issue #83，防两侧漂移）；
+    // 开关按"底栏"点位取（#167 / UI03），不再由宿主层层下传布尔
+    val blurEnabled = LocalGlassSettings.current.enabledFor(GlassScope.BOTTOM_BAR)
     val useHazeSource = GlassRenderPolicy.shouldAttachHazeSource(blurEnabled)
 
     // 外部 tab 状态变化（如顶部头像切到我的）→ 联动 pager 滚动
