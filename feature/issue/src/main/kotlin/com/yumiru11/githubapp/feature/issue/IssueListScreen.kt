@@ -140,6 +140,9 @@ fun IssueListScreen(
                         repo = repo,
                         issues = state.issues,
                         onIssueClick = onIssueClick,
+                        // 空态下拉刷新：无内容可保留 → 走 VM 失效重建（invalidate），
+                        // 已有内容时列表内部用 LazyPagingItems.refresh() 保滚动位置。
+                        onEmptyRefresh = viewModel::refresh,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -181,6 +184,7 @@ private fun IssueListContent(
     repo: String,
     issues: Flow<PagingData<Issue>>,
     onIssueClick: (owner: String, repo: String, number: Int, isPullRequest: Boolean) -> Unit,
+    onEmptyRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lazyItems = issues.collectAsLazyPagingItems()
@@ -200,7 +204,7 @@ private fun IssueListContent(
         lazyItems.itemCount == 0 -> {
             PullToRefreshBox(
                 isRefreshing = lazyItems.loadState.refresh is LoadState.Loading,
-                onRefresh = { lazyItems.refresh() },
+                onRefresh = onEmptyRefresh,
                 modifier = modifier,
             ) {
                 EmptyContent(modifier = Modifier.fillMaxSize())

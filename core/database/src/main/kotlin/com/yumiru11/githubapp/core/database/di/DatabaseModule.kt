@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.yumiru11.githubapp.core.database.AppDatabase
 import com.yumiru11.githubapp.core.database.dao.CachedReadmeDao
 import com.yumiru11.githubapp.core.database.dao.CachedRepositoryDao
+import com.yumiru11.githubapp.core.database.dao.IssueDao
 import com.yumiru11.githubapp.core.database.dao.SearchHistoryDao
 import dagger.Module
 import dagger.Provides
@@ -29,8 +30,11 @@ object DatabaseModule {
                 context,
                 AppDatabase::class.java,
                 DATABASE_NAME,
-            ).addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
-            .build()
+            ).addMigrations(
+                AppDatabase.MIGRATION_1_2,
+                AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4,
+            ).build()
 
     @Provides
     fun provideCachedRepositoryDao(db: AppDatabase): CachedRepositoryDao = db.cachedRepositoryDao()
@@ -40,6 +44,9 @@ object DatabaseModule {
 
     @Provides
     fun provideSearchHistoryDao(db: AppDatabase): SearchHistoryDao = db.searchHistoryDao()
+
+    @Provides
+    fun provideIssueDao(db: AppDatabase): IssueDao = db.issueDao()
 
     private const val DATABASE_NAME = "githubapp.db"
 }
