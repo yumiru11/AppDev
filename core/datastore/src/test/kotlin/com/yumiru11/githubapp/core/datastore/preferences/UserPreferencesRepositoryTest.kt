@@ -75,6 +75,73 @@ class UserPreferencesRepositoryTest {
             assertEquals(false, reloaded.blurEnabled.first())
         }
 
+    // ── 毛玻璃逐项开关（#167 / UI03）────────────────────────────────────────
+    @Test
+    fun glassSwitches_byDefault_allEmitTrue() =
+        runTest {
+            val repository = createRepository()
+
+            assertEquals(true, repository.glassTopBar.first())
+            assertEquals(true, repository.glassBottomBar.first())
+            assertEquals(true, repository.glassPanel.first())
+            assertEquals(true, repository.glassBottomSheet.first())
+        }
+
+    @Test
+    fun setGlassSwitches_false_eachPersistsIndependently() =
+        runTest {
+            val repository = createRepository()
+
+            repository.setGlassTopBar(false)
+            repository.setGlassPanel(false)
+
+            assertEquals(false, repository.glassTopBar.first())
+            assertEquals(true, repository.glassBottomBar.first())
+            assertEquals(false, repository.glassPanel.first())
+            assertEquals(true, repository.glassBottomSheet.first())
+        }
+
+    @Test
+    fun setGlassSwitches_false_allFourSettersPersistAndEmit() =
+        runTest {
+            val repository = createRepository()
+
+            repository.setGlassTopBar(false)
+            repository.setGlassBottomBar(false)
+            repository.setGlassPanel(false)
+            repository.setGlassBottomSheet(false)
+
+            assertEquals(false, repository.glassTopBar.first())
+            assertEquals(false, repository.glassBottomBar.first())
+            assertEquals(false, repository.glassPanel.first())
+            assertEquals(false, repository.glassBottomSheet.first())
+        }
+
+    @Test
+    fun setGlassSwitches_trueAfterFalse_revertsToEnabled() =
+        runTest {
+            val repository = createRepository()
+
+            repository.setGlassTopBar(false)
+            repository.setGlassTopBar(true)
+
+            assertEquals(true, repository.glassTopBar.first())
+        }
+
+    @Test
+    fun setGlassBottomSheet_false_newInstance_readsBackPersistedValue() =
+        runTest {
+            val file = newPreferencesFile()
+            val scope = newScope()
+            createRepository(scope, file).setGlassBottomSheet(false)
+            scope.cancel()
+
+            val reloaded = createRepository(newScope(), file)
+
+            assertEquals(false, reloaded.glassBottomSheet.first())
+            assertEquals(true, reloaded.glassTopBar.first())
+        }
+
     @Test
     fun setThemeMode_darkMode_persistsAndEmits() =
         runTest {

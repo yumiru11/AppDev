@@ -81,6 +81,31 @@ class DefaultUserPreferencesRepository
             dataStore.edit { it[KEY_BLUR_ENABLED] = enabled }
         }
 
+        // ── 毛玻璃逐项开关（#167 / UI03，ui-design §6.3 四条允许点位）──────────────
+        override val glassTopBar: Flow<Boolean> = dataStore.data.map { it[KEY_GLASS_TOP_BAR] ?: true }
+
+        override val glassBottomBar: Flow<Boolean> = dataStore.data.map { it[KEY_GLASS_BOTTOM_BAR] ?: true }
+
+        override val glassPanel: Flow<Boolean> = dataStore.data.map { it[KEY_GLASS_PANEL] ?: true }
+
+        override val glassBottomSheet: Flow<Boolean> = dataStore.data.map { it[KEY_GLASS_BOTTOM_SHEET] ?: true }
+
+        override suspend fun setGlassTopBar(enabled: Boolean) {
+            dataStore.edit { it[KEY_GLASS_TOP_BAR] = enabled }
+        }
+
+        override suspend fun setGlassBottomBar(enabled: Boolean) {
+            dataStore.edit { it[KEY_GLASS_BOTTOM_BAR] = enabled }
+        }
+
+        override suspend fun setGlassPanel(enabled: Boolean) {
+            dataStore.edit { it[KEY_GLASS_PANEL] = enabled }
+        }
+
+        override suspend fun setGlassBottomSheet(enabled: Boolean) {
+            dataStore.edit { it[KEY_GLASS_BOTTOM_SHEET] = enabled }
+        }
+
         override suspend fun setLanguageTag(tag: String?) {
             dataStore.edit {
                 if (tag == null) {
@@ -131,6 +156,10 @@ class DefaultUserPreferencesRepository
             val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
             val KEY_LANGUAGE_TAG = stringPreferencesKey("language_tag")
             val KEY_BLUR_ENABLED = booleanPreferencesKey("blur_enabled")
+            val KEY_GLASS_TOP_BAR = booleanPreferencesKey("glass_top_bar")
+            val KEY_GLASS_BOTTOM_BAR = booleanPreferencesKey("glass_bottom_bar")
+            val KEY_GLASS_PANEL = booleanPreferencesKey("glass_panel")
+            val KEY_GLASS_BOTTOM_SHEET = booleanPreferencesKey("glass_bottom_sheet")
             val KEY_DYNAMIC_COLOR_ENABLED = booleanPreferencesKey("dynamic_color_enabled")
             val KEY_SEED_COLOR = longPreferencesKey("seed_color")
             val KEY_OLED_ENABLED = booleanPreferencesKey("oled_enabled")
