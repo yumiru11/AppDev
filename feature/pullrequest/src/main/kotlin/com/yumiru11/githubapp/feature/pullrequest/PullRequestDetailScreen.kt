@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -153,6 +154,30 @@ fun PullRequestDetailScreen(
                 PullRequestDetailEvent.DeleteBranchFailed -> {
                     snackbarHostState.showSnackbar(context.getString(R.string.pull_request_delete_branch_failed))
                 }
+
+                PullRequestDetailEvent.EditSucceeded -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_edit_succeeded))
+                }
+
+                PullRequestDetailEvent.EditFailed -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_edit_failed))
+                }
+
+                PullRequestDetailEvent.CloseSucceeded -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_close_succeeded))
+                }
+
+                PullRequestDetailEvent.CloseFailed -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_close_failed))
+                }
+
+                PullRequestDetailEvent.ReopenSucceeded -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_reopen_succeeded))
+                }
+
+                PullRequestDetailEvent.ReopenFailed -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_reopen_failed))
+                }
             }
         }
     }
@@ -163,6 +188,10 @@ fun PullRequestDetailScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     // T17：Review 提交 BottomSheet 状态
     var showReviewSheet by remember { mutableStateOf(false) }
+    // #163 L03：编辑 PR 对话框 / 关闭 PR 二次确认
+    var showEditPrDialog by remember { mutableStateOf(false) }
+    var showCloseConfirm by remember { mutableStateOf(false) }
+    val successState = uiState as? PullRequestDetailUiState.Success
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -179,9 +208,20 @@ fun PullRequestDetailScreen(
                     }
                 },
                 actions = {
-                    if (currentUrl != null) {
+                    if (currentUrl != null || successState != null) {
                         PullRequestMoreMenu(
                             url = currentUrl,
+                            // #163 L03：编辑/关闭/重开（WRITE 权限才可见；已合并不可关闭重开）
+                            editActions =
+                                PullRequestEditMenuActions(
+                                    canEditPr = successState?.canEditPr == true,
+                                    canCloseReopenPr = successState?.canCloseReopenPr == true,
+                                    isClosed = successState?.pullRequest?.state == PullRequestState.CLOSED,
+                                    pending = successState?.pendingAction != null,
+                                    onEditPr = { showEditPrDialog = true },
+                                    onClosePr = { showCloseConfirm = true },
+                                    onReopenPr = viewModel::reopenPullRequest,
+                                ),
                             snackbarHostState = snackbarHostState,
                             scope = scope,
                         )
@@ -248,6 +288,7 @@ fun PullRequestDetailScreen(
                                 mergeableState = state.pullRequest.mergeableState,
                                 canReview = state.canReview,
                                 canMerge = state.canMerge,
+                                canMergeBox = state.canMergeBox,
                                 canDeleteHeadBranch = state.canDeleteHeadBranch,
                                 headSameRepo = state.headSameRepo,
                                 pendingAction = state.pendingAction,
@@ -290,6 +331,42 @@ fun PullRequestDetailScreen(
                 )
             }
 
+            // #163 L03：编辑 PR（标题 + 正文）
+            if (showEditPrDialog && successState?.canEditPr == true) {
+                EditPullRequestDialog(
+                    pullRequest = successState.pullRequest,
+                    onDismiss = { showEditPrDialog = false },
+                    onSubmit = { title, body ->
+                        showEditPrDialog = false
+                        viewModel.editPullRequest(title, body)
+                    },
+                )
+            }
+
+            // #163 L03：关闭 PR 二次确认
+            if (showCloseConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showCloseConfirm = false },
+                    title = { Text(text = stringResource(R.string.pull_request_close_confirm_title)) },
+                    text = { Text(text = stringResource(R.string.pull_request_close_confirm_message)) },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showCloseConfirm = false
+                                viewModel.closePullRequest()
+                            },
+                        ) {
+                            Text(text = stringResource(R.string.pull_request_close))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showCloseConfirm = false }) {
+                            Text(text = stringResource(R.string.cancel))
+                        }
+                    },
+                )
+            }
+
             // Review 提交 BottomSheet（T17）
             if (showReviewSheet) {
                 val canApprove = (uiState as? PullRequestDetailUiState.Success)?.canApprove ?: false
@@ -306,10 +383,28 @@ fun PullRequestDetailScreen(
     }
 }
 
-/** TopAppBar 更多菜单：分享 / 浏览器打开 / 复制链接（复制成功后 Snackbar 反馈） */
+/**
+ * #163 L03：更多菜单的编辑/关闭/重开入口（权限位 + 回调聚合，避免菜单签名膨胀——
+ * [ConversationActions] 同款做法）。
+ */
+internal data class PullRequestEditMenuActions(
+    val canEditPr: Boolean = false,
+    val canCloseReopenPr: Boolean = false,
+    val isClosed: Boolean = false,
+    val pending: Boolean = false,
+    val onEditPr: () -> Unit = {},
+    val onClosePr: () -> Unit = {},
+    val onReopenPr: () -> Unit = {},
+)
+
+/**
+ * TopAppBar 更多菜单：分享 / 浏览器打开 / 复制链接（复制成功后 Snackbar 反馈）
+ * + #163 L03 编辑 PR / 关闭 PR / 重开 PR（WRITE 权限且未合并时才显示）。
+ */
 @Composable
 private fun PullRequestMoreMenu(
-    url: String,
+    url: String?,
+    editActions: PullRequestEditMenuActions,
     snackbarHostState: SnackbarHostState,
     scope: CoroutineScope,
     modifier: Modifier = Modifier,
@@ -324,30 +419,110 @@ private fun PullRequestMoreMenu(
             )
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.pull_request_share)) },
-                onClick = {
-                    expanded = false
-                    shareUrl(context, url)
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.pull_request_open_in_browser)) },
-                onClick = {
-                    expanded = false
-                    openInBrowser(context, url)
-                },
-            )
-            DropdownMenuItem(
-                text = { Text(text = stringResource(R.string.pull_request_copy_link)) },
-                onClick = {
-                    expanded = false
-                    copyLink(context, url)
-                    scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.pull_request_link_copied)) }
-                },
-            )
+            if (url != null) {
+                DropdownMenuItem(
+                    text = { Text(text = stringResource(R.string.pull_request_share)) },
+                    onClick = {
+                        expanded = false
+                        shareUrl(context, url)
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(text = stringResource(R.string.pull_request_open_in_browser)) },
+                    onClick = {
+                        expanded = false
+                        openInBrowser(context, url)
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(text = stringResource(R.string.pull_request_copy_link)) },
+                    onClick = {
+                        expanded = false
+                        copyLink(context, url)
+                        scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.pull_request_link_copied)) }
+                    },
+                )
+            }
+            if (editActions.canEditPr) {
+                DropdownMenuItem(
+                    text = { Text(text = stringResource(R.string.pull_request_edit)) },
+                    onClick = {
+                        expanded = false
+                        editActions.onEditPr()
+                    },
+                )
+            }
+            if (editActions.canCloseReopenPr) {
+                // 关闭走二次确认；重开直接执行（写操作进行中禁用，防连点）
+                if (editActions.isClosed) {
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.pull_request_reopen)) },
+                        enabled = !editActions.pending,
+                        onClick = {
+                            expanded = false
+                            editActions.onReopenPr()
+                        },
+                    )
+                } else {
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.pull_request_close)) },
+                        enabled = !editActions.pending,
+                        onClick = {
+                            expanded = false
+                            editActions.onClosePr()
+                        },
+                    )
+                }
+            }
         }
     }
+}
+
+/** #163 L03：编辑 PR 对话框（标题 + 正文；标题必填） */
+@Composable
+private fun EditPullRequestDialog(
+    pullRequest: PullRequest,
+    onDismiss: () -> Unit,
+    onSubmit: (String, String) -> Unit,
+) {
+    var title by remember { mutableStateOf(pullRequest.title) }
+    var body by remember { mutableStateOf(pullRequest.body.orEmpty()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.pull_request_edit_title)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(text = stringResource(R.string.pull_request_edit_title_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = body,
+                    onValueChange = { body = it },
+                    label = { Text(text = stringResource(R.string.pull_request_edit_body_label)) },
+                    minLines = 4,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSubmit(title, body) },
+                enabled = title.isNotBlank(),
+            ) {
+                Text(text = stringResource(R.string.pull_request_edit_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.cancel))
+            }
+        },
+    )
 }
 
 /** 成功态：PrHeader（固定）+ TabRow + 当前 Tab 内容 */

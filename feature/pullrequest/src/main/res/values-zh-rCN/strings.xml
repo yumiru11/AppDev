@@ -190,4 +190,22 @@
     <string name="pull_request_create_select_branch">选择分支</string>
     <string name="pull_request_create_same_branch_hint">源分支必须与基础分支不同</string>
     <string name="pull_request_create_no_permission_hint">你没有创建 Pull Request 的权限</string>
+
+    <!-- #163 L03：编辑 / 关闭 / 重开 PR -->
+    <string name="pull_request_edit">编辑 Pull Request</string>
+    <string name="pull_request_edit_title">编辑 Pull Request</string>
+    <string name="pull_request_edit_title_label">标题</string>
+    <string name="pull_request_edit_body_label">描述</string>
+    <string name="pull_request_edit_save">保存</string>
+    <string name="pull_request_edit_succeeded">Pull Request 已更新</string>
+    <string name="pull_request_edit_failed">Pull Request 更新失败</string>
+    <string name="pull_request_close">关闭 Pull Request</string>
+    <string name="pull_request_close_confirm_title">关闭此 Pull Request？</string>
+    <string name="pull_request_close_confirm_message">此 Pull Request 将在未合并的情况下关闭，之后可以重新开启。</string>
+    <string name="pull_request_close_succeeded">Pull Request 已关闭</string>
+    <string name="pull_request_close_failed">Pull Request 关闭失败</string>
+    <string name="pull_request_reopen">重新开启 Pull Request</string>
+    <string name="pull_request_reopen_succeeded">Pull Request 已重新开启</string>
+    <string name="pull_request_reopen_failed">Pull Request 重新开启失败</string>
+    <string name="pull_request_merge_closed_hint">此 Pull Request 已关闭</string>
 </resources>

@@ -38,6 +38,8 @@ data class IssueDto(
 data class LabelDto(
     val name: String,
     val color: String? = null,
+    /** 标签说明（GET /repos/{o}/{r}/labels，标签选择器展示；#163 L02） */
+    val description: String? = null,
 )
 
 @Serializable
@@ -45,6 +47,10 @@ data class MilestoneDto(
     val title: String,
     val state: String? = null,
     val description: String? = null,
+    /** 里程碑编号（PATCH issue 的 milestone 字段值；#163 L02） */
+    val number: Long? = null,
+    /** 截止日期（ISO8601；#163 L02） */
+    val dueOn: String? = null,
 )
 
 @Serializable

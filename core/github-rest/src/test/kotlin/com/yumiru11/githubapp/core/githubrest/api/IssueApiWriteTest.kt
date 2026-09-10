@@ -5,6 +5,7 @@ import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
 import com.yumiru11.githubapp.core.githubrest.model.CreateCommentRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreateIssueRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreateReactionRequest
+import com.yumiru11.githubapp.core.githubrest.model.SubscriptionRequest
 import com.yumiru11.githubapp.core.githubrest.model.UpdateIssueRequest
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
@@ -383,5 +384,187 @@ class IssueApiWriteTest {
             assertEquals("t", issue.title)
             assertNull(issue.body)
             assertNull(issue.reactions)
+        }
+
+    // ── #163 L01：Issue 级订阅 ─────────────────────────────────────
+
+    @Test
+    fun getIssueSubscription_subscribed_returnsTrue() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"subscribed": true, "ignored": false}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val subscription = issueApi.getIssueSubscription("octocat", "Hello-World", 42)
+
+            assertTrue(subscription.subscribed)
+            val request = server.takeRequest()
+            assertEquals("GET", request.method)
+            assertEquals("/repos/octocat/Hello-World/issues/42/subscription", request.url.encodedPath)
+        }
+
+    @Test
+    fun getIssueSubscription_404Response_throwsHttpException() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 404 Not Found")
+                    .body("""{"message":"Not Found"}""")
+                    .build(),
+            )
+
+            try {
+                issueApi.getIssueSubscription("octocat", "Hello-World", 42)
+                throw AssertionError("404 应抛 HttpException（未订阅语义）")
+            } catch (e: HttpException) {
+                assertEquals(404, e.code())
+            }
+        }
+
+    @Test
+    fun subscribeIssue_sendsPutWithSubscribedTrue() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"subscribed": true}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            issueApi.subscribeIssue("octocat", "Hello-World", 42, SubscriptionRequest(subscribed = true))
+
+            val request = server.takeRequest()
+            assertEquals("PUT", request.method)
+            assertEquals("/repos/octocat/Hello-World/issues/42/subscription", request.url.encodedPath)
+            assertEquals("""{"subscribed":true}""", request.body?.utf8())
+        }
+
+    @Test
+    fun unsubscribeIssue_sendsDelete() =
+        runTest {
+            server.enqueue(MockResponse.Builder().status("HTTP/1.1 204 No Content").build())
+
+            issueApi.unsubscribeIssue("octocat", "Hello-World", 42)
+
+            val request = server.takeRequest()
+            assertEquals("DELETE", request.method)
+            assertEquals("/repos/octocat/Hello-World/issues/42/subscription", request.url.encodedPath)
+        }
+
+    // ── #163 L02：元数据编辑候选项（只读端点） ─────────────────────
+
+    @Test
+    fun listLabels_returnsNameColorDescription() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        [{"name": "bug", "color": "d73a4a", "description": "Something isn't working"},
+                         {"name": "ui", "color": "1d76db"}]
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val labels = issueApi.listLabels("octocat", "Hello-World")
+
+            assertEquals(2, labels.size)
+            assertEquals("bug", labels[0].name)
+            assertEquals("d73a4a", labels[0].color)
+            assertEquals("Something isn't working", labels[0].description)
+            assertNull(labels[1].description)
+            assertEquals("/repos/octocat/Hello-World/labels", server.takeRequest().url.encodedPath)
+        }
+
+    @Test
+    fun listAssignees_returnsUsers() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""[{"login": "octocat", "id": 1, "avatar_url": "https://a/o.png"}]""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val assignees = issueApi.listAssignees("octocat", "Hello-World")
+
+            assertEquals(1, assignees.size)
+            assertEquals("octocat", assignees.first().login)
+            assertEquals("/repos/octocat/Hello-World/assignees", server.takeRequest().url.encodedPath)
+        }
+
+    @Test
+    fun listAssignees_404Response_throwsHttpException() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 404 Not Found")
+                    .body("""{"message":"Not Found"}""")
+                    .build(),
+            )
+
+            try {
+                issueApi.listAssignees("octocat", "Hello-World")
+                throw AssertionError("404 应抛 HttpException（无权限语义）")
+            } catch (e: HttpException) {
+                assertEquals(404, e.code())
+            }
+        }
+
+    @Test
+    fun listMilestones_sendsStateAllAndParsesNumberDueOn() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        [{"number": 3, "title": "v1.0", "state": "open", "due_on": "2026-12-31T00:00:00Z"}]
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val milestones = issueApi.listMilestones("octocat", "Hello-World")
+
+            assertEquals(1, milestones.size)
+            assertEquals(3L, milestones.first().number)
+            assertEquals("v1.0", milestones.first().title)
+            assertEquals("2026-12-31T00:00:00Z", milestones.first().dueOn)
+            val request = server.takeRequest()
+            assertEquals("/repos/octocat/Hello-World/milestones", request.url.encodedPath)
+            assertEquals("all", request.url.queryParameter("state"))
+        }
+
+    @Test
+    fun updateIssue_clearMilestone_serializesExplicitNull() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"id": 1, "number": 42, "title": "t", "state": "open"}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            issueApi.updateIssue("octocat", "Hello-World", 42, UpdateIssueRequest(clearMilestone = true))
+
+            val body =
+                server
+                    .takeRequest()
+                    .body
+                    ?.utf8()
+                    .orEmpty()
+            assertEquals("""{"milestone":null}""", body)
         }
 }

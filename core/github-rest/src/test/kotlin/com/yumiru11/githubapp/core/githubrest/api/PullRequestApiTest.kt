@@ -1,3 +1,5 @@
+@file:Suppress("LargeClass") // T15/T16/T17 读 + #163 L03 写操作的 API 集成测试同文件（按端点分段），拆分反损可读性
+
 package com.yumiru11.githubapp.core.githubrest.api
 
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
@@ -7,6 +9,7 @@ import com.yumiru11.githubapp.core.githubrest.model.CreateReviewCommentRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreateReviewRequest
 import com.yumiru11.githubapp.core.githubrest.model.MergePullRequestRequest
 import com.yumiru11.githubapp.core.githubrest.model.UpdateBranchRequest
+import com.yumiru11.githubapp.core.githubrest.model.UpdatePullRequestRequest
 import com.yumiru11.githubapp.core.githubrest.model.UpdateReviewCommentRequest
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
@@ -653,6 +656,91 @@ class PullRequestApiTest {
                     "octocat",
                     "Hello-World",
                     CreatePullRequestRequest(title = "T", head = "feature", base = "feature"),
+                )
+                fail("expected HttpException")
+            } catch (e: HttpException) {
+                assertEquals(422, e.code())
+            }
+        }
+
+    // ── #163 L03：编辑 / 关闭 / 重开（PATCH /pulls/{number}） ─────────
+
+    @Test
+    fun updatePullRequest_stateClosed_sendsPatchWithStateOnly() =
+        runTest {
+            server.enqueue(jsonResponse("""{"id": 1, "number": 42, "title": "T", "state": "closed"}"""))
+
+            val pullRequest =
+                pullRequestApi.updatePullRequest(
+                    "octocat",
+                    "Hello-World",
+                    42,
+                    UpdatePullRequestRequest(state = "closed"),
+                )
+
+            assertEquals("closed", pullRequest.state)
+            val request = server.takeRequest()
+            assertEquals("PATCH", request.method)
+            assertEquals("/repos/octocat/Hello-World/pulls/42", request.url.encodedPath)
+            assertEquals("""{"state":"closed"}""", request.body?.utf8())
+        }
+
+    @Test
+    fun updatePullRequest_titleAndBody_sendsOnlyChangedFields() =
+        runTest {
+            server.enqueue(jsonResponse("""{"id": 1, "number": 42, "title": "New", "state": "open"}"""))
+
+            pullRequestApi.updatePullRequest(
+                "octocat",
+                "Hello-World",
+                42,
+                UpdatePullRequestRequest(title = "New", body = "Desc"),
+            )
+
+            val body =
+                server
+                    .takeRequest()
+                    .body
+                    ?.utf8()
+                    .orEmpty()
+            assertEquals("""{"title":"New","body":"Desc"}""", body)
+            assertFalse("未变更字段不应携带 state", body.contains("state"))
+        }
+
+    @Test
+    fun updatePullRequest_reopen_sendsStateOpen() =
+        runTest {
+            server.enqueue(jsonResponse("""{"id": 1, "number": 42, "title": "T", "state": "open"}"""))
+
+            val pullRequest =
+                pullRequestApi.updatePullRequest(
+                    "octocat",
+                    "Hello-World",
+                    42,
+                    UpdatePullRequestRequest(state = "open"),
+                )
+
+            assertEquals("open", pullRequest.state)
+            assertEquals("""{"state":"open"}""", server.takeRequest().body?.utf8())
+        }
+
+    @Test
+    fun updatePullRequest_httpError_throwsHttpException() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 422 Unprocessable Entity")
+                    .body("""{"message":"Validation Failed"}""")
+                    .build(),
+            )
+
+            try {
+                pullRequestApi.updatePullRequest(
+                    "octocat",
+                    "Hello-World",
+                    42,
+                    UpdatePullRequestRequest(title = ""),
                 )
                 fail("expected HttpException")
             } catch (e: HttpException) {
