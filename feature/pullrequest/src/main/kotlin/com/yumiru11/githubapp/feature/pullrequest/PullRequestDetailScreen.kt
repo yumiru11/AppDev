@@ -79,6 +79,7 @@ import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
+import com.yumiru11.githubapp.core.ui.gitHubStatusStateDescription
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
 import com.yumiru11.githubapp.feature.pullrequest.model.CombinedStatus
@@ -723,15 +724,18 @@ private fun StatusChip(state: PullRequestState) {
             PullRequestState.MERGED -> stringResource(R.string.pull_request_state_merged)
             PullRequestState.DRAFT -> stringResource(R.string.pull_request_state_draft)
         }
+    val status =
+        when (state) {
+            PullRequestState.OPEN -> GitHubStatus.OPEN
+            PullRequestState.CLOSED -> GitHubStatus.CLOSED
+            PullRequestState.MERGED -> GitHubStatus.MERGED
+            PullRequestState.DRAFT -> GitHubStatus.DRAFT
+        }
+    // #168 / UI26：补状态播报（TalkBack 读「Merged, 该 PR 已合并」）
     AppStateChip(
-        status =
-            when (state) {
-                PullRequestState.OPEN -> GitHubStatus.OPEN
-                PullRequestState.CLOSED -> GitHubStatus.CLOSED
-                PullRequestState.MERGED -> GitHubStatus.MERGED
-                PullRequestState.DRAFT -> GitHubStatus.DRAFT
-            },
+        status = status,
         label = text,
+        stateDescription = gitHubStatusStateDescription(status),
     )
 }
 

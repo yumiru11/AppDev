@@ -22,6 +22,7 @@ import com.yumiru11.githubapp.core.designsystem.theme.oledPalette
 import com.yumiru11.githubapp.core.designsystem.token.GlassScope
 import com.yumiru11.githubapp.core.designsystem.token.GlassSettings
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
+import com.yumiru11.githubapp.core.designsystem.token.LocalIconStyle
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
@@ -83,6 +84,46 @@ class AppThemeHostTest {
         GlassScope.entries.forEach { scope ->
             assertEquals("默认应全开：$scope", true, settings.enabledFor(scope))
         }
+    }
+
+    @Test
+    fun themeHost_iconStylePreference_providesLocalIconStyle() {
+        // #168 / UI12：设置页选的图标风格经 LocalIconStyle 下发（AppIcon 据此取变体）
+        var captured: IconStyle? = null
+
+        composeRule.setContent {
+            val lifecycleOwner = remember { TestLifecycleOwner() }
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                AppThemeHost(repository = FakeUserPreferencesRepository(iconStyle = IconStyle.FILLED)) {
+                    captured = LocalIconStyle.current
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(IconStyle.FILLED, captured)
+    }
+
+    @Test
+    fun themeHost_iconStyleChange_recomposesToNewStyle() {
+        // 「切换后立即变化」：仓库 Flow 发射新值 → LocalIconStyle 跟随重组（无需重启）
+        val repository = FakeUserPreferencesRepository(iconStyle = IconStyle.ROUNDED)
+        val seen = mutableListOf<IconStyle>()
+
+        composeRule.setContent {
+            val lifecycleOwner = remember { TestLifecycleOwner() }
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                AppThemeHost(repository = repository) {
+                    seen += LocalIconStyle.current
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle { repository.iconStyleFlow.value = IconStyle.OUTLINED }
+        composeRule.waitForIdle()
+
+        assertEquals(IconStyle.OUTLINED, seen.last())
     }
 
     @Test
@@ -271,6 +312,7 @@ private class FakeUserPreferencesRepository(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     oledEnabled: Boolean = false,
     glassPanel: Boolean = true,
+    iconStyle: IconStyle = IconStyle.ROUNDED,
 ) : UserPreferencesRepository {
     val themeModeFlow = MutableStateFlow(themeMode)
 
@@ -286,7 +328,7 @@ private class FakeUserPreferencesRepository(
     private val highContrastEnabledFlow = MutableStateFlow(false)
     private val cornerScaleFlow = MutableStateFlow(UserPreferencesRepository.DEFAULT_CORNER_SCALE)
     private val motionScaleFlow = MutableStateFlow(UserPreferencesRepository.DEFAULT_MOTION_SCALE)
-    private val iconStyleFlow = MutableStateFlow(IconStyle.ROUNDED)
+    val iconStyleFlow = MutableStateFlow(iconStyle)
     private val codeFontFlow = MutableStateFlow(CodeFont.MONO)
     private val codeLineNumbersFlow = MutableStateFlow(true)
 
