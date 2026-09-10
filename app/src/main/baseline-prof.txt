@@ -1,0 +1,70 @@
+# AppDev Baseline Profile（T25 / #26）
+#
+# 这是什么：AGP 会把本文件编译进 APK 的 assets/dexopt/baseline.prof；
+# Android 5.0+（本项目 minSdk 26）在安装/首次运行时由 ProfileInstaller 安装到 ART，
+# API 31+ 则在编译期直接产出 baseline.profm（无需运行时安装）。
+#
+# 为什么是手写而不是 macrobenchmark 生成：
+#   macrobenchmark 需要真机或模拟器采集（connectedAndroidTest / baselineprofile 插件），
+#   而本仓红线是「测试与截图全跑 Linux 纯 JVM，不依赖模拟器」。这里先给按代码路径人工
+#   推导的启动热路径，覆盖：应用入口 → Hilt 图根 → 主题装配 → 首页首屏 → 导航壳 → 数据层。
+#   接入 macrobenchmark 后应替换为采集产物（见 PR「未做」）。
+#
+# 语法（AGP 的 ART profile 解析器，实测口径）：
+#   - **方法规则**可带标志位：HSPLcom/foo/Bar;->method()V
+#   - **整类规则不能带标志位**：Lcom/foo/Bar;
+#     （写成 HSPLcom/foo/Bar; 会直接报 "Class rules don't support flags, but 'HSP' were specified"）
+#   - 这里的标志位取 HSP：Hot / Startup / PostStartup —— 冷启动路径的标准组合
+
+# ── 应用入口（冷启动最热的一段，方法级）───────────────────────────
+HSPLcom/yumiru11/githubapp/GitHubApp;-><init>()V
+HSPLcom/yumiru11/githubapp/GitHubApp;->onCreate()V
+HSPLcom/yumiru11/githubapp/GitHubApp;->newImageLoader(Lcoil3/PlatformContext;)Lcoil3/ImageLoader;
+HSPLcom/yumiru11/githubapp/MainActivity;-><init>()V
+HSPLcom/yumiru11/githubapp/MainActivity;->onCreate(Landroid/os/Bundle;)V
+HSPLcom/yumiru11/githubapp/MainActivity;->attachBaseContext(Landroid/content/Context;)Landroid/content/Context;
+
+# ── 主题装配（AppThemeHost → AppTheme → 色板/形状/动效）─────────────
+Lcom/yumiru11/githubapp/AppThemeHostKt;
+Lcom/yumiru11/githubapp/core/designsystem/theme/AppThemeKt;
+Lcom/yumiru11/githubapp/core/designsystem/theme/ThemeColorsKt;
+Lcom/yumiru11/githubapp/core/designsystem/theme/AnimatedColorSchemeKt;
+Lcom/yumiru11/githubapp/core/designsystem/theme/AppShapes;
+Lcom/yumiru11/githubapp/core/designsystem/token/AppDimens;
+Lcom/yumiru11/githubapp/core/designsystem/token/AppMotion;
+
+# ── 导航壳与底部导航（首帧必走）─────────────────────────────────
+Lcom/yumiru11/githubapp/core/ui/AppNavHostKt;
+Lcom/yumiru11/githubapp/core/ui/MainTabPagerKt;
+Lcom/yumiru11/githubapp/core/ui/AppTopBarKt;
+Lcom/yumiru11/githubapp/core/ui/AppBottomBarKt;
+Lcom/yumiru11/githubapp/core/navigation/AppRoute;
+
+# ── 首页首屏（默认落地页）─────────────────────────────────────
+Lcom/yumiru11/githubapp/feature/home/HomeScreenKt;
+Lcom/yumiru11/githubapp/feature/home/HomeViewModel;
+Lcom/yumiru11/githubapp/feature/home/data/FeedRepository;
+Lcom/yumiru11/githubapp/feature/home/ui/StaggerKt;
+
+# ── 数据层冷启动路径（Apollo + Retrofit + Room + DataStore）────────
+Lcom/yumiru11/githubapp/core/githubgraphql/GitHubApolloClientFactory;
+Lcom/yumiru11/githubapp/core/githubrest/api/GitHubRestClient;
+Lcom/yumiru11/githubapp/core/githubrest/di/RestNetworkModule;
+Lcom/yumiru11/githubapp/core/database/AppDatabase;
+Lcom/yumiru11/githubapp/core/datastore/preferences/DefaultUserPreferencesRepository;
+
+# ── 设计系统常用组件（首屏即出现）───────────────────────────────
+Lcom/yumiru11/githubapp/core/designsystem/component/GlassSurfaceKt;
+Lcom/yumiru11/githubapp/core/designsystem/component/AppStateViewsKt;
+Lcom/yumiru11/githubapp/core/designsystem/component/LongBarActionKt;
+
+# ── Jetpack Compose 运行时热路径（首帧组合必走）───────────────────
+Landroidx/compose/runtime/Recomposer;
+Landroidx/compose/runtime/ComposerImpl;
+Landroidx/compose/runtime/SlotTable;
+Landroidx/compose/ui/platform/AndroidCompositionLocals_androidKt;
+Landroidx/navigation/compose/NavHostKt;
+
+# ── Hilt 生成的图根（框架类，类名固定）───────────────────────────
+Ldagger/hilt/android/internal/managers/ActivityComponentManager;
+Ldagger/hilt/android/internal/managers/ApplicationComponentManager;
