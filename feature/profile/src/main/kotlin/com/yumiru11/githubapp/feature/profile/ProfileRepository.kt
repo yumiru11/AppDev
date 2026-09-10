@@ -58,8 +58,7 @@ class ProfileRepository
          * withTimeout 会在真实网络挂起时被虚拟时间"立刻"触发，让所有基于 runTest 的资料头测试
          * 拿到 null（本 PR 实测踩到）。
          */
-        private suspend fun starredCountOrNull(login: String?): Int? =
-            runCatching { probeStarredCount(login) }.getOrNull()
+        private suspend fun starredCountOrNull(login: String?): Int? = runCatching { probeStarredCount(login) }.getOrNull()
 
         private suspend fun probeStarredCount(login: String?): Int? {
             val response =
@@ -121,10 +120,10 @@ class ProfileRepository
 
         private companion object {
             /** HTTP 204 No Content：GitHub 关注类端点的成功/已关注码 */
+            const val HTTP_NO_CONTENT = 204
+
             /** Star 总数探测用 per_page=1：Link 头的 last page 即总数，无需拉数据 */
             const val COUNT_PROBE_PER_PAGE = 1
-
-            const val HTTP_NO_CONTENT = 204
 
             /** HTTP 404 Not Found：/user/following/{u} 的「未关注」语义 */
             const val HTTP_NOT_FOUND = 404
