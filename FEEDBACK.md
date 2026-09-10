@@ -32,7 +32,7 @@
 | 14 | 顶部栏到系统通知栏留出距离 | 分区重构 Scaffold 双重 insets | ✅ 已修复（contentWindowInsets 归零）|
 | 15 | 通知全部显示出错（登录正常） | 401/403 无分类 → UNKNOWN 误导文案 | ✅ 已修复（UNAUTHORIZED 分类）|
 | 16 | 设置页进入后变浅色（跟随系统时） | SettingsScreen 调 resolveEffectiveThemeMode 未传 systemDark | ✅ 已修复 |
-| 17 | 毛玻璃效果仅模糊顶/底栏，非预期 | 旧实现 `Modifier.blur` 糊的是栏自身内容；且常驻头部把列表视口推出玻璃矩形（#83 查到的几何根因）| 🟢 已修并合入 main（#83 / PR #108 / 8bcaec6）：Haze backdrop + 分区条入玻璃头 + 内容 full-bleed + 长条按钮随 feed 滚动。**待你在真机按 PR 验收卡第 4-9 条正式复测穿越感**，通过后回写本行为 ✅ 并手动关 #83 |
+| 17 | 毛玻璃效果仅模糊顶/底栏，非预期 | 旧实现 `Modifier.blur` 糊的是栏自身内容；且常驻头部把列表视口推出玻璃矩形（#83 查到的几何根因）| ✅ 已修并合入 main（#83 / PR #108 / 8bcaec6）：Haze backdrop + 分区条入玻璃头 + 内容 full-bleed + 长条按钮随 feed 滚动。**真机穿越感复测项**顺延到 #167（玻璃逐项开关 + BottomSheet 玻璃点位）；#83 已按「代码合入即视为完成」口径关闭，真机复测若体感不达预期请重开 #83 |
 
 ---
 
