@@ -36,4 +36,8 @@
     <string name="repo_picker_empty">No repositories found</string>
     <string name="repo_picker_error">Couldn\'t load repositories</string>
     <string name="repo_picker_retry">Retry</string>
+
+    <!-- Trending feed section (L08, ui-design.md §2.2/§2.5) -->
+    <string name="home_trending_title">Trending</string>
+    <string name="home_trending_stars_cd">Stars</string>
 </resources>

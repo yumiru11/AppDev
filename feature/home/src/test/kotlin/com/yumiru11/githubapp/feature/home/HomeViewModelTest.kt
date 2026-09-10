@@ -6,8 +6,10 @@ import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
 import com.yumiru11.githubapp.core.githubauth.token.SessionData
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.feature.home.data.FeedRepository
+import com.yumiru11.githubapp.feature.home.data.TrendRepository
 import com.yumiru11.githubapp.feature.home.model.FeedEventType
 import com.yumiru11.githubapp.feature.home.model.FeedItem
+import com.yumiru11.githubapp.feature.home.model.TrendItem
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -28,7 +30,8 @@ import kotlin.test.assertIs
 /**
  * HomeViewModel 单测（纯 JVM，MockK 桩 Repository 与 T4 OAuthSessionManager）。
  *
- * 覆盖：登录态（SignedIn/PAT/Anonymous）→ UiState、login 获取失败 → Error、retry 恢复。
+ * 覆盖：登录态（SignedIn/PAT/Anonymous）→ UiState、login 获取失败 → Error、retry 恢复、
+ * Trending 小节（L08）随登录态加载/静默为空。
  */
 class HomeViewModelTest {
     @get:Rule
@@ -45,11 +48,38 @@ class HomeViewModelTest {
             every { feed(any()) } returns flowOf(PagingData.empty())
         }
 
+    private fun trendItem(): TrendItem =
+        TrendItem(
+            fullName = "octocat/Hello-World",
+            description = "My first repository",
+            language = "Kotlin",
+            stars = 1_234,
+            forks = 56,
+            url = "https://github.com/octocat/Hello-World",
+        )
+
+    private fun trendRepository(items: List<TrendItem> = emptyList()): TrendRepository =
+        mockk<TrendRepository> {
+            coEvery { trending(any()) } returns items
+        }
+
+    /** 装配入口：Trending 仓库默认桩为空列表（本节测试不关心 Trending 时零噪音） */
+    private fun homeViewModel(
+        feed: FeedRepository,
+        session: OAuthSessionManager,
+        trend: TrendRepository = trendRepository(),
+    ): HomeViewModel =
+        HomeViewModel(
+            feedRepository = feed,
+            trendRepository = trend,
+            sessionManager = session,
+        )
+
     @Test
     fun load_signedIn_emitsSuccess() =
         runTest {
             val viewModel =
-                HomeViewModel(
+                homeViewModel(
                     repository(),
                     sessionManager(AuthState.SignedIn(SessionData(accessToken = "tok"))),
                 )
@@ -60,7 +90,7 @@ class HomeViewModelTest {
     @Test
     fun load_patMode_emitsSuccess() =
         runTest {
-            val viewModel = HomeViewModel(repository(), sessionManager(AuthState.PAT))
+            val viewModel = homeViewModel(repository(), sessionManager(AuthState.PAT))
 
             assertTrue(viewModel.uiState.value is HomeUiState.Success)
         }
@@ -68,7 +98,7 @@ class HomeViewModelTest {
     @Test
     fun load_anonymous_emitsUnauthenticated() =
         runTest {
-            val viewModel = HomeViewModel(repository(), sessionManager(AuthState.Anonymous))
+            val viewModel = homeViewModel(repository(), sessionManager(AuthState.Anonymous))
 
             assertEquals(HomeUiState.Unauthenticated, viewModel.uiState.value)
         }
@@ -82,7 +112,7 @@ class HomeViewModelTest {
                 }
 
             val viewModel =
-                HomeViewModel(
+                homeViewModel(
                     repo,
                     sessionManager(AuthState.SignedIn(SessionData(accessToken = "tok"))),
                 )
@@ -99,7 +129,7 @@ class HomeViewModelTest {
                 }
 
             val viewModel =
-                HomeViewModel(
+                homeViewModel(
                     repo,
                     sessionManager(AuthState.SignedIn(SessionData(accessToken = "tok"))),
                 )
@@ -115,7 +145,7 @@ class HomeViewModelTest {
                     coEvery { currentLogin() } throws IOException("network down")
                 }
             val viewModel =
-                HomeViewModel(
+                homeViewModel(
                     repo,
                     sessionManager(AuthState.SignedIn(SessionData(accessToken = "tok"))),
                 )
@@ -133,7 +163,7 @@ class HomeViewModelTest {
         runTest {
             val repo = repository()
             val viewModel =
-                HomeViewModel(
+                homeViewModel(
                     repo,
                     sessionManager(AuthState.SignedIn(SessionData(accessToken = "tok"))),
                 )
@@ -154,7 +184,7 @@ class HomeViewModelTest {
                 }
 
             val viewModel =
-                HomeViewModel(
+                homeViewModel(
                     repo,
                     sessionManager(AuthState.SignedIn(SessionData(accessToken = "tok"))),
                 )
@@ -177,7 +207,7 @@ class HomeViewModelTest {
                 }
 
             val viewModel =
-                HomeViewModel(
+                homeViewModel(
                     repo,
                     sessionManager(AuthState.SignedIn(SessionData(accessToken = "tok"))),
                 )
@@ -196,7 +226,7 @@ class HomeViewModelTest {
                 }
 
             val viewModel =
-                HomeViewModel(
+                homeViewModel(
                     repo,
                     sessionManager(AuthState.SignedIn(SessionData(accessToken = "tok"))),
                 )
@@ -215,7 +245,7 @@ class HomeViewModelTest {
                 }
 
             val viewModel =
-                HomeViewModel(
+                homeViewModel(
                     repo,
                     sessionManager(AuthState.SignedIn(SessionData(accessToken = "tok"))),
                 )
@@ -232,7 +262,7 @@ class HomeViewModelTest {
                     every { feed(any()) } returns flowOf(PagingData.empty())
                 }
             val viewModel =
-                HomeViewModel(
+                homeViewModel(
                     repo,
                     sessionManager(AuthState.SignedIn(SessionData(accessToken = "tok"))),
                 )
@@ -268,7 +298,7 @@ class HomeViewModelTest {
                 }
 
             val viewModel =
-                HomeViewModel(
+                homeViewModel(
                     repo,
                     sessionManager(AuthState.SignedIn(SessionData(accessToken = "tok"))),
                 )
@@ -286,7 +316,7 @@ class HomeViewModelTest {
                 mockk<OAuthSessionManager> {
                     every { authState } returns authFlow
                 }
-            val viewModel = HomeViewModel(repository(), session)
+            val viewModel = homeViewModel(repository(), session)
             assertTrue(viewModel.uiState.value is HomeUiState.Success)
 
             // 运行期登出（token 失效/用户退出）→ 立即回到未登录态
@@ -303,7 +333,7 @@ class HomeViewModelTest {
                 mockk<OAuthSessionManager> {
                     every { authState } returns authFlow
                 }
-            val viewModel = HomeViewModel(repository(), session)
+            val viewModel = homeViewModel(repository(), session)
             assertEquals(HomeUiState.Unauthenticated, viewModel.uiState.value)
 
             // 运行期登录 → 自动加载动态流
@@ -313,10 +343,39 @@ class HomeViewModelTest {
         }
 
     @Test
+    fun load_signedIn_populatesTrendingStateFlow() =
+        runTest {
+            val trend = trendItem()
+            val viewModel =
+                homeViewModel(
+                    repository(),
+                    sessionManager(AuthState.SignedIn(SessionData(accessToken = "tok"))),
+                    trendRepository(listOf(trend)),
+                )
+
+            // Trending 与 feed 同源加载，但走独立 StateFlow（不进 UiState 状态机）
+            assertEquals(listOf(trend), viewModel.trending.value)
+        }
+
+    @Test
+    fun load_anonymous_keepsTrendingEmpty() =
+        runTest {
+            val viewModel =
+                homeViewModel(
+                    repository(),
+                    sessionManager(AuthState.Anonymous),
+                    trendRepository(listOf(trendItem())),
+                )
+
+            assertEquals(HomeUiState.Unauthenticated, viewModel.uiState.value)
+            assertTrue(viewModel.trending.value.isEmpty())
+        }
+
+    @Test
     fun retry_whenUnauthenticated_doesNotLoad() =
         runTest {
             val repo = repository()
-            val viewModel = HomeViewModel(repo, sessionManager(AuthState.Anonymous))
+            val viewModel = homeViewModel(repo, sessionManager(AuthState.Anonymous))
             assertEquals(HomeUiState.Unauthenticated, viewModel.uiState.value)
 
             viewModel.retry()

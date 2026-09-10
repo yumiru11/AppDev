@@ -61,6 +61,7 @@ import com.yumiru11.githubapp.feature.issue.CreateIssueScreen
 import com.yumiru11.githubapp.feature.issue.IssueDetailScreen
 import com.yumiru11.githubapp.feature.issue.IssueListScreen
 import com.yumiru11.githubapp.feature.notifications.ui.NotificationsPanel
+import com.yumiru11.githubapp.feature.profile.GistsScreen
 import com.yumiru11.githubapp.feature.profile.ProfileScreen
 import com.yumiru11.githubapp.feature.pullrequest.PullRequestDetailScreen
 import com.yumiru11.githubapp.feature.pullrequest.PullRequestListScreen
@@ -206,6 +207,9 @@ class MainActivity : ComponentActivity() {
                                                     navController.navigate(AppRoute.User(login))
                                                 },
                                                 onSettingsClick = { navController.navigate(AppRoute.Settings) },
+                                                onOpenGists = { login ->
+                                                    navController.navigate(AppRoute.Gists(login))
+                                                },
                                                 bottomContentPadding = padding.calculateBottomPadding(),
                                             )
                                         },
@@ -250,7 +254,10 @@ class MainActivity : ComponentActivity() {
                                         },
                                     )
                                 },
-                                profileScreen = { onLoginClick: () -> Unit, onSettingsClick: () -> Unit ->
+                                // L10 他人主页（USER 路由）：只读资料头 + Follow/Unfollow；
+                                // 路由参数 login 由 Navigation 写入 SavedStateHandle，
+                                // ProfileScreen 经 ProfileViewModel 读取，无需在此透传
+                                profileScreen = { onLoginClick: () -> Unit, onBackClick: () -> Unit ->
                                     ProfileScreen(
                                         onLoginClick = onLoginClick,
                                         onOpenRepository = { owner, repo ->
@@ -260,6 +267,15 @@ class MainActivity : ComponentActivity() {
                                             navController.navigate(AppRoute.User(login))
                                         },
                                         onSettingsClick = { navController.navigate(AppRoute.Settings) },
+                                        onBackClick = onBackClick,
+                                        onOpenGists = { login -> navController.navigate(AppRoute.Gists(login)) },
+                                    )
+                                },
+                                // L11 Gists 列表页：条目点击 → Chrome Custom Tabs（v1 不做详情渲染）
+                                gistsScreen = { _, onBackClick ->
+                                    GistsScreen(
+                                        onBackClick = onBackClick,
+                                        onOpenExternal = { url -> openExternalBrowser(context, url) },
                                     )
                                 },
                                 settingsScreen = {

@@ -2,7 +2,10 @@ package com.yumiru11.githubapp.core.githubrest.api
 
 import com.yumiru11.githubapp.core.githubrest.model.RepositoryDto
 import com.yumiru11.githubapp.core.githubrest.model.UserDto
+import retrofit2.Response
+import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -81,4 +84,28 @@ interface UserApi {
         @Query("per_page") perPage: Int,
         @Query("page") page: Int,
     ): List<UserDto>
+
+    // ── 关注写操作（L10 他人主页）─────────────────────────────────────────────
+    //
+    // 三端点用 retrofit2.Response 承接状态码而非直接返回 Unit：GitHub 把
+    // 「是否已关注」编码在状态码里（**204 = 已关注 / 404 = 未关注**），
+    // 直接返回 Unit 会让 404 变成 HttpException，把正常语义当异常吞掉。
+
+    /** GET /user/following/{username}：当前用户是否关注了该用户（204 = 已关注，404 = 未关注） */
+    @GET("user/following/{username}")
+    suspend fun isFollowing(
+        @Path("username") username: String,
+    ): Response<Unit>
+
+    /** PUT /user/following/{username}：关注（204 = 成功） */
+    @PUT("user/following/{username}")
+    suspend fun follow(
+        @Path("username") username: String,
+    ): Response<Unit>
+
+    /** DELETE /user/following/{username}：取关（204 = 成功） */
+    @DELETE("user/following/{username}")
+    suspend fun unfollow(
+        @Path("username") username: String,
+    ): Response<Unit>
 }

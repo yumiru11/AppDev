@@ -22,12 +22,18 @@ import retrofit2.http.Query
  * 每仓库最多展示前 100 个匹配文件。
  */
 interface SearchApi {
-    /** GET /search/repositories：仓库搜索 */
+    /**
+     * GET /search/repositories：仓库搜索。
+     *
+     * [sort] 为可选排序字段（GitHub 参数是独立 query，不写在 q 里；null 时不下发，
+     * 默认 best match）。L08 Trending 回退路用 `sort=stars`。
+     */
     @GET("search/repositories")
     suspend fun searchRepositories(
         @Query("q") query: String,
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int = 30,
+        @Query("sort") sort: String? = null,
     ): SearchRepositoriesResponse
 
     /** GET /search/users：用户搜索 */

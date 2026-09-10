@@ -7,6 +7,7 @@ import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.feature.notifications.data.NotificationRepository
 import com.yumiru11.githubapp.feature.notifications.model.NotificationFilter
 import com.yumiru11.githubapp.feature.notifications.model.NotificationItem
+import com.yumiru11.githubapp.feature.notifications.model.NotificationSortOrder
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -24,7 +25,8 @@ import java.io.IOException
  * NotificationsPanelViewModel 单测（纯 JVM，MockK 桩 Repository 与 OAuthSessionManager）。
  *
  * 覆盖：登录态驱动加载、分组快照排序、过滤切换重拉、折叠切换、乐观已读（单条/全部）、
- * 乐观删除（组空整组消失）与失败重拉对齐、错误分类映射（401/403 → UNAUTHORIZED 等）。
+ * 乐观删除（组空整组消失）与失败重拉对齐、错误分类映射（401/403 → UNAUTHORIZED 等）、
+ * L12 组内时间排序切换（立即重排且不重拉快照）。
  */
 class NotificationsPanelViewModelTest {
     @get:Rule
@@ -84,6 +86,66 @@ class NotificationsPanelViewModelTest {
             state as NotificationsPanelUiState.Success
             assertEquals(listOf("a/A", "b/B"), state.groups.map { it.repoFullName })
             assertEquals(listOf("3", "1"), state.groups[0].items.map { it.id })
+        }
+
+    @Test
+    fun selectSortOrder_oldestFirst_reordersGroupsImmediatelyWithoutRefetch() =
+        runTest {
+            val repo =
+                repository(
+                    listOf(
+                        item("1", repo = "a/A", updatedAt = "2026-08-01T10:00:00Z"),
+                        item("2", repo = "b/B", updatedAt = "2026-08-02T10:00:00Z"),
+                        item("3", repo = "a/A", updatedAt = "2026-08-03T10:00:00Z"),
+                    ),
+                )
+            val model = viewModel(repo)
+            assertEquals(NotificationSortOrder.NEWEST_FIRST, model.sortOrder.value)
+
+            model.selectSortOrder(NotificationSortOrder.OLDEST_FIRST)
+
+            assertEquals(NotificationSortOrder.OLDEST_FIRST, model.sortOrder.value)
+            val state = model.uiState.value as NotificationsPanelUiState.Success
+            // 组间按「组内最旧一条」正序：a/A 最旧 08-01 < b/B 08-02 → a/A 在前
+            assertEquals(listOf("a/A", "b/B"), state.groups.map { it.repoFullName })
+            assertEquals(listOf("1", "3"), state.groups[0].items.map { it.id })
+            // 排序是纯内存态：不重拉快照
+            coVerify(exactly = 1) { repo.latest(any()) }
+        }
+
+    @Test
+    fun selectSortOrder_switchBackToNewestFirst_restoresDescendingOrder() =
+        runTest {
+            val model =
+                viewModel(
+                    repository(
+                        listOf(
+                            item("1", repo = "a/A", updatedAt = "2026-08-01T10:00:00Z"),
+                            item("3", repo = "a/A", updatedAt = "2026-08-03T10:00:00Z"),
+                        ),
+                    ),
+                )
+
+            model.selectSortOrder(NotificationSortOrder.OLDEST_FIRST)
+            model.selectSortOrder(NotificationSortOrder.NEWEST_FIRST)
+
+            val state = model.uiState.value as NotificationsPanelUiState.Success
+            assertEquals(listOf("3", "1"), state.groups[0].items.map { it.id })
+        }
+
+    @Test
+    fun selectSortOrder_preservesCollapsedGroups() =
+        runTest {
+            val model = viewModel(repository(listOf(item("1", repo = "a/A"), item("2", repo = "b/B"))))
+            model.toggleGroup("a/A")
+
+            model.selectSortOrder(NotificationSortOrder.OLDEST_FIRST)
+
+            // 与过滤切换不同：排序切换是同一视图的呈现变化，保留折叠态
+            assertEquals(
+                setOf("a/A"),
+                (model.uiState.value as NotificationsPanelUiState.Success).collapsedRepos,
+            )
         }
 
     @Test

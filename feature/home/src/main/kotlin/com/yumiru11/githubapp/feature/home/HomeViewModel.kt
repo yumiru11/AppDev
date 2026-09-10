@@ -9,6 +9,8 @@ import androidx.paging.cachedIn
 import com.yumiru11.githubapp.core.githubauth.auth.AuthState
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
 import com.yumiru11.githubapp.feature.home.data.FeedRepository
+import com.yumiru11.githubapp.feature.home.data.TrendRepository
+import com.yumiru11.githubapp.feature.home.model.TrendItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,16 +28,22 @@ import javax.inject.Inject
  * - 加载流程：先取当前用户 login（GET /user），再构造 received_events 分页流
  *   （login 获取失败 → Error 态；分页加载错误由 UI 层 loadState 呈现）
  * - 下拉刷新在 UI 层走 LazyPagingItems.refresh()，不经 VM
+ * - Trending（L08）：独立 StateFlow；数据层永不抛出，失败即空列表 → UI 静默隐藏小节
  */
 @HiltViewModel
 class HomeViewModel
     @Inject
     constructor(
         private val feedRepository: FeedRepository,
+        private val trendRepository: TrendRepository,
         private val sessionManager: OAuthSessionManager,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
         val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+        /** feed 尾部 Trending 小节数据（L08）：空列表 = 静默隐藏（不展示错误块） */
+        private val _trending = MutableStateFlow<List<TrendItem>>(emptyList())
+        val trending: StateFlow<List<TrendItem>> = _trending.asStateFlow()
 
         init {
             viewModelScope.launch {
@@ -66,11 +74,24 @@ class HomeViewModel
                 try {
                     val login = feedRepository.currentLogin()
                     _uiState.value = HomeUiState.Success(feed = feedRepository.feed(login).cachedIn(viewModelScope))
+                    loadTrending()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     _uiState.value = HomeUiState.Error(errorType = mapError(e))
                 }
+            }
+        }
+
+        /**
+         * Trending 小节独立加载（L08）：不参与 feed 状态机。
+         *
+         * 数据层契约「永不抛出」，故失败静默为已有值（首轮失败 = 空列表 → 小节不渲染），
+         * 绝不把首页推进 Error 态（加分内容不得打断 feed）。
+         */
+        private fun loadTrending() {
+            viewModelScope.launch {
+                _trending.value = trendRepository.trending()
             }
         }
 

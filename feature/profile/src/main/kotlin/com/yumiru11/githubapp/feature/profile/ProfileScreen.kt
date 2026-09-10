@@ -19,23 +19,31 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -63,10 +71,14 @@ import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.ui.sharedTransitionElement
 
 /**
- * 个人主页（T20）。
+ * 个人主页（T20；L10 起兼作他人主页）。
  *
+ * - **模式**：路由参数 login 决定——PROFILE 路由（无参）＝本人主页，保留设置入口；
+ *   USER 路由（带 login）＝他人主页，只读资料头 + Follow/Unfollow（乐观更新 + 失败回滚 + Snackbar），
+ *   顶栏给返回按钮、隐藏设置入口（[onBackClick] 非空即为他人主页语境）
  * - 未登录（Anonymous）→ 登录引导（onLoginClick 由宿主接线到 LOGIN 路由）
- * - 已登录 → 资料头（头像/昵称/简介/统计）+ 四 Tab 列表（Repos/Starred/Followers/Following，Paging 3 分页）
+ * - 已登录 → 资料头（头像/昵称/简介/统计）+ 入口列表（Gists，L11）+ 四 Tab 列表
+ *   （Repos/Starred/Followers/Following，Paging 3 分页）
  * - 空态/错态/加载态齐全；全部文案 stringResource（en + zh-rCN）
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,23 +88,61 @@ fun ProfileScreen(
     onOpenRepository: (owner: String, repo: String) -> Unit = { _, _ -> },
     onOpenUser: (login: String) -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    /** 他人主页（USER 路由）传入返回动作；null = 本人主页（底栏 Tab，无返回） */
+    onBackClick: (() -> Unit)? = null,
+    /** Gists 入口（L11）：参数为该主页用户的 login */
+    onOpenGists: (login: String) -> Unit = {},
     /** 底栏玻璃总高（MainTabPager 传入）：作为列表 contentPadding，让内容滚进玻璃背后 */
     bottomContentPadding: Dp = 0.dp,
     modifier: Modifier = Modifier,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val success = uiState as? ProfileUiState.Success
+    val isOtherUser = success != null && !success.isSelf
+    val snackbarHostState = remember { SnackbarHostState() }
+    val followFailedMessage = stringResource(R.string.profile_follow_failed)
+
+    // 关注失败事件 → Snackbar（回滚由 ViewModel 完成，UI 只负责告知）
+    LaunchedEffect(followFailedMessage) {
+        viewModel.events.collect { event ->
+            when (event) {
+                ProfileEvent.FollowActionFailed -> snackbarHostState.showSnackbar(followFailedMessage)
+            }
+        }
+    }
 
     Scaffold(
         modifier = modifier,
         // 内容延伸到底栏玻璃背后（Haze source 需真实像素 + 消除栏上方空带）
         contentWindowInsets = WindowInsets(0.dp),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.profile_title)) },
+                title = {
+                    if (isOtherUser && success != null) {
+                        Text(text = "@${success.user.login}")
+                    } else {
+                        Text(text = stringResource(R.string.profile_title))
+                    }
+                },
+                navigationIcon = {
+                    if (onBackClick != null) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.profile_back),
+                            )
+                        }
+                    }
+                },
                 actions = {
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.profile_settings))
+                    // 设置入口只属于本人主页（底栏分区页）：按路由语境判定而非资料头状态，
+                    // 他人主页在加载/错误/未登录态下同样不出现写入口
+                    if (onBackClick == null) {
+                        IconButton(onClick = onSettingsClick) {
+                            Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.profile_settings))
+                        }
                     }
                 },
             )
@@ -122,10 +172,11 @@ fun ProfileScreen(
 
                 is ProfileUiState.Success -> {
                     ProfileContent(
-                        user = state.user,
+                        state = state,
                         viewModel = viewModel,
                         onOpenRepository = onOpenRepository,
                         onOpenUser = onOpenUser,
+                        onOpenGists = onOpenGists,
                         bottomContentPadding = bottomContentPadding,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -140,13 +191,15 @@ fun ProfileScreen(
  */
 @Composable
 private fun ProfileContent(
-    user: User,
+    state: ProfileUiState.Success,
     viewModel: ProfileViewModel,
     onOpenRepository: (owner: String, repo: String) -> Unit,
     onOpenUser: (login: String) -> Unit,
+    onOpenGists: (login: String) -> Unit,
     bottomContentPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
+    val user = state.user
     var selectedTab by rememberSaveable { mutableStateOf(ProfileTab.REPOSITORIES) }
     // 四列表各自独立收集（cachedIn 共享缓存，切换 Tab 不重复请求）
     val repositories = viewModel.repositories.collectAsLazyPagingItems()
@@ -158,7 +211,18 @@ private fun ProfileContent(
         modifier = modifier,
         contentPadding = PaddingValues(bottom = bottomContentPadding),
     ) {
-        item(key = "header") { ProfileHeader(user) }
+        item(key = "header") {
+            ProfileHeader(
+                user = user,
+                isSelf = state.isSelf,
+                isFollowing = state.isFollowing,
+                onToggleFollow = viewModel::toggleFollow,
+            )
+        }
+        item(key = "entries") {
+            // 入口列表（ui-design §3.5）：Gists（L11）；Bookmarks/关于属后续版本
+            ProfileEntries(onOpenGists = { onOpenGists(user.login) })
+        }
         item(key = "tabs") {
             ProfileTabs(
                 selectedTab = selectedTab,
@@ -174,9 +238,19 @@ private fun ProfileContent(
     }
 }
 
-/** 资料头：头像/昵称/@login/简介/统计（仓库数/关注者/关注中；REST /user 无 Starred 计数） */
+/**
+ * 资料头：头像/昵称/@login/简介/统计（仓库数/关注者/关注中；REST /user 无 Starred 计数）。
+ *
+ * 他人主页（[isSelf] = false）在统计行下方补 Follow/Unfollow 按钮（L10）：
+ * 文案随 [isFollowing] 切换，点击交给 ViewModel 乐观更新。
+ */
 @Composable
-private fun ProfileHeader(user: User) {
+private fun ProfileHeader(
+    user: User,
+    isSelf: Boolean,
+    isFollowing: Boolean,
+    onToggleFollow: () -> Unit,
+) {
     Column(
         modifier =
             Modifier
@@ -222,6 +296,47 @@ private fun ProfileHeader(user: User) {
             Spacer(modifier = Modifier.width(24.dp))
             StatItem(text = stringResource(R.string.profile_stats_following, user.following))
         }
+        if (!isSelf) {
+            Spacer(modifier = Modifier.height(16.dp))
+            FilledTonalButton(onClick = onToggleFollow) {
+                Text(
+                    text =
+                        stringResource(
+                            if (isFollowing) R.string.profile_unfollow else R.string.profile_follow,
+                        ),
+                )
+            }
+        }
+    }
+}
+
+/** 入口列表（ui-design §3.5）：Gists（L11）——ListItem + 前置 Octicons + 尾随指示箭头 */
+@Composable
+private fun ProfileEntries(onOpenGists: () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ListItem(
+            headlineContent = { Text(text = stringResource(R.string.profile_gists_entry)) },
+            leadingContent = {
+                Icon(
+                    imageVector = AppDevOcticons.File,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            trailingContent = {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+            modifier =
+                Modifier.clickable(
+                    onClickLabel = stringResource(R.string.profile_gists_entry),
+                    onClick = onOpenGists,
+                ),
+        )
+        HorizontalDivider()
     }
 }
 

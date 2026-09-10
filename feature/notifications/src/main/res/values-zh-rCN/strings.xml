@@ -37,4 +37,9 @@
     <string name="notification_state_unread">未读</string>
     <string name="notification_state_read">已读</string>
     <string name="notification_unread_count">%1$d 条未读</string>
+
+    <!-- L12：组内时间排序切换（ui-design.md §3.4 A3-2） -->
+    <string name="notification_sort_cd">按时间排序通知</string>
+    <string name="notification_sort_newest">最新</string>
+    <string name="notification_sort_oldest">最早</string>
 </resources>

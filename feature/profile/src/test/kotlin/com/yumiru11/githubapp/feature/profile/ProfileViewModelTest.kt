@@ -11,7 +11,9 @@ import com.yumiru11.githubapp.core.testing.fake.GitHubFakes
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.runs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceTimeBy
@@ -30,7 +32,8 @@ import java.io.IOException
  * ProfileViewModel 单测（纯 JVM，MockK 桩 ProfileRepository + OAuthSessionManager.authState）。
  *
  * 覆盖：未登录 → Anonymous；SignedIn/PAT → Success；错误映射（404/网络/未知）；
- * retry 重载；未登录 → 已登录状态迁移重载；USER 路由 login 参数透传。
+ * retry 重载；未登录 → 已登录状态迁移重载；USER 路由 login 参数透传；
+ * L10 self/other 分支、关注态查询降级、toggleFollow 乐观更新 + 失败回滚 + 事件提示。
  */
 class ProfileViewModelTest {
     @get:Rule
@@ -249,6 +252,142 @@ class ProfileViewModelTest {
 
             assertEquals("second", (viewModel.uiState.value as ProfileUiState.Success).user.login)
             coVerify(exactly = 2) { repository.getProfile(login = null) }
+        }
+
+    // ── L10 他人主页：self/other 分支 + 关注写操作 ─────────────────────────────
+
+    private fun otherUserViewModel(
+        repository: ProfileRepository,
+        login: String = "torvalds",
+    ): ProfileViewModel = viewModel(repository, signedInState(), SavedStateHandle(mapOf("login" to login)))
+
+    @Test
+    fun init_selfRoute_marksSelfAndNeverQueriesFollowState() =
+        runTest {
+            val repository =
+                mockk<ProfileRepository> {
+                    coEvery { getProfile(login = null) } returns fakeUserWithStats()
+                }
+
+            val model = viewModel(repository, signedInState())
+
+            val success = model.uiState.value as ProfileUiState.Success
+            assertTrue(model.isSelf)
+            assertTrue(success.isSelf)
+            assertEquals(false, success.isFollowing)
+            coVerify(exactly = 0) { repository.isFollowing(any()) }
+        }
+
+    @Test
+    fun init_otherUserRoute_marksOtherAndLoadsFollowState() =
+        runTest {
+            val repository =
+                mockk<ProfileRepository> {
+                    coEvery { getProfile(login = "torvalds") } returns GitHubFakes.fakeUser(login = "torvalds")
+                    coEvery { isFollowing("torvalds") } returns true
+                }
+
+            val model = otherUserViewModel(repository)
+
+            val success = model.uiState.value as ProfileUiState.Success
+            assertEquals(false, model.isSelf)
+            assertEquals(false, success.isSelf)
+            assertTrue(success.isFollowing)
+        }
+
+    @Test
+    fun init_otherUserFollowQueryFails_degradesToNotFollowingWithoutPageError() =
+        runTest {
+            val repository =
+                mockk<ProfileRepository> {
+                    coEvery { getProfile(login = "torvalds") } returns GitHubFakes.fakeUser(login = "torvalds")
+                    coEvery { isFollowing("torvalds") } throws httpException(403)
+                }
+
+            val model = otherUserViewModel(repository)
+
+            // 资料头已拿到：关注态查询失败只降级按钮文案，不把整页打成 Error
+            val success = model.uiState.value as ProfileUiState.Success
+            assertEquals(false, success.isFollowing)
+        }
+
+    @Test
+    fun toggleFollow_otherUserNotFollowing_optimisticallyFollowsAndBumpsFollowers() =
+        runTest {
+            val repository =
+                mockk<ProfileRepository> {
+                    coEvery { getProfile(login = "torvalds") } returns
+                        GitHubFakes.fakeUser(login = "torvalds").copy(followers = 10)
+                    coEvery { isFollowing("torvalds") } returns false
+                    coEvery { follow("torvalds") } just runs
+                }
+            val model = otherUserViewModel(repository)
+
+            model.toggleFollow()
+
+            val success = model.uiState.value as ProfileUiState.Success
+            assertTrue(success.isFollowing)
+            assertEquals(11, success.user.followers)
+            coVerify(exactly = 1) { repository.follow("torvalds") }
+        }
+
+    @Test
+    fun toggleFollow_otherUserAlreadyFollowing_optimisticallyUnfollowsAndDecrementsFollowers() =
+        runTest {
+            val repository =
+                mockk<ProfileRepository> {
+                    coEvery { getProfile(login = "torvalds") } returns
+                        GitHubFakes.fakeUser(login = "torvalds").copy(followers = 10)
+                    coEvery { isFollowing("torvalds") } returns true
+                    coEvery { unfollow("torvalds") } just runs
+                }
+            val model = otherUserViewModel(repository)
+
+            model.toggleFollow()
+
+            val success = model.uiState.value as ProfileUiState.Success
+            assertEquals(false, success.isFollowing)
+            assertEquals(9, success.user.followers)
+            coVerify(exactly = 1) { repository.unfollow("torvalds") }
+        }
+
+    @Test
+    fun toggleFollow_followFails_rollsBackAndEmitsFailureEvent() =
+        runTest {
+            val repository =
+                mockk<ProfileRepository> {
+                    coEvery { getProfile(login = "torvalds") } returns
+                        GitHubFakes.fakeUser(login = "torvalds").copy(followers = 10)
+                    coEvery { isFollowing("torvalds") } returns false
+                    coEvery { follow("torvalds") } throws httpException(403)
+                }
+            val model = otherUserViewModel(repository)
+
+            model.events.test {
+                model.toggleFollow()
+
+                assertEquals(ProfileEvent.FollowActionFailed, awaitItem())
+            }
+
+            // 失败必须回滚到操作前快照（关注态 + 关注者数）
+            val success = model.uiState.value as ProfileUiState.Success
+            assertEquals(false, success.isFollowing)
+            assertEquals(10, success.user.followers)
+        }
+
+    @Test
+    fun toggleFollow_selfProfile_doesNotCallRepository() =
+        runTest {
+            val repository =
+                mockk<ProfileRepository> {
+                    coEvery { getProfile(login = null) } returns fakeUserWithStats()
+                }
+            val model = viewModel(repository, signedInState())
+
+            model.toggleFollow()
+
+            coVerify(exactly = 0) { repository.follow(any()) }
+            coVerify(exactly = 0) { repository.unfollow(any()) }
         }
 
     @Test

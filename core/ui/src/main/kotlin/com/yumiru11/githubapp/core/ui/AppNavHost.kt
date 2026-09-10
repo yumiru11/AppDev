@@ -46,7 +46,10 @@ import com.yumiru11.githubapp.core.ui.screens.SearchScreen as PlaceholderSearchS
  * - [repoDetailScreen]：仓库详情页 Composable（宿主注入，避免 core:ui 依赖 feature:repo）
  * - 通知自 #88 起为铃铛触发的覆盖面板（ui-design §3.4），不再有导航 destination
  * - [profileScreen]：个人主页 Composable（宿主注入，避免 core:ui 依赖 feature:profile；
- *   onLoginClick 由宿主接线到 LOGIN 路由）
+ *   onLoginClick 由宿主接线到 LOGIN 路由）。**只服务 USER 路由**（他人主页，L10）：
+ *   路由参数 login 由 Navigation 写入 SavedStateHandle，feature 侧 hiltViewModel 读取；
+ *   本人主页是底栏分区页（MainTabPager），不经本 NavHost
+ * - [gistsScreen]：Gists 列表页 Composable（宿主注入，避免 core:ui 依赖 feature:profile；L11）
  * - [settingsScreen]：设置页 Composable（宿主注入，避免 core:ui 依赖 feature:settings）
  * - [editorScreen]：Markdown 编辑器页 Composable（宿主注入，避免 core:ui 依赖 feature:editor；
  *   initialContent 由 [EditorContentHolder] 传递，onClose 由宿主接线返回）
@@ -62,7 +65,8 @@ fun AppNavHost(
     repoDetailScreen: @Composable (owner: String, repo: String, ref: String) -> Unit = { _, _, _ -> },
     blobScreen:
         @Composable (owner: String, repo: String, ref: String, path: String) -> Unit = { _, _, _, _ -> },
-    profileScreen: @Composable (onLoginClick: () -> Unit, onSettingsClick: () -> Unit) -> Unit = { _, _ -> },
+    profileScreen: @Composable (onLoginClick: () -> Unit, onBackClick: () -> Unit) -> Unit = { _, _ -> },
+    gistsScreen: @Composable (username: String, onBackClick: () -> Unit) -> Unit = { _, _ -> },
     settingsScreen: @Composable () -> Unit = {},
     issueListScreen: @Composable (
         owner: String,
@@ -252,11 +256,23 @@ fun AppNavHost(
                 }
 
                 composable<AppRoute.User> {
+                    // L10：他人主页（只读 + 关注按钮）。路由参数 login 由 Navigation 写入
+                    // 本 destination 的 SavedStateHandle，ProfileViewModel 经 hiltViewModel 读取，
+                    // 故这里不需要把 login 透传给屏幕（屏幕数据一律来自 VM）
                     provideNavTransitionScope {
                         profileScreen(
                             { navController.navigate(AppRoute.Login) },
-                            { navController.navigate(AppRoute.Settings) },
+                            { navController.popBackStack() },
                         )
+                    }
+                }
+
+                composable<AppRoute.Gists> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.Gists>()
+                    // L11：Gists 列表页（username 进 SavedStateHandle，GistsViewModel 读取；
+                    // 条目点击的外部打开由宿主接线，core:ui 不关心浏览器细节）
+                    provideNavTransitionScope {
+                        gistsScreen(route.username) { navController.popBackStack() }
                     }
                 }
 

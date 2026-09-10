@@ -15,6 +15,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +34,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -45,6 +47,9 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -64,6 +69,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -89,6 +95,7 @@ import com.yumiru11.githubapp.feature.notifications.R
 import com.yumiru11.githubapp.feature.notifications.model.NotificationFilter
 import com.yumiru11.githubapp.feature.notifications.model.NotificationGroup
 import com.yumiru11.githubapp.feature.notifications.model.NotificationItem
+import com.yumiru11.githubapp.feature.notifications.model.NotificationSortOrder
 import java.time.Instant
 import java.time.ZoneId
 
@@ -120,6 +127,7 @@ fun NotificationsPanel(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val filter by viewModel.filter.collectAsStateWithLifecycle()
+    val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
 
     BackHandler(enabled = visible) { onDismiss() }
 
@@ -162,9 +170,11 @@ fun NotificationsPanel(
                 NotificationsPanelContent(
                     uiState = uiState,
                     filter = filter,
+                    sortOrder = sortOrder,
                     onDismiss = onDismiss,
                     onMarkAllRead = viewModel::markAllRead,
                     onSelectFilter = viewModel::selectFilter,
+                    onSelectSortOrder = viewModel::selectSortOrder,
                     onToggleGroup = viewModel::toggleGroup,
                     onMarkRead = viewModel::markRead,
                     onDelete = viewModel::delete,
@@ -189,9 +199,11 @@ fun NotificationsPanel(
 fun NotificationsPanelContent(
     uiState: NotificationsPanelUiState,
     filter: NotificationFilter,
+    sortOrder: NotificationSortOrder,
     onDismiss: () -> Unit,
     onMarkAllRead: () -> Unit,
     onSelectFilter: (NotificationFilter) -> Unit,
+    onSelectSortOrder: (NotificationSortOrder) -> Unit,
     onToggleGroup: (String) -> Unit,
     onMarkRead: (NotificationItem) -> Unit,
     onDelete: (NotificationItem) -> Unit,
@@ -236,7 +248,12 @@ fun NotificationsPanelContent(
             }
         }
         AnimatedVisibility(visible = filtersExpanded) {
-            FilterChipsRow(selected = filter, onFilterSelected = onSelectFilter)
+            FilterAndSortRow(
+                selected = filter,
+                onFilterSelected = onSelectFilter,
+                sortOrder = sortOrder,
+                onSortOrderSelected = onSelectSortOrder,
+            )
         }
         Box(modifier = Modifier.weight(1f)) {
             when (val state = uiState) {
@@ -574,29 +591,65 @@ private fun eventIconFor(subjectType: String): ImageVector =
         else -> AppDevOcticons.Info
     }
 
-/** 过滤 chips 行（T19 三态迁移自旧通知页） */
+/**
+ * 过滤 chips 行 + 组内时间排序切换控件（T19 三态迁移自旧通知页；L12 右侧新增排序）。
+ *
+ * 窄屏防溢出：chips 区 `weight(1f)` + 横向滚动，排序控件恒在行尾可见
+ * （英文 "Newest/Oldest" 分段按钮较宽，与三个 chips 同排必然超宽）。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FilterChipsRow(
+private fun FilterAndSortRow(
     selected: NotificationFilter,
     onFilterSelected: (NotificationFilter) -> Unit,
+    sortOrder: NotificationSortOrder,
+    onSortOrderSelected: (NotificationSortOrder) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val sortDescription = stringResource(R.string.notification_sort_cd)
     Row(
         modifier =
             modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        NotificationFilter.entries.forEach { entry ->
-            FilterChip(
-                selected = entry == selected,
-                onClick = { onFilterSelected(entry) },
-                label = { Text(text = filterLabel(entry)) },
-            )
+        Row(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            NotificationFilter.entries.forEach { entry ->
+                FilterChip(
+                    selected = entry == selected,
+                    onClick = { onFilterSelected(entry) },
+                    label = { Text(text = filterLabel(entry)) },
+                )
+            }
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.semantics { contentDescription = sortDescription }) {
+            NotificationSortOrder.entries.forEachIndexed { index, entry ->
+                SegmentedButton(
+                    selected = entry == sortOrder,
+                    onClick = { onSortOrderSelected(entry) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = NotificationSortOrder.entries.size),
+                    label = { Text(text = sortOrderLabel(entry)) },
+                )
+            }
         }
     }
 }
+
+/** 排序枚举 → 本地化文案（ViewModel 只传枚举，不产英文） */
+@Composable
+private fun sortOrderLabel(order: NotificationSortOrder): String =
+    when (order) {
+        NotificationSortOrder.NEWEST_FIRST -> stringResource(R.string.notification_sort_newest)
+        NotificationSortOrder.OLDEST_FIRST -> stringResource(R.string.notification_sort_oldest)
+    }
 
 @Composable
 private fun filterLabel(filter: NotificationFilter): String =
