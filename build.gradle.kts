@@ -441,23 +441,33 @@ abstract class DiffCoverageCheck : DefaultTask() {
         }
 
         // 3) 逐文件比对新增行与覆盖集
+        //
+        // ★ #170 / D04 口径修正：只统计"可执行新增行"。原先把 KDoc/注释/空行/import/注解
+        // 也算进分母，导致"写文档 = 掉覆盖率"——实测某 PR 原始口径 24.5%、可执行行口径 80.4%，
+        // 门禁读数完全失真（且当时 threshold 语义还错，见任务注册处注释）。
+        // JaCoCo 的行覆盖只对可执行行有定义，非可执行行永远不会出现在报告里，必须排除。
         var totalAdded = 0
+        var rawAdded = 0
         var totalCovered = 0
         val uncoveredByFile = linkedMapOf<String, List<Int>>()
         val noReport = mutableListOf<String>()
         for (file in changedFiles) {
             val added = addedLines(file, base)
             if (added.isEmpty()) continue
-            totalAdded += added.size
+            rawAdded += added.size
+            val codeLines = added.filter { isExecutableLine(file, it) }
+            if (codeLines.isEmpty()) continue
+            totalAdded += codeLines.size
             val key = xmlKeyOf(file)
             val covered = key?.let { coveredByKey[it] } ?: emptySet()
-            val uncovered = added.filter { it !in covered }
-            totalCovered += added.size - uncovered.size
+            val uncovered = codeLines.filter { it !in covered }
+            totalCovered += codeLines.size - uncovered.size
             if (uncovered.isNotEmpty()) uncoveredByFile[file] = uncovered
             if (key == null || key !in coveredByKey) noReport += file
         }
+        logger.lifecycle("diffCoverageCheck: 新增 $rawAdded 行，其中可执行 $totalAdded 行（base=$base）")
         if (totalAdded == 0) {
-            logger.lifecycle("diffCoverageCheck: 变更文件无新增行（base=$base），通过")
+            logger.lifecycle("diffCoverageCheck: 无可执行新增行，通过")
             return
         }
 
@@ -532,6 +542,27 @@ abstract class DiffCoverageCheck : DefaultTask() {
         return added
     }
 
+    /**
+     * 该新增行是否"可执行"（计入覆盖率分母）。
+     *
+     * JaCoCo 只给可执行行打标；把注释/空行/import/纯注解/纯收尾括号算进分母会让
+     * 「写文档就掉覆盖率」。判据取保守白名单：非空、不以注释或 import/package/注解开头、
+     * 不是纯括号收尾行。
+     */
+    private fun isExecutableLine(
+        file: String,
+        lineNumber: Int,
+    ): Boolean {
+        val lines = sourceCache.getOrPut(file) { runCatching { File(file).readLines() }.getOrDefault(emptyList()) }
+        val text = lines.getOrNull(lineNumber - 1)?.trim() ?: return false
+        if (text.isEmpty()) return false
+        if (NON_CODE_PREFIXES.any { text.startsWith(it) }) return false
+        return !CLOSING_ONLY_PATTERN.matches(text)
+    }
+
+    /** 变更文件内容缓存（同一文件只读一次） */
+    private val sourceCache = mutableMapOf<String, List<String>>()
+
     /** "core/x/src/main/kotlin/com/foo/Bar.kt" → "com/foo/Bar.kt"（与 XML 的 package/sourcefile 对应） */
     private fun xmlKeyOf(file: String): String? {
         val idx = file.indexOf("/src/main/")
@@ -545,8 +576,17 @@ abstract class DiffCoverageCheck : DefaultTask() {
 
     companion object {
         private val HUNK_PATTERN = Regex("""^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@""")
+
+        /** 非可执行行前缀：注释块、单行注释、包/导入声明、注解 */
+        private val NON_CODE_PREFIXES = listOf("//", "/*", "*", "import ", "package ", "@")
+
+        /** 纯收尾括号行（"}", ");", "])," 等）：不承载可执行指令，JaCoCo 不为其打标 */
+        private val CLOSING_ONLY_PATTERN = Regex("""^[)\]},;]+$""")
     }
 }
+
+// 默认阈值（0..1）。-PdiffCoverageThreshold 同时接受 0..1 与 0..100 两种口径（见下方归一逻辑）
+val DEFAULT_DIFF_THRESHOLD = 0.80
 
 tasks.register<DiffCoverageCheck>("diffCoverageCheck") {
     group = "verification"
@@ -562,7 +602,14 @@ tasks.register<DiffCoverageCheck>("diffCoverageCheck") {
     threshold.set(
         providers
             .gradleProperty("diffCoverageThreshold")
-            .map { it.toDouble() }
-            .orElse(0.80),
+            // ★ #170 / D04：口径归一。CI 一直传 -PdiffCoverageThreshold=80（百分数），
+            // 而本任务按 0..1 比例比较 → gate=80.0，ratio（0..1）恒 < 80 → 门禁**恒失败**；
+            // 失败又被 ci.yml 的 continue-on-error 吞掉，于是"从未真正拦过任何 PR"。
+            // 现在同时接受 0..1 与 0..100 两种写法，越界值钳到合法区间。
+            .map { raw ->
+                val value = raw.trim().toDoubleOrNull() ?: DEFAULT_DIFF_THRESHOLD
+                if (value > 1.0) (value / 100.0).coerceIn(0.0, 1.0) else value.coerceIn(0.0, 1.0)
+            }
+            .orElse(DEFAULT_DIFF_THRESHOLD),
     )
 }

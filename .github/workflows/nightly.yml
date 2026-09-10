@@ -1,0 +1,238 @@
+# Nightly 全量回归（#170 / D03，testing-strategy.md §6 后续项）。
+#
+# 与 ci.yml 的分工：
+#   - ci.yml（PR/push）：只跑「挡住合并」的最小集，:app 截图 + :app 单测，控制在 60 分钟内
+#   - nightly.yml（每日 02:00 Asia/Shanghai = 18:00 UTC）：跑 CI 跑不起/太慢的全量面
+#       * 全模块截图基线校验（CI 只验 :app，模块级漂移长期无人看）
+#       * 全模块截图**重录**并上传 artifact（视觉走查用；产物不入库，绝不自动提交）
+#       * release 变体 R8 + 资源缩减实跑（keep 规则回归的第一道网）
+#       * 多 API level 单测子集（Robolectric enabledSdks：26 最低支持 / 35 目标）
+#
+# 失败处理：开/更新一个 `nightly-failure` 标签的 issue，避免「夜里红了没人知道」。
+name: Nightly
+
+on:
+  schedule:
+    # 18:00 UTC = 次日 02:00 Asia/Shanghai
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_screenshots:
+        description: '跳过截图重录（只跑门禁与 R8）'
+        type: boolean
+        default: false
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  quality:
+    name: Quality Gate (full)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # 开发机私有 JDK 路径（gradle.properties 里不入库，但仓库历史版本可能带）
+      - name: Override local JDK path for CI
+        run: python3 -c "import re; p='gradle.properties'; s=open(p).read(); open(p,'w').write(re.sub(r'(?m)^org\\.gradle\\.java\\.home.*\\n?', '', s))"
+
+      - name: Seed plugin artifacts into mavenLocal
+        run: bash .github/gradle/seed-plugins.sh
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # 与 ci.yml 命令级对齐；额外补 :prototype 与各 feature 模块的单测（CI 只跑 :app:
+      # :app:testDebugUnitTest 通过依赖关系已覆盖大部分模块，这里显式跑全量 test 任务）
+      - name: Spotless + Detekt + Konsist + Lint
+        run: ./gradlew spotlessCheck detekt konsistCheck :app:lintDebug :core:ui:lintDebug --no-daemon
+
+      - name: Unit tests (all modules)
+        run: ./gradlew testDebugUnitTest --no-daemon
+
+      - name: Coverage report + verify
+        run: ./gradlew coverageReport coverageVerify --no-daemon
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-coverage
+          path: |
+            **/build/reports/jacoco/*/html/**
+          if-no-files-found: ignore
+
+  module-screenshots:
+    name: Module screenshot baselines (verify)
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Override local JDK path for CI
+        run: python3 -c "import re; p='gradle.properties'; s=open(p).read(); open(p,'w').write(re.sub(r'(?m)^org\\.gradle\\.java\\.home.*\\n?', '', s))"
+
+      - name: Seed plugin artifacts into mavenLocal
+        run: bash .github/gradle/seed-plugins.sh
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # ★ D02 修复：模块级截图基线此前不在任何门禁里，core:ui / core:designsystem 长期漂移无人发现。
+      # 这里把所有带 src/test/screenshots 的模块一次性验一遍（与 :app 的 verify 分开跑，
+      # 失败时能直接看出是哪个模块的基线漂了）。
+      - name: Verify every module's Roborazzi baselines
+        run: |
+          ./gradlew \
+            :app:verifyRoborazziDebug \
+            :core:ui:verifyRoborazziDebug \
+            :core:designsystem:verifyRoborazziDebug \
+            :core:markdown:verifyRoborazziDebug \
+            :feature:auth:verifyRoborazziDebug \
+            :feature:repo:verifyRoborazziDebug \
+            :feature:issue:verifyRoborazziDebug \
+            :feature:notifications:verifyRoborazziDebug \
+            --no-daemon
+
+      - name: Upload Roborazzi diffs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-roborazzi-diffs
+          path: |
+            **/build/outputs/roborazzi/**
+            **/build/roborazzi/**
+          if-no-files-found: ignore
+
+  screenshot-refresh:
+    name: Screenshot refresh (artifacts only)
+    needs: quality
+    if: ${{ inputs.skip_screenshots != true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Override local JDK path for CI
+        run: python3 -c "import re; p='gradle.properties'; s=open(p).read(); open(p,'w').write(re.sub(r'(?m)^org\\.gradle\\.java\\.home.*\\n?', '', s))"
+
+      - name: Seed plugin artifacts into mavenLocal
+        run: bash .github/gradle/seed-plugins.sh
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # 重录（-Proborazzi.test.record=true）只为拿 PNG 做视觉走查：
+      # 产物上传 artifact，**不提交回仓库**（基线改动必须走 PR 审批，见 workflow.md §4 设计闸门）
+      - name: Record all screenshots
+        run: |
+          ./gradlew \
+            :app:recordRoborazziDebug \
+            :core:ui:recordRoborazziDebug \
+            :core:designsystem:recordRoborazziDebug \
+            :core:markdown:recordRoborazziDebug \
+            :feature:auth:recordRoborazziDebug \
+            :feature:repo:recordRoborazziDebug \
+            :feature:issue:recordRoborazziDebug \
+            :feature:notifications:recordRoborazziDebug \
+            --no-daemon
+
+      - name: Upload refreshed screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-screenshots
+          path: |
+            app/src/test/screenshots/*.png
+            core/**/src/test/screenshots/*.png
+            feature/**/src/test/screenshots/*.png
+          if-no-files-found: warn
+
+  release-shrink:
+    name: Release variant R8 (keep-rule regression)
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Override local JDK path for CI
+        run: python3 -c "import re; p='gradle.properties'; s=open(p).read(); open(p,'w').write(re.sub(r'(?m)^org\\.gradle\\.java\\.home.*\\n?', '', s))"
+
+      - name: Seed plugin artifacts into mavenLocal
+        run: bash .github/gradle/seed-plugins.sh
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # R8 无签名也能跑（signingConfig 仅在 KEYSTORE_FILE 存在时启用）：
+      # 验证 keep 规则不产生 missing-class 错误 / R8 警告升级为失败
+      - name: Assemble release (minified)
+        run: ./gradlew :app:assembleRelease --no-daemon
+
+      - name: Report shrink size
+        run: |
+          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
+          test -n "$APK" || { echo "::error::release APK not produced"; exit 1; }
+          echo "### Release APK size" >> "$GITHUB_STEP_SUMMARY"
+          ls -lh "$APK" | awk '{print "- APK: " $5 " (" $9 ")"}' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release APK + mapping
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: nightly-release-unsigned
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: warn
+
+  notify-failure:
+    name: Report nightly failure
+    needs: [quality, module-screenshots, release-shrink]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open or update nightly-failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          TITLE="nightly: 全量回归失败（$(date -u +%Y-%m-%d)）"
+          BODY=$(printf 'Nightly 全量回归失败。\n\n- Run: %s\n- Commit: %s\n\n请查看失败的 job 与 artifact。\n' "$RUN_URL" "${{ github.sha }}")
+          EXISTING=$(gh issue list --label nightly-failure --state open --limit 1 --json number -q '.[0].number' || true)
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --label nightly-failure --body "$BODY" || gh issue create --title "$TITLE" --body "$BODY"
+          fi

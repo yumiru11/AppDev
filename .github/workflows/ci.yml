@@ -80,8 +80,23 @@ jobs:
         run: ./gradlew :app:testDebugUnitTest --no-daemon
 
       # 失败时保留截图 diff 供排查（实际截图/compare 产物）；空测试阶段直接通过
-      - name: Verify Roborazzi screenshots
-        run: ./gradlew :app:verifyRoborazziDebug --no-daemon
+      #
+      # ★ D02 修复（#170）：此前只验 :app，模块级基线（core:ui / core:designsystem /
+      # core:markdown / feature:*）不在任何门禁里 —— #83 改了 GlassSurface 实现后
+      # core:ui 的 AppTopBar_* 基线静默腐烂了整整两周无人发现（本地实测：
+      # 6/8 张核心基线 verify 失败）。现在把带 src/test/screenshots 的模块一次全验。
+      - name: Verify Roborazzi screenshots (app + all modules)
+        run: |
+          ./gradlew \
+            :app:verifyRoborazziDebug \
+            :core:ui:verifyRoborazziDebug \
+            :core:designsystem:verifyRoborazziDebug \
+            :core:markdown:verifyRoborazziDebug \
+            :feature:auth:verifyRoborazziDebug \
+            :feature:repo:verifyRoborazziDebug \
+            :feature:issue:verifyRoborazziDebug \
+            :feature:notifications:verifyRoborazziDebug \
+            --no-daemon
 
       - name: Upload Roborazzi diffs (on failure)
         if: failure()
@@ -109,18 +124,19 @@ jobs:
       - name: Coverage report + verify (hard gate)
         run: ./gradlew coverageReport coverageVerify --no-daemon
 
-      # diffCoverageCheck 是软门禁（PR 变更的新增代码 ≥80%，-PdiffCoverageThreshold 可调）。
-      # 任务可能尚未落地（与构建侧任务并行开发），先 --dry-run 探测：不存在 → 显式跳过并告警，
-      # 不把 job 染红；continue-on-error 兜底（软门禁，暂不硬卡合并）。
-      - name: Diff coverage check (soft gate, best-effort)
+      # ★ D04 修复（#170）：diffCoverageCheck 从「软门禁 + --dry-run 探测」升级为硬门禁。
+      # 原状态：任务已实现（根 build.gradle.kts DiffCoverageCheck），但 CI 用 dry-run 探测 +
+      # continue-on-error 兜底，等于从未真正拦过任何 PR —— 探测分支永远为假（任务存在），
+      # 而 continue-on-error 让真实失败静默通过。现在直接跑，失败即 job 红。
+      # 阈值：新增代码行 ≥80%（-PdiffCoverageThreshold 可调）；UI 源文件按路径白名单跳过
+      # （Composable 由 Roborazzi/真机兜底，见任务实现内的 uiSourceExcludes 注释）。
+      - name: Diff coverage check (hard gate)
         if: github.event_name == 'pull_request'
-        continue-on-error: true
         run: |
-          if ./gradlew diffCoverageCheck --dry-run -q >/dev/null 2>&1; then
-            ./gradlew diffCoverageCheck -PdiffCoverageThreshold=80 -PdiffBaseSha=${{ github.event.pull_request.base.sha }} --no-daemon
-          else
-            echo "::warning::diffCoverageCheck task not present; diff coverage gate skipped"
-          fi
+          ./gradlew diffCoverageCheck \
+            -PdiffCoverageThreshold=80 \
+            -PdiffBaseSha=${{ github.event.pull_request.base.sha }} \
+            --no-daemon
 
       # 聚合报告上传：if: always() —— coverageVerify 失败时也保留报告供排查。
       # glob 覆盖根级聚合报告（build/reports/jacoco/coverageReport/html）与各模块报告。
