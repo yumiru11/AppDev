@@ -73,6 +73,36 @@ jobs:
       - name: Android Lint
         run: ./gradlew :app:lintDebug --no-daemon
 
+      # ── Lint 覆盖面守卫（#170 / Q01+Q02）─────────────────────────────────────
+      # Q01 的根因是 compose-ui 的 lint jar 链接了比 lint 自带的更新的 Kotlin Analysis API，
+      # 导致整个 UiIssueRegistry 被跳过（15 项检查不参与分析）。解除条件是升 AGP 9.x；
+      # AGP 8.13.2 实测无效。在升级之前，至少要让"覆盖面退化"这件事**可见且只能变小**：
+      #   ① 只允许 UiIssueRegistry 一个 registry 被跳过，多一个就红；
+      #   ② disables 里不允许出现 lint 不认识的 issue id（Q02 清掉了 2 个）。
+      - name: Lint detector coverage guard
+        run: |
+          REPORT=app/build/reports/lint-results-debug.txt
+          if [ ! -f "$REPORT" ]; then
+            echo "::error::找不到 $REPORT —— lint 报告未生成"
+            exit 1
+          fi
+
+          SKIPPED=$(grep -o 'Lint found an issue registry ([^)]*)' "$REPORT" | sed 's/.*(//;s/)//' | sort -u || true)
+          echo "被跳过的 lint registry:"
+          echo "${SKIPPED:-（无）}"
+          UNKNOWN=$(printf '%s\n' "$SKIPPED" | grep -v '^$' | grep -v '^androidx\.compose\.ui\.lint\.UiIssueRegistry$' || true)
+          if [ -n "$UNKNOWN" ]; then
+            echo "::error::出现新的被跳过 lint registry（lint 覆盖面静默退化）：$UNKNOWN"
+            exit 1
+          fi
+
+          UNKNOWN_IDS=$(grep -c 'Unknown issue id' "$REPORT" || true)
+          echo "UnknownIssueId 告警数: $UNKNOWN_IDS"
+          if [ "$UNKNOWN_IDS" != "0" ]; then
+            echo "::error::lint 配置里存在 lint 不认识的 issue id（见 $REPORT 的 UnknownIssueId）"
+            exit 1
+          fi
+
       - name: Konsist architecture tests
         run: ./gradlew konsistCheck --no-daemon
 

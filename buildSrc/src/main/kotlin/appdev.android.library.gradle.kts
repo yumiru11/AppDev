@@ -28,11 +28,12 @@ android {
 
     lint {
         abortOnError = true
-        // AGP 8.7.3 的 lint-api 与新版 Compose 1.11 / Lifecycle AAR 内置 lint 检查器二进制不兼容
-        // （IncompatibleClassChangeError），整体禁用这批库内检测器（AGP/lint 升级后移除本段）。
+        // Compose/Lifecycle 库内 lint 检测器禁用：根因与解除条件见 :app 的 lint 块详细注释
+        // （#170 / Q01：compose-ui lint jar 链接了更老的 Kotlin Analysis API，需 AGP 9.x 才能跑）。
+        // 已移除两个不存在的 id（ComposableCoroutineCreation / UnrememberedState）——
+        // lint 会为它们报 UnknownIssueId（#170 / Q02）。
         disable += "AutoboxingStateCreation"
         disable += "AutoboxingStateValueProperty"
-        disable += "ComposableCoroutineCreation"
         disable += "ComposableLambdaParameterNaming"
         disable += "ComposableNaming"
         disable += "CompositionLocalNaming"
@@ -44,7 +45,6 @@ android {
         disable += "RememberInComposition"
         disable += "UnrememberedAnimatable"
         disable += "UnrememberedMutableState"
-        disable += "UnrememberedState"
         disable += "NullSafeMutableLiveData"
     }
 }
