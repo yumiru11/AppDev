@@ -934,10 +934,19 @@ class PullRequestDetailViewModelTest {
     @Test
     fun updateComment_success_optimisticallyRewritesBodyAndEmitsUpdated() =
         runTest {
+            // 两条评论：确保 map 的「非目标项原样保留」分支也被走到（只放一条会漏掉 else）
+            val twoComments =
+                timeline() +
+                    PullRequestTimelineItem.Comment(
+                        id = 11L,
+                        author = PullRequestUser(login = "other"),
+                        body = "second",
+                    )
             val mockRepo = repository()
+            coEvery { mockRepo.timeline(owner, repo, number) } returns twoComments
             coEvery { mockRepo.updateComment(any(), any(), any(), any()) } returns Unit
-            val comment = timeline().filterIsInstance<PullRequestTimelineItem.Comment>().first()
-            val originalIndex = timeline().indexOfFirst { it.id == comment.id }
+            val comment = twoComments.filterIsInstance<PullRequestTimelineItem.Comment>().first()
+            val originalIndex = twoComments.indexOfFirst { it.id == comment.id }
 
             val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
             viewModel.events.test {
@@ -952,6 +961,12 @@ class PullRequestDetailViewModelTest {
                 assertEquals("edited body", updated.body)
                 // 原位次：编辑不该让评论跳到时间线末尾
                 assertEquals(originalIndex, state.timeline.indexOfFirst { it.id == comment.id })
+                // 非目标评论原样保留（未受编辑影响）
+                val untouched =
+                    state.timeline
+                        .filterIsInstance<PullRequestTimelineItem.Comment>()
+                        .first { it.id == 11L }
+                assertEquals("second", untouched.body)
                 coVerify(exactly = 1) { mockRepo.updateComment(owner, repo, comment.id, "edited body") }
                 assertEquals(PullRequestDetailEvent.CommentUpdated, awaitItem())
                 cancelAndIgnoreRemainingEvents()

@@ -1,6 +1,7 @@
 package com.yumiru11.githubapp.feature.pullrequest.data
 
 import com.apollographql.apollo.ApolloClient
+import com.yumiru11.githubapp.core.githubgraphql.generated.ViewerQuery
 import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
 import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
 import com.yumiru11.githubapp.core.githubrest.api.IssueApi
@@ -10,6 +11,7 @@ import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestState
+import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
@@ -17,10 +19,12 @@ import mockwebserver3.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import retrofit2.HttpException
+import java.io.IOException
 
 /**
  * [PullRequestRepository] 写操作单测（#163 L03，MockWebServer 真实 PullRequestApi）。
@@ -32,6 +36,7 @@ class PullRequestRepositoryWriteTest {
     private lateinit var server: MockWebServer
     private lateinit var pullRequestApi: PullRequestApi
     private lateinit var issueApi: IssueApi
+    private lateinit var apollo: ApolloClient
 
     @Before
     fun setUp() {
@@ -50,6 +55,7 @@ class PullRequestRepositoryWriteTest {
             )
         pullRequestApi = retrofit.create(PullRequestApi::class.java)
         issueApi = retrofit.create(IssueApi::class.java)
+        apollo = mockk()
     }
 
     @After
@@ -64,7 +70,7 @@ class PullRequestRepositoryWriteTest {
             repoManagementApi = mockk<RepoManagementApi>(),
             gitRefApi = mockk<GitRefApi>(),
             issueApi = issueApi,
-            apolloClient = mockk<ApolloClient>(),
+            apolloClient = apollo,
         )
 
     private fun enqueuePullRequest(
@@ -143,6 +149,15 @@ class PullRequestRepositoryWriteTest {
         }
 
     // ── PR 会话评论（#166：补上此前"写接口尚未接入"的缺口）──────────────────
+    @Test
+    fun viewerLoginOrNull_graphqlThrows_returnsNull() =
+        runTest {
+            // 未登录 / GraphQL 降级：返回 null，UI 据此整体隐藏编辑/删除菜单
+            coEvery { apollo.query(any<ViewerQuery>()) } throws IOException("graphql down")
+
+            assertNull(repository().viewerLoginOrNull())
+        }
+
     @Test
     fun updateComment_patchesCommentBody() =
         runTest {
