@@ -86,7 +86,9 @@ fun AppTheme(
         LocalMotionScale provides motionScale,
     ) {
         MaterialTheme(
-            colorScheme = themeColors.colorScheme,
+            // 主题切换的颜色过渡（#167 / UI15）：内容树原地保留，只插值颜色角色，
+            // 视觉上等价于整屏 Crossfade 但不会重建导航/滚动状态。
+            colorScheme = rememberAnimatedColorScheme(themeColors.colorScheme),
             shapes = AppShapes.from(cornerScale),
             content = content,
         )
