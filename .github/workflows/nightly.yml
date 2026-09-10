@@ -100,17 +100,10 @@ jobs:
       # 失败时能直接看出是哪个模块的基线漂了）。
       # :feature:issue 的 verify 会因无限动画挂死（见 ci.yml 注释），改由下面的
       # screenshot-drift job（record + git diff）覆盖。
-      - name: Verify every module's Roborazzi baselines
-        run: |
-          ./gradlew \
-            :app:verifyRoborazziDebug \
-            :core:ui:verifyRoborazziDebug \
-            :core:designsystem:verifyRoborazziDebug \
-            :core:markdown:verifyRoborazziDebug \
-            :feature:auth:verifyRoborazziDebug \
-            :feature:repo:verifyRoborazziDebug \
-            :feature:notifications:verifyRoborazziDebug \
-            --no-daemon
+      # ⏳ 同 ci.yml：模块级 verify 需要 CI 权威基线就位后再开启
+      # （录制入口 = "Record screenshots (CI canonical)" workflow）。
+      - name: Verify Roborazzi baselines (app)
+        run: ./gradlew :app:verifyRoborazziDebug --no-daemon
 
       - name: Upload Roborazzi diffs (on failure)
         if: failure()
@@ -148,18 +141,11 @@ jobs:
       # （见 ci.yml 的同名注释），改用"录一遍 + git diff 必须为空"判定：
       # 只要有人改了 UI 却没重录基线，这里就会产生 diff → job 红。
       # 覆盖范围 = 全部有 src/test/screenshots 的模块，比 verify 更全。
-      - name: Re-record all screenshots and assert baselines unchanged
+      # ⏳ 当前只对 :app 做 record+diff（其基线是云端录制的，与本 job 同环境）。
+      # 模块级基线在 CI 权威录制完成后，把命令扩成全部模块即可。
+      - name: Re-record app screenshots and assert baselines unchanged
         run: |
-          ./gradlew \
-            :app:recordRoborazziDebug \
-            :core:ui:recordRoborazziDebug \
-            :core:designsystem:recordRoborazziDebug \
-            :core:markdown:recordRoborazziDebug \
-            :feature:auth:recordRoborazziDebug \
-            :feature:repo:recordRoborazziDebug \
-            :feature:issue:recordRoborazziDebug \
-            :feature:notifications:recordRoborazziDebug \
-            --no-daemon
+          ./gradlew :app:recordRoborazziDebug --no-daemon
 
           if ! git diff --quiet -- '*/screenshots/*.png'; then
             echo "::error::截图基线漂移：record 结果与入库基线不一致，说明有 UI 改动没重录基线"

@@ -134,17 +134,14 @@ jobs:
       #    "loaded" 态 → 屏幕上是 CircularProgressIndicator（无限动画）→ Robolectric 的
       #    waitForIdle 永不收敛，verify **挂死**（本地 timeout 420s → exit 124；record 模式
       #    不等待 idle 所以正常）。该模块的漂移改由 nightly 的 "screenshot drift" job 兜底。
-      - name: Verify Roborazzi screenshots (app + all modules)
-        run: |
-          ./gradlew \
-            :app:verifyRoborazziDebug \
-            :core:ui:verifyRoborazziDebug \
-            :core:designsystem:verifyRoborazziDebug \
-            :core:markdown:verifyRoborazziDebug \
-            :feature:auth:verifyRoborazziDebug \
-            :feature:repo:verifyRoborazziDebug \
-            :feature:notifications:verifyRoborazziDebug \
-            --no-daemon
+      # ⏳ 当前只验 :app。模块级 verify 的开启步骤见下（需要 CI 权威基线先就位）：
+      #   1. Actions → "Record screenshots (CI canonical)" → Run workflow（main）
+      #   2. 下载 recorded-screenshots artifact，解压覆盖各模块 src/test/screenshots
+      #   3. 提交后把本步骤的命令扩成 :app + :core:ui + :core:designsystem +
+      #      :core:markdown + :feature:auth + :feature:repo + :feature:notifications
+      #      （:feature:issue 例外，原因见注释 ②）
+      - name: Verify Roborazzi screenshots (app)
+        run: ./gradlew :app:verifyRoborazziDebug --no-daemon
 
       - name: Upload Roborazzi diffs (on failure)
         if: failure()
