@@ -7,11 +7,13 @@ package com.yumiru11.githubapp.feature.repo
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
@@ -93,6 +95,10 @@ import coil3.compose.AsyncImage
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Add
 import com.composables.icons.materialsymbols.rounded.Call_split
+import com.composables.icons.materialsymbols.rounded.Delete
+import com.composables.icons.materialsymbols.rounded.Link
+import com.composables.icons.materialsymbols.rounded.Open_in_new
+import com.composables.icons.materialsymbols.rounded.Share
 import com.composables.icons.materialsymbols.rounded.Tag
 import com.composables.icons.materialsymbols.rounded.Visibility
 import com.composables.icons.materialsymbols.rounded.Visibility_off
@@ -105,6 +111,7 @@ import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
+import com.yumiru11.githubapp.core.ui.AppImageOverlay
 import com.yumiru11.githubapp.core.ui.LocalRepoDetailActions
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
 import com.yumiru11.githubapp.core.ui.sharedTransitionElement
@@ -445,10 +452,26 @@ internal fun copyToClipboard(
     clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
 }
 
+/** 系统分享面板（ui-design §3.8 顶栏「更多」菜单的分享项）。 */
+internal fun shareText(
+    context: Context,
+    text: String,
+    chooserTitle: String,
+) {
+    val sendIntent =
+        Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+    context.startActivity(Intent.createChooser(sendIntent, chooserTitle))
+}
+
 /**
- * 顶栏：返回 + 仓库名 + 「更多」菜单（L04 删除仓库；此处是后续更多操作的统一挂载点）。
+ * 顶栏：返回 + 仓库名 + 「更多」菜单（ui-design §3.8：分享 / 浏览器打开 / 复制链接；
+ * L04 追加「删除仓库」）。
  *
- * [canDelete] = false（游客/非 admin/permissions 缺失）时菜单不渲染——入口不可见而非禁用，
+ * 三个客户端动作（分享/外链/复制）**始终可见**——它们不依赖权限，游客也能用；
+ * 「删除仓库」按 [canDelete]（游客/非 admin/permissions 缺失）隐藏，入口不可见而非禁用，
  * 避免把「可能有但没权限」暴露成可点击的空壳。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -461,6 +484,9 @@ private fun RepoTopBar(
     onDeleteClick: () -> Unit = {},
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val htmlUrl = "https://github.com/$owner/$repo"
+    val shareTitle = stringResource(R.string.repo_share_chooser)
     TopAppBar(
         title = {
             Text(
@@ -478,20 +504,45 @@ private fun RepoTopBar(
             }
         },
         actions = {
-            if (canDelete) {
-                Box {
-                    IconButton(onClick = { menuExpanded = true }) {
-                        Icon(
-                            imageVector = Icons.Filled.MoreVert,
-                            contentDescription = stringResource(R.string.repo_more),
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false },
-                    ) {
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(
+                        imageVector = Icons.Filled.MoreVert,
+                        contentDescription = stringResource(R.string.repo_more),
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.repo_menu_copy_link)) },
+                        leadingIcon = { Icon(MaterialSymbols.Rounded.Link, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            copyToClipboard(context, htmlUrl, owner)
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.repo_menu_open_browser)) },
+                        leadingIcon = { Icon(MaterialSymbols.Rounded.Open_in_new, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(htmlUrl))
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(text = stringResource(R.string.repo_menu_share)) },
+                        leadingIcon = { Icon(MaterialSymbols.Rounded.Share, contentDescription = null) },
+                        onClick = {
+                            menuExpanded = false
+                            shareText(context, htmlUrl, shareTitle)
+                        },
+                    )
+                    if (canDelete) {
                         DropdownMenuItem(
                             text = { Text(text = stringResource(R.string.repo_delete)) },
+                            leadingIcon = { Icon(MaterialSymbols.Rounded.Delete, contentDescription = null) },
                             onClick = {
                                 menuExpanded = false
                                 onDeleteClick()
@@ -1552,6 +1603,9 @@ private fun ReadmeSection(
     onRetryReadme: () -> Unit,
     baseRepoUrl: String,
 ) {
+    // 图片全屏查看（#166 / UI11）：README 正文里的图片此前点了没反应（onImageClick 是空桩）
+    var previewImageUrl by remember { mutableStateOf<String?>(null) }
+
     when (readmeState) {
         is ReadmeState.Loading -> {
             Box(
@@ -1585,7 +1639,7 @@ private fun ReadmeSection(
             WebViewMarkdownRenderer(
                 sanitizedHtml = readmeState.content,
                 tokenProvider = { null },
-                bridgeCallback = createBridgeCallback(actions),
+                bridgeCallback = createBridgeCallback(actions) { previewImageUrl = it },
                 baseRepoUrl = baseRepoUrl,
                 renderMode = readmeState.webViewRenderMode,
             )
@@ -1598,6 +1652,12 @@ private fun ReadmeSection(
             )
         }
     }
+
+    // 全屏图片查看（纯黑背景 + 向上 fade in，ui-design §3.11 9g）
+    AppImageOverlay(
+        imageUrl = previewImageUrl,
+        onDismiss = { previewImageUrl = null },
+    )
 }
 
 /**
@@ -1619,11 +1679,16 @@ internal fun handleParsedUrl(
 
 /**
  * WebView bridge callback：链接/复制已接线（T9 验收第 3 条），
- * 图片预览/任务列表写回留待 T14。
+ * 图片预览自 #166 起接到 [AppImageOverlay]（此前是空桩）；任务列表写回仍留待 T14。
+ *
+ * @param onImageClick 图片点击 → 全屏查看（由调用方持有状态）
  */
-@Suppress("EmptyFunctionBlock") // onImageClick/onCheckboxClick/onHeightChanged 为 T14 占位桩
+@Suppress("EmptyFunctionBlock") // onCheckboxClick/onHeightChanged 为 T14 占位桩
 @Composable
-private fun createBridgeCallback(actions: RepoDetailActions): MarkdownBridgeCallback {
+private fun createBridgeCallback(
+    actions: RepoDetailActions,
+    onImageClick: (String) -> Unit,
+): MarkdownBridgeCallback {
     val context = LocalContext.current
     return object : MarkdownBridgeCallback {
         override fun onExternalLink(url: String) {
@@ -1641,7 +1706,9 @@ private fun createBridgeCallback(actions: RepoDetailActions): MarkdownBridgeCall
             clipboard.setPrimaryClip(ClipData.newPlainText("code", code))
         }
 
-        override fun onImageClick(src: String) {}
+        override fun onImageClick(src: String) {
+            onImageClick(src)
+        }
 
         override fun onCheckboxClick(
             index: Int,

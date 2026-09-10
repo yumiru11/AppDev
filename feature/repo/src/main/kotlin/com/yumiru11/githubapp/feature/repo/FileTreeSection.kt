@@ -75,6 +75,12 @@ fun FileTreeSection(
                                 viewModel.openFile(row.node, ref)
                             }
                         },
+                        // 展开/收起动画（#166 / UI20，ui-design §3.8）：
+                        // 文件树是**扁平化行列表**（FileTreeBuilder.visibleRows），展开只是
+                        // 让子行进入可见集合 —— 用 LazyColumn 的 animateItem 让新行淡入/位移、
+                        // 消失行淡出，比"每层套一个 AnimatedVisibility 高度动画"更贴合这套
+                        // 扁平数据结构，也不会因为多层嵌套产生 N 层动画叠加。
+                        modifier = Modifier.animateItem(),
                     )
                 }
             }
