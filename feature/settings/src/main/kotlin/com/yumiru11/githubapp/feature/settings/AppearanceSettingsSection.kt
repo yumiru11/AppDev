@@ -107,6 +107,44 @@ internal fun AppearanceSettingsSection(
                 onCheckedChange = viewModel::setBlurEnabled,
             )
         }
+        // 逐项开关（#167 / UI03，ui-design §6.3 四条允许点位）：总开关关闭或
+        // OLED/高对比生效时整体置灰 —— 此时玻璃本就被强制禁用，可点会误导。
+        item {
+            SwitchSettingRow(
+                title = stringResource(R.string.settings_glass_top_bar),
+                checked = uiState.glassTopBar,
+                onCheckedChange = viewModel::setGlassTopBar,
+                enabled = uiState.glassPerItemEnabled,
+                indented = true,
+            )
+        }
+        item {
+            SwitchSettingRow(
+                title = stringResource(R.string.settings_glass_bottom_bar),
+                checked = uiState.glassBottomBar,
+                onCheckedChange = viewModel::setGlassBottomBar,
+                enabled = uiState.glassPerItemEnabled,
+                indented = true,
+            )
+        }
+        item {
+            SwitchSettingRow(
+                title = stringResource(R.string.settings_glass_panel),
+                checked = uiState.glassPanel,
+                onCheckedChange = viewModel::setGlassPanel,
+                enabled = uiState.glassPerItemEnabled,
+                indented = true,
+            )
+        }
+        item {
+            SwitchSettingRow(
+                title = stringResource(R.string.settings_glass_bottom_sheet),
+                checked = uiState.glassBottomSheet,
+                onCheckedChange = viewModel::setGlassBottomSheet,
+                enabled = uiState.glassPerItemEnabled,
+                indented = true,
+            )
+        }
         item { CornerScaleRow(scale = uiState.cornerScale, onScaleChange = viewModel::setCornerScale) }
         item { MotionScaleRow(scale = uiState.motionScale, onScaleChange = viewModel::setMotionScale) }
     }
@@ -304,25 +342,45 @@ private fun MotionPulsePreview(scale: Float) {
     }
 }
 
-/** 开关型设置行（标题 + 可选说明 + Switch）。 */
+/**
+ * 开关型设置行（标题 + 可选说明 + Switch）。
+ *
+ * @param enabled 交互可用性；false 时置灰（#167 / UI03：OLED/高对比下逐项开关被强制禁用）
+ * @param indented 作为上级开关的子项缩进（同款控件层级化，避免另造组件）
+ */
 @Composable
 internal fun SwitchSettingRow(
     title: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     description: String? = null,
+    enabled: Boolean = true,
+    indented: Boolean = false,
 ) {
+    // 禁用态统一走 M3 的 38% onSurface（与 Switch 自身的禁用色一致）
+    val titleColor =
+        if (enabled) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_CONTENT_ALPHA)
+        }
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(
+                    start = if (indented) AppDimens.contentPadding * 2 else AppDimens.contentPadding,
+                    end = AppDimens.contentPadding,
+                    top = 8.dp,
+                    bottom = 8.dp,
+                ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = if (indented) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+                color = titleColor,
             )
             if (description != null) {
                 Spacer(modifier = Modifier.height(2.dp))
@@ -337,9 +395,13 @@ internal fun SwitchSettingRow(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            enabled = enabled,
         )
     }
 }
+
+/** M3 禁用态内容不透明度（状态层规范值） */
+private const val DISABLED_CONTENT_ALPHA = 0.38f
 
 /** 标题 + 当前值副标题（可选）+ 内容行的通用容器（内容可换行）。 */
 @Composable

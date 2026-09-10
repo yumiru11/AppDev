@@ -31,6 +31,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
+import com.yumiru11.githubapp.core.designsystem.token.GlassScope
+import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 
 /**
  * 应用顶栏（玻璃头）：左侧胶囊搜索框 + 右侧通知铃铛（未读角标）+ 头像，
@@ -58,7 +60,8 @@ fun AppTopBar(
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
     unreadCount: Int = 0,
-    blurEnabled: Boolean = true,
+    // 玻璃开关按"顶栏"点位从 LocalGlassSettings 取（#167 / UI03）；显式传值只用于测试/预览
+    blurEnabled: Boolean = LocalGlassSettings.current.enabledFor(GlassScope.TOP_BAR),
     modifier: Modifier = Modifier,
     /** 玻璃头副行插槽（首页小分区条）；默认空 = 只有 TopAppBar 一行 */
     sectionBar: @Composable () -> Unit = {},
@@ -66,6 +69,7 @@ fun AppTopBar(
     GlassSurface(
         modifier = modifier,
         windowInsets = WindowInsets.statusBars,
+        scope = GlassScope.TOP_BAR,
         blurEnabled = blurEnabled,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {

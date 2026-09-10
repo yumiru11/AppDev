@@ -24,6 +24,19 @@ data class SettingsUiState(
     val codeFont: CodeFont = CodeFont.MONO,
     val codeLineNumbers: Boolean = true,
     val languageTag: String? = null,
+    /** 毛玻璃总开关（#167 / UI03） */
     val blurEnabled: Boolean = true,
+    /** 毛玻璃逐项开关：顶栏 / 底栏 / 通知面板 / BottomSheet（ui-design §6.3 四条允许点位） */
+    val glassTopBar: Boolean = true,
+    val glassBottomBar: Boolean = true,
+    val glassPanel: Boolean = true,
+    val glassBottomSheet: Boolean = true,
     val authState: AuthState = AuthState.Anonymous,
-)
+) {
+    /**
+     * 毛玻璃逐项开关是否可交互：OLED / 高对比下 §6.3 强制禁用（此时总开关也被覆盖），
+     * 逐项开关置灰更诚实 —— 避免"打开了却看不到效果"的困惑。
+     */
+    val glassPerItemEnabled: Boolean
+        get() = blurEnabled && !oledEnabled && !highContrastEnabled
+}

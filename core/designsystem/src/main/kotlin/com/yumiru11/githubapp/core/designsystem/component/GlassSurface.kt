@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.token.AppBlur
 import com.yumiru11.githubapp.core.designsystem.token.GlassRenderMode
 import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
+import com.yumiru11.githubapp.core.designsystem.token.GlassScope
+import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
 
@@ -53,7 +55,10 @@ import dev.chrisbanes.haze.hazeEffect
  * @param windowInsets 内容需要避让的系统 insets（如状态栏 / 导航栏）。
  *   玻璃背景延伸进 insets 区域（玻璃盖住状态栏），内容按 insets 内缩。
  *   默认无 insets。
- * @param blurEnabled 毛玻璃开关；false 时退化为纯半透明 surface（不模糊）
+ * @param scope 本点位身份（ui-design §6.1 四条允许点位，issue #167 / UI03）。
+ *   开关由 [LocalGlassSettings] 按 scope 裁决，调用方不需要自己拼布尔。
+ * @param blurEnabled 覆盖用开关；默认取 [LocalGlassSettings] 对 [scope] 的裁决结果。
+ *   显式传值只用于测试/预览（例如截图基准要固定走降级路径）。
  * @param content 玻璃层之上的内容
  */
 @Composable
@@ -61,7 +66,8 @@ fun GlassSurface(
     modifier: Modifier = Modifier,
     shape: Shape = RectangleShape,
     windowInsets: WindowInsets = WindowInsets(0.dp),
-    blurEnabled: Boolean = true,
+    scope: GlassScope = GlassScope.TOP_BAR,
+    blurEnabled: Boolean = LocalGlassSettings.current.enabledFor(scope),
     content: @Composable BoxScope.() -> Unit,
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
