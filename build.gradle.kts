@@ -424,6 +424,10 @@ abstract class DiffCoverageCheck : DefaultTask() {
         dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
         val doc = dbf.newDocumentBuilder().parse(xmlFile)
         val coveredByKey = mutableMapOf<String, Set<Int>>()
+        // JaCoCo 报告里出现的行号集合 = 它认为"可执行"的行。新增行若不在此集合里，
+        // 说明 JaCoCo 根本不把它当可执行行（函数签名的括号行、纯声明行等），
+        // 计入分母会制造永远无法覆盖的假失败（#170 实测：函数签名的收尾括号行被判未覆盖）。
+        val knownByKey = mutableMapOf<String, Set<Int>>()
         val pkgNodes = doc.getElementsByTagName("package")
         for (i in 0 until pkgNodes.length) {
             val pkg = pkgNodes.item(i) as Element
@@ -433,14 +437,18 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 val sf = sourceFiles.item(j) as Element
                 val key = if (pkgName.isEmpty()) sf.getAttribute("name") else "$pkgName/${sf.getAttribute("name")}"
                 val covered = mutableSetOf<Int>()
+                val known = mutableSetOf<Int>()
                 val lines = sf.getElementsByTagName("line")
                 for (k in 0 until lines.length) {
                     val ln = lines.item(k) as Element
+                    val nr = ln.getAttribute("nr").toInt()
+                    known += nr
                     if ((ln.getAttribute("ci").toIntOrNull() ?: 0) > 0) {
-                        covered += ln.getAttribute("nr").toInt()
+                        covered += nr
                     }
                 }
                 coveredByKey[key] = covered
+                knownByKey[key] = known
             }
         }
 
@@ -464,7 +472,9 @@ abstract class DiffCoverageCheck : DefaultTask() {
             totalAdded += codeLines.size
             val key = xmlKeyOf(file)
             val covered = key?.let { coveredByKey[it] } ?: emptySet()
-            val uncovered = codeLines.filter { it !in covered }
+            val known = key?.let { knownByKey[it] } ?: emptySet()
+            // 只统计 JaCoCo 认账的行：不在报告里的行视为不可执行（不计入分母也不计入未覆盖）
+            val uncovered = codeLines.filter { it in known && it !in covered }
             totalCovered += codeLines.size - uncovered.size
             if (uncovered.isNotEmpty()) uncoveredByFile[file] = uncovered
             if (key == null || key !in coveredByKey) noReport += file

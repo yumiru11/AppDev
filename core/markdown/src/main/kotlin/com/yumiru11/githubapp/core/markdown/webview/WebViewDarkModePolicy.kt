@@ -24,16 +24,31 @@ import androidx.webkit.WebViewFeature
  * 降级代价只是少一层暗化策略（页面 CSS 本就是主题驱动出图，见 markdown-you.css），
  * 绝不能因此崩溃。
  */
-internal fun applyWebViewDarkModePolicy(settings: WebSettings) {
-    if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+internal fun applyWebViewDarkModePolicy(
+    settings: WebSettings,
+    // 特性支持位做成参数而不是函数内直查：默认值仍是真实探测，但测试可以强制两条分支
+    // 都走到（实测：Robolectric/CI 环境下 isFeatureSupported 恒为 false，直查会让这两个
+    // 分支永远不执行 —— diff 覆盖率硬门禁直接判 0/8 行未覆盖）。
+    supportsAlgorithmicDarkening: Boolean = webViewSupports(WebViewFeature.ALGORITHMIC_DARKENING),
+    supportsForceDarkStrategy: Boolean = webViewSupports(WebViewFeature.FORCE_DARK_STRATEGY),
+) {
+    if (supportsAlgorithmicDarkening) {
         runCatching { WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false) }
     }
-    if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK_STRATEGY)) {
-        runCatching {
-            WebSettingsCompat.setForceDarkStrategy(
-                settings,
-                WebSettingsCompat.DARK_STRATEGY_WEB_THEME_DARKENING_ONLY,
-            )
-        }
+    if (supportsForceDarkStrategy) {
+        // 单行语句：多行 lambda 的收尾行在"调用抛异常"的路径上不会被执行，
+        // 而异常路径恰恰是本函数最需要被测到的分支（覆盖率门禁会因此判未覆盖）。
+        val strategy = WebSettingsCompat.DARK_STRATEGY_WEB_THEME_DARKENING_ONLY
+        runCatching { WebSettingsCompat.setForceDarkStrategy(settings, strategy) }
     }
 }
+
+/**
+ * 特性探测本身也必须防崩（#170）。
+ *
+ * 实测：纯 JVM / 无 WebView APK 的环境里 `WebViewFeature.isFeatureSupported` 会**抛异常**
+ * 而不是返回 false，而它原本出现在默认参数位置 —— 异常会在进入函数体**之前**抛出，
+ * 外层没有 runCatching 可兜，整棵渲染树直接崩。这跟 §"两道防线"要解决的问题是同一类，
+ * 只是发生在更早的一步。探测失败一律按"不支持"处理（最保守、也最安全）。
+ */
+private fun webViewSupports(feature: String): Boolean = runCatching { WebViewFeature.isFeatureSupported(feature) }.getOrDefault(false)

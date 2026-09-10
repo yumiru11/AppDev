@@ -9,6 +9,9 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            // Android 桩方法返回默认值（而不是抛 "not mocked"）：WebViewDarkModePolicyTest
+            // 是纯 JVM 测试（原因见该文件 KDoc：Robolectric 沙箱类不产 JaCoCo 覆盖数据）
+            isReturnDefaultValues = true
             all {
                 // Roborazzi 官方推荐：硬件渲染模式提升截图颜色准确性（符号不再与背景混色）
                 it.systemProperties["robolectric.pixelCopyRenderMode"] = "hardware"
