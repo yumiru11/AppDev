@@ -55,4 +55,8 @@
     <plurals name="notification_unread_badge_cd">
         <item quantity="other">%d 条未读通知</item>
     </plurals>
+
+    <!-- 图片全屏查看器（#166 / UI11，ui-design §3.11） -->
+    <string name="image_viewer_cd">图片预览</string>
+    <string name="image_viewer_close_cd">关闭图片预览</string>
 </resources>

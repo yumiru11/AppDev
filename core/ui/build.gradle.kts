@@ -39,6 +39,9 @@ dependencies {
     // Haze：MainTabPager 对分区内容挂 hazeSource（backdrop blur 内容侧，issue #83）
     implementation(libs.haze)
 
+    // 图片全屏查看器（#166 / UI11）：AsyncImage 加载 README/正文里的图片
+    implementation(libs.coil.compose)
+
     // 测试：core:testing 已 api 导出 JUnit4/Robolectric/Roborazzi/compose-test
     testImplementation(project(":core:testing"))
 }
