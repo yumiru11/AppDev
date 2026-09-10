@@ -312,6 +312,15 @@ private fun ProfileHeader(
                 value = user.following,
                 labelRes = R.string.profile_stats_following,
             )
+            // Star 总数（#166 / UI21）：REST 资料端点不返回，取不到时**整项不渲染**——
+            // 不拿 0 冒充（"0 stars" 与"未知"在用户眼里是两回事）。
+            user.starredCount?.let { stars ->
+                Spacer(modifier = Modifier.width(24.dp))
+                StatNumber(
+                    value = stars,
+                    labelRes = R.string.profile_stats_stars,
+                )
+            }
         }
         if (!isSelf) {
             Spacer(modifier = Modifier.height(16.dp))

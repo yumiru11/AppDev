@@ -98,6 +98,23 @@ class ProfileRepositoryTest {
         }
         """.trimIndent()
 
+    /**
+     * 入队一次 "Star 总数探测" 响应（#166 / UI21）。
+     *
+     * 探测走 per_page=1 + Link 头推总数，所以这里要同时给 body 和 Link 头。
+     * [lastPage] 为 null 表示"只有一页"（无 Link 头）。
+     */
+    private fun enqueueStarredProbe(lastPage: Int? = null) {
+        val builder = MockResponse.Builder().body("[]")
+        if (lastPage != null) {
+            builder.addHeader(
+                "Link",
+                "<https://api.github.com/user/starred?per_page=1&page=$lastPage>; rel=\"last\"",
+            )
+        }
+        server.enqueue(builder.build())
+    }
+
     private fun enqueueJson(body: String) {
         server.enqueue(
             MockResponse
@@ -112,6 +129,7 @@ class ProfileRepositoryTest {
     fun getProfile_self_validResponse_mapsDomainWithStats() =
         runTest {
             enqueueJson(userJson())
+            enqueueStarredProbe(lastPage = 1_234)
 
             val user = repository.getProfile(login = null)
 
@@ -121,18 +139,42 @@ class ProfileRepositoryTest {
             assertEquals(8, user.publicRepos)
             assertEquals(9_000, user.followers)
             assertEquals(10, user.following)
+            // per_page=1 的 Link 头 last page 即 star 总数
+            assertEquals(1_234, user.starredCount)
             assertEquals("/user", server.takeRequest().url.encodedPath)
+            assertEquals("/user/starred", server.takeRequest().url.encodedPath)
         }
 
     @Test
     fun getProfile_login_validResponse_mapsDomain() =
         runTest {
             enqueueJson(userJson(login = "torvalds"))
+            enqueueStarredProbe(lastPage = 7)
 
             val user = repository.getProfile(login = "torvalds")
 
             assertEquals("torvalds", user.login)
+            assertEquals(7, user.starredCount)
             assertEquals("/users/torvalds", server.takeRequest().url.encodedPath)
+        }
+
+    @Test
+    fun getProfile_starredProbeFails_stillReturnsProfileWithNullCount() =
+        runTest {
+            enqueueJson(userJson())
+            // 探测失败（500）：资料头必须照常返回，只是统计行少一项
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 500 Internal Server Error")
+                    .body("{}")
+                    .build(),
+            )
+
+            val user = repository.getProfile(login = null)
+
+            assertEquals("octocat", user.login)
+            assertNull(user.starredCount)
         }
 
     @Test

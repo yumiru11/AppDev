@@ -11,6 +11,7 @@
     <string name="profile_stats_repos">%d 个仓库</string>
     <string name="profile_stats_followers">%d 关注者</string>
     <string name="profile_stats_following">%d 关注中</string>
+    <string name="profile_stats_stars">%d 星标</string>
     <string name="profile_list_empty">这里还没有内容</string>
     <string name="profile_list_error">加载失败</string>
     <string name="profile_list_retry">重试</string>

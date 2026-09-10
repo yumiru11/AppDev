@@ -11,6 +11,7 @@
     <string name="profile_stats_repos">%d repos</string>
     <string name="profile_stats_followers">%d followers</string>
     <string name="profile_stats_following">%d following</string>
+    <string name="profile_stats_stars">%d stars</string>
     <string name="profile_list_empty">Nothing here yet</string>
     <string name="profile_list_error">Failed to load</string>
     <string name="profile_list_retry">Retry</string>

@@ -58,6 +58,24 @@ interface UserApi {
         @Query("page") page: Int,
     ): List<RepositoryDto>
 
+    /**
+     * GET /user/starred?per_page=1 —— **只为了拿 Link 响应头**（#166 / UI21）。
+     *
+     * 用 Response 承接而不是直接返回 List：总数信息只在响应头里，
+     * 走 [com.yumiru11.githubapp.core.githubrest.http.GitHubLinkHeader] 解析。
+     */
+    @GET("user/starred")
+    suspend fun currentUserStarredCountProbe(
+        @Query("per_page") perPage: Int,
+    ): Response<List<RepositoryDto>>
+
+    /** GET /users/{login}/starred?per_page=1 —— 同上，任意用户公开 star 总数探测。 */
+    @GET("users/{login}/starred")
+    suspend fun userStarredCountProbe(
+        @Path("login") login: String,
+        @Query("per_page") perPage: Int,
+    ): Response<List<RepositoryDto>>
+
     /** GET /user/followers：当前认证用户的关注者（page/per_page 分页） */
     @GET("user/followers")
     suspend fun currentUserFollowers(
