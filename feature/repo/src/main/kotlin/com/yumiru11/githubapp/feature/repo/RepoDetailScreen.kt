@@ -1409,6 +1409,8 @@ private fun ReleaseAssetsSection(
             assets.forEach { asset ->
                 Card(
                     onClick = { asset.downloadUrl?.let(actions.onOpenExternal) },
+                    // 无直链（异常数据）时不可点，避免"点了没反应"
+                    enabled = asset.downloadUrl != null,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     colors =
                         CardDefaults.cardColors(
@@ -1440,13 +1442,14 @@ private fun ReleaseAssetsSection(
     }
 }
 
-/** 字节数 → 人类可读大小（B/KB/MB/GB；纯展示换算）。 */
+/** 字节数 → 人类可读大小（单位文案走 stringResource，零硬编码文案）。 */
+@Composable
 internal fun formatFileSize(bytes: Long): String =
     when {
-        bytes < KIB -> "$bytes B"
-        bytes < KIB * KIB -> "${bytes / KIB} KB"
-        bytes < KIB * KIB * KIB -> "${bytes / (KIB * KIB)} MB"
-        else -> "${bytes / (KIB * KIB * KIB)} GB"
+        bytes < KIB -> stringResource(R.string.repo_release_asset_size_b, bytes)
+        bytes < KIB * KIB -> stringResource(R.string.repo_release_asset_size_kb, bytes / KIB)
+        bytes < KIB * KIB * KIB -> stringResource(R.string.repo_release_asset_size_mb, bytes / (KIB * KIB))
+        else -> stringResource(R.string.repo_release_asset_size_gb, bytes / (KIB * KIB * KIB))
     }
 
 /** 1 KiB（单位换算常量） */

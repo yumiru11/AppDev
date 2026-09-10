@@ -158,6 +158,10 @@
     <string name="repo_release_assets">Assets</string>
     <string name="repo_release_assets_empty">No assets attached</string>
     <string name="repo_release_asset_meta">%1$s · %2$d downloads</string>
+    <string name="repo_release_asset_size_b">%1$d B</string>
+    <string name="repo_release_asset_size_kb">%1$d KB</string>
+    <string name="repo_release_asset_size_mb">%1$d MB</string>
+    <string name="repo_release_asset_size_gb">%1$d GB</string>
     <string name="repo_release_asset_upload">Upload asset</string>
     <string name="repo_release_asset_uploaded">Uploaded %1$s</string>
     <string name="repo_release_asset_upload_failed">Asset upload failed</string>
