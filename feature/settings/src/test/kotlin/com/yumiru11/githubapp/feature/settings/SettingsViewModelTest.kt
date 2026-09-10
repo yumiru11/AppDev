@@ -3,6 +3,7 @@ package com.yumiru11.githubapp.feature.settings
 import app.cash.turbine.test
 import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
+import com.yumiru11.githubapp.core.datastore.model.RepoLayoutMode
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.githubauth.auth.AuthState
@@ -480,6 +481,8 @@ private class FakeUserPreferencesRepository(
 
     override val codeLineNumbers: Flow<Boolean> = codeLineNumbersFlow
 
+    override val repoLayout: Flow<RepoLayoutMode> = MutableStateFlow(RepoLayoutMode.LIST)
+
     override suspend fun setThemeMode(mode: ThemeMode) {
         if (failOnSetThemeMode) throw IOException("disk full")
         themeModeFlow.value = mode
@@ -543,5 +546,9 @@ private class FakeUserPreferencesRepository(
 
     override suspend fun setCodeLineNumbers(enabled: Boolean) {
         codeLineNumbersFlow.value = enabled
+    }
+
+    override suspend fun setRepoLayout(mode: RepoLayoutMode) {
+        // 设置页不暴露布局开关（仓库分区右上角按钮直接写偏好），此处仅满足接口契约
     }
 }

@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
+import com.yumiru11.githubapp.core.datastore.model.RepoLayoutMode
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.model.resolveEffectiveThemeMode
 import kotlinx.coroutines.CoroutineScope
@@ -140,6 +141,53 @@ class UserPreferencesRepositoryTest {
 
             assertEquals(false, reloaded.glassBottomSheet.first())
             assertEquals(true, reloaded.glassTopBar.first())
+        }
+
+    // ── 仓库列表布局（#166 / UI01）──────────────────────────────────────────
+    @Test
+    fun repoLayout_byDefault_emitsList() =
+        runTest {
+            val repository = createRepository()
+
+            assertEquals(RepoLayoutMode.LIST, repository.repoLayout.first())
+        }
+
+    @Test
+    fun setRepoLayout_grid_persistsAndEmits() =
+        runTest {
+            val repository = createRepository()
+
+            repository.setRepoLayout(RepoLayoutMode.GRID)
+
+            assertEquals(RepoLayoutMode.GRID, repository.repoLayout.first())
+        }
+
+    @Test
+    fun setRepoLayout_grid_newInstance_readsBackPersistedValue() =
+        runTest {
+            val file = newPreferencesFile()
+            val scope = newScope()
+            createRepository(scope, file).setRepoLayout(RepoLayoutMode.GRID)
+            scope.cancel()
+
+            val reloaded = createRepository(newScope(), file)
+
+            assertEquals(RepoLayoutMode.GRID, reloaded.repoLayout.first())
+        }
+
+    @Test
+    fun repoLayout_unknownPersistedValue_fallsBackToList() =
+        runTest {
+            val file = newPreferencesFile()
+            val scope = newScope()
+            val store: DataStore<Preferences> =
+                PreferenceDataStoreFactory.create(scope = scope, produceFile = { file })
+            store.edit { it[stringPreferencesKey("repo_layout")] = "TRIANGLE" }
+            scope.cancel()
+
+            val reloaded = createRepository(newScope(), file)
+
+            assertEquals(RepoLayoutMode.LIST, reloaded.repoLayout.first())
         }
 
     @Test
