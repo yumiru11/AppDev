@@ -16,10 +16,14 @@ import org.junit.Test
  *
  * 行为：200 + ETag → 按 URL 缓存响应体；再次请求携带 If-None-Match；
  * 服务端 304 → 回放缓存体为 200（调用方无感知）。
+ *
+ * 另覆盖 issue #165 / L13 的限流观测：同一条响应链上录制 x-ratelimit-* 快照
+ * （304 回放会丢头，必须在回放前录制）。
  */
 class EtagCacheInterceptorTest {
     private lateinit var server: MockWebServer
     private lateinit var store: InMemoryEtagStore
+    private lateinit var rateLimitStore: InMemoryRateLimitStore
     private lateinit var client: OkHttpClient
 
     @Before
@@ -27,10 +31,11 @@ class EtagCacheInterceptorTest {
         server = MockWebServer()
         server.start()
         store = InMemoryEtagStore()
+        rateLimitStore = InMemoryRateLimitStore()
         client =
             OkHttpClient
                 .Builder()
-                .addInterceptor(EtagCacheInterceptor(store))
+                .addInterceptor(EtagCacheInterceptor(store, rateLimitStore))
                 .build()
     }
 
@@ -123,6 +128,84 @@ class EtagCacheInterceptorTest {
 
         assertNull(server.takeRequest().headers["If-None-Match"])
         assertNull(store.get(server.url("/markdown").toString()))
+    }
+
+    @Test
+    fun intercept_responseWithRateLimitHeaders_recordsSnapshot() {
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .body("{}")
+                .addHeader("x-ratelimit-limit", "30")
+                .addHeader("x-ratelimit-remaining", "7")
+                .addHeader("x-ratelimit-reset", "1800000000")
+                .addHeader("x-ratelimit-resource", "search")
+                .build(),
+        )
+
+        get("/search/repositories?q=kotlin").close()
+
+        val snapshot = rateLimitStore.snapshot.value
+        assertEquals(30, snapshot?.limit)
+        assertEquals(7, snapshot?.remaining)
+        assertEquals("search", snapshot?.resource)
+    }
+
+    @Test
+    fun intercept_304Replay_recordsRateLimitHeadersFromOriginResponse() {
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .body("""{"name":"Hello-World"}""")
+                .addHeader("ETag", """"abc123"""")
+                .addHeader("x-ratelimit-limit", "5000")
+                .addHeader("x-ratelimit-remaining", "4200")
+                .addHeader("x-ratelimit-reset", "1800000000")
+                .addHeader("x-ratelimit-resource", "core")
+                .build(),
+        )
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .status("HTTP/1.1 304 Not Modified")
+                .addHeader("x-ratelimit-limit", "5000")
+                .addHeader("x-ratelimit-remaining", "4199")
+                .addHeader("x-ratelimit-reset", "1800000000")
+                .addHeader("x-ratelimit-resource", "core")
+                .build(),
+        )
+
+        get("/repos/octocat/Hello-World").close()
+        val replayed = get("/repos/octocat/Hello-World")
+
+        // 回放后的 200 不带限流头，但 304 原始响应的配额已被录制
+        assertEquals(200, replayed.code)
+        assertEquals(4199, rateLimitStore.snapshot.value?.remaining)
+    }
+
+    @Test
+    fun intercept_nonGetRequest_recordsRateLimitHeaders() {
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .body("{}")
+                .addHeader("x-ratelimit-limit", "5000")
+                .addHeader("x-ratelimit-remaining", "4990")
+                .addHeader("x-ratelimit-reset", "1800000000")
+                .build(),
+        )
+
+        client
+            .newCall(
+                Request
+                    .Builder()
+                    .url(server.url("/markdown"))
+                    .post("body".toRequestBody(null))
+                    .build(),
+            ).execute()
+            .close()
+
+        assertEquals(4990, rateLimitStore.snapshot.value?.remaining)
     }
 
     @Test

@@ -6,6 +6,9 @@ import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
 import com.yumiru11.githubapp.core.githubauth.token.SessionData
 import com.yumiru11.githubapp.core.githubdata.error.GitHubError
 import com.yumiru11.githubapp.core.githubdata.error.GitHubRequestException
+import com.yumiru11.githubapp.core.githubrest.http.InMemoryRateLimitStore
+import com.yumiru11.githubapp.core.githubrest.http.RateLimitSnapshot
+import com.yumiru11.githubapp.core.githubrest.http.RateLimitStore
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.feature.search.data.SearchHistoryRepository
 import com.yumiru11.githubapp.feature.search.data.SearchPagingRepository
@@ -25,6 +28,7 @@ import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -70,7 +74,7 @@ class SearchViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val paging = pagingRepository()
             val viewModel =
-                SearchViewModel(
+                viewModel(
                     paging,
                     historyRepository(),
                     sessionManager(AuthState.SignedIn(SessionData(accessToken = "tok"))),
@@ -98,7 +102,7 @@ class SearchViewModelTest {
                     coEvery { add(capture(historySlot)) } answers { recorded += historySlot.captured }
                     coEvery { clear() } returns Unit
                 }
-            val viewModel = SearchViewModel(pagingRepository(), history, sessionManager(AuthState.PAT))
+            val viewModel = viewModel(pagingRepository(), history, sessionManager(AuthState.PAT))
             runCurrent()
 
             viewModel.submitQuery("kotlin")
@@ -112,7 +116,7 @@ class SearchViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             val paging = pagingRepository()
             val history = historyRepository()
-            val viewModel = SearchViewModel(paging, history, sessionManager(AuthState.PAT))
+            val viewModel = viewModel(paging, history, sessionManager(AuthState.PAT))
             runCurrent()
 
             viewModel.submitQuery("   ")
@@ -127,7 +131,7 @@ class SearchViewModelTest {
     fun onQueryChange_debouncedSearch_waits300msAndSearches() =
         runTest(mainDispatcherRule.testDispatcher) {
             val paging = pagingRepository()
-            val viewModel = SearchViewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
+            val viewModel = viewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
             runCurrent()
 
             viewModel.onQueryChange("kot")
@@ -146,7 +150,7 @@ class SearchViewModelTest {
     @Test
     fun onQueryChange_clearToEmpty_emitsIdle() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val viewModel = SearchViewModel(pagingRepository(), historyRepository(), sessionManager(AuthState.PAT))
+            val viewModel = viewModel(pagingRepository(), historyRepository(), sessionManager(AuthState.PAT))
             runCurrent()
             viewModel.submitQuery("kotlin")
             runCurrent()
@@ -168,7 +172,7 @@ class SearchViewModelTest {
                     coEvery { add(any()) } returns Unit
                     coEvery { clear() } returns Unit
                 }
-            val viewModel = SearchViewModel(paging, history, sessionManager(AuthState.PAT))
+            val viewModel = viewModel(paging, history, sessionManager(AuthState.PAT))
             runCurrent()
             viewModel.onQueryChange("kotlin")
             advanceTimeBy(300)
@@ -186,7 +190,7 @@ class SearchViewModelTest {
     fun selectTab_rebuildsFlowForNewTab() =
         runTest(mainDispatcherRule.testDispatcher) {
             val paging = pagingRepository()
-            val viewModel = SearchViewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
+            val viewModel = viewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
             runCurrent()
             viewModel.submitQuery("kotlin")
             runCurrent()
@@ -205,7 +209,7 @@ class SearchViewModelTest {
     fun selectTab_codeTabAnonymous_doesNotSearchAndKeepsEmptyFlow() =
         runTest(mainDispatcherRule.testDispatcher) {
             val paging = pagingRepository()
-            val viewModel = SearchViewModel(paging, historyRepository(), sessionManager(AuthState.Anonymous))
+            val viewModel = viewModel(paging, historyRepository(), sessionManager(AuthState.Anonymous))
             runCurrent()
             viewModel.submitQuery("kotlin")
             runCurrent()
@@ -223,7 +227,7 @@ class SearchViewModelTest {
     fun selectTab_codeTabSignedIn_searches() =
         runTest(mainDispatcherRule.testDispatcher) {
             val paging = pagingRepository()
-            val viewModel = SearchViewModel(paging, historyRepository(), sessionManager(AuthState.SignedIn(SessionData("tok"))))
+            val viewModel = viewModel(paging, historyRepository(), sessionManager(AuthState.SignedIn(SessionData("tok"))))
             runCurrent()
             viewModel.submitQuery("kotlin")
             runCurrent()
@@ -243,7 +247,7 @@ class SearchViewModelTest {
                 mockk<OAuthSessionManager> {
                     every { authState } returns authFlow
                 }
-            val viewModel = SearchViewModel(paging, historyRepository(), session)
+            val viewModel = viewModel(paging, historyRepository(), session)
             runCurrent()
             viewModel.submitQuery("kotlin")
             runCurrent()
@@ -264,7 +268,7 @@ class SearchViewModelTest {
                 mockk<SearchPagingRepository> {
                     every { repositories(any()) } throws httpException(429)
                 }
-            val viewModel = SearchViewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
+            val viewModel = viewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
             runCurrent()
 
             viewModel.submitQuery("kotlin")
@@ -280,7 +284,7 @@ class SearchViewModelTest {
                 mockk<SearchPagingRepository> {
                     every { repositories(any()) } throws IOException("network down")
                 }
-            val viewModel = SearchViewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
+            val viewModel = viewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
             runCurrent()
 
             viewModel.submitQuery("kotlin")
@@ -296,7 +300,7 @@ class SearchViewModelTest {
                 mockk<SearchPagingRepository> {
                     every { repositories(any()) } throws IOException("network down")
                 }
-            val viewModel = SearchViewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
+            val viewModel = viewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
             runCurrent()
             viewModel.submitQuery("kotlin")
             runCurrent()
@@ -313,7 +317,7 @@ class SearchViewModelTest {
     fun retry_inSuccessState_doesNotReload() =
         runTest(mainDispatcherRule.testDispatcher) {
             val paging = pagingRepository()
-            val viewModel = SearchViewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
+            val viewModel = viewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
             runCurrent()
             viewModel.submitQuery("kotlin")
             runCurrent()
@@ -334,7 +338,7 @@ class SearchViewModelTest {
                     coEvery { add(any()) } returns Unit
                     coEvery { clear() } returns Unit
                 }
-            val viewModel = SearchViewModel(pagingRepository(), history, sessionManager(AuthState.PAT))
+            val viewModel = viewModel(pagingRepository(), history, sessionManager(AuthState.PAT))
             runCurrent()
             assertEquals(listOf("kotlin"), viewModel.history.value)
 
@@ -349,7 +353,7 @@ class SearchViewModelTest {
     @Test
     fun init_anonymous_historyAndIdleInitialState() =
         runTest(mainDispatcherRule.testDispatcher) {
-            val viewModel = SearchViewModel(pagingRepository(), historyRepository(), sessionManager(AuthState.Anonymous))
+            val viewModel = viewModel(pagingRepository(), historyRepository(), sessionManager(AuthState.Anonymous))
             runCurrent()
 
             assertEquals(SearchUiState.Idle, viewModel.uiState.value)
@@ -364,13 +368,78 @@ class SearchViewModelTest {
                 mockk<SearchPagingRepository> {
                     every { repositories(any()) } throws GitHubRequestException(GitHubError.RateLimited(retryAfterSeconds = 60))
                 }
-            val viewModel = SearchViewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
+            val viewModel = viewModel(paging, historyRepository(), sessionManager(AuthState.PAT))
             runCurrent()
 
             viewModel.submitQuery("kotlin")
             runCurrent()
 
             assertEquals(SearchUiState.Error(SearchErrorType.RATE_LIMITED), viewModel.uiState.value)
+        }
+
+    /** 统一构造被测 ViewModel（16 处调用点共用，便于后续新增依赖） */
+    private fun viewModel(
+        paging: SearchPagingRepository = pagingRepository(),
+        history: SearchHistoryRepository = historyRepository(),
+        session: OAuthSessionManager = sessionManager(AuthState.PAT),
+        rateLimit: RateLimitStore = InMemoryRateLimitStore(),
+    ): SearchViewModel = SearchViewModel(paging, history, session, rateLimit)
+
+    @Test
+    fun rateLimitWarning_remainingBelowThreshold_emitsWarning() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val store = InMemoryRateLimitStore()
+            val viewModel = viewModel(rateLimit = store)
+            runCurrent()
+            assertNull(viewModel.rateLimitWarning.value)
+
+            // core 配额 5000/h，剩余 3 → 低于 50 阈值
+            store.record(
+                RateLimitSnapshot(
+                    limit = 5000,
+                    remaining = 3,
+                    resetEpochSeconds = System.currentTimeMillis() / 1000 + 120,
+                    resource = "core",
+                ),
+            )
+            runCurrent()
+
+            val warning = viewModel.rateLimitWarning.value
+            assertEquals(3, warning?.remaining)
+            assertTrue("重置时间应折算为 1~3 分钟，实际 ${warning?.resetInMinutes}", (warning?.resetInMinutes ?: 0L) in 1L..3L)
+        }
+
+    @Test
+    fun rateLimitWarning_remainingAboveThreshold_staysNull() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val store = InMemoryRateLimitStore()
+            val viewModel = viewModel(rateLimit = store)
+            runCurrent()
+
+            store.record(RateLimitSnapshot(limit = 5000, remaining = 4321, resetEpochSeconds = 1_800_000_000L, resource = "core"))
+            runCurrent()
+
+            assertNull(viewModel.rateLimitWarning.value)
+        }
+
+    @Test
+    fun retry_afterRateLimited_reloadsAndSucceeds() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val paging =
+                mockk<SearchPagingRepository> {
+                    every { repositories(any()) } throws httpException(429)
+                }
+            val viewModel = viewModel(paging = paging)
+            runCurrent()
+            viewModel.submitQuery("kotlin")
+            runCurrent()
+            assertEquals(SearchUiState.Error(SearchErrorType.RATE_LIMITED), viewModel.uiState.value)
+
+            every { paging.repositories(any()) } returns flowOf(PagingData.empty())
+            viewModel.retry()
+            runCurrent()
+
+            assertTrue(viewModel.uiState.value is SearchUiState.Success)
         }
 
     private fun httpException(code: Int): HttpException {
