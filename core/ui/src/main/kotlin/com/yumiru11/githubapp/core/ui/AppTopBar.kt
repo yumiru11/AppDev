@@ -9,14 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -31,6 +26,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.GlassScope
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 
@@ -86,8 +83,8 @@ fun AppTopBar(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
+                            AppIcon(
+                                spec = AppIcons.Search,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -101,30 +98,31 @@ fun AppTopBar(
                     }
                 },
                 actions = {
-                    // audit 缺陷 #14（issue #85）：未读数并入铃铛语义描述，TalkBack 可感知数量
+                    // audit 缺陷 #14（issue #85）：未读数并入铃铛语义描述，TalkBack 可感知数量。
+                    // issue #168 / UI27：>99 时显示与播报同口径封顶 99+（不再报真实数字）。
                     val notificationBellDescription =
                         if (unreadCount > 0) {
-                            pluralStringResource(R.plurals.notification_unread_badge_cd, unreadCount, unreadCount)
+                            unreadBadgeDescription(unreadCount)
                         } else {
                             stringResource(R.string.notification_title)
                         }
                     BadgedBox(
                         badge = {
                             if (unreadCount > 0) {
-                                Badge { Text(formatBadgeCount(unreadCount)) }
+                                Badge { Text(badgeCountText(unreadCount)) }
                             }
                         },
                     ) {
                         IconButton(onClick = onNotificationClick) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
+                            AppIcon(
+                                spec = AppIcons.Notifications,
                                 contentDescription = notificationBellDescription,
                             )
                         }
                     }
                     IconButton(onClick = onProfileClick) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
+                        AppIcon(
+                            spec = AppIcons.Person,
                             contentDescription = stringResource(R.string.nav_profile),
                         )
                     }
@@ -140,10 +138,33 @@ fun AppTopBar(
 /** 角标数字显示上限：超过显示 99+（audit 缺陷 #14 / issue #85）。 */
 internal const val BADGE_MAX_COUNT = 99
 
-/** 未读角标数字格式化：不超过 [BADGE_MAX_COUNT] 时原样显示，超出显示 99+。 */
-internal fun formatBadgeCount(count: Int): String =
-    if (count > BADGE_MAX_COUNT) {
-        "${BADGE_MAX_COUNT}+"
+/** 未读数是否溢出显示上限（>99 一律收敛为 99+）。纯函数，边界由 AppTopBarBadgeTest 锁定。 */
+internal fun badgeCountOverflows(count: Int): Boolean = count > BADGE_MAX_COUNT
+
+/**
+ * 未读角标显示文本（issue #168 / UI27）：不超过上限时原样显示，
+ * 超出用 i18n 模板 [R.string.notification_badge_overflow]（"%1$d+"）渲染上限值。
+ */
+@Composable
+internal fun badgeCountText(count: Int): String =
+    if (badgeCountOverflows(count)) {
+        stringResource(R.string.notification_badge_overflow, BADGE_MAX_COUNT)
     } else {
         count.toString()
+    }
+
+/**
+ * 铃铛语义描述：与角标显示同口径（issue #168 / UI27）——>99 时播报「99+ 条未读通知」，
+ * 不与屏幕上看到的数字打架。
+ */
+@Composable
+internal fun unreadBadgeDescription(unreadCount: Int): String =
+    if (badgeCountOverflows(unreadCount)) {
+        pluralStringResource(
+            R.plurals.notification_unread_badge_cd_overflow,
+            BADGE_MAX_COUNT,
+            BADGE_MAX_COUNT,
+        )
+    } else {
+        pluralStringResource(R.plurals.notification_unread_badge_cd, unreadCount, unreadCount)
     }

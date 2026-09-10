@@ -6,12 +6,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.yumiru11.githubapp.core.datastore.model.IconStyle
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.model.resolveEffectiveThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.designsystem.token.GlassSettings
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
+import com.yumiru11.githubapp.core.designsystem.token.LocalIconStyle
 import com.yumiru11.githubapp.core.designsystem.token.rememberSystemMotionScale
 import com.yumiru11.githubapp.core.designsystem.token.resolveEffectiveMotionScale
 
@@ -25,6 +27,7 @@ import com.yumiru11.githubapp.core.designsystem.token.resolveEffectiveMotionScal
  *   seed 色（[UserPreferencesRepository.seedColor]）传给 [AppTheme] 作用于基础模式
  * - 仓库 Flow 发射新值（T24 设置页 setXxx）→ collectAsStateWithLifecycle
  *   重组 → [AppTheme] 切换色板，无需 activity 重启
+ * - #168 / UI12：iconStyle 经 [LocalIconStyle] 下发，AppIcon 据此选 Material Symbols 变体
  * - 单一测试缝：装配行为在 AppThemeHostTest 用假仓库验证（色板选择/重组）
  *
  * @param repository 用户偏好仓库（Hilt 注入的单例）
@@ -66,6 +69,9 @@ fun AppThemeHost(
     val glassPanel by repository.glassPanel.collectAsStateWithLifecycle(initialValue = true)
     val glassBottomSheet by repository.glassBottomSheet.collectAsStateWithLifecycle(initialValue = true)
     val blurEnabled by repository.blurEnabled.collectAsStateWithLifecycle(initialValue = true)
+    // 图标风格（#168 / UI12）：设置页「图标风格」→ DataStore → LocalIconStyle →
+    // 底栏/顶栏图标经 AppIcon 立即切换 Material Symbols 变体（无需重启）。
+    val iconStyle by repository.iconStyle.collectAsStateWithLifecycle(initialValue = IconStyle.ROUNDED)
     val glassSettings =
         GlassSettings(
             masterEnabled = blurEnabled,
@@ -78,7 +84,10 @@ fun AppThemeHost(
             highContrastEnabled = highContrastEnabled,
         )
 
-    CompositionLocalProvider(LocalGlassSettings provides glassSettings) {
+    CompositionLocalProvider(
+        LocalGlassSettings provides glassSettings,
+        LocalIconStyle provides iconStyle,
+    ) {
         AppTheme(
             themeMode = effectiveMode,
             // 默认 seed（未自定义）传 null → 走默认调色板（与 T6/T12 行为一致，AppThemeHostTest 断言依赖）；

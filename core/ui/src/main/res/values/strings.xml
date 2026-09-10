@@ -60,4 +60,19 @@
     <!-- Fullscreen image viewer (issue #166 / UI11, ui-design §3.11) -->
     <string name="image_viewer_cd">Image preview</string>
     <string name="image_viewer_close_cd">Close image preview</string>
+
+    <!-- GitHub 状态播报（issue #168 / UI26）：AppStateChip 的 stateDescription 短语 -->
+    <string name="state_description_open">This item is open</string>
+    <string name="state_description_closed">This item is closed</string>
+    <string name="state_description_merged">This pull request is merged</string>
+    <string name="state_description_draft">Draft pull request</string>
+    <string name="state_description_mergeable">No merge conflicts</string>
+    <string name="state_description_conflicting">Has merge conflicts</string>
+
+    <!-- 角标数字上限（issue #168 / UI27）：>99 显示 99+，播报同口径 -->
+    <string name="notification_badge_overflow">%1$d+</string>
+    <plurals name="notification_unread_badge_cd_overflow">
+        <item quantity="one">%d+ unread notification</item>
+        <item quantity="other">%d+ unread notifications</item>
+    </plurals>
 </resources>
