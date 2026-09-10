@@ -1,3 +1,8 @@
+@file:Suppress("LongParameterList")
+// 分区内容分发装配（HomeSuccessContent/HomePage/FeedPage）：feed + trending（L08）+
+// 玻璃避让上下 padding + 三个快捷入口回调，参数天然多（同 NotificationsPanelContent 先例）；
+// 为凑阈值硬包数据类只会增加无意义包装层，精准抑制。
+
 package com.yumiru11.githubapp.feature.home
 
 import androidx.compose.animation.core.spring
@@ -59,9 +64,11 @@ import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppTopBar
 import com.yumiru11.githubapp.feature.home.model.FeedItem
+import com.yumiru11.githubapp.feature.home.model.TrendItem
 import com.yumiru11.githubapp.feature.home.ui.FeedRow
 import com.yumiru11.githubapp.feature.home.ui.RepoPickerSheet
 import com.yumiru11.githubapp.feature.home.ui.STAGGER_MAX_ITEMS
+import com.yumiru11.githubapp.feature.home.ui.TrendingSection
 import com.yumiru11.githubapp.feature.home.ui.rememberStaggerEnterModifier
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -72,6 +79,9 @@ import java.io.IOException
 
 /** 快捷入口进列表后的稳定 item key（与 feed 条目的数字 id 命名空间不冲突） */
 internal const val QUICK_ACTIONS_KEY = "home-quick-actions"
+
+/** Trending 小节在 feed 尾部的稳定 item key（L08） */
+internal const val TRENDING_SECTION_KEY = "home-trending-section"
 
 /**
  * 首页（T10 + #89 + #83）：玻璃头（顶栏 + 小分区条）+ HorizontalPager 分区内容区。
@@ -125,6 +135,8 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    // Trending（L08）：空列表 = 小节不渲染（数据层失败静默降级）
+    val trending by viewModel.trending.collectAsStateWithLifecycle()
 
     // backdrop blur（issue #83）：顶栏玻璃的 hazeEffect 与本页内容侧 hazeSource 共享本 state
     val hazeState = rememberHazeState()
@@ -189,6 +201,7 @@ fun HomeScreen(
                     is HomeUiState.Success -> {
                         HomeSuccessContent(
                             feed = state.feed,
+                            trending = trending,
                             pagerState = pagerState,
                             onFeedItemClick = onFeedItemClick,
                             topGlassPadding = topGlassPadding,
@@ -258,6 +271,7 @@ private fun HomeGlassHeader(
 @Composable
 private fun HomeSuccessContent(
     feed: Flow<PagingData<FeedItem>>,
+    trending: List<TrendItem>,
     pagerState: PagerState,
     onFeedItemClick: (ParsedUrl) -> Unit,
     topGlassPadding: Dp,
@@ -277,6 +291,7 @@ private fun HomeSuccessContent(
         HomePage(
             page = page,
             feed = feed,
+            trending = trending,
             onFeedItemClick = onFeedItemClick,
             topGlassPadding = topGlassPadding,
             bottomContentPadding = bottomContentPadding,
@@ -311,6 +326,7 @@ private fun HomeSuccessContent(
 private fun HomePage(
     page: Int,
     feed: Flow<PagingData<FeedItem>>,
+    trending: List<TrendItem>,
     onFeedItemClick: (ParsedUrl) -> Unit,
     topGlassPadding: Dp,
     bottomContentPadding: Dp,
@@ -321,6 +337,7 @@ private fun HomePage(
         HomeTab.FEED -> {
             FeedPage(
                 feed = feed,
+                trending = trending,
                 onFeedItemClick = onFeedItemClick,
                 topGlassPadding = topGlassPadding,
                 bottomContentPadding = bottomContentPadding,
@@ -391,6 +408,7 @@ private fun QuickActionsSection(
 @Composable
 private fun FeedPage(
     feed: Flow<PagingData<FeedItem>>,
+    trending: List<TrendItem>,
     onFeedItemClick: (ParsedUrl) -> Unit,
     topGlassPadding: Dp,
     bottomContentPadding: Dp,
@@ -412,6 +430,8 @@ private fun FeedPage(
     if (hasFeedRows) {
         FeedList(
             lazyItems = lazyItems,
+            trending = trending,
+            onTrendingClick = { item -> handleTrendingClick(item, onFeedItemClick) },
             onFeedItemClick = onFeedItemClick,
             topGlassPadding = topGlassPadding,
             bottomContentPadding = bottomContentPadding,
@@ -466,6 +486,8 @@ private fun FeedPage(
 @Composable
 private fun FeedList(
     lazyItems: LazyPagingItems<FeedItem>,
+    trending: List<TrendItem>,
+    onTrendingClick: (TrendItem) -> Unit,
     onFeedItemClick: (ParsedUrl) -> Unit,
     topGlassPadding: Dp,
     bottomContentPadding: Dp,
@@ -523,7 +545,23 @@ private fun FeedList(
                     )
                 }
             }
+            // Trending 小节：feed 尾部（ui-design §2.2「trending repo 穿插在 feed 下方」）。
+            // 空列表时 TrendingSection 自身不渲染；固定 key 避免刷新时与 feed 行冲突
+            item(key = TRENDING_SECTION_KEY) {
+                TrendingSection(items = trending, onItemClick = onTrendingClick)
+            }
         }
+    }
+}
+
+/** 点击 Trending 条目：仓库链接 → 应用内仓库详情（复用 feed 的 ParsedUrl 导航通道） */
+private fun handleTrendingClick(
+    item: TrendItem,
+    onFeedItemClick: (ParsedUrl) -> Unit,
+) {
+    val parsed = GitHubLinkParser.parseUrl(item.url)
+    if (parsed !is ParsedUrl.External) {
+        onFeedItemClick(parsed)
     }
 }
 

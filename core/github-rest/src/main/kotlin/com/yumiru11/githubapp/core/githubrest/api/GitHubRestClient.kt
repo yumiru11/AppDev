@@ -56,6 +56,29 @@ object GitHubRestClient {
             .readTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .build()
 
+    /**
+     * 无认证 Retrofit：**第三方 host 专用**（L08 Trending 镜像站）。
+     *
+     * 刻意不接 OkHttpClient 参数——共享客户端装着 [AuthTokenInterceptor]，
+     * 它按 host 无差别注入 `Authorization: Bearer {token}`；GitHub 令牌只应发往
+     * api.github.com，发给社区静态镜像属泄漏。超时收紧到 5s（超时即降级）。
+     */
+    fun createUnauthenticatedRetrofit(
+        baseUrl: HttpUrl,
+        timeoutSeconds: Long = UNAUTHENTICATED_TIMEOUT_SECONDS,
+    ): Retrofit =
+        createRetrofit(
+            baseUrl = baseUrl,
+            client =
+                OkHttpClient
+                    .Builder()
+                    .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
+                    .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
+                    .build(),
+            // Json 在工厂内部构造：消费方（feature 模块）无需依赖 kotlinx-serialization
+            json = createJson(),
+        )
+
     fun createRetrofit(
         baseUrl: HttpUrl,
         client: OkHttpClient,
@@ -69,6 +92,9 @@ object GitHubRestClient {
             .build()
 
     private const val DEFAULT_TIMEOUT_SECONDS = 30L
+
+    /** 无认证通道超时（Trending 镜像：超时即走搜索回退，不拖住首页） */
+    private const val UNAUTHENTICATED_TIMEOUT_SECONDS = 5L
 
     /** OkHttp 日志 tag（脱敏后输出，见下方 logger 装配） */
     private const val LOG_TAG = "GitHubRest"
