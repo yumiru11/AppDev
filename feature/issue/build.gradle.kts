@@ -57,6 +57,9 @@ dependencies {
 
     // Markdown（评论/正文原生渲染）
     implementation(project(":core:markdown"))
+    // 评论输入 Sheet 的完整形态（#166 / UI05）：复用 core:editor 的 MarkdownComposer
+    // （编辑/预览双 Tab + md 工具栏），不再手搓输入框
+    implementation(project(":core:editor"))
 
     // 导航（GitHubLinkParser 解析评论链接）
     implementation(project(":core:navigation"))

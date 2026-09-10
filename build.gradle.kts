@@ -406,6 +406,9 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 // （无独立单测可打点；逻辑部分已抽到 WebViewDarkModePolicy 并有单测）。
                 // #170 实测：动一行注释都会让 diff 门禁把它算成"未覆盖新增行"。
                 Regex("""(^|/)[^/]*Renderer\.kt$"""),
+                // *Composer.kt：编辑/预览装配层（MarkdownComposer 等纯 Composable）。
+                // "Composer" 是 Compose 专有词（runtime 的 Composer），不会有同名逻辑类。
+                Regex("""(^|/)[^/]*Composer[^/]*\.kt$"""),
             )
 
         val changedFiles =

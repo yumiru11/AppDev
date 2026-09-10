@@ -41,6 +41,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -99,6 +100,10 @@ import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
+import com.yumiru11.githubapp.core.editor.MarkdownComposer
+import com.yumiru11.githubapp.core.editor.MarkdownEditorController
+import com.yumiru11.githubapp.core.editor.rememberM3EditorThemeTokens
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
@@ -1120,7 +1125,18 @@ private fun MilestoneOptionCard(
     }
 }
 
-/** 评论输入 BottomSheet（ui-design §3.9：圆角 + 输入区 + 提交） */
+/**
+ * 评论输入 Sheet 完整形态（#166 / UI05，ui-design §3.9 D2-3 用户拍板）。
+ *
+ * 用户拍板形制：**右下角圆角按钮触发 → 上滑 Sheet（圆角 + 把手）+ 编辑/预览切换 +
+ * 底部 md 功能按钮**。此前实现只是一个 OutlinedTextField + 提交按钮，三件套缺两件。
+ *
+ * 复用 core:editor 的 [MarkdownComposer]（编辑/预览双 Tab + 11 个语法动作工具栏），
+ * 与全屏 Markdown 编辑页共享同一套交互 —— 不给评论单独维护一份工具栏。
+ *
+ * 预览刻意用**原生 [MarkdownViewer]** 而不是 WebView：本仓铁律「评论列表绝不用 WebView」
+ * 同样适用于评论预览（短文本、进 Sheet 就要出画面，WebView 初始化反而慢）。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CommentInputSheet(
@@ -1128,30 +1144,64 @@ private fun CommentInputSheet(
     onSubmit: (String) -> Unit,
 ) {
     var body by remember { mutableStateOf("") }
+    var isPreview by remember { mutableStateOf(false) }
+    var editorController by remember { mutableStateOf<MarkdownEditorController?>(null) }
     val sheetState = rememberModalBottomSheetState()
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    val editorTokens = rememberM3EditorThemeTokens()
+    val previewPlaceholder = stringResource(R.string.issue_comment_preview_empty)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        // 圆角 + 顶部把手：ModalBottomSheet 自带把手，圆角走全局形状令牌
+        shape =
+            RoundedCornerShape(
+                topStart = AppDimens.cornerExtraLarge,
+                topEnd = AppDimens.cornerExtraLarge,
+            ),
+    ) {
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 24.dp)
+                    .padding(horizontal = AppDimens.contentPadding)
+                    .padding(bottom = AppDimens.contentPadding)
                     .imePadding(),
         ) {
-            OutlinedTextField(
-                value = body,
-                onValueChange = { body = it },
-                label = { Text(text = stringResource(R.string.issue_comment_hint)) },
-                minLines = 3,
-                modifier = Modifier.fillMaxWidth(),
+            MarkdownComposer(
+                text = body,
+                isPreview = isPreview,
+                onTogglePreview = { isPreview = it },
+                onTextChanged = { body = it },
+                onEditorReady = { editorController = it },
+                onToolbarAction = { editorController?.applySyntax(it) },
+                themeTokens = editorTokens,
+                preview = {
+                    MarkdownViewer(
+                        markdown = body.ifBlank { previewPlaceholder },
+                        // Sheet 自身可滚动：预览不再开内层滚动（避免嵌套滚动手势打架）
+                        scrollable = false,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = AppDimens.cornerSmall),
+                    )
+                },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp, max = 380.dp),
             )
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = { onSubmit(body) },
-                enabled = body.isNotBlank(),
-                modifier = Modifier.align(Alignment.End),
+            Spacer(modifier = Modifier.height(AppDimens.cornerMedium))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(text = stringResource(R.string.issue_comment_submit))
+                TextButton(onClick = onDismiss) {
+                    Text(text = stringResource(R.string.issue_comment_cancel))
+                }
+                Spacer(modifier = Modifier.width(AppDimens.cornerSmall))
+                Button(
+                    onClick = { onSubmit(body) },
+                    enabled = body.isNotBlank(),
+                ) {
+                    Text(text = stringResource(R.string.issue_comment_submit))
+                }
             }
         }
     }
