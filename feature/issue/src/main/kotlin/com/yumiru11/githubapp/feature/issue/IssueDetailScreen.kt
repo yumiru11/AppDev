@@ -105,6 +105,7 @@ import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppImageOverlay
+import com.yumiru11.githubapp.core.ui.gitHubStatusStateDescription
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueLabel
@@ -690,14 +691,17 @@ private fun StatusChip(state: IssueState) {
             IssueState.OPEN -> stringResource(R.string.issue_state_open)
             IssueState.CLOSED -> stringResource(R.string.issue_state_closed)
         }
+    val status =
+        when (state) {
+            IssueState.OPEN -> GitHubStatus.OPEN
+            IssueState.CLOSED -> GitHubStatus.CLOSED
+        }
     // #84 audit 缺陷 #4：四态同色 secondaryContainer → AppStateChip 语义色
+    // #168 / UI26：补状态播报（TalkBack 读「Open, 该项已开启」）
     AppStateChip(
-        status =
-            when (state) {
-                IssueState.OPEN -> GitHubStatus.OPEN
-                IssueState.CLOSED -> GitHubStatus.CLOSED
-            },
+        status = status,
         label = text,
+        stateDescription = gitHubStatusStateDescription(status),
     )
 }
 
@@ -754,6 +758,9 @@ private fun AssigneeRow(assignees: List<IssueUser>) {
 /**
  * 反应条：8 种 GitHub 反应（+1/-1/laugh/hooray/confused/heart/rocket/eyes）文本 chip + 计数。
  * 已反应（viewer 添加过）→ primary 容器；点击 toggle 增删。
+ *
+ * chip 本体见 [ReactionChip]（issue #168 / UI24：命中区 48dp、视觉不膨胀，触区断言在
+ * ReactionChipTouchTargetTest）。
  */
 @Composable
 private fun ReactionBar(
@@ -771,61 +778,13 @@ private fun ReactionBar(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         visible.forEach { content ->
-            val count = reactions.counts[content] ?: 0
-            val reacted = myReactions.containsKey(content)
-            Surface(
-                shape = MaterialTheme.shapes.small,
-                color =
-                    if (reacted) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                onClick = { onToggle(content) },
-                modifier =
-                    Modifier
-                        // audit 缺陷 #15（issue #85）：最小触点 48dp
-                        .heightIn(min = 48.dp)
-                        .then(
-                            if (reacted) {
-                                Modifier.semantics { stateDescription = reactedStateText }
-                            } else {
-                                Modifier
-                            },
-                        ),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier =
-                        Modifier
-                            .fillMaxHeight()
-                            .padding(horizontal = 12.dp),
-                ) {
-                    Text(
-                        text = content,
-                        style = MaterialTheme.typography.labelMedium,
-                        color =
-                            if (reacted) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                    )
-                    if (count > 0) {
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = count.toString(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color =
-                                if (reacted) {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                        )
-                    }
-                }
-            }
+            ReactionChip(
+                content = content,
+                count = reactions.counts[content] ?: 0,
+                reacted = myReactions.containsKey(content),
+                reactedStateText = reactedStateText,
+                onToggle = { onToggle(content) },
+            )
         }
     }
 }
