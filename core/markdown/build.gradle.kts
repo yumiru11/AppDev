@@ -50,6 +50,8 @@ dependencies {
 
     // 测试基建（ScreenshotTest 基类 + Robolectric/Roborazzi，见 AGENTS.md）
     testImplementation(project(":core:testing"))
+    // PrivateImageInterceptor 代理链测试：MockWebServer 验证 Authorization 注入与回包
+    testImplementation(libs.mockwebserver3)
 }
 
 configurations.all {
