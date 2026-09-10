@@ -124,7 +124,12 @@ class RepoDetailViewModel
             }
         }
 
-        /** 第三个 Tab 打开时确保 Releases 已加载（Idle/Error 才触发，Loaded 不重复拉取）。 */
+        /**
+         * 第三个 Tab 打开时确保 Releases 已加载（Idle/Error 才触发，Loaded 不重复拉取）。
+         *
+         * 草稿可见性（L05）：无 push 权限（游客/只读）时不渲染 draft Release——GitHub 服务端
+         * 本身对无权限者已过滤，这里再兜一层，保证「游客看不到草稿」（权限未就绪时同样按隐藏处理）。
+         */
         fun ensureReleasesLoaded() {
             val state = _uiState.value as? RepoDetailUiState.Success ?: return
             if (state.releasesState !is ReleasesState.Idle && state.releasesState !is ReleasesState.Error) return
@@ -134,7 +139,12 @@ class RepoDetailViewModel
                     .getReleases(owner, repo)
                     .onSuccess { releases ->
                         _uiState.update { s ->
-                            if (s is RepoDetailUiState.Success) s.copy(releasesState = ReleasesState.Loaded(releases)) else s
+                            if (s is RepoDetailUiState.Success) {
+                                val visible = if (s.canPushRepo) releases else releases.filterNot { it.draft }
+                                s.copy(releasesState = ReleasesState.Loaded(visible))
+                            } else {
+                                s
+                            }
                         }
                     }.onFailure { e ->
                         _uiState.update { s ->

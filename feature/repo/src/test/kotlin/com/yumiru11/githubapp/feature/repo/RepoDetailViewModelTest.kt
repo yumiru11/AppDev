@@ -727,6 +727,50 @@ class RepoDetailViewModelTest {
             )
         }
 
+    // ---- L05 草稿可见性 ----
+
+    @Test
+    fun ensureReleasesLoaded_withoutPushPermission_hidesDraftReleases() =
+        runTest {
+            val draft = Release(id = 1, tagName = "v0.1", draft = true)
+            val published = Release(id = 2, tagName = "v1.0")
+            val repoManagementRepository =
+                mockk<RepoManagementRepository> {
+                    coEvery { getLanguages(any(), any()) } returns Result.success(emptyMap())
+                    coEvery { getReleases(any(), any()) } returns Result.success(listOf(draft, published))
+                }
+            val viewModel = viewModel(repoRepositoryWithReadme(), repoManagementRepository)
+
+            viewModel.ensureReleasesLoaded()
+
+            val loaded = (viewModel.uiState.value as RepoDetailUiState.Success).releasesState as ReleasesState.Loaded
+            assertEquals(listOf(published), loaded.releases)
+        }
+
+    @Test
+    fun ensureReleasesLoaded_withPushPermission_showsDraftReleases() =
+        runTest {
+            val draft = Release(id = 1, tagName = "v0.1", draft = true)
+            val repoManagementRepository =
+                mockk<RepoManagementRepository> {
+                    coEvery { getLanguages(any(), any()) } returns Result.success(emptyMap())
+                    coEvery { getReleases(any(), any()) } returns Result.success(listOf(draft))
+                }
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getRepository(any(), any()) } returns GitHubFakes.fakeRepository()
+                    coEvery { getReadme(any(), any(), any<String>()) } returns
+                        Result.success(ReadmeContent(markdown = "# H", html = "<p>h</p>", renderMode = ReadmeRenderMode.WEBVIEW))
+                    coEvery { repositoryPermissions(any(), any()) } returns RepositoryPermissions(canAdmin = true, canPush = true)
+                }
+            val viewModel = viewModel(repoRepository, repoManagementRepository)
+
+            viewModel.ensureReleasesLoaded()
+
+            val loaded = (viewModel.uiState.value as RepoDetailUiState.Success).releasesState as ReleasesState.Loaded
+            assertEquals(listOf(draft), loaded.releases)
+        }
+
     // ---- L06 Topics ----
 
     @Test
