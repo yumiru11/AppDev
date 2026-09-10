@@ -79,6 +79,12 @@ interface UserPreferencesRepository {
      */
     val repoLayout: Flow<RepoLayoutMode>
 
+    /**
+     * 列表首屏 stagger 开关（#167 / UI06，ui-design §4.2 H2-2 用户拍板「可选开关（设置里）」）。
+     * 默认开启；关闭后退化为一次性直出（不位移、不淡入）。
+     */
+    val staggerEnabled: Flow<Boolean>
+
     suspend fun setThemeMode(mode: ThemeMode)
 
     suspend fun setBlurEnabled(enabled: Boolean)
@@ -113,4 +119,6 @@ interface UserPreferencesRepository {
     suspend fun setCodeLineNumbers(enabled: Boolean)
 
     suspend fun setRepoLayout(mode: RepoLayoutMode)
+
+    suspend fun setStaggerEnabled(enabled: Boolean)
 }

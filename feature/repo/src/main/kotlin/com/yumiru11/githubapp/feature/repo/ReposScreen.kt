@@ -91,6 +91,7 @@ import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
 import com.yumiru11.githubapp.core.designsystem.token.GlassScope
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
+import com.yumiru11.githubapp.core.designsystem.token.LocalStaggerEnabled
 import com.yumiru11.githubapp.core.ui.AppTopBar
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -656,11 +657,18 @@ private fun RepoMetaRow(repository: Repository) {
  */
 @Composable
 private fun rememberEnterModifier(index: Int): Modifier {
+    // 全局 stagger 开关（#167 / UI06，§4.2 H2-2）：关掉即一次性直出
+    val staggerEnabled = LocalStaggerEnabled.current
     val played = rememberSaveable { mutableStateOf(false) }
     val progress = remember { Animatable(if (played.value) 1f else 0f) }
     val duration = AppMotion.scaledDuration(AppMotion.DURATION_LIST_ITEM)
-    LaunchedEffect(duration) {
+    LaunchedEffect(duration, staggerEnabled) {
         if (progress.value < 1f) {
+            if (!staggerEnabled || duration <= 0) {
+                progress.snapTo(1f)
+                played.value = true
+                return@LaunchedEffect
+            }
             val delay = if (index < STAGGER_MAX_ITEMS) index * AppMotion.LIST_STAGGER_INTERVAL_MILLIS else 0
             if (delay > 0) kotlinx.coroutines.delay(delay.toLong())
             progress.animateTo(1f, tween(durationMillis = duration, easing = AppMotion.EmphasizedDecelerate))

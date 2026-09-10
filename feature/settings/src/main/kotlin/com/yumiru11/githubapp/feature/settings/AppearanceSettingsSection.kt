@@ -160,6 +160,16 @@ internal fun AppearanceSettingsSection(
         }
         item { CornerScaleRow(scale = uiState.cornerScale, onScaleChange = viewModel::setCornerScale) }
         item { MotionScaleRow(scale = uiState.motionScale, onScaleChange = viewModel::setMotionScale) }
+        // 列表 stagger 开关（#167 / UI06，§4.2 H2-2 用户拍板「可选开关」）：
+        // 放在动效强度滑杆下方 —— 同属"动效"语义，但一个是全局时长、一个是逐项错峰。
+        item {
+            SwitchSettingRow(
+                title = stringResource(R.string.settings_stagger),
+                description = stringResource(R.string.settings_stagger_desc),
+                checked = uiState.staggerEnabled,
+                onCheckedChange = viewModel::setStaggerEnabled,
+            )
+        }
     }
 }
 

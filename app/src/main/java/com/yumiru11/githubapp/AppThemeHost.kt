@@ -14,6 +14,7 @@ import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.designsystem.token.GlassSettings
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import com.yumiru11.githubapp.core.designsystem.token.LocalIconStyle
+import com.yumiru11.githubapp.core.designsystem.token.LocalStaggerEnabled
 import com.yumiru11.githubapp.core.designsystem.token.rememberSystemMotionScale
 import com.yumiru11.githubapp.core.designsystem.token.resolveEffectiveMotionScale
 
@@ -84,8 +85,13 @@ fun AppThemeHost(
             highContrastEnabled = highContrastEnabled,
         )
 
+    // 列表 stagger 开关（#167 / UI06）：只控制"逐项错峰入场"这一个特性，
+    // 与动效缩放（LocalMotionScale）语义不同，故单独下发。
+    val staggerEnabled by repository.staggerEnabled.collectAsStateWithLifecycle(initialValue = true)
+
     CompositionLocalProvider(
         LocalGlassSettings provides glassSettings,
+        LocalStaggerEnabled provides staggerEnabled,
         LocalIconStyle provides iconStyle,
     ) {
         AppTheme(

@@ -232,6 +232,18 @@ class SettingsViewModelTest {
         }
 
     @Test
+    fun setStaggerEnabled_false_persistsAndEmits() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                assertEquals(true, awaitItem().staggerEnabled)
+                viewModel.setStaggerEnabled(false)
+                assertEquals(false, awaitItem().staggerEnabled)
+            }
+        }
+
+    @Test
     fun setGlassTopBar_false_persistsAndEmitsOnlyThatScope() =
         runTest {
             val viewModel = createViewModel()
@@ -483,6 +495,10 @@ private class FakeUserPreferencesRepository(
 
     override val repoLayout: Flow<RepoLayoutMode> = MutableStateFlow(RepoLayoutMode.LIST)
 
+    private val staggerEnabledFlow = MutableStateFlow(true)
+
+    override val staggerEnabled: Flow<Boolean> = staggerEnabledFlow
+
     override suspend fun setThemeMode(mode: ThemeMode) {
         if (failOnSetThemeMode) throw IOException("disk full")
         themeModeFlow.value = mode
@@ -546,6 +562,10 @@ private class FakeUserPreferencesRepository(
 
     override suspend fun setCodeLineNumbers(enabled: Boolean) {
         codeLineNumbersFlow.value = enabled
+    }
+
+    override suspend fun setStaggerEnabled(enabled: Boolean) {
+        staggerEnabledFlow.value = enabled
     }
 
     override suspend fun setRepoLayout(mode: RepoLayoutMode) {
