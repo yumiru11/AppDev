@@ -402,6 +402,10 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 Regex("""(^|/)[^/]*TimelineItems[^/]*\.kt$"""),
                 // Composable 视图：*View.kt（排除 *ViewModel.kt，ViewModel 是逻辑需门禁）
                 Regex("""(^|/)[^/]*View\.kt$"""),
+                // WebView 渲染宿主：整个文件是 @Composable + AndroidView factory 装配
+                // （无独立单测可打点；逻辑部分已抽到 WebViewDarkModePolicy 并有单测）。
+                // #170 实测：动一行注释都会让 diff 门禁把它算成"未覆盖新增行"。
+                Regex("""(^|/)[^/]*Renderer\.kt$"""),
             )
 
         val changedFiles =
@@ -420,6 +424,10 @@ abstract class DiffCoverageCheck : DefaultTask() {
         dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
         val doc = dbf.newDocumentBuilder().parse(xmlFile)
         val coveredByKey = mutableMapOf<String, Set<Int>>()
+        // JaCoCo 报告里出现的行号集合 = 它认为"可执行"的行。新增行若不在此集合里，
+        // 说明 JaCoCo 根本不把它当可执行行（函数签名的括号行、纯声明行等），
+        // 计入分母会制造永远无法覆盖的假失败（#170 实测：函数签名的收尾括号行被判未覆盖）。
+        val knownByKey = mutableMapOf<String, Set<Int>>()
         val pkgNodes = doc.getElementsByTagName("package")
         for (i in 0 until pkgNodes.length) {
             val pkg = pkgNodes.item(i) as Element
@@ -429,35 +437,51 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 val sf = sourceFiles.item(j) as Element
                 val key = if (pkgName.isEmpty()) sf.getAttribute("name") else "$pkgName/${sf.getAttribute("name")}"
                 val covered = mutableSetOf<Int>()
+                val known = mutableSetOf<Int>()
                 val lines = sf.getElementsByTagName("line")
                 for (k in 0 until lines.length) {
                     val ln = lines.item(k) as Element
+                    val nr = ln.getAttribute("nr").toInt()
+                    known += nr
                     if ((ln.getAttribute("ci").toIntOrNull() ?: 0) > 0) {
-                        covered += ln.getAttribute("nr").toInt()
+                        covered += nr
                     }
                 }
                 coveredByKey[key] = covered
+                knownByKey[key] = known
             }
         }
 
         // 3) 逐文件比对新增行与覆盖集
+        //
+        // ★ #170 / D04 口径修正：只统计"可执行新增行"。原先把 KDoc/注释/空行/import/注解
+        // 也算进分母，导致"写文档 = 掉覆盖率"——实测某 PR 原始口径 24.5%、可执行行口径 80.4%，
+        // 门禁读数完全失真（且当时 threshold 语义还错，见任务注册处注释）。
+        // JaCoCo 的行覆盖只对可执行行有定义，非可执行行永远不会出现在报告里，必须排除。
         var totalAdded = 0
+        var rawAdded = 0
         var totalCovered = 0
         val uncoveredByFile = linkedMapOf<String, List<Int>>()
         val noReport = mutableListOf<String>()
         for (file in changedFiles) {
             val added = addedLines(file, base)
             if (added.isEmpty()) continue
-            totalAdded += added.size
+            rawAdded += added.size
+            val codeLines = added.filter { isExecutableLine(file, it) }
+            if (codeLines.isEmpty()) continue
+            totalAdded += codeLines.size
             val key = xmlKeyOf(file)
             val covered = key?.let { coveredByKey[it] } ?: emptySet()
-            val uncovered = added.filter { it !in covered }
-            totalCovered += added.size - uncovered.size
+            val known = key?.let { knownByKey[it] } ?: emptySet()
+            // 只统计 JaCoCo 认账的行：不在报告里的行视为不可执行（不计入分母也不计入未覆盖）
+            val uncovered = codeLines.filter { it in known && it !in covered }
+            totalCovered += codeLines.size - uncovered.size
             if (uncovered.isNotEmpty()) uncoveredByFile[file] = uncovered
             if (key == null || key !in coveredByKey) noReport += file
         }
+        logger.lifecycle("diffCoverageCheck: 新增 $rawAdded 行，其中可执行 $totalAdded 行（base=$base）")
         if (totalAdded == 0) {
-            logger.lifecycle("diffCoverageCheck: 变更文件无新增行（base=$base），通过")
+            logger.lifecycle("diffCoverageCheck: 无可执行新增行，通过")
             return
         }
 
@@ -490,11 +514,22 @@ abstract class DiffCoverageCheck : DefaultTask() {
 
     private fun git(vararg args: String): String {
         val out = ByteArrayOutputStream()
-        execOperations.exec {
-            commandLine("git", *args)
-            standardOutput = out
-            errorOutput = out
-            isIgnoreExitValue = false
+        val result =
+            execOperations.exec {
+                commandLine("git", *args)
+                standardOutput = out
+                errorOutput = out
+                isIgnoreExitValue = true
+            }
+        // 失败时给出可操作的原因提示：#170 实测 CI 浅克隆（fetch-depth=1）会让
+        // `git diff <base>...HEAD` 直接退出 128，而默认报错只有 "non-zero exit value 128"，
+        // 排查成本极高 —— 这里把 stderr 与常见解法一起抛出。
+        if (result.exitValue != 0) {
+            throw GradleException(
+                "diffCoverageCheck 执行 git " + args.joinToString(" ") + " 失败（exit " + result.exitValue + "）：" +
+                    out.toString(Charsets.UTF_8).trim() +
+                    "\n提示：比对基准提交必须存在于本地仓库 —— CI 上需要 actions/checkout 的 fetch-depth: 0。",
+            )
         }
         return out.toString(Charsets.UTF_8)
     }
@@ -532,6 +567,27 @@ abstract class DiffCoverageCheck : DefaultTask() {
         return added
     }
 
+    /**
+     * 该新增行是否"可执行"（计入覆盖率分母）。
+     *
+     * JaCoCo 只给可执行行打标；把注释/空行/import/纯注解/纯收尾括号算进分母会让
+     * 「写文档就掉覆盖率」。判据取保守白名单：非空、不以注释或 import/package/注解开头、
+     * 不是纯括号收尾行。
+     */
+    private fun isExecutableLine(
+        file: String,
+        lineNumber: Int,
+    ): Boolean {
+        val lines = sourceCache.getOrPut(file) { runCatching { File(file).readLines() }.getOrDefault(emptyList()) }
+        val text = lines.getOrNull(lineNumber - 1)?.trim() ?: return false
+        if (text.isEmpty()) return false
+        if (NON_CODE_PREFIXES.any { text.startsWith(it) }) return false
+        return !CLOSING_ONLY_PATTERN.matches(text)
+    }
+
+    /** 变更文件内容缓存（同一文件只读一次） */
+    private val sourceCache = mutableMapOf<String, List<String>>()
+
     /** "core/x/src/main/kotlin/com/foo/Bar.kt" → "com/foo/Bar.kt"（与 XML 的 package/sourcefile 对应） */
     private fun xmlKeyOf(file: String): String? {
         val idx = file.indexOf("/src/main/")
@@ -545,8 +601,18 @@ abstract class DiffCoverageCheck : DefaultTask() {
 
     companion object {
         private val HUNK_PATTERN = Regex("""^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@""")
+
+        /** 非可执行行前缀：注释块、单行注释、包/导入声明、注解 */
+        private val NON_CODE_PREFIXES = listOf("//", "/*", "*", "import ", "package ", "@")
+
+        /** 纯收尾括号行（"}", ");", "])," 等）：不承载可执行指令，JaCoCo 不为其打标 */
+        private val CLOSING_ONLY_PATTERN = Regex("""^[)\]},;]+$""")
     }
 }
+
+// 默认阈值（0..1）。-PdiffCoverageThreshold 同时接受 0..1 与 0..100 两种口径（见下方归一逻辑）。
+// 顶层 val 必须是 camelCase（ktlint property-naming；只有 const val 才允许 SCREAMING_SNAKE）
+val defaultDiffThreshold = 0.80
 
 tasks.register<DiffCoverageCheck>("diffCoverageCheck") {
     group = "verification"
@@ -562,7 +628,13 @@ tasks.register<DiffCoverageCheck>("diffCoverageCheck") {
     threshold.set(
         providers
             .gradleProperty("diffCoverageThreshold")
-            .map { it.toDouble() }
-            .orElse(0.80),
+            // ★ #170 / D04：口径归一。CI 一直传 -PdiffCoverageThreshold=80（百分数），
+            // 而本任务按 0..1 比例比较 → gate=80.0，ratio（0..1）恒 < 80 → 门禁**恒失败**；
+            // 失败又被 ci.yml 的 continue-on-error 吞掉，于是"从未真正拦过任何 PR"。
+            // 现在同时接受 0..1 与 0..100 两种写法，越界值钳到合法区间。
+            .map { raw ->
+                val value = raw.trim().toDoubleOrNull() ?: defaultDiffThreshold
+                if (value > 1.0) (value / 100.0).coerceIn(0.0, 1.0) else value.coerceIn(0.0, 1.0)
+            }.orElse(defaultDiffThreshold),
     )
 }

@@ -29,11 +29,28 @@ android {
     lint {
         abortOnError = true
         checkReleaseBuilds = false
-        // AGP 8.7.3 的 lint-api 与新版 Compose 1.11 / Lifecycle AAR 内置 lint 检查器二进制不兼容
-        // （IncompatibleClassChangeError），整体禁用这批库内检测器；AGP/lint 升级后移除本段
+
+        // ── Compose/Lifecycle 库内 lint 检测器禁用（#170 / Q01+Q02 复核结论）─────────
+        //
+        // 根因（2026-09-10 实测，不是"AGP 太旧"这么笼统）：
+        //   Compose BOM 2026.06.01 带的 compose-ui lint jar（UiIssueRegistry）编译时链接了
+        //   Kotlin Analysis API 的 KaCompoundAccessCall#getCompoundOperation()，而 lint 自带的
+        //   Kotlin 分析 API 版本更老 → 注册期直接判为
+        //   "Library lint checks reference invalid APIs; these checks will be skipped!"，
+        //   整包 15 项检查（SuspiciousModifierThen/UnnecessaryComposedModifier/…）**不参与分析**。
+        //   Lifecycle AAR 的 StateFlowValueCalledInComposition 同源（IncompatibleClassChangeError）。
+        //
+        // 已排除的解法：AGP 8.13.2 + Gradle 8.14.3 实测**不能**修（lint 31.13 仍缺该 API，
+        //   报告里的 ObsoleteLintCustomCheck 与禁用项一字不差）。真正的修法是升到 **AGP 9.x**
+        //   （lint 32.x 才带上 Kotlin 2.3 时代的 Analysis API），但那是 KSP/Hilt/Apollo/Room
+        //   全线迁移，不属于本票范围 → 已作为后续项记录在 PR 描述与 issue #170。
+        //
+        // 因此这里的 disable 不是"眼不见为净"：这些 id 对应的检查**本来就没在跑**，显式列出
+        //   只是让 intent 可见 + 避免 lint 报 UnknownIssueId。真正防退化的是 CI 的
+        //   "Lint detector coverage" 步骤：它断言**只有** Compose 那一个 registry 被跳过，
+        //   新增任何被跳过的 registry 都会让 job 变红。
         disable += "AutoboxingStateCreation"
         disable += "AutoboxingStateValueProperty"
-        disable += "ComposableCoroutineCreation"
         disable += "ComposableLambdaParameterNaming"
         disable += "ComposableNaming"
         disable += "CompositionLocalNaming"
@@ -45,11 +62,7 @@ android {
         disable += "RememberInComposition"
         disable += "UnrememberedAnimatable"
         disable += "UnrememberedMutableState"
-        disable += "UnrememberedState"
         disable += "NullSafeMutableLiveData"
-        // T4 Wave2 新增（AuthNavigationTest/AuthViewModel 触发）：AGP 8.7.3 lint 与
-        // Compose 1.11 的 StateFlow 值检测器二进制不兼容（IncompatibleClassChangeError，
-        // lint 崩溃 "KaFunctionCall interface was expected"）；AGP/lint 升级后移除
         disable += "StateFlowValueCalledInComposition"
     }
 

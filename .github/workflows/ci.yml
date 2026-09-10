@@ -37,8 +37,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      # ★ fetch-depth: 0（#170 / D04 实测踩到）：diffCoverageCheck 用
+      # `git diff --unified=0 <base>...HEAD` 逐行比对新增代码，而 actions/checkout 默认
+      # 浅克隆（depth=1）拿不到 PR base 提交 → git 退出 128（"bad object"）。
+      # 本地全量仓库跑得通、CI 一开硬门禁就红，根因就在这里。
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
@@ -73,6 +79,36 @@ jobs:
       - name: Android Lint
         run: ./gradlew :app:lintDebug --no-daemon
 
+      # ── Lint 覆盖面守卫（#170 / Q01+Q02）─────────────────────────────────────
+      # Q01 的根因是 compose-ui 的 lint jar 链接了比 lint 自带的更新的 Kotlin Analysis API，
+      # 导致整个 UiIssueRegistry 被跳过（15 项检查不参与分析）。解除条件是升 AGP 9.x；
+      # AGP 8.13.2 实测无效。在升级之前，至少要让"覆盖面退化"这件事**可见且只能变小**：
+      #   ① 只允许 UiIssueRegistry 一个 registry 被跳过，多一个就红；
+      #   ② disables 里不允许出现 lint 不认识的 issue id（Q02 清掉了 2 个）。
+      - name: Lint detector coverage guard
+        run: |
+          REPORT=app/build/reports/lint-results-debug.txt
+          if [ ! -f "$REPORT" ]; then
+            echo "::error::找不到 $REPORT —— lint 报告未生成"
+            exit 1
+          fi
+
+          SKIPPED=$(grep -o 'Lint found an issue registry ([^)]*)' "$REPORT" | sed 's/.*(//;s/)//' | sort -u || true)
+          echo "被跳过的 lint registry:"
+          echo "${SKIPPED:-（无）}"
+          UNKNOWN=$(printf '%s\n' "$SKIPPED" | grep -v '^$' | grep -v '^androidx\.compose\.ui\.lint\.UiIssueRegistry$' || true)
+          if [ -n "$UNKNOWN" ]; then
+            echo "::error::出现新的被跳过 lint registry（lint 覆盖面静默退化）：$UNKNOWN"
+            exit 1
+          fi
+
+          UNKNOWN_IDS=$(grep -c 'Unknown issue id' "$REPORT" || true)
+          echo "UnknownIssueId 告警数: $UNKNOWN_IDS"
+          if [ "$UNKNOWN_IDS" != "0" ]; then
+            echo "::error::lint 配置里存在 lint 不认识的 issue id（见 $REPORT 的 UnknownIssueId）"
+            exit 1
+          fi
+
       - name: Konsist architecture tests
         run: ./gradlew konsistCheck --no-daemon
 
@@ -80,7 +116,31 @@ jobs:
         run: ./gradlew :app:testDebugUnitTest --no-daemon
 
       # 失败时保留截图 diff 供排查（实际截图/compare 产物）；空测试阶段直接通过
-      - name: Verify Roborazzi screenshots
+      #
+      # ★ D02 修复（#170）：此前只验 :app，模块级基线（core:ui / core:designsystem /
+      # core:markdown / feature:*）不在任何门禁里 —— #83 改了 GlassSurface 实现后
+      # core:ui 的 AppTopBar_* 基线静默腐烂了整整两周无人发现（本地实测：
+      # 6/8 张核心基线 verify 失败）。现在把带 src/test/screenshots 的模块一次全验。
+      # ⚠️ 两条硬约束（2026-09-10 实测，别再踩）：
+      #
+      # ① **模块级基线必须以 CI 为唯一权威录制环境**。Robolectric Native Graphics 的渲染
+      #    结果依赖运行环境（字体/原生库/JDK），同一份代码在本机与 runner 上出的 PNG
+      #    不是逐字节相同 —— 本机录的 core:ui 基线在 CI 上 verify 全红（8 张）。
+      #    :app 的基线之所以一直绿，是因为它当初就是"云端补录"的。
+      #    录制入口：Actions → "Record screenshots (CI canonical)" → 下载 artifact 后提交。
+      #    本地若 verify 模块级基线失败，先怀疑环境差异，**不要**直接 record 覆盖。
+      #
+      # ② :feature:issue 不在本步骤：它的截图测试用真实 ViewModel + Paging 渲染，首帧落不到
+      #    "loaded" 态 → 屏幕上是 CircularProgressIndicator（无限动画）→ Robolectric 的
+      #    waitForIdle 永不收敛，verify **挂死**（本地 timeout 420s → exit 124；record 模式
+      #    不等待 idle 所以正常）。该模块的漂移改由 nightly 的 "screenshot drift" job 兜底。
+      # ⏳ 当前只验 :app。模块级 verify 的开启步骤见下（需要 CI 权威基线先就位）：
+      #   1. Actions → "Record screenshots (CI canonical)" → Run workflow（main）
+      #   2. 下载 recorded-screenshots artifact，解压覆盖各模块 src/test/screenshots
+      #   3. 提交后把本步骤的命令扩成 :app + :core:ui + :core:designsystem +
+      #      :core:markdown + :feature:auth + :feature:repo + :feature:notifications
+      #      （:feature:issue 例外，原因见注释 ②）
+      - name: Verify Roborazzi screenshots (app)
         run: ./gradlew :app:verifyRoborazziDebug --no-daemon
 
       - name: Upload Roborazzi diffs (on failure)
@@ -109,18 +169,19 @@ jobs:
       - name: Coverage report + verify (hard gate)
         run: ./gradlew coverageReport coverageVerify --no-daemon
 
-      # diffCoverageCheck 是软门禁（PR 变更的新增代码 ≥80%，-PdiffCoverageThreshold 可调）。
-      # 任务可能尚未落地（与构建侧任务并行开发），先 --dry-run 探测：不存在 → 显式跳过并告警，
-      # 不把 job 染红；continue-on-error 兜底（软门禁，暂不硬卡合并）。
-      - name: Diff coverage check (soft gate, best-effort)
+      # ★ D04 修复（#170）：diffCoverageCheck 从「软门禁 + --dry-run 探测」升级为硬门禁。
+      # 原状态：任务已实现（根 build.gradle.kts DiffCoverageCheck），但 CI 用 dry-run 探测 +
+      # continue-on-error 兜底，等于从未真正拦过任何 PR —— 探测分支永远为假（任务存在），
+      # 而 continue-on-error 让真实失败静默通过。现在直接跑，失败即 job 红。
+      # 阈值：新增代码行 ≥80%（-PdiffCoverageThreshold 可调）；UI 源文件按路径白名单跳过
+      # （Composable 由 Roborazzi/真机兜底，见任务实现内的 uiSourceExcludes 注释）。
+      - name: Diff coverage check (hard gate)
         if: github.event_name == 'pull_request'
-        continue-on-error: true
         run: |
-          if ./gradlew diffCoverageCheck --dry-run -q >/dev/null 2>&1; then
-            ./gradlew diffCoverageCheck -PdiffCoverageThreshold=80 -PdiffBaseSha=${{ github.event.pull_request.base.sha }} --no-daemon
-          else
-            echo "::warning::diffCoverageCheck task not present; diff coverage gate skipped"
-          fi
+          ./gradlew diffCoverageCheck \
+            -PdiffCoverageThreshold=80 \
+            -PdiffBaseSha=${{ github.event.pull_request.base.sha }} \
+            --no-daemon
 
       # 聚合报告上传：if: always() —— coverageVerify 失败时也保留报告供排查。
       # glob 覆盖根级聚合报告（build/reports/jacoco/coverageReport/html）与各模块报告。

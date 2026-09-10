@@ -153,13 +153,18 @@ fun WebViewMarkdownRenderer(
                 // 特性检查：API 30 模拟器/旧 WebView 不支持 AlgorithmicDarkening，
                 // 直接调用抛 UnsupportedOperationException 崩溃（2026-08-16 模拟器截图
                 // logcat 实证 FATAL EXCEPTION at WebViewMarkdownRenderer.kt:118）。
-                if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
-                    WebSettingsCompat.setAlgorithmicDarkeningAllowed(settings, false)
-                }
-                WebSettingsCompat.setForceDarkStrategy(
-                    settings,
-                    WebSettingsCompat.DARK_STRATEGY_WEB_THEME_DARKENING_ONLY,
-                )
+                //
+                // ⚠️ 两道防线（#170 补）：isFeatureSupported 只按 WebView APK 版本判定，
+                // 在 Robolectric / 部分 stub WebView 上会返回 true，而真正的
+                // WebSettingsCompat 调用仍抛 UnsupportedOperationException
+                // （androidx.webkit 的已知行为；Robolectric 下实测
+                //  WebViewFeatureInternal.getUnsupportedOperationException）。
+                // 同款调用 setForceDarkStrategy 此前完全没做特性检查 —— 它在旧 WebView
+                // APK 上与 setAlgorithmicDarkeningAllowed 同源受限，等于留了一颗崩溃雷。
+                // 降级路径最多少一层暗化策略（页面 CSS 已是主题驱动），绝不能因此崩溃。
+                // 具体实现抽到 WebViewDarkModePolicy（可单测；diff 覆盖率门禁覆盖该文件，
+                // 原先内联在 AndroidView factory 里的写法无单测可打点）。
+                applyWebViewDarkModePolicy(settings)
                 if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
                     // allowedOriginRules 只接受 origin（scheme://host 或 * / *.host），
                     // 不接受路径通配符 —— "https://appassets.androidplatform.net/*" 会使

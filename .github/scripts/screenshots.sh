@@ -22,6 +22,41 @@ OUT="artifacts/screenshots"
 PKG="com.yumiru11.githubapp"
 mkdir -p "$OUT"
 
+# ── 输入服务就绪等待（#170）──────────────────────────────────────────────
+# PR #174 实测：android-emulator-runner 的 sys.boot_completed 已满足，但 input
+# 服务仍可能尚未注册，紧接着的 `adb shell input swipe` 直接抛
+# "No service published for: input" → set -e 让整条截图流水线变红。
+# 这是模拟器启动竞态（基础设施），与应用无关，故前置轮询 + 单次重试。
+wait_for_input_service() {
+  local _
+  for _ in $(seq 1 60); do
+    if adb shell service check input 2>/dev/null | grep -q "found"; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "::error::input service 未就绪（60s 超时）——模拟器启动异常"
+  return 1
+}
+
+# 带重试的 input 调用：偶发 ServiceNotFoundException 时等待服务恢复再试，
+# 三次都失败只告警不中断（后续步骤仍能产出部分截图，比整条 job 红更有价值）
+retry_input() {
+  local attempt
+  for attempt in 1 2 3; do
+    if adb shell input "$@" >/dev/null 2>&1; then
+      return 0
+    fi
+    echo "::warning::input $* 第 $attempt 次失败，等待 input 服务恢复"
+    sleep 2
+    wait_for_input_service || true
+  done
+  echo "::warning::input $* 连续 3 次失败，跳过本次交互"
+  return 0
+}
+
+wait_for_input_service
+
 # ImageMagick 后台预装（拼板前才需要）：安装的 ~20s 完全藏在前面截图时间里。
 # 直装优先（镜像常命中缓存），失败再 update+装，全程 timeout 兜底。
 APT_PID=""
@@ -256,11 +291,11 @@ wait_for_activity "$PKG" || true
 sleep 5
 
 # ── 5.6 Issue 评论（原生短文本渲染——正文 WebView 很高，滑到评论区）─
-adb shell input swipe 540 1800 540 400 500
+retry_input swipe 540 1800 540 400 500
 sleep 2
-adb shell input swipe 540 1800 540 400 500
+retry_input swipe 540 1800 540 400 500
 sleep 2
-adb shell input swipe 540 1800 540 400 500
+retry_input swipe 540 1800 540 400 500
 sleep 3
 adb exec-out screencap -p > "$OUT/issue-comments.png"
 
@@ -290,7 +325,7 @@ wait_for_text ".github" || true          # 树条目就绪信号（首屏可见�
 adb exec-out screencap -p > "$OUT/file-tree.png"
 # README WebView 渲染帧（ADR-0007 主路径）：树下方滚动一屏拍 README 区，
 # 替代被砍的 readme-long 长截图保住渲染分流回归信号
-adb shell input swipe 540 1800 540 500 400
+retry_input swipe 540 1800 540 500 400
 sleep 2
 adb exec-out screencap -p > "$OUT/readme-webview.png"
 
