@@ -2,6 +2,7 @@ package com.yumiru11.githubapp
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -9,6 +10,8 @@ import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.model.resolveEffectiveThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.designsystem.token.GlassSettings
+import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import com.yumiru11.githubapp.core.designsystem.token.rememberSystemMotionScale
 import com.yumiru11.githubapp.core.designsystem.token.resolveEffectiveMotionScale
 
@@ -54,13 +57,36 @@ fun AppThemeHost(
             highContrastEnabled = highContrastEnabled,
             systemDark = isSystemInDarkTheme(),
         )
-    AppTheme(
-        themeMode = effectiveMode,
-        // 默认 seed（未自定义）传 null → 走默认调色板（与 T6/T12 行为一致，AppThemeHostTest 断言依赖）；
-        // 用户改过 seed 才激活 seed 色板（T24「seed 色盘」）
-        seedColor = seedColor.takeIf { it != UserPreferencesRepository.DEFAULT_SEED_COLOR }?.let(::Color),
-        cornerScale = cornerScale,
-        motionScale = effectiveMotionScale,
-        content = content,
-    )
+
+    // 毛玻璃逐项开关（#167 / UI03）：总开关 + 四个点位开关 → GlassSettings，
+    // 再叠加 §6.3 的强制项（OLED / 高对比下禁用玻璃）。
+    // 消费侧只看 LocalGlassSettings，不需要各自拼布尔（GlassSurface 按 scope 裁决）。
+    val glassTopBar by repository.glassTopBar.collectAsStateWithLifecycle(initialValue = true)
+    val glassBottomBar by repository.glassBottomBar.collectAsStateWithLifecycle(initialValue = true)
+    val glassPanel by repository.glassPanel.collectAsStateWithLifecycle(initialValue = true)
+    val glassBottomSheet by repository.glassBottomSheet.collectAsStateWithLifecycle(initialValue = true)
+    val blurEnabled by repository.blurEnabled.collectAsStateWithLifecycle(initialValue = true)
+    val glassSettings =
+        GlassSettings(
+            masterEnabled = blurEnabled,
+            topBarEnabled = glassTopBar,
+            bottomBarEnabled = glassBottomBar,
+            panelEnabled = glassPanel,
+            bottomSheetEnabled = glassBottomSheet,
+        ).withAccessibilityOverrides(
+            oledEnabled = oledEnabled,
+            highContrastEnabled = highContrastEnabled,
+        )
+
+    CompositionLocalProvider(LocalGlassSettings provides glassSettings) {
+        AppTheme(
+            themeMode = effectiveMode,
+            // 默认 seed（未自定义）传 null → 走默认调色板（与 T6/T12 行为一致，AppThemeHostTest 断言依赖）；
+            // 用户改过 seed 才激活 seed 色板（T24「seed 色盘」）
+            seedColor = seedColor.takeIf { it != UserPreferencesRepository.DEFAULT_SEED_COLOR }?.let(::Color),
+            cornerScale = cornerScale,
+            motionScale = effectiveMotionScale,
+            content = content,
+        )
+    }
 }

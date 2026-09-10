@@ -60,6 +60,8 @@ import com.yumiru11.githubapp.core.designsystem.component.LongBarAction
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
+import com.yumiru11.githubapp.core.designsystem.token.GlassScope
+import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppTopBar
@@ -122,7 +124,6 @@ fun HomeScreen(
     onSearchClick: () -> Unit,
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
-    blurEnabled: Boolean = true,
     /** 底栏玻璃总高（MainTabPager 传入）：作为列表 contentPadding，让内容滚进玻璃背后 */
     bottomContentPadding: Dp = 0.dp,
     onLoginClick: () -> Unit = {},
@@ -140,7 +141,8 @@ fun HomeScreen(
 
     // backdrop blur（issue #83）：顶栏玻璃的 hazeEffect 与本页内容侧 hazeSource 共享本 state
     val hazeState = rememberHazeState()
-    // source 侧门禁与 GlassSurface 的 effect 侧同源判定（防两侧漂移）
+    // 玻璃开关按"顶栏"点位取（#167 / UI03）；source 侧门禁与 effect 侧同源判定（防两侧漂移）
+    val blurEnabled = LocalGlassSettings.current.enabledFor(GlassScope.TOP_BAR)
     val useHazeSource = GlassRenderPolicy.shouldAttachHazeSource(blurEnabled)
 
     // pager 状态上提到这里：分区条已进玻璃头（顶栏插槽），两者要读写同一份状态

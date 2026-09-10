@@ -22,6 +22,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.designsystem.token.GlassScope
+import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 
 /**
  * 应用底部导航栏：首页 / 仓库 / 我的。
@@ -37,7 +39,8 @@ import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 fun AppBottomBar(
     selectedTab: String,
     onTabSelected: (String) -> Unit,
-    blurEnabled: Boolean = true,
+    // 玻璃开关按"底栏"点位从 LocalGlassSettings 取（#167 / UI03）；显式传值只用于测试/预览
+    blurEnabled: Boolean = LocalGlassSettings.current.enabledFor(GlassScope.BOTTOM_BAR),
     modifier: Modifier = Modifier,
 ) {
     data class TabItem(
@@ -57,6 +60,7 @@ fun AppBottomBar(
     GlassSurface(
         modifier = modifier,
         windowInsets = WindowInsets.navigationBars,
+        scope = GlassScope.BOTTOM_BAR,
         blurEnabled = blurEnabled,
     ) {
         NavigationBar(

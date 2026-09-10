@@ -38,6 +38,8 @@ import com.yumiru11.githubapp.auth.shouldNavigateForAuthState
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
 import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
+import com.yumiru11.githubapp.core.designsystem.token.GlassScope
+import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthCallbackException
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthConfig
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
@@ -85,7 +87,7 @@ import javax.inject.Inject
  *   起始 destination 按 authState 传入 AppNavHost；状态变化经 LaunchedEffect 导航
  *   （仅目标页不符时 navigate，popUpTo(0) 清栈防循环）
  * - 主题（T6 Wave2）：[AppThemeHost] 把仓库持久化的 ThemeMode 接到 AppTheme；
- *   blurEnabled 经 AppNavHost 下传顶/底栏 GlassSurface（ADR-0004 玻璃只做两处）
+ *   毛玻璃开关经 LocalGlassSettings 下发（#167：四条点位各自可关；AppThemeHost 合成）
  * - OAuth 回调（ADR-0001 自定义 scheme）：命中 oauth-callback 的 intent data →
  *   [OAuthSessionManager.handleCallback]（token 交换），成功后 authState 自动变
  *   SignedIn → 登录态导航接管跳主页；失败（用户取消/错误回调）留在登录页
@@ -100,7 +102,7 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var sessionManager: OAuthSessionManager
 
-    // 主题/毛玻璃偏好仓库（T6 Wave2）：themeMode → AppThemeHost，blurEnabled → 顶/底栏玻璃
+    // 主题/偏好仓库（T6 Wave2）：themeMode/玻璃/圆角/动效 → AppThemeHost（含 LocalGlassSettings）
     @Inject lateinit var userPreferencesRepository: UserPreferencesRepository
 
     // 待消费的深链 URI（冷启动 + onNewIntent 运行时）；用 mutableStateOf 以便 Compose 观察重组
@@ -122,8 +124,8 @@ class MainActivity : ComponentActivity() {
             val navController = rememberNavController()
             val context = LocalContext.current
             val authState by authViewModel.authState.collectAsStateWithLifecycle()
-            // 毛玻璃开关（ADR-0004：默认开启，设置页 T24 提供关闭项）→ 顶栏/底栏 GlassSurface
-            val blurEnabled by userPreferencesRepository.blurEnabled.collectAsStateWithLifecycle(initialValue = true)
+            // 毛玻璃开关不再在此收集：AppThemeHost 从仓库合成 GlassSettings 并经
+            // LocalGlassSettings 下发（#167 / UI03），顶/底栏/面板/BottomSheet 各按 scope 自取
             // 语言偏好（T24 设置页语言切换）：变化 → 缓存 + recreate 应用 locale
             val languageTag by userPreferencesRepository.languageTag.collectAsStateWithLifecycle(initialValue = null)
             // 底部三分区当前页（分区重构 2026-08-14：tab 切换 = pager 横滑，非导航）
@@ -134,6 +136,8 @@ class MainActivity : ComponentActivity() {
                 // MainTabPager/HomeScreen 自建内层 state 只服务其顶/底栏，面板读不到内层值
                 val rootHazeState = rememberHazeState()
                 var notificationPanelVisible by rememberSaveable { mutableStateOf(false) }
+                // 根级 source 只服务通知面板玻璃 → 按 PANEL 点位判定（#167 / UI03）
+                val panelGlassEnabled = LocalGlassSettings.current.enabledFor(GlassScope.PANEL)
                 CompositionLocalProvider(LocalHazeState provides rootHazeState) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         Box(
@@ -141,7 +145,7 @@ class MainActivity : ComponentActivity() {
                                 Modifier
                                     .fillMaxSize()
                                     .then(
-                                        if (GlassRenderPolicy.shouldAttachHazeSource(blurEnabled)) {
+                                        if (GlassRenderPolicy.shouldAttachHazeSource(panelGlassEnabled)) {
                                             Modifier.hazeSource(rootHazeState)
                                         } else {
                                             Modifier
@@ -155,7 +159,6 @@ class MainActivity : ComponentActivity() {
                                     MainTabPager(
                                         selectedTab = mainTab,
                                         onTabSelected = { mainTab = it },
-                                        blurEnabled = blurEnabled,
                                         homePage = { padding ->
                                             HomeScreen(
                                                 onSearchClick = { navController.navigate(AppRoute.Search) },
@@ -167,7 +170,6 @@ class MainActivity : ComponentActivity() {
                                                 onViewPullRequests = { owner, repo ->
                                                     navController.navigate(AppRoute.Pulls(owner, repo))
                                                 },
-                                                blurEnabled = blurEnabled,
                                                 onLoginClick = {
                                                     navController.navigate(AppRoute.Login) {
                                                         popUpTo(0) { inclusive = true }
@@ -357,7 +359,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onNotificationClick = { parsed -> navigateToParsedUrl(navController, parsed) },
-                            blurEnabled = blurEnabled,
                         )
                     }
                 }

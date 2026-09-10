@@ -85,6 +85,8 @@ import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
+import com.yumiru11.githubapp.core.designsystem.token.GlassScope
+import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
@@ -121,7 +123,8 @@ fun NotificationsPanel(
     onDismiss: () -> Unit,
     onLoginClick: () -> Unit,
     onNotificationClick: (ParsedUrl) -> Unit,
-    blurEnabled: Boolean,
+    // 玻璃开关按"通知面板"点位从 LocalGlassSettings 取（#167 / UI03）
+    blurEnabled: Boolean = LocalGlassSettings.current.enabledFor(GlassScope.PANEL),
     modifier: Modifier = Modifier,
     viewModel: NotificationsPanelViewModel = hiltViewModel(),
 ) {
@@ -165,6 +168,7 @@ fun NotificationsPanel(
             GlassSurface(
                 modifier = Modifier.fillMaxSize(),
                 windowInsets = WindowInsets.systemBars,
+                scope = GlassScope.PANEL,
                 blurEnabled = blurEnabled,
             ) {
                 NotificationsPanelContent(

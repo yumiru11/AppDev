@@ -231,6 +231,110 @@ class SettingsViewModelTest {
         }
 
     @Test
+    fun setGlassTopBar_false_persistsAndEmitsOnlyThatScope() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.setGlassTopBar(false)
+                val state = awaitItem()
+                assertEquals(false, state.glassTopBar)
+                assertEquals(true, state.glassBottomBar)
+                assertEquals(true, state.glassPanel)
+                assertEquals(true, state.glassBottomSheet)
+            }
+        }
+
+    @Test
+    fun setGlassPanel_false_persistsAndEmits() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.setGlassPanel(false)
+                assertEquals(false, awaitItem().glassPanel)
+            }
+        }
+
+    @Test
+    fun setGlassBottomBar_false_persistsAndEmits() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.setGlassBottomBar(false)
+                assertEquals(false, awaitItem().glassBottomBar)
+            }
+        }
+
+    @Test
+    fun setGlassBottomSheet_false_persistsAndEmits() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.setGlassBottomSheet(false)
+                assertEquals(false, awaitItem().glassBottomSheet)
+            }
+        }
+
+    @Test
+    fun uiState_glassDefaults_perItemSwitchesAreInteractive() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertEquals(true, state.blurEnabled)
+                assertEquals(true, state.glassPerItemEnabled)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun uiState_oledEnabled_perItemSwitchesAreDisabled() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.setOledEnabled(true)
+                // 总开关仍开着，但 §6.3 在 OLED 下强制禁用玻璃 → 逐项开关应置灰
+                val state = awaitItem()
+                assertEquals(true, state.blurEnabled)
+                assertEquals(false, state.glassPerItemEnabled)
+            }
+        }
+
+    @Test
+    fun uiState_highContrastEnabled_perItemSwitchesAreDisabled() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.setHighContrastEnabled(true)
+                assertEquals(false, awaitItem().glassPerItemEnabled)
+            }
+        }
+
+    @Test
+    fun uiState_masterBlurOff_perItemSwitchesAreDisabled() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.setBlurEnabled(false)
+                assertEquals(false, awaitItem().glassPerItemEnabled)
+            }
+        }
+
+    @Test
     fun setThemeMode_light_persistsAndEmits() =
         runTest {
             val viewModel = createViewModel()
@@ -330,6 +434,10 @@ private class FakeUserPreferencesRepository(
     private val themeModeFlow = MutableStateFlow(ThemeMode.SYSTEM)
     private val languageTagFlow = MutableStateFlow<String?>(null)
     private val blurEnabledFlow = MutableStateFlow(true)
+    private val glassTopBarFlow = MutableStateFlow(true)
+    private val glassBottomBarFlow = MutableStateFlow(true)
+    private val glassPanelFlow = MutableStateFlow(true)
+    private val glassBottomSheetFlow = MutableStateFlow(true)
     private val dynamicColorEnabledFlow = MutableStateFlow(false)
     private val seedColorFlow = MutableStateFlow(UserPreferencesRepository.DEFAULT_SEED_COLOR)
     private val oledEnabledFlow = MutableStateFlow(false)
@@ -345,6 +453,14 @@ private class FakeUserPreferencesRepository(
     override val languageTag: Flow<String?> = languageTagFlow
 
     override val blurEnabled: Flow<Boolean> = blurEnabledFlow
+
+    override val glassTopBar: Flow<Boolean> = glassTopBarFlow
+
+    override val glassBottomBar: Flow<Boolean> = glassBottomBarFlow
+
+    override val glassPanel: Flow<Boolean> = glassPanelFlow
+
+    override val glassBottomSheet: Flow<Boolean> = glassBottomSheetFlow
 
     override val dynamicColorEnabled: Flow<Boolean> = dynamicColorEnabledFlow
 
@@ -371,6 +487,22 @@ private class FakeUserPreferencesRepository(
 
     override suspend fun setBlurEnabled(enabled: Boolean) {
         blurEnabledFlow.value = enabled
+    }
+
+    override suspend fun setGlassTopBar(enabled: Boolean) {
+        glassTopBarFlow.value = enabled
+    }
+
+    override suspend fun setGlassBottomBar(enabled: Boolean) {
+        glassBottomBarFlow.value = enabled
+    }
+
+    override suspend fun setGlassPanel(enabled: Boolean) {
+        glassPanelFlow.value = enabled
+    }
+
+    override suspend fun setGlassBottomSheet(enabled: Boolean) {
+        glassBottomSheetFlow.value = enabled
     }
 
     override suspend fun setLanguageTag(tag: String?) {

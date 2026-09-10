@@ -18,6 +18,9 @@ import com.yumiru11.githubapp.core.designsystem.theme.highContrastDarkPalette
 import com.yumiru11.githubapp.core.designsystem.theme.highContrastLightPalette
 import com.yumiru11.githubapp.core.designsystem.theme.lightPalette
 import com.yumiru11.githubapp.core.designsystem.theme.oledPalette
+import com.yumiru11.githubapp.core.designsystem.token.GlassScope
+import com.yumiru11.githubapp.core.designsystem.token.GlassSettings
+import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
@@ -59,6 +62,70 @@ class AppThemeHostTest {
 
         // Robolectric 默认日间模式 → SYSTEM 解析为亮色色板
         assertEquals(lightPalette().colorScheme.background, capturedBackground)
+    }
+
+    @Test
+    fun themeHost_defaultPrefs_providesFullyEnabledGlassSettings() {
+        var captured: GlassSettings? = null
+
+        composeRule.setContent {
+            val lifecycleOwner = remember { TestLifecycleOwner() }
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                AppThemeHost(repository = FakeUserPreferencesRepository()) {
+                    captured = LocalGlassSettings.current
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val settings = captured!!
+        GlassScope.entries.forEach { scope ->
+            assertEquals("默认应全开：$scope", true, settings.enabledFor(scope))
+        }
+    }
+
+    @Test
+    fun themeHost_panelSwitchOff_disablesOnlyPanelScope() {
+        var captured: GlassSettings? = null
+        val repository = FakeUserPreferencesRepository(glassPanel = false)
+
+        composeRule.setContent {
+            val lifecycleOwner = remember { TestLifecycleOwner() }
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                AppThemeHost(repository = repository) {
+                    captured = LocalGlassSettings.current
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val settings = captured!!
+        assertEquals(false, settings.enabledFor(GlassScope.PANEL))
+        assertEquals(true, settings.enabledFor(GlassScope.TOP_BAR))
+        assertEquals(true, settings.enabledFor(GlassScope.BOTTOM_BAR))
+        assertEquals(true, settings.enabledFor(GlassScope.BOTTOM_SHEET))
+    }
+
+    @Test
+    fun themeHost_oledEnabled_forcesAllScopesOff() {
+        var captured: GlassSettings? = null
+
+        composeRule.setContent {
+            val lifecycleOwner = remember { TestLifecycleOwner() }
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                // OLED 生效 → §6.3 强制禁用玻璃（即使总开关与逐项开关都开着）
+                AppThemeHost(repository = FakeUserPreferencesRepository(oledEnabled = true)) {
+                    captured = LocalGlassSettings.current
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        val settings = captured!!
+        assertEquals(false, settings.masterEnabled)
+        GlassScope.entries.forEach { scope ->
+            assertEquals("OLED 下应全关：$scope", false, settings.enabledFor(scope))
+        }
     }
 
     @Test
@@ -201,14 +268,20 @@ class AppThemeHostTest {
  */
 private class FakeUserPreferencesRepository(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
+    oledEnabled: Boolean = false,
+    glassPanel: Boolean = true,
 ) : UserPreferencesRepository {
     val themeModeFlow = MutableStateFlow(themeMode)
 
     private val blurEnabledFlow = MutableStateFlow(true)
+    private val glassTopBarFlow = MutableStateFlow(true)
+    private val glassBottomBarFlow = MutableStateFlow(true)
+    private val glassPanelFlow = MutableStateFlow(glassPanel)
+    private val glassBottomSheetFlow = MutableStateFlow(true)
     private val languageTagFlow = MutableStateFlow<String?>(null)
     private val dynamicColorEnabledFlow = MutableStateFlow(false)
     private val seedColorFlow = MutableStateFlow(UserPreferencesRepository.DEFAULT_SEED_COLOR)
-    private val oledEnabledFlow = MutableStateFlow(false)
+    private val oledEnabledFlow = MutableStateFlow(oledEnabled)
     private val highContrastEnabledFlow = MutableStateFlow(false)
     private val cornerScaleFlow = MutableStateFlow(UserPreferencesRepository.DEFAULT_CORNER_SCALE)
     private val motionScaleFlow = MutableStateFlow(UserPreferencesRepository.DEFAULT_MOTION_SCALE)
@@ -221,6 +294,14 @@ private class FakeUserPreferencesRepository(
     override val languageTag: Flow<String?> = languageTagFlow
 
     override val blurEnabled: Flow<Boolean> = blurEnabledFlow
+
+    override val glassTopBar: Flow<Boolean> = glassTopBarFlow
+
+    override val glassBottomBar: Flow<Boolean> = glassBottomBarFlow
+
+    override val glassPanel: Flow<Boolean> = glassPanelFlow
+
+    override val glassBottomSheet: Flow<Boolean> = glassBottomSheetFlow
 
     override val dynamicColorEnabled: Flow<Boolean> = dynamicColorEnabledFlow
 
@@ -246,6 +327,22 @@ private class FakeUserPreferencesRepository(
 
     override suspend fun setBlurEnabled(enabled: Boolean) {
         blurEnabledFlow.value = enabled
+    }
+
+    override suspend fun setGlassTopBar(enabled: Boolean) {
+        glassTopBarFlow.value = enabled
+    }
+
+    override suspend fun setGlassBottomBar(enabled: Boolean) {
+        glassBottomBarFlow.value = enabled
+    }
+
+    override suspend fun setGlassPanel(enabled: Boolean) {
+        glassPanelFlow.value = enabled
+    }
+
+    override suspend fun setGlassBottomSheet(enabled: Boolean) {
+        glassBottomSheetFlow.value = enabled
     }
 
     override suspend fun setLanguageTag(tag: String?) {

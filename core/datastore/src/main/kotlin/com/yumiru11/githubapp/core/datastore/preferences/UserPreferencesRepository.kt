@@ -26,8 +26,24 @@ interface UserPreferencesRepository {
     /** 语言标签（BCP 47，null = 跟随系统语言） */
     val languageTag: Flow<String?>
 
-    /** 毛玻璃效果开关（默认开启；T6 设置页提供关闭项） */
+    /** 毛玻璃效果**总**开关（默认开启；T6 设置页提供） */
     val blurEnabled: Flow<Boolean>
+
+    /**
+     * 毛玻璃逐项开关（#167 / UI03，ui-design §6.3）：四条允许点位各自可关，默认全开。
+     * 生效值 = 总开关 ∧ 逐项 ∧ 非 OLED ∧ 非高对比（后两条见
+     * [com.yumiru11.githubapp.core.designsystem.token.GlassSettings.withAccessibilityOverrides]）。
+     */
+    val glassTopBar: Flow<Boolean>
+
+    /** 底栏毛玻璃开关（默认开启） */
+    val glassBottomBar: Flow<Boolean>
+
+    /** 通知面板毛玻璃开关（默认开启） */
+    val glassPanel: Flow<Boolean>
+
+    /** BottomSheet 毛玻璃开关（默认开启） */
+    val glassBottomSheet: Flow<Boolean>
 
     /** 动态取色开关（Android 12+ 壁纸取色；默认关闭） */
     val dynamicColorEnabled: Flow<Boolean>
@@ -59,6 +75,14 @@ interface UserPreferencesRepository {
     suspend fun setThemeMode(mode: ThemeMode)
 
     suspend fun setBlurEnabled(enabled: Boolean)
+
+    suspend fun setGlassTopBar(enabled: Boolean)
+
+    suspend fun setGlassBottomBar(enabled: Boolean)
+
+    suspend fun setGlassPanel(enabled: Boolean)
+
+    suspend fun setGlassBottomSheet(enabled: Boolean)
 
     /** null 表示清除语言偏好（回退系统语言） */
     suspend fun setLanguageTag(tag: String?)
