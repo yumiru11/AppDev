@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
+import com.yumiru11.githubapp.core.designsystem.token.LocalStaggerEnabled
 
 /** 参与首屏 stagger 的最大行数（#89）：其余行直出，避免深页滚动时反复入场。 */
 internal const val STAGGER_MAX_ITEMS = 12
@@ -33,12 +34,17 @@ internal fun staggerDelayMillis(index: Int): Int =
  */
 @Composable
 internal fun rememberStaggerEnterModifier(index: Int): Modifier {
+    // 全局开关（#167 / UI06，§4.2 H2-2）：关掉即"列表一次性直出"，不位移不淡入。
+    // 注意与动效缩放的差别：缩放到 0 是"动画瞬时完成"（首帧即在终态，视觉相同），
+    // 而关开关是"根本不进入动画路径"——对长列表省下的组合/绘制开销是实打实的。
+    val staggerEnabled = LocalStaggerEnabled.current
     val shown = rememberSaveable { mutableStateOf(false) }
     val progress = remember { Animatable(if (shown.value) 1f else 0f) }
     val durationMillis = AppMotion.scaledDuration(AppMotion.DURATION_LIST_ITEM)
     val slideDistancePx = with(LocalDensity.current) { SLIDE_DISTANCE.toPx() }
-    LaunchedEffect(durationMillis) {
-        if (shown.value || durationMillis <= 0) {
+    LaunchedEffect(durationMillis, staggerEnabled) {
+        if (shown.value || durationMillis <= 0 || !staggerEnabled) {
+            progress.snapTo(1f)
             shown.value = true
             return@LaunchedEffect
         }

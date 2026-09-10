@@ -45,8 +45,8 @@ import com.composables.icons.materialsymbols.rounded.Link
 import com.composables.icons.materialsymbols.rounded.Redo
 import com.composables.icons.materialsymbols.rounded.Undo
 import com.yumiru11.githubapp.core.editor.DEFAULT_MARKDOWN_EMOJIS
+import com.yumiru11.githubapp.core.editor.MarkdownComposer
 import com.yumiru11.githubapp.core.editor.MarkdownEditorView
-import com.yumiru11.githubapp.core.editor.MarkdownToolbarAction
 import com.yumiru11.githubapp.core.editor.rememberM3EditorThemeTokens
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
@@ -117,13 +117,18 @@ fun MarkdownEditorScreen(
             )
         },
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            EditorTabRow(
-                isPreview = uiState.isPreview,
-                onEditClick = { if (uiState.isPreview) viewModel.togglePreview() },
-                onPreviewClick = { if (!uiState.isPreview) viewModel.togglePreview() },
-            )
-            if (uiState.isPreview) {
+        // 编辑/预览 + md 工具栏收敛在 core:editor 的 MarkdownComposer（#166 / UI05）：
+        // 同一套交互同时服务本页与 issue 评论输入 Sheet，避免两处各维护一份工具栏。
+        // 预览用 WebView（长文档，与 README 渲染一致）；评论那侧用原生 viewer（短文本铁律）。
+        MarkdownComposer(
+            text = uiState.text,
+            isPreview = uiState.isPreview,
+            onTogglePreview = { viewModel.setPreview(it) },
+            onTextChanged = { viewModel.onTextChanged(it) },
+            onEditorReady = { viewModel.onEditorReady(it) },
+            onToolbarAction = { viewModel.applySyntax(it) },
+            themeTokens = editorTokens,
+            preview = {
                 WebViewMarkdownRenderer(
                     sanitizedHtml = uiState.text,
                     tokenProvider = { null },
@@ -135,101 +140,12 @@ fun MarkdownEditorScreen(
                     fillAvailableHeight = true,
                     modifier = Modifier.fillMaxSize(),
                 )
-            } else {
-                MarkdownToolbar(onAction = { viewModel.applySyntax(it) })
-                MarkdownEditorView(
-                    content = uiState.text,
-                    themeTokens = editorTokens,
-                    mentions = emptyList(),
-                    emojis = DEFAULT_MARKDOWN_EMOJIS,
-                    onEditorReady = { viewModel.onEditorReady(it) },
-                    onTextChanged = { viewModel.onTextChanged(it) },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
-    }
-}
-
-/** 编辑/预览双 Tab 行（选中态 primary，未选中 onSurfaceVariant）。 */
-@Composable
-private fun EditorTabRow(
-    isPreview: Boolean,
-    onEditClick: () -> Unit,
-    onPreviewClick: () -> Unit,
-) {
-    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-        TextButton(onClick = onEditClick) {
-            Text(
-                text = stringResource(R.string.editor_tab_edit),
-                color =
-                    if (isPreview) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-            )
-        }
-        TextButton(onClick = onPreviewClick) {
-            Text(
-                text = stringResource(R.string.editor_tab_preview),
-                color =
-                    if (isPreview) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-            )
-        }
-    }
-}
-
-/** 工具栏：横向滚动图标按钮行（11 个语法动作）。 */
-@Composable
-private fun MarkdownToolbar(onAction: (MarkdownToolbarAction) -> Unit) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp),
-    ) {
-        ToolbarButton(MaterialSymbols.Rounded.Format_bold, R.string.editor_bold) { onAction(MarkdownToolbarAction.BOLD) }
-        ToolbarButton(MaterialSymbols.Rounded.Format_italic, R.string.editor_italic) { onAction(MarkdownToolbarAction.ITALIC) }
-        ToolbarButton(MaterialSymbols.Rounded.Code, R.string.editor_inline_code) { onAction(MarkdownToolbarAction.INLINE_CODE) }
-        ToolbarButton(MaterialSymbols.Rounded.Code_blocks, R.string.editor_code_block) { onAction(MarkdownToolbarAction.CODE_BLOCK) }
-        ToolbarButton(MaterialSymbols.Rounded.Format_h1, R.string.editor_heading) { onAction(MarkdownToolbarAction.HEADING) }
-        ToolbarButton(MaterialSymbols.Rounded.Format_list_bulleted, R.string.editor_unordered_list) {
-            onAction(MarkdownToolbarAction.UNORDERED_LIST)
-        }
-        ToolbarButton(
-            MaterialSymbols.Rounded.Format_list_numbered,
-            R.string.editor_ordered_list,
-        ) { onAction(MarkdownToolbarAction.ORDERED_LIST) }
-        ToolbarButton(MaterialSymbols.Rounded.Checklist, R.string.editor_task_list) { onAction(MarkdownToolbarAction.TASK_LIST) }
-        ToolbarButton(MaterialSymbols.Rounded.Link, R.string.editor_link) { onAction(MarkdownToolbarAction.LINK) }
-        ToolbarButton(MaterialSymbols.Rounded.Image, R.string.editor_image) { onAction(MarkdownToolbarAction.IMAGE) }
-        ToolbarButton(MaterialSymbols.Rounded.Format_quote, R.string.editor_quote) { onAction(MarkdownToolbarAction.QUOTE) }
-    }
-}
-
-/** 单个工具栏图标按钮（矢量图标 + contentDescription，禁 emoji）。 */
-@Composable
-private fun ToolbarButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    contentDescriptionRes: Int,
-    onClick: () -> Unit,
-) {
-    IconButton(onClick = onClick) {
-        Icon(
-            imageVector = icon,
-            contentDescription = stringResource(contentDescriptionRes),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            },
+            modifier = Modifier.fillMaxSize().padding(padding),
         )
     }
 }
 
-/** 预览 WebView bridge 回调：链接分发，其余事件忽略（预览只读）。 */
 private class EditorPreviewBridgeCallback(
     private val internalLinkHandler: (ParsedUrl) -> Unit,
     private val externalLinkHandler: (String) -> Unit,

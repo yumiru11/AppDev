@@ -68,9 +68,10 @@ class SettingsViewModel
                 },
                 combine(
                     preferences.languageTag,
-                    sessionManager.authState,
-                ) { languageTag, authState -> MiscPrefs(languageTag, authState) },
-            ) { theme, style, glass, misc ->
+                    preferences.staggerEnabled,
+                ) { languageTag, stagger -> MiscPrefs(languageTag, stagger) },
+                sessionManager.authState,
+            ) { theme, style, glass, misc, authState ->
                 SettingsUiState(
                     themeMode = theme.themeMode,
                     dynamicColorEnabled = theme.dynamicColorEnabled,
@@ -88,7 +89,8 @@ class SettingsViewModel
                     glassBottomBar = glass.bottomBar,
                     glassPanel = glass.panel,
                     glassBottomSheet = glass.bottomSheet,
-                    authState = misc.authState,
+                    staggerEnabled = misc.staggerEnabled,
+                    authState = authState,
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -138,6 +140,11 @@ class SettingsViewModel
 
         fun setBlurEnabled(enabled: Boolean) {
             persist { preferences.setBlurEnabled(enabled) }
+        }
+
+        /** 列表首屏 stagger 开关（#167 / UI06） */
+        fun setStaggerEnabled(enabled: Boolean) {
+            persist { preferences.setStaggerEnabled(enabled) }
         }
 
         // ── 毛玻璃逐项开关（#167 / UI03：ui-design §6.3 四条允许点位）──────────────
@@ -213,8 +220,8 @@ private data class GlassPrefs(
     val bottomSheet: Boolean,
 )
 
-/** 语言 / 登录态中间聚合（与毛玻璃组凑成外层 combine 的 4 个槽位）。 */
+/** 语言 / stagger 中间聚合（与毛玻璃组凑成外层 combine 的槽位）。 */
 private data class MiscPrefs(
     val languageTag: String?,
-    val authState: com.yumiru11.githubapp.core.githubauth.auth.AuthState,
+    val staggerEnabled: Boolean,
 )

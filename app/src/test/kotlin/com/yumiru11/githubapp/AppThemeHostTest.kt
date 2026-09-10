@@ -366,6 +366,10 @@ private class FakeUserPreferencesRepository(
 
     override val repoLayout: Flow<RepoLayoutMode> = MutableStateFlow(RepoLayoutMode.LIST)
 
+    private val staggerEnabledFlow = MutableStateFlow(true)
+
+    override val staggerEnabled: Flow<Boolean> = staggerEnabledFlow
+
     override suspend fun setThemeMode(mode: ThemeMode) {
         themeModeFlow.value = mode
     }
@@ -428,6 +432,10 @@ private class FakeUserPreferencesRepository(
 
     override suspend fun setCodeLineNumbers(enabled: Boolean) {
         codeLineNumbersFlow.value = enabled
+    }
+
+    override suspend fun setStaggerEnabled(enabled: Boolean) {
+        staggerEnabledFlow.value = enabled
     }
 
     override suspend fun setRepoLayout(mode: RepoLayoutMode) {
