@@ -40,8 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -132,6 +130,8 @@ fun HomeScreen(
     onCreateIssue: (owner: String, repo: String) -> Unit = { _, _ -> },
     /** #89：仓库选择器选中后路由到 pulls/{owner}/{repo} */
     onViewPullRequests: (owner: String, repo: String) -> Unit = { _, _ -> },
+    /** L04：第三条长条按钮「新建仓库」→ 新建仓库页（未登录由宿主先引导登录） */
+    onCreateRepo: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -210,6 +210,7 @@ fun HomeScreen(
                             bottomContentPadding = bottomContentPadding,
                             onCreateIssue = onCreateIssue,
                             onViewPullRequests = onViewPullRequests,
+                            onCreateRepo = onCreateRepo,
                         )
                     }
                 }
@@ -280,6 +281,7 @@ private fun HomeSuccessContent(
     bottomContentPadding: Dp,
     onCreateIssue: (owner: String, repo: String) -> Unit,
     onViewPullRequests: (owner: String, repo: String) -> Unit,
+    onCreateRepo: () -> Unit,
 ) {
     val pickerViewModel: RepoPickerViewModel = hiltViewModel()
     val pickerUiState by pickerViewModel.uiState.collectAsStateWithLifecycle()
@@ -305,6 +307,7 @@ private fun HomeSuccessContent(
                 pickerTarget = PickerTarget.VIEW_PULL_REQUESTS
                 pickerVisible = true
             },
+            onCreateRepoClick = onCreateRepo,
         )
     }
     RepoPickerSheet(
@@ -334,6 +337,7 @@ private fun HomePage(
     bottomContentPadding: Dp,
     onCreateIssueClick: () -> Unit,
     onViewPullRequestsClick: () -> Unit,
+    onCreateRepoClick: () -> Unit,
 ) {
     when (HomeTab.entries[page]) {
         HomeTab.FEED -> {
@@ -345,6 +349,7 @@ private fun HomePage(
                 bottomContentPadding = bottomContentPadding,
                 onCreateIssueClick = onCreateIssueClick,
                 onViewPullRequestsClick = onViewPullRequestsClick,
+                onCreateRepoClick = onCreateRepoClick,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -366,9 +371,9 @@ private fun HomePage(
 private fun QuickActionsSection(
     onCreateIssueClick: () -> Unit,
     onViewPullRequestsClick: () -> Unit,
+    onCreateRepoClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val comingSoon = stringResource(R.string.home_action_create_repo_cd)
     Column(
         modifier = modifier.padding(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -387,16 +392,11 @@ private fun QuickActionsSection(
             icon = AppDevOcticons.PullRequest,
             onClick = onViewPullRequestsClick,
         )
-        // 新建仓库：占位待功能票（issue #89 任务清单），禁用态语义可辨
+        // L04：新建仓库（此前为占位禁用态；未登录由宿主先引导登录）
         LongBarAction(
             text = stringResource(R.string.home_action_create_repo),
             icon = AppDevOcticons.Repo,
-            onClick = {},
-            enabled = false,
-            modifier =
-                Modifier.semantics {
-                    stateDescription = comingSoon
-                },
+            onClick = onCreateRepoClick,
         )
     }
 }
@@ -416,6 +416,7 @@ private fun FeedPage(
     bottomContentPadding: Dp,
     onCreateIssueClick: () -> Unit,
     onViewPullRequestsClick: () -> Unit,
+    onCreateRepoClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lazyItems = feed.collectAsLazyPagingItems()
@@ -424,6 +425,7 @@ private fun FeedPage(
         QuickActionsSection(
             onCreateIssueClick = onCreateIssueClick,
             onViewPullRequestsClick = onViewPullRequestsClick,
+            onCreateRepoClick = onCreateRepoClick,
             modifier = Modifier.fillMaxWidth(),
         )
     }
