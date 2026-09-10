@@ -1,6 +1,16 @@
 package com.yumiru11.githubapp.feature.profile
 
+import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,11 +54,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -68,7 +80,9 @@ import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.ui.sharedTransitionElement
+import kotlinx.coroutines.launch
 
 /**
  * 个人主页（T20；L10 起兼作他人主页）。
@@ -257,15 +271,7 @@ private fun ProfileHeader(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 16.dp),
     ) {
-        AsyncImage(
-            model = user.avatarUrl,
-            contentDescription = stringResource(R.string.profile_avatar),
-            modifier =
-                Modifier
-                    .size(96.dp)
-                    .clip(CircleShape),
-            contentScale = ContentScale.Crop,
-        )
+        ProfileAvatar(avatarUrl = user.avatarUrl)
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = user.name ?: user.login,
@@ -289,12 +295,23 @@ private fun ProfileHeader(
             )
         }
         Spacer(modifier = Modifier.height(16.dp))
+        // 统计数字变化用 AnimatedContent 滚动（#167 / UI09，§3.5「统计数字 AnimatedContent 滚动」）：
+        // 关注/取关后 followers 会变，数字直接跳变会显得"闪"，滚动过渡更稳。
         Row {
-            StatItem(text = stringResource(R.string.profile_stats_repos, user.publicRepos))
+            StatNumber(
+                value = user.publicRepos,
+                labelRes = R.string.profile_stats_repos,
+            )
             Spacer(modifier = Modifier.width(24.dp))
-            StatItem(text = stringResource(R.string.profile_stats_followers, user.followers))
+            StatNumber(
+                value = user.followers,
+                labelRes = R.string.profile_stats_followers,
+            )
             Spacer(modifier = Modifier.width(24.dp))
-            StatItem(text = stringResource(R.string.profile_stats_following, user.following))
+            StatNumber(
+                value = user.following,
+                labelRes = R.string.profile_stats_following,
+            )
         }
         if (!isSelf) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -347,6 +364,30 @@ private fun StatItem(text: String) {
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+/**
+ * 统计数字（#167 / UI09，ui-design §3.5「统计数字 AnimatedContent 滚动」）。
+ *
+ * 数字变化（例如关注后 followers +1）时用 [AnimatedContent] 做滑动过渡：直接跳变在
+ * 统计行里很显眼，滚动一格的观感更接近原生 M3。
+ * 动效时长走 [AppMotion.scaledDuration]（系统「减弱动画」下退化为瞬时切换）。
+ */
+@Composable
+private fun StatNumber(
+    value: Int,
+    @StringRes labelRes: Int,
+) {
+    AnimatedContent(
+        targetState = value,
+        transitionSpec = {
+            (slideInVertically { height -> height } + fadeIn())
+                .togetherWith(slideOutVertically { height -> -height } + fadeOut())
+        },
+        label = "profile-stat",
+    ) { current ->
+        StatItem(text = stringResource(labelRes, current))
+    }
 }
 
 /** 四 Tab 选择器（Repos/Starred/Followers/Following） */
@@ -660,4 +701,49 @@ private enum class ProfileTab(
     STARRED(R.string.profile_tab_starred),
     FOLLOWERS(R.string.profile_tab_followers),
     FOLLOWING(R.string.profile_tab_following),
+}
+
+/** 头像点击回弹峰值（#167 / UI09：§3.5 用户拍板 1.1x） */
+private const val AVATAR_BOUNCE_SCALE = 1.1f
+
+/**
+ * 资料头头像（#167 / UI09，ui-design §3.5「头像点击 1.1x 回弹」+ §4.3 spring）。
+ *
+ * 纯反馈动效，不导航：头像本身没有"更进一步的去处"，点击跳转会造成意外。
+ * 单独成组件是为了让 [ProfileHeader] 保持在 detekt 的方法长度上限内。
+ */
+@Composable
+private fun ProfileAvatar(avatarUrl: String?) {
+    val scope = rememberCoroutineScope()
+    val scale = remember { Animatable(1f) }
+    AsyncImage(
+        model = avatarUrl,
+        contentDescription = stringResource(R.string.profile_avatar),
+        modifier =
+            Modifier
+                .size(96.dp)
+                .graphicsLayer {
+                    scaleX = scale.value
+                    scaleY = scale.value
+                }.clip(CircleShape)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) {
+                    // 播一次 1.0 → 1.1 → 1.0；已在播放中（value ≠ 1）就忽略重复点击
+                    scope.launch {
+                        if (scale.value == 1f) {
+                            scale.animateTo(
+                                AVATAR_BOUNCE_SCALE,
+                                spring(dampingRatio = AppMotion.DampingRatioHighBouncy, stiffness = AppMotion.StiffnessMedium),
+                            )
+                            scale.animateTo(
+                                1f,
+                                spring(dampingRatio = AppMotion.DampingRatioHighBouncy, stiffness = AppMotion.StiffnessMedium),
+                            )
+                        }
+                    }
+                },
+        contentScale = ContentScale.Crop,
+    )
 }
