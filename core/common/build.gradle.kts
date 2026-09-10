@@ -26,3 +26,9 @@ afterEvaluate {
         dependencies.clear()
     }
 }
+
+dependencies {
+    // 纯 JVM 逻辑测试（LogRedaction 脱敏规则矩阵）：不引 Compose/Robolectric，
+    // 保持本模块「纯 JVM」定位。
+    testImplementation(libs.junit)
+}

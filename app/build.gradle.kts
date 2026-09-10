@@ -75,6 +75,24 @@ android {
     buildTypes {
         release {
             signingConfigs.findByName("release")?.let { signingConfig = it }
+            // R8 代码缩减 + 资源缩减（#169 / L15）。keep 规则见 app/proguard-rules.pro，
+            // 覆盖 kotlinx-serialization 路由反序列化、Apollo、Retrofit、Room、Hilt、
+            // Sora 编辑器与 AppAuth。本地以 `./gradlew :app:assembleRelease` 实跑验证。
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
+    }
+
+    // 运行时语言切换 × Bundle 语言拆分（#169 / Q04，lint AppBundleLocaleChanges）：
+    // MainActivity 用 AppCompatDelegate.setApplicationLocales 做 in-app 切换，
+    // Play 的语言拆分会在安装时剥掉未用语言 → 切换后回退英文。禁用语言拆分。
+    bundle {
+        language {
+            enableSplit = false
         }
     }
 
@@ -107,6 +125,8 @@ dependencies {
     // 导航骨架（core:ui + core:navigation）
     implementation(project(":core:ui"))
     implementation(project(":core:navigation"))
+    // 通用工具（#169：LogRedaction 日志脱敏，Timber 树与 OkHttp 日志共用同一份规则）
+    implementation(project(":core:common"))
 
     // 主题（core:designsystem）
     implementation(project(":core:designsystem"))
@@ -157,6 +177,13 @@ dependencies {
 
     // Core
     implementation(libs.core.ktx)
+
+    // 调试工具链（#169 / L14）：Timber 日志（debug 树 + token 脱敏）、
+    // Chucker 网络面板（仅 debug 变体，release 走 no-op 空实现）、LeakCanary（仅 debug）
+    implementation(libs.timber)
+    debugImplementation(libs.chucker.library)
+    releaseImplementation(libs.chucker.library.noop)
+    debugImplementation(libs.leakcanary.android)
 
     // Testing：Konsist 架构护栏 + core:testing 基建（JUnit4/Robolectric/Roborazzi/coroutines-test 由其 api 导出）
     testImplementation(libs.konsist)
