@@ -585,8 +585,9 @@ abstract class DiffCoverageCheck : DefaultTask() {
     }
 }
 
-// 默认阈值（0..1）。-PdiffCoverageThreshold 同时接受 0..1 与 0..100 两种口径（见下方归一逻辑）
-val DEFAULT_DIFF_THRESHOLD = 0.80
+// 默认阈值（0..1）。-PdiffCoverageThreshold 同时接受 0..1 与 0..100 两种口径（见下方归一逻辑）。
+// 顶层 val 必须是 camelCase（ktlint property-naming；只有 const val 才允许 SCREAMING_SNAKE）
+val defaultDiffThreshold = 0.80
 
 tasks.register<DiffCoverageCheck>("diffCoverageCheck") {
     group = "verification"
@@ -607,9 +608,8 @@ tasks.register<DiffCoverageCheck>("diffCoverageCheck") {
             // 失败又被 ci.yml 的 continue-on-error 吞掉，于是"从未真正拦过任何 PR"。
             // 现在同时接受 0..1 与 0..100 两种写法，越界值钳到合法区间。
             .map { raw ->
-                val value = raw.trim().toDoubleOrNull() ?: DEFAULT_DIFF_THRESHOLD
+                val value = raw.trim().toDoubleOrNull() ?: defaultDiffThreshold
                 if (value > 1.0) (value / 100.0).coerceIn(0.0, 1.0) else value.coerceIn(0.0, 1.0)
-            }
-            .orElse(DEFAULT_DIFF_THRESHOLD),
+            }.orElse(defaultDiffThreshold),
     )
 }
