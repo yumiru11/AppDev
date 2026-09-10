@@ -52,6 +52,8 @@ dependencies {
     testImplementation(project(":core:testing"))
     // PrivateImageInterceptor 代理链测试：MockWebServer 验证 Authorization 注入与回包
     testImplementation(libs.mockwebserver3)
+    // WebViewDarkModePolicyTest：用 relaxed mock 的 WebSettings 复现"检查通过但调用不支持"的组合
+    testImplementation(libs.mockk)
 }
 
 configurations.all {

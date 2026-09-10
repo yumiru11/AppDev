@@ -402,6 +402,10 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 Regex("""(^|/)[^/]*TimelineItems[^/]*\.kt$"""),
                 // Composable 视图：*View.kt（排除 *ViewModel.kt，ViewModel 是逻辑需门禁）
                 Regex("""(^|/)[^/]*View\.kt$"""),
+                // WebView 渲染宿主：整个文件是 @Composable + AndroidView factory 装配
+                // （无独立单测可打点；逻辑部分已抽到 WebViewDarkModePolicy 并有单测）。
+                // #170 实测：动一行注释都会让 diff 门禁把它算成"未覆盖新增行"。
+                Regex("""(^|/)[^/]*Renderer\.kt$"""),
             )
 
         val changedFiles =
@@ -500,11 +504,22 @@ abstract class DiffCoverageCheck : DefaultTask() {
 
     private fun git(vararg args: String): String {
         val out = ByteArrayOutputStream()
-        execOperations.exec {
-            commandLine("git", *args)
-            standardOutput = out
-            errorOutput = out
-            isIgnoreExitValue = false
+        val result =
+            execOperations.exec {
+                commandLine("git", *args)
+                standardOutput = out
+                errorOutput = out
+                isIgnoreExitValue = true
+            }
+        // 失败时给出可操作的原因提示：#170 实测 CI 浅克隆（fetch-depth=1）会让
+        // `git diff <base>...HEAD` 直接退出 128，而默认报错只有 "non-zero exit value 128"，
+        // 排查成本极高 —— 这里把 stderr 与常见解法一起抛出。
+        if (result.exitValue != 0) {
+            throw GradleException(
+                "diffCoverageCheck 执行 git " + args.joinToString(" ") + " 失败（exit " + result.exitValue + "）：" +
+                    out.toString(Charsets.UTF_8).trim() +
+                    "\n提示：比对基准提交必须存在于本地仓库 —— CI 上需要 actions/checkout 的 fetch-depth: 0。",
+            )
         }
         return out.toString(Charsets.UTF_8)
     }
