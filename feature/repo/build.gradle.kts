@@ -53,6 +53,13 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
 
+    // Paging 3（「仓库」分区的 LazyPagingItems 消费端，issue #166）
+    implementation(libs.paging.compose)
+
+    // 「仓库」分区的顶栏玻璃（与 HomeScreen 同一契约）：Haze backdrop blur + Custom Tabs 外链
+    implementation(libs.haze)
+    implementation(libs.androidx.browser)
+
     // Coil 3 (avatar images)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
@@ -64,8 +71,11 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:github-rest"))
     implementation(project(":core:database"))
-    // 错误归一化（L04/L05：422/403 → GitHubError.Validation/Forbidden；与 feature:search 同口径）
+    // core:github-data：错误归一化（#164 L04/L05：422/403 → GitHubError）
+    //  + 「仓库」分区的 GraphQL 游标分页源（#166 UI01）
     implementation(project(":core:github-data"))
+    // 布局偏好（通栏/网格）与登录态（#166 UI01）
+    implementation(project(":core:datastore"))
 
     // 登录态（游客只读：Star/Watch/Fork 按钮隐藏）
     implementation(project(":core:github-auth"))
