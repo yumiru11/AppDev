@@ -15,6 +15,7 @@ import com.yumiru11.githubapp.core.githubrest.model.PullRequestReviewCommentDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestReviewDto
 import com.yumiru11.githubapp.core.githubrest.model.UpdateBranchRequest
 import com.yumiru11.githubapp.core.githubrest.model.UpdateBranchResult
+import com.yumiru11.githubapp.core.githubrest.model.UpdatePullRequestRequest
 import com.yumiru11.githubapp.core.githubrest.model.UpdateReviewCommentRequest
 import retrofit2.Response
 import retrofit2.http.Body
@@ -220,6 +221,20 @@ interface PullRequestApi {
         @Path("number") number: Int,
         @Body request: UpdateBranchRequest,
     ): UpdateBranchResult
+
+    /**
+     * PATCH /repos/{owner}/{repo}/pulls/{number}：更新 PR（#163 L03：编辑标题/正文、关闭/重开）。
+     *
+     * 请求体仅携带非空字段（[UpdatePullRequestRequest] 自定义序列化器）；
+     * state = "closed" 关闭、"open" 重开。422 = 校验失败（如标题为空）。
+     */
+    @PATCH("repos/{owner}/{repo}/pulls/{number}")
+    suspend fun updatePullRequest(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("number") number: Int,
+        @Body request: UpdatePullRequestRequest,
+    ): PullRequestDto
 
     /**
      * POST /repos/{owner}/{repo}/pulls：创建 PR（T23）。
