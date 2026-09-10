@@ -2,6 +2,8 @@
 
 package com.yumiru11.githubapp.feature.search
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +47,7 @@ import com.yumiru11.githubapp.core.data.model.Repository
 import com.yumiru11.githubapp.core.data.model.SearchCodeItem
 import com.yumiru11.githubapp.core.data.model.SearchIssue
 import com.yumiru11.githubapp.core.data.model.User
+import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.feature.search.qualifier.QUALIFIER_SUGGESTIONS
 import com.yumiru11.githubapp.feature.search.qualifier.appendQualifier
@@ -156,51 +159,64 @@ private fun SuccessContent(
             selectedTab = state.activeTab,
             onTabSelected = onTabSelected,
         )
-        when (state.activeTab) {
-            SearchTab.REPOSITORIES -> {
-                RepositoriesContent(
-                    flow = state.repositories,
-                    onResultClick = onResultClick,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            SearchTab.USERS -> {
-                UsersContent(
-                    flow = state.users,
-                    onResultClick = onResultClick,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            SearchTab.ISSUES -> {
-                IssuesContent(
-                    flow = state.issues,
-                    onResultClick = onResultClick,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            SearchTab.PULL_REQUESTS -> {
-                IssuesContent(
-                    flow = state.pullRequests,
-                    onResultClick = onResultClick,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            SearchTab.CODE -> {
-                if (isLoggedIn) {
-                    CodeContent(
-                        flow = state.code,
+        // 结果区 Crossfade（#167 / UI16，ui-design §3.3「输入防抖 300ms 后结果区 Crossfade」）。
+        // 切 Tab / 换关键词都是"同一块区域换内容"，Crossfade 比硬切更贴近 M3 的
+        // fade-through 语义；时长与曲线走 AppMotion 令牌（系统减弱动画下退化为瞬时）。
+        Crossfade(
+            targetState = state.activeTab,
+            animationSpec =
+                tween(
+                    durationMillis = AppMotion.scaledDuration(AppMotion.DURATION_LIST_ITEM),
+                    easing = AppMotion.EmphasizedDecelerate,
+                ),
+            label = "search-results",
+        ) { activeTab ->
+            when (activeTab) {
+                SearchTab.REPOSITORIES -> {
+                    RepositoriesContent(
+                        flow = state.repositories,
                         onResultClick = onResultClick,
                         modifier = Modifier.fillMaxSize(),
                     )
-                } else {
-                    CodeLoginGateContent(
-                        onLoginClick = onLoginClick,
+                }
+
+                SearchTab.USERS -> {
+                    UsersContent(
+                        flow = state.users,
+                        onResultClick = onResultClick,
                         modifier = Modifier.fillMaxSize(),
                     )
+                }
+
+                SearchTab.ISSUES -> {
+                    IssuesContent(
+                        flow = state.issues,
+                        onResultClick = onResultClick,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
+                SearchTab.PULL_REQUESTS -> {
+                    IssuesContent(
+                        flow = state.pullRequests,
+                        onResultClick = onResultClick,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
+                SearchTab.CODE -> {
+                    if (isLoggedIn) {
+                        CodeContent(
+                            flow = state.code,
+                            onResultClick = onResultClick,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        CodeLoginGateContent(
+                            onLoginClick = onLoginClick,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
         }
