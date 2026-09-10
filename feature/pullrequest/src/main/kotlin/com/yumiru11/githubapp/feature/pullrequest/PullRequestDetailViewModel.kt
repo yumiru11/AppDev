@@ -138,6 +138,28 @@ class PullRequestDetailViewModel
             _lineCommentTarget.value = null
         }
 
+        /**
+         * 发布 PR 会话评论（#166：补上此前"写接口尚未接入"的缺口）。
+         *
+         * 与行内评论不同，这里**不做乐观插入**：会话评论要按时间线顺序与服务器返回的 id 落位，
+         * 伪造一条临时评论再替换会让"评论区暂时多一条、随后跳位"。改为发布成功后整体刷新时间线
+         * （PR 详情本就有 refreshPullRequestAndTimeline），失败则明确报错且**不清空输入**。
+         */
+        fun submitComment(body: String) {
+            if (body.isBlank()) return
+            viewModelScope.launch {
+                try {
+                    repository.addComment(owner, repo, number, body)
+                    refreshPullRequestAndTimeline()
+                    _events.tryEmit(PullRequestDetailEvent.CommentPosted)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _events.tryEmit(PullRequestDetailEvent.CommentFailed)
+                }
+            }
+        }
+
         /** 新增/回复行内评论：乐观插入 → 失败回滚 + Snackbar（T16，T14 Issue 同款模式） */
         fun submitLineComment(
             anchor: LineCommentAnchor,

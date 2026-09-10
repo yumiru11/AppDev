@@ -76,6 +76,9 @@ sealed interface PullRequestDetailEvent {
     /** 行评论新增/回复/会话解析写操作失败 */
     data object CommentFailed : PullRequestDetailEvent
 
+    /** PR 会话评论发布成功（#166：UI 据此关闭 Sheet + 提示） */
+    data object CommentPosted : PullRequestDetailEvent
+
     /** T17：Review 提交失败（已回滚） */
     data object ReviewFailed : PullRequestDetailEvent
 

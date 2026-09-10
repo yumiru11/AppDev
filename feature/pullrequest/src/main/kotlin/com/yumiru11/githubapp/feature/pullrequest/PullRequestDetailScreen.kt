@@ -120,12 +120,20 @@ fun PullRequestDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    // 会话评论 Sheet 开关声明在事件收集之前：CommentPosted 事件要在这里把它关掉
+    var showCommentSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
                 PullRequestDetailEvent.CommentFailed -> {
                     snackbarHostState.showSnackbar(context.getString(R.string.pull_request_line_comment_failed))
+                }
+
+                // 会话评论发布成功（#166）：关掉 Sheet 让用户看到时间线里的新评论
+                PullRequestDetailEvent.CommentPosted -> {
+                    showCommentSheet = false
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_comment_posted))
                 }
 
                 PullRequestDetailEvent.ReviewFailed -> {
@@ -185,7 +193,7 @@ fun PullRequestDetailScreen(
     val currentUrl = (uiState as? PullRequestDetailUiState.Success)?.pullRequest?.htmlUrl
 
     // 评论 BottomSheet 状态
-    var showCommentSheet by remember { mutableStateOf(false) }
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     // T17：Review 提交 BottomSheet 状态
     var showReviewSheet by remember { mutableStateOf(false) }
@@ -309,13 +317,10 @@ fun PullRequestDetailScreen(
 
             // 评论输入 BottomSheet
             if (showCommentSheet) {
-                val commentUnavailableMessage = stringResource(R.string.pull_request_comment_unavailable)
                 CommentBottomSheet(
                     onDismiss = { showCommentSheet = false },
-                    onSubmit = {
-                        // 写接口尚未接入（REST 评论发布属后续票）：明确告知，不关闭 sheet 以保留已输入内容
-                        scope.launch { snackbarHostState.showSnackbar(commentUnavailableMessage) }
-                    },
+                    // 发布失败时**不关闭** Sheet：已输入的内容不能丢（失败提示由事件通道给出）
+                    onSubmit = viewModel::submitComment,
                     sheetState = sheetState,
                 )
             }

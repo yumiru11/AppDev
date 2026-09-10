@@ -928,6 +928,54 @@ class PullRequestDetailViewModelTest {
             }
         }
 
+    // ── PR 会话评论（#166）───────────────────────────────────────────────
+    @Test
+    fun submitComment_success_refreshesTimelineAndEmitsPosted() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.addComment(any(), any(), any(), any()) } returns Unit
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.events.test {
+                viewModel.submitComment("LGTM")
+                advanceUntilIdle()
+
+                coVerify(exactly = 1) { mockRepo.addComment(owner, repo, number, "LGTM") }
+                // 发布成功后整体刷新（会话评论按服务器 id/顺序落位，不做乐观插入）
+                coVerify(atLeast = 1) { mockRepo.getPullRequest(owner, repo, number) }
+                assertEquals(PullRequestDetailEvent.CommentPosted, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun submitComment_failure_emitsCommentFailed() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.addComment(any(), any(), any(), any()) } throws IOException("network down")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.events.test {
+                viewModel.submitComment("LGTM")
+                advanceUntilIdle()
+
+                assertEquals(PullRequestDetailEvent.CommentFailed, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun submitComment_blankBody_doesNotCallRepository() =
+        runTest {
+            val mockRepo = repository()
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+
+            viewModel.submitComment("   ")
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { mockRepo.addComment(any(), any(), any(), any()) }
+        }
+
     @Test
     fun editPullRequest_blankTitle_doesNotSubmit() =
         runTest {

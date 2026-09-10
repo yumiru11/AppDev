@@ -3,6 +3,7 @@ package com.yumiru11.githubapp.feature.pullrequest.data
 import com.apollographql.apollo.ApolloClient
 import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
 import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
+import com.yumiru11.githubapp.core.githubrest.api.IssueApi
 import com.yumiru11.githubapp.core.githubrest.api.PullRequestApi
 import com.yumiru11.githubapp.core.githubrest.api.RepoManagementApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
@@ -30,6 +31,7 @@ import retrofit2.HttpException
 class PullRequestRepositoryWriteTest {
     private lateinit var server: MockWebServer
     private lateinit var pullRequestApi: PullRequestApi
+    private lateinit var issueApi: IssueApi
 
     @Before
     fun setUp() {
@@ -47,6 +49,7 @@ class PullRequestRepositoryWriteTest {
                 json = GitHubRestClient.createJson(),
             )
         pullRequestApi = retrofit.create(PullRequestApi::class.java)
+        issueApi = retrofit.create(IssueApi::class.java)
     }
 
     @After
@@ -60,6 +63,7 @@ class PullRequestRepositoryWriteTest {
             repositoryApi = mockk<RepositoryApi>(),
             repoManagementApi = mockk<RepoManagementApi>(),
             gitRefApi = mockk<GitRefApi>(),
+            issueApi = issueApi,
             apolloClient = mockk<ApolloClient>(),
         )
 
@@ -135,6 +139,46 @@ class PullRequestRepositoryWriteTest {
                 throw AssertionError("422 应抛 HttpException")
             } catch (e: HttpException) {
                 assertEquals(422, e.code())
+            }
+        }
+
+    // ── PR 会话评论（#166：补上此前"写接口尚未接入"的缺口）──────────────────
+    @Test
+    fun addComment_postsToIssueCommentsEndpointWithBody() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"id": 9, "body": "LGTM"}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            repository().addComment("octocat", "Hello-World", 42, "LGTM")
+
+            val request = server.takeRequest()
+            // PR 在 REST 语义里就是 issue：会话评论走 issues/{number}/comments
+            assertEquals("/repos/octocat/Hello-World/issues/42/comments", request.url.encodedPath)
+            assertEquals("POST", request.method)
+            assertEquals("""{"body":"LGTM"}""", request.body?.utf8())
+        }
+
+    @Test
+    fun addComment_403Response_propagatesHttpException() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 403 Forbidden")
+                    .body("""{"message":"Resource not accessible by integration"}""")
+                    .build(),
+            )
+
+            try {
+                repository().addComment("octocat", "Hello-World", 42, "x")
+                throw AssertionError("403 应抛 HttpException（上层据此提示失败且不清空输入）")
+            } catch (e: HttpException) {
+                assertEquals(403, e.code())
             }
         }
 }
