@@ -22,7 +22,11 @@ import javax.inject.Inject
  *
  * 从 SavedStateHandle 读取 [owner]/[repo] 导航参数，按 [filter] 构造分页流。
  * GitHub Issue 公开可读，无需登录门禁（GuestTokenProvider 覆盖 API 认证）。
- * 切换 Open/Closed 过滤时重建分页流；下拉刷新由 UI 层 LazyPagingItems.refresh() 触发。
+ * 切换 Open/Closed 过滤时重建分页流。
+ *
+ * 刷新语义（issue #165 / L07，两条路径最终都走 RemoteMediator REFRESH → 网络 + Room 合并）：
+ * - 列表已有内容：UI 层 LazyPagingItems.refresh()（Paging 原生 invalidate，保留滚动位置与已渲染行）
+ * - 列表空/错误：[refresh] 重建分页流（丢弃 cachedIn 缓存，从头跑一次 REFRESH）
  */
 @HiltViewModel
 class IssueListViewModel
@@ -56,6 +60,15 @@ class IssueListViewModel
             if (_uiState.value is IssueListUiState.Error) {
                 load()
             }
+        }
+
+        /**
+         * 失效并重建分页流（invalidate 语义）：丢弃 cachedIn 缓存并重新构造 Pager，
+         * 新的 RemoteMediator 会重新拉首屏写回 Room。空态下拉刷新走此路径
+         * （已有内容时 UI 用 LazyPagingItems.refresh()，避免整列表闪回 Loading）。
+         */
+        fun refresh() {
+            load()
         }
 
         private fun load() {

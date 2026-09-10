@@ -6,6 +6,7 @@ import androidx.paging.PagingSource.LoadResult
 import androidx.paging.PagingState
 import com.yumiru11.githubapp.core.githubdata.error.GitHubError
 import com.yumiru11.githubapp.core.githubdata.error.GitHubRequestException
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -19,7 +20,8 @@ import retrofit2.HttpException
  * SearchPagingSource 单测（loader 注入假数据源，零网络）。
  *
  * 覆盖：首页/中间页/末页分页 key 推进、空页终止、loader 抛 429 → LoadResult.Error
- * 携带归一化 RateLimited、refresh key 计算。
+ * 携带归一化 RateLimited、refresh key 计算；以及 issue #165 / L13 的结果缓存
+ * （命中零网络、TTL 过期出网、命中写回缓存、后台静默刷新后 invalidate 且自我终止）。
  */
 class SearchPagingSourceTest {
     @Test
@@ -65,10 +67,12 @@ class SearchPagingSourceTest {
         runTest {
             val loadSizes = mutableListOf<Int>()
             val source =
-                SearchPagingSource<String> { _, perPage ->
-                    loadSizes += perPage
-                    listOf("x")
-                }
+                SearchPagingSource<String>(
+                    loader = { _, perPage ->
+                        loadSizes += perPage
+                        listOf("x")
+                    },
+                )
 
             source.load(PagingSource.LoadParams.Refresh(key = null, loadSize = 15, placeholdersEnabled = false))
 
@@ -128,6 +132,148 @@ class SearchPagingSourceTest {
             )
         }
 
+    // ── 结果缓存（issue #165 / L13） ──────────────────────────────────────
+
+    @Test
+    fun load_freshCacheHit_returnsCachedItemsWithoutCallingLoader() =
+        runTest {
+            val cache = SearchResultCache()
+            cache.put(CACHE_KEY, page = 1, items = listOf("cached"), hasMore = true)
+            var calls = 0
+
+            val result = cachedSource(cache) { calls++ }.load(refreshParams())
+
+            val page = result as LoadResult.Page
+            assertEquals(listOf("cached"), page.data)
+            assertEquals(2, page.nextKey)
+            assertEquals(0, calls)
+        }
+
+    @Test
+    fun load_cachedLastPage_returnsNullNextKey() =
+        runTest {
+            val cache = SearchResultCache()
+            cache.put(CACHE_KEY, page = 1, items = listOf("only"), hasMore = false)
+
+            val page = cachedSource(cache) { 0 }.load(refreshParams()) as LoadResult.Page
+
+            assertNull(page.nextKey)
+        }
+
+    @Test
+    fun load_expiredCacheEntry_fetchesFromNetworkAndRewritesCache() =
+        runTest {
+            var now = 0L
+            val cache = SearchResultCache(ttlMillis = 1_000L, clock = { now })
+            cache.put(CACHE_KEY, page = 1, items = listOf("stale"), hasMore = true)
+            var calls = 0
+            now = 5_000L
+
+            val page = cachedSource(cache) { calls++ }.load(refreshParams()) as LoadResult.Page
+
+            assertEquals(listOf("fresh"), page.data)
+            assertEquals(1, calls)
+            assertEquals(listOf("fresh"), cache.get<String>(CACHE_KEY, 1)?.items)
+        }
+
+    @Test
+    fun load_cacheMiss_writesFetchedPageIntoCache() =
+        runTest {
+            val cache = SearchResultCache()
+
+            cachedSource(cache) { 0 }.load(refreshParams())
+
+            assertEquals(listOf("fresh"), cache.get<String>(CACHE_KEY, 1)?.items)
+        }
+
+    @Test
+    fun load_freshCacheHit_silentlyRefreshesInBackgroundThenInvalidates() =
+        runTest {
+            val cache = SearchResultCache()
+            cache.put(CACHE_KEY, page = 1, items = listOf("stale"), hasMore = true)
+            var calls = 0
+            val source = cachedSource(cache, refreshScope = this) { calls++ }
+            var invalidations = 0
+            source.registerInvalidatedCallback { invalidations++ }
+
+            val page = source.load(refreshParams()) as LoadResult.Page
+            // 命中即时返回缓存（用户先看到内容），此时尚未出网
+            assertEquals(listOf("stale"), page.data)
+            assertEquals(0, calls)
+
+            runCurrent()
+
+            assertEquals(1, calls)
+            assertEquals(listOf("fresh"), cache.get<String>(CACHE_KEY, 1)?.items)
+            assertTrue("静默刷新成功后应 invalidate 触发重载", invalidations == 1)
+            assertTrue("刷新结果需标记 revalidated 以自我终止", cache.get<String>(CACHE_KEY, 1)?.revalidated == true)
+        }
+
+    @Test
+    fun load_revalidatedCacheHit_doesNotRefreshAgain() =
+        runTest {
+            val cache = SearchResultCache()
+            cache.put(CACHE_KEY, page = 1, items = listOf("stale"), hasMore = true, revalidated = true)
+            var calls = 0
+            val source = cachedSource(cache, refreshScope = this) { calls++ }
+            var invalidations = 0
+            source.registerInvalidatedCallback { invalidations++ }
+
+            source.load(refreshParams())
+            runCurrent()
+
+            assertEquals("已 revalidate 的条目不得再次触发静默刷新（否则 invalidate 会无限循环）", 0, calls)
+            assertEquals(0, invalidations)
+        }
+
+    @Test
+    fun load_cacheHitWithoutRefreshScope_doesNotLaunchRefresh() =
+        runTest {
+            val cache = SearchResultCache()
+            cache.put(CACHE_KEY, page = 1, items = listOf("stale"), hasMore = true)
+            var calls = 0
+
+            cachedSource(cache, refreshScope = null) { calls++ }.load(refreshParams())
+            runCurrent()
+
+            assertEquals(0, calls)
+        }
+
+    @Test
+    fun load_silentRefreshFails_keepsCachedData() =
+        runTest {
+            val cache = SearchResultCache()
+            cache.put(CACHE_KEY, page = 1, items = listOf("stale"), hasMore = true)
+            val source =
+                SearchPagingSource<String>(
+                    loader = { _, _ -> throw java.io.IOException("offline") },
+                    cache = cache,
+                    cacheKey = CACHE_KEY,
+                    refreshScope = this,
+                )
+
+            val page = source.load(refreshParams()) as LoadResult.Page
+            runCurrent()
+
+            assertEquals(listOf("stale"), page.data)
+            assertEquals(listOf("stale"), cache.get<String>(CACHE_KEY, 1)?.items)
+        }
+
+    private fun cachedSource(
+        cache: SearchResultCache,
+        refreshScope: kotlinx.coroutines.CoroutineScope? = null,
+        onLoad: () -> Unit = {},
+    ): SearchPagingSource<String> =
+        SearchPagingSource(
+            loader = { _, _ ->
+                onLoad()
+                listOf("fresh")
+            },
+            cache = cache,
+            cacheKey = CACHE_KEY,
+            refreshScope = refreshScope,
+        )
+
     private fun source(
         items: List<String> = emptyList(),
         loader: suspend (page: Int, perPage: Int) -> List<String> = { _, _ -> items },
@@ -155,5 +301,9 @@ class SearchPagingSourceTest {
                 .body(body)
                 .build()
         return HttpException(retrofit2.Response.error<Any>(body, rawResponse))
+    }
+
+    private companion object {
+        const val CACHE_KEY = "REPOSITORIES:kotlin"
     }
 }

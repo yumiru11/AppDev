@@ -7,7 +7,7 @@
 
 开发一个**功能全面的 Android GitHub 客户端**（轻量、流畅、全 Material You）。技术规划 = `plan.md`（41KB，必读），需求来源 = `request.txt`。应用名/包名仍为占位符：applicationId 与 namespace = `com.yumiru11.githubapp`（模块 namespace 用 `core.github_xxx` 下划线写法），产品定名后统一改。
 
-**当前状态（2026-08-19）**：T1-T10 + T13 + T19/T20/T24 + T26 共 **15 票已完成并合入 main**。**Task B 渲染架构切换已完成（工作树未提交）**：README/Issue 正文改 WebView 主渲染（服务端 HTML + 离线 GFM 两级），评论/通知短文本保持原生（ADR-0007 已修订）。剩余 11 票见 `docs/agents/project-status.md`。
+**当前状态（2026-09-06）**：`main@2b7071d`。**T1–T26 中 25 票已合入 main 并关闭**，唯一未开工的功能票是 **T25（#26，性能与发布收尾）**；ui-audit 8 票（#83–#90）与 Task B 渲染架构切换（PR #70/#73）全部合入。全量审计（`docs/agents/task-audit-2026-09-06.md`）已把 51 项遗留发现合并立项为 **9 张分类票 #163–#171**——当前活动票就这 9 张 + #26（#1 Spec 与 #71 测试面板按约定常开）。剩余工作与执行顺序见 `docs/agents/project-status.md`。
 
 ## 核心决策（来自 plan.md，勿偏离）
 
@@ -108,6 +108,7 @@ feature/                   auth, home, repo, issue, pullrequest, search, editor,
 | **DSH × V4 Pro 使用指南** | `docs/agents/dsh-guide.md` |
 | UI 设计规范（权威，2026-08-15 拍板版） | `docs/ui-design.md` |
 | **UI 审查问题清单（2026-08-21 快照，缺陷/挂账/提案）** | `docs/ui-audit-2026-08-21.md` |
+| **全量审计报告（2026-09-06，9 张分类票来源）** | `docs/agents/task-audit-2026-09-06.md` |
 | 架构决策记录（ADR-0001~0006） | `docs/adr/` |
 | 术语表 | `CONTEXT.md` |
 | 真机走查反馈与状态 | `FEEDBACK.md` |

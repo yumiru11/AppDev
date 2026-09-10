@@ -15,13 +15,21 @@ import okhttp3.ResponseBody.Companion.toResponseBody
  * 3. 服务端返回 200 且带 ETag → peekBody 复制一份入缓存（原响应流不受影响）
  *
  * 仅缓存文本型 JSON 响应（≤ [MAX_CACHED_BODY_BYTES]），超限不入缓存但正常透传。
+ *
+ * 同时承担限流观测（issue #165 / L13，plan.md §9.3）：作为最外层拦截器，它对每一条响应
+ * 录制 `x-ratelimit-*` 快照到 [rateLimitStore]。之所以搭在本拦截器上而不是新建独立拦截器：
+ * 安装点是 `GitHubRestClient.createOkHttpClient`（core:github-rest 的 api/di 包，本票文件边界
+ * 之外），新建的拦截器无法被装配进 OkHttp 链。录制失败绝不影响请求（解析异常 → 记 null）。
  */
 class EtagCacheInterceptor(
     private val store: EtagStore,
+    /** 限流观测写入点（默认进程级单例，见 [ProcessRateLimitStore]） */
+    private val rateLimitStore: RateLimitStore = ProcessRateLimitStore,
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
-        if (request.method != METHOD_GET) return chain.proceed(request)
+        // 非 GET（写操作）同样带限流头（且 403/429 往往就发生在写操作上）→ 必须先录制再透传
+        if (request.method != METHOD_GET) return chain.proceed(request).recordRateLimit()
 
         val cacheKey = request.url.toString()
         val cached = store.get(cacheKey)
@@ -33,6 +41,8 @@ class EtagCacheInterceptor(
             }
 
         val response = chain.proceed(conditional)
+        // 304 回放会丢弃原始响应头 → 限流头必须在回放【之前】录制
+        response.recordRateLimit()
         return when {
             response.code == CODE_NOT_MODIFIED && cached != null -> response.replayFromCache(request, cached)
             response.code == CODE_OK -> response.cacheIfEtagged(cacheKey)
@@ -65,6 +75,9 @@ class EtagCacheInterceptor(
         store.put(cacheKey, EtagEntry(etag = etag, contentType = header(HEADER_CONTENT_TYPE), body = body))
         return this
     }
+
+    /** 录制限流快照（无 x-ratelimit-* 头时 [toRateLimitSnapshot] 返回 null，静默跳过） */
+    private fun Response.recordRateLimit(): Response = also { response -> response.toRateLimitSnapshot()?.let(rateLimitStore::record) }
 
     private companion object {
         const val METHOD_GET = "GET"

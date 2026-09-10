@@ -45,6 +45,9 @@ dependencies {
     // @Inject AppDatabase 时需要该类型可见（implementation 不透传，2026-08-12 实测）。
     api(libs.room.runtime)
     implementation(libs.room.ktx)
+    // room-paging：DAO 查询直接返回 PagingSource<Int, T>（RemoteMediator 本地数据源）。
+    // catalog 无该别名且本票不改 libs.versions.toml → 版本仍取自 catalog 单一事实来源。
+    implementation("androidx.room:room-paging:${libs.versions.room.get()}")
     ksp(libs.room.compiler)
 
     // Hilt（DatabaseModule 装配 AppDatabase/DAO）
