@@ -1,0 +1,81 @@
+# 截图基线「云端录制」（#170 / D02 的配套工具）。
+#
+# ## 为什么需要它
+#
+# Robolectric 的 Native Graphics 渲染结果**依赖运行环境**（字体、原生库版本、JDK），
+# 同一份代码在本机与 GitHub runner 上渲染出的 PNG **不是逐字节相同**的。
+# PR #181 实测：本机录的 core:ui 基线在 CI 上 verify 全红（8 张），而 :app 的基线
+# 之所以一直绿，是因为它当初就是「云端补录」的。
+#
+# 结论：**模块级截图基线必须以 CI 为唯一权威录制环境**。本 workflow 就是那个录制器。
+#
+# ## 用法
+#   1. Actions → "Record screenshots (CI canonical)" → Run workflow（选目标分支）
+#   2. 跑完下载 artifact（recorded-screenshots）
+#   3. 解压覆盖各模块 src/test/screenshots/*.png，提交
+#
+# 产物只用于提交基线，workflow 本身**不会**改动仓库。
+name: Record screenshots (CI canonical)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: record-screenshots
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    name: Record all module baselines
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Override local JDK path for CI
+        run: python3 -c "import re; p='gradle.properties'; s=open(p).read(); open(p,'w').write(re.sub(r'(?m)^org\\.gradle\\.java\\.home.*\\n?', '', s))"
+
+      - name: Seed plugin artifacts into mavenLocal
+        run: bash .github/gradle/seed-plugins.sh
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # 覆盖全部有 src/test/screenshots 的模块。record 模式不做 idle 等待与比对，
+      # 因此 :feature:issue 那种「无限动画导致 verify 挂死」的测试在这里是安全的。
+      - name: Record all screenshots
+        run: |
+          ./gradlew \
+            :app:recordRoborazziDebug \
+            :core:ui:recordRoborazziDebug \
+            :core:designsystem:recordRoborazziDebug \
+            :core:markdown:recordRoborazziDebug \
+            :feature:auth:recordRoborazziDebug \
+            :feature:repo:recordRoborazziDebug \
+            :feature:issue:recordRoborazziDebug \
+            :feature:notifications:recordRoborazziDebug \
+            --no-daemon
+
+      - name: Collect recorded baselines
+        run: |
+          mkdir -p artifacts/baselines
+          # 保留模块相对路径，解压后可直接覆盖仓库
+          find . -path "*/src/test/screenshots/*.png" -not -path "./artifacts/*" -print0 \
+            | xargs -0 -I{} sh -c 'mkdir -p "artifacts/baselines/$(dirname "{}")" && cp "{}" "artifacts/baselines/{}"'
+          echo "录制到 $(find artifacts/baselines -name "*.png" | wc -l) 张基线"
+          find artifacts/baselines -name "*.png" | sort | head -50
+
+      - name: Upload recorded baselines
+        uses: actions/upload-artifact@v7
+        with:
+          name: recorded-screenshots
+          path: artifacts/baselines/**
+          if-no-files-found: error
