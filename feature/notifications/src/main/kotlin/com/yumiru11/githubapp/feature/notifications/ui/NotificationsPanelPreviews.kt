@@ -7,6 +7,7 @@ import com.yumiru11.githubapp.feature.notifications.NotificationsPanelUiState
 import com.yumiru11.githubapp.feature.notifications.model.NotificationFilter
 import com.yumiru11.githubapp.feature.notifications.model.NotificationGroup
 import com.yumiru11.githubapp.feature.notifications.model.NotificationItem
+import com.yumiru11.githubapp.feature.notifications.model.NotificationSortOrder
 
 /**
  * 通知面板 @Preview 族（audit 缺陷 #16）：行与面板内容 Light/Dark 双主题预览，
@@ -91,9 +92,11 @@ private fun NotificationsPanelContentPreviewLight() {
         NotificationsPanelContent(
             uiState = NotificationsPanelUiState.Success(filter = NotificationFilter.ALL, groups = previewGroups()),
             filter = NotificationFilter.ALL,
+            sortOrder = NotificationSortOrder.NEWEST_FIRST,
             onDismiss = {},
             onMarkAllRead = {},
             onSelectFilter = {},
+            onSelectSortOrder = {},
             onToggleGroup = {},
             onMarkRead = {},
             onDelete = {},
@@ -111,9 +114,11 @@ private fun NotificationsPanelContentPreviewDark() {
         NotificationsPanelContent(
             uiState = NotificationsPanelUiState.Success(filter = NotificationFilter.ALL, groups = previewGroups()),
             filter = NotificationFilter.ALL,
+            sortOrder = NotificationSortOrder.OLDEST_FIRST,
             onDismiss = {},
             onMarkAllRead = {},
             onSelectFilter = {},
+            onSelectSortOrder = {},
             onToggleGroup = {},
             onMarkRead = {},
             onDelete = {},

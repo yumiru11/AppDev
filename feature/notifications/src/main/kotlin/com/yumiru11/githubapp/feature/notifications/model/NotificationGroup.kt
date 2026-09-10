@@ -19,20 +19,44 @@ data class NotificationGroup(
 }
 
 /**
- * 面板分组纯函数：按仓库 groupBy → 组内 updatedAt 倒序 → 组间按组内最新时间倒序。
+ * 面板分组纯函数：按仓库 groupBy → 组内按 [order] 排序 → 组间按同向的时间基准排序。
  *
- * 时间戳缺失/非法 ISO-8601 视为最旧（排组尾/组间末位）；排序稳定，同时间戳保持
- * 服务端相对顺序。折叠是 UI 状态（ViewModel collapsedRepos），不在此处理。
+ * 分组维度恒为仓库（ui-design §3.4 A3-2），[order] 只翻转时间方向：
+ * - [NotificationSortOrder.NEWEST_FIRST]：组内倒序，组间按组内**最新**一条倒序
+ * - [NotificationSortOrder.OLDEST_FIRST]：组内正序，组间按组内**最旧**一条正序
+ *
+ * 时间戳缺失/非法 ISO-8601 视为最旧；排序稳定，同时间戳保持服务端相对顺序。
+ * 折叠是 UI 状态（ViewModel collapsedRepos），不在此处理。
  */
-fun groupByRepository(items: List<NotificationItem>): List<NotificationGroup> =
-    items
+fun groupByRepository(
+    items: List<NotificationItem>,
+    order: NotificationSortOrder = NotificationSortOrder.NEWEST_FIRST,
+): List<NotificationGroup> {
+    val newestFirst = order == NotificationSortOrder.NEWEST_FIRST
+    return items
         .groupBy(NotificationItem::repoFullName)
         .map { (repo, groupItems) ->
             NotificationGroup(
                 repoFullName = repo,
-                items = groupItems.sortedByDescending(::itemTimestamp),
+                items =
+                    if (newestFirst) {
+                        groupItems.sortedByDescending(::itemTimestamp)
+                    } else {
+                        groupItems.sortedBy(::itemTimestamp)
+                    },
             )
-        }.sortedByDescending { group -> group.items.maxOfOrNull(::itemTimestamp) ?: Long.MIN_VALUE }
+        }.sortedWith(
+            if (newestFirst) {
+                compareByDescending<NotificationGroup> { group ->
+                    group.items.maxOfOrNull(::itemTimestamp) ?: Long.MIN_VALUE
+                }
+            } else {
+                compareBy<NotificationGroup> { group ->
+                    group.items.minOfOrNull(::itemTimestamp) ?: Long.MAX_VALUE
+                }
+            },
+        )
+}
 
 /** updatedAt → epoch millis；缺失/非法回退 Long.MIN_VALUE（最旧） */
 private fun itemTimestamp(item: NotificationItem): Long =

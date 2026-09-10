@@ -12,6 +12,7 @@ import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
 import com.yumiru11.githubapp.feature.notifications.data.NotificationRepository
 import com.yumiru11.githubapp.feature.notifications.model.NotificationFilter
 import com.yumiru11.githubapp.feature.notifications.model.NotificationItem
+import com.yumiru11.githubapp.feature.notifications.model.NotificationSortOrder
 import com.yumiru11.githubapp.feature.notifications.model.groupByRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -28,6 +29,7 @@ import javax.inject.Inject
  * - 右滑已读 / 全部已读：先本地置已读（色条淡出 + 条目重排），PATCH 失败静默（T19 约定）
  * - 左滑删除：先本地移除（组空整组消失，animateItem 补位），DELETE 失败重拉快照回滚视觉
  * - 过滤切换：重置折叠态并重拉快照
+ * - 组内时间排序切换（L12）：纯内存态，切换即用现有快照重排（不重拉、不重置折叠态）
  */
 @HiltViewModel
 class NotificationsPanelViewModel
@@ -38,6 +40,9 @@ class NotificationsPanelViewModel
     ) : ViewModel() {
         private val _filter = MutableStateFlow(NotificationFilter.ALL)
         val filter: StateFlow<NotificationFilter> = _filter.asStateFlow()
+
+        private val _sortOrder = MutableStateFlow(NotificationSortOrder.NEWEST_FIRST)
+        val sortOrder: StateFlow<NotificationSortOrder> = _sortOrder.asStateFlow()
 
         private val _uiState = MutableStateFlow<NotificationsPanelUiState>(NotificationsPanelUiState.Loading)
         val uiState: StateFlow<NotificationsPanelUiState> = _uiState.asStateFlow()
@@ -59,6 +64,19 @@ class NotificationsPanelViewModel
             _filter.value = filter
             if (_uiState.value !is NotificationsPanelUiState.Unauthenticated) {
                 load(filter)
+            }
+        }
+
+        /**
+         * 切换组内时间排序（L12）：**立即**用当前快照重排，不重拉快照、不重置折叠态。
+         *
+         * 重排动画归 #167（UI18），本票只保证顺序即时生效。
+         */
+        fun selectSortOrder(order: NotificationSortOrder) {
+            if (_sortOrder.value == order) return
+            _sortOrder.value = order
+            mapSuccess { state ->
+                state.copy(groups = groupByRepository(state.groups.flatMap { it.items }, order))
             }
         }
 
@@ -133,7 +151,7 @@ class NotificationsPanelViewModel
                     _uiState.value =
                         NotificationsPanelUiState.Success(
                             filter = filter,
-                            groups = groupByRepository(items),
+                            groups = groupByRepository(items, _sortOrder.value),
                             // 过滤切换语义为「新视图」：不携带旧视图折叠态
                             collapsedRepos = emptySet(),
                         )

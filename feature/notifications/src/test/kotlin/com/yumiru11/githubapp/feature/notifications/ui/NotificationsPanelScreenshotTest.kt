@@ -11,6 +11,7 @@ import com.yumiru11.githubapp.feature.notifications.NotificationsPanelUiState
 import com.yumiru11.githubapp.feature.notifications.model.NotificationFilter
 import com.yumiru11.githubapp.feature.notifications.model.NotificationGroup
 import com.yumiru11.githubapp.feature.notifications.model.NotificationItem
+import com.yumiru11.githubapp.feature.notifications.model.NotificationSortOrder
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -108,9 +109,11 @@ class NotificationsPanelScreenshotTest : ScreenshotTest() {
             NotificationsPanelContent(
                 uiState = sampleState(),
                 filter = NotificationFilter.ALL,
+                sortOrder = NotificationSortOrder.NEWEST_FIRST,
                 onDismiss = {},
                 onMarkAllRead = {},
                 onSelectFilter = {},
+                onSelectSortOrder = {},
                 onToggleGroup = {},
                 onMarkRead = {},
                 onDelete = {},
