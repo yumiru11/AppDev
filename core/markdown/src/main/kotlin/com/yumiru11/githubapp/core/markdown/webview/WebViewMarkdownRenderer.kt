@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -112,6 +114,26 @@ fun WebViewMarkdownRenderer(
             200.dp
         }
 
+    // WebView 生命周期（T25 验收「离开页面 destroy，无泄漏」）：
+    // AndroidView 的 factory 产物在节点离开组合后不会被自动回收，持有它的 WebView
+    // 会连着渲染进程里的一整套 chromium 对象一起泄漏（长列表里反复进 README 尤其明显）。
+    // 这里在 onDispose 里停加载 → 清历史 → destroy，并断开 JS bridge。
+    val webViewRef = remember { mutableStateOf<WebView?>(null) }
+    DisposableEffect(Unit) {
+        onDispose {
+            webViewRef.value?.let { webView ->
+                runCatching {
+                    webView.stopLoading()
+                    webView.loadUrl("about:blank")
+                    webView.clearHistory()
+                    webView.removeJavascriptInterface("AndroidBridge")
+                    webView.destroy()
+                }
+            }
+            webViewRef.value = null
+        }
+    }
+
     AndroidView(
         modifier =
             if (fillAvailableHeight) {
@@ -121,6 +143,7 @@ fun WebViewMarkdownRenderer(
             },
         factory = { ctx ->
             WebView(ctx).apply {
+                webViewRef.value = this
                 WebViewSecurity.apply(this)
                 // body 背景 transparent（markdown-you.css），此处必须同步透明，
                 // 否则 WebView 控件默认白底在深色主题下与页面不融合（2026-08-15 真机验证）。
