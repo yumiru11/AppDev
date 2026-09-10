@@ -131,6 +131,16 @@
     <string name="pull_request_comment">评论</string>
     <string name="pull_request_comment_placeholder">留下评论…</string>
     <string name="pull_request_comment_posted">评论已发布</string>
+    <string name="pull_request_comment_menu">评论操作</string>
+    <string name="pull_request_comment_edit">编辑</string>
+    <string name="pull_request_comment_delete">删除</string>
+    <string name="pull_request_comment_updated">评论已更新</string>
+    <string name="pull_request_comment_deleted">评论已删除</string>
+    <string name="pull_request_comment_edit_title">编辑评论</string>
+    <string name="pull_request_comment_delete_title">删除评论</string>
+    <string name="pull_request_comment_delete_message">该评论将被永久删除，且无法恢复。</string>
+    <string name="pull_request_comment_save">保存</string>
+    <string name="pull_request_comment_cancel">取消</string>
     <string name="cancel">取消</string>
     <string name="submit">提交</string>
 

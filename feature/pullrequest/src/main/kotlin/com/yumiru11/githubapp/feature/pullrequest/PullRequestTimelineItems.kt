@@ -1,5 +1,6 @@
 package com.yumiru11.githubapp.feature.pullrequest
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,10 +10,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,12 +45,22 @@ internal fun CommentItem(
     item: PullRequestTimelineItem.Comment,
     onInternalLink: (ParsedUrl) -> Unit,
     baseRepoUrl: String,
+    // #166：只有评论作者本人能编辑/删除（判定在 ViewModel 层的 canEditComment）
+    canEdit: Boolean = false,
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {},
 ) {
     TimelineCard {
         TimelineHeader(
             avatarUrl = item.author?.avatarUrl,
             login = item.author?.login,
             timestamp = item.createdAt,
+            menu =
+                if (canEdit) {
+                    { CommentMenu(onEdit = onEdit, onDelete = onDelete) }
+                } else {
+                    null
+                },
         )
         if (!item.body.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -331,6 +352,8 @@ private fun TimelineHeader(
     timestamp: String?,
     trailingText: String? = null,
     trailingColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    /** 行尾插槽（#166：会话评论的编辑/删除菜单；null = 不显示） */
+    menu: (@Composable () -> Unit)? = null,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         AsyncImage(
@@ -361,6 +384,40 @@ private fun TimelineHeader(
                 text = trailingText,
                 style = MaterialTheme.typography.labelMedium,
                 color = trailingColor,
+            )
+        }
+        menu?.invoke()
+    }
+}
+
+/** 评论操作菜单（编辑/删除，仅评论作者可见；#166）。 */
+@Composable
+private fun CommentMenu(
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                imageVector = Icons.Filled.MoreVert,
+                contentDescription = stringResource(R.string.pull_request_comment_menu),
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.pull_request_comment_edit)) },
+                onClick = {
+                    expanded = false
+                    onEdit()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(text = stringResource(R.string.pull_request_comment_delete)) },
+                onClick = {
+                    expanded = false
+                    onDelete()
+                },
             )
         }
     }

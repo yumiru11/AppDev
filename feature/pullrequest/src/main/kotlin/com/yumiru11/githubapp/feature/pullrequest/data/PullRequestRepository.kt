@@ -13,6 +13,7 @@ import com.apollographql.cache.normalized.fetchPolicy
 import com.yumiru11.githubapp.core.githubgraphql.generated.PullRequestReviewThreadsQuery
 import com.yumiru11.githubapp.core.githubgraphql.generated.ResolveReviewThreadMutation
 import com.yumiru11.githubapp.core.githubgraphql.generated.UnresolveReviewThreadMutation
+import com.yumiru11.githubapp.core.githubgraphql.generated.ViewerQuery
 import com.yumiru11.githubapp.core.githubgraphql.generated.type.ResolveReviewThreadInput
 import com.yumiru11.githubapp.core.githubgraphql.generated.type.UnresolveReviewThreadInput
 import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
@@ -120,6 +121,41 @@ class PullRequestRepository
         ) {
             issueApi.createComment(owner, repo, number, CreateCommentRequest(body = body))
         }
+
+        /** 编辑会话评论（#166：与新增评论同一端点族，复用 IssueApi） */
+        suspend fun updateComment(
+            owner: String,
+            repo: String,
+            commentId: Long,
+            body: String,
+        ) {
+            issueApi.updateComment(owner, repo, commentId, CreateCommentRequest(body = body))
+        }
+
+        /** 删除会话评论 */
+        suspend fun deleteComment(
+            owner: String,
+            repo: String,
+            commentId: Long,
+        ) {
+            issueApi.deleteComment(owner, repo, commentId)
+        }
+
+        /**
+         * 当前登录用户登录名（#166：判断评论是否为「我发的」，据此决定是否显示编辑/删除菜单）。
+         *
+         * 走既有的 Viewer 查询（core:github-graphql 已生成 ViewerQuery），不新增 .graphql 文件。
+         * 取不到（未登录/GraphQL 降级）返回 null —— 菜单整体不显示，而不是显示成别人的评论。
+         */
+        suspend fun viewerLoginOrNull(): String? =
+            runCatching {
+                apolloClient
+                    .query(ViewerQuery())
+                    .execute()
+                    .data
+                    ?.viewer
+                    ?.login
+            }.getOrNull()
 
         /** 单个 PR 详情 */
         suspend fun getPullRequest(

@@ -114,6 +114,8 @@ class PullRequestDetailViewModelTest {
             coEvery { reviewThreadContext(any()) } returns ReviewThreadContext(pullRequestNodeId = "PR_1")
             coEvery { repositoryControl(owner, repo) } returns
                 RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
+            // #166：评论作者判定用的 viewer 登录名（默认 null = 不显示编辑/删除菜单）
+            coEvery { viewerLoginOrNull() } returns null
         }
 
     @Test
@@ -927,6 +929,133 @@ class PullRequestDetailViewModelTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    // ── 会话评论编辑/删除（#166）─────────────────────────────────────────
+    @Test
+    fun updateComment_success_optimisticallyRewritesBodyAndEmitsUpdated() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.updateComment(any(), any(), any(), any()) } returns Unit
+            val comment = timeline().filterIsInstance<PullRequestTimelineItem.Comment>().first()
+            val originalIndex = timeline().indexOfFirst { it.id == comment.id }
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.events.test {
+                viewModel.updateComment(comment.id, "edited body")
+                advanceUntilIdle()
+
+                val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+                val updated =
+                    state.timeline
+                        .filterIsInstance<PullRequestTimelineItem.Comment>()
+                        .first { it.id == comment.id }
+                assertEquals("edited body", updated.body)
+                // 原位次：编辑不该让评论跳到时间线末尾
+                assertEquals(originalIndex, state.timeline.indexOfFirst { it.id == comment.id })
+                coVerify(exactly = 1) { mockRepo.updateComment(owner, repo, comment.id, "edited body") }
+                assertEquals(PullRequestDetailEvent.CommentUpdated, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun updateComment_failure_rollsBackBody() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.updateComment(any(), any(), any(), any()) } throws IOException("network down")
+            val comment = timeline().filterIsInstance<PullRequestTimelineItem.Comment>().first()
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.events.test {
+                viewModel.updateComment(comment.id, "edited body")
+                advanceUntilIdle()
+
+                val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+                val rolledBack =
+                    state.timeline
+                        .filterIsInstance<PullRequestTimelineItem.Comment>()
+                        .first { it.id == comment.id }
+                assertEquals(comment.body, rolledBack.body)
+                assertEquals(PullRequestDetailEvent.CommentFailed, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun deleteComment_success_removesFromTimelineAndEmitsDeleted() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.deleteComment(any(), any(), any()) } returns Unit
+            val comment = timeline().filterIsInstance<PullRequestTimelineItem.Comment>().first()
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.events.test {
+                viewModel.deleteComment(comment.id)
+                advanceUntilIdle()
+
+                val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+                assertTrue("删除后时间线不再包含该评论", state.timeline.none { it.id == comment.id })
+                assertEquals(PullRequestDetailEvent.CommentDeleted, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun deleteComment_failure_restoresTimeline() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.deleteComment(any(), any(), any()) } throws IOException("network down")
+            val comment = timeline().filterIsInstance<PullRequestTimelineItem.Comment>().first()
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.events.test {
+                viewModel.deleteComment(comment.id)
+                advanceUntilIdle()
+
+                val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+                // 顺序敏感：回滚必须整表还原（filter 后再插回会错位）
+                assertEquals(timeline(), state.timeline)
+                assertEquals(PullRequestDetailEvent.CommentFailed, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun canEditComment_viewerIsAuthor_isTrue() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.viewerLoginOrNull() } returns "me"
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertTrue(state.canEditComment(commentBy("me")))
+            assertTrue(!state.canEditComment(commentBy("someone-else")))
+        }
+
+    @Test
+    fun canEditComment_viewerUnknown_isFalse() =
+        runTest {
+            // viewer 登录名取不到（未登录 / GraphQL 降级）：一律不可编辑，
+            // 宁可少显示菜单，也不要把别人的评论显示成可以改
+            val mockRepo = repository()
+            coEvery { mockRepo.viewerLoginOrNull() } returns null
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertTrue(!state.canEditComment(commentBy("me")))
+        }
+
+    /** 构造一条指定作者的会话评论（canEditComment 只关心作者与 viewer 登录名是否相等）。 */
+    private fun commentBy(login: String): PullRequestTimelineItem.Comment =
+        PullRequestTimelineItem.Comment(
+            id = 99L,
+            author = PullRequestUser(login = login),
+            body = "b",
+        )
 
     // ── PR 会话评论（#166）───────────────────────────────────────────────
     @Test

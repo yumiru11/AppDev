@@ -144,6 +144,37 @@ class PullRequestRepositoryWriteTest {
 
     // ── PR 会话评论（#166：补上此前"写接口尚未接入"的缺口）──────────────────
     @Test
+    fun updateComment_patchesCommentBody() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"id": 9, "body": "edited"}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            repository().updateComment("octocat", "Hello-World", 9L, "edited")
+
+            val request = server.takeRequest()
+            assertEquals("/repos/octocat/Hello-World/issues/comments/9", request.url.encodedPath)
+            assertEquals("PATCH", request.method)
+            assertEquals("""{"body":"edited"}""", request.body?.utf8())
+        }
+
+    @Test
+    fun deleteComment_sendsDeleteToCommentEndpoint() =
+        runTest {
+            server.enqueue(MockResponse.Builder().status("HTTP/1.1 204 No Content").build())
+
+            repository().deleteComment("octocat", "Hello-World", 9L)
+
+            val request = server.takeRequest()
+            assertEquals("/repos/octocat/Hello-World/issues/comments/9", request.url.encodedPath)
+            assertEquals("DELETE", request.method)
+        }
+
+    @Test
     fun addComment_postsToIssueCommentsEndpointWithBody() =
         runTest {
             server.enqueue(

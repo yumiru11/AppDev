@@ -63,6 +63,8 @@ sealed interface PullRequestDetailUiState {
         val canDeleteHeadBranch: Boolean = false,
         /** T17：进行中的写操作（防重入；按钮 loading/禁用） */
         val pendingAction: PullRequestWriteAction? = null,
+        /** 当前登录用户登录名（#166：评论作者判定；null = 未取到，编辑/删除菜单整体不显示） */
+        val viewerLogin: String? = null,
     ) : PullRequestDetailUiState
 
     /** 加载失败（错误类型驱动文案，UI 层 stringResource 映射，ViewModel 不产英文） */
@@ -78,6 +80,12 @@ sealed interface PullRequestDetailEvent {
 
     /** PR 会话评论发布成功（#166：UI 据此关闭 Sheet + 提示） */
     data object CommentPosted : PullRequestDetailEvent
+
+    /** PR 会话评论编辑成功（#166） */
+    data object CommentUpdated : PullRequestDetailEvent
+
+    /** PR 会话评论删除成功（#166） */
+    data object CommentDeleted : PullRequestDetailEvent
 
     /** T17：Review 提交失败（已回滚） */
     data object ReviewFailed : PullRequestDetailEvent
@@ -113,3 +121,12 @@ sealed interface PullRequestDetailEvent {
 
     data object ReopenFailed : PullRequestDetailEvent
 }
+
+/**
+ * 是否可以对这条会话评论做编辑/删除（#166）：**只有评论作者本人**。
+ *
+ * 与 Issue 侧同款口径（IssueDetailUiState.canEditComment）：viewerLogin 取不到时一律 false，
+ * 宁可少显示菜单，也不要把别人的评论显示成可以改。
+ */
+fun PullRequestDetailUiState.Success.canEditComment(comment: PullRequestTimelineItem.Comment): Boolean =
+    viewerLogin != null && viewerLogin == comment.author?.login
