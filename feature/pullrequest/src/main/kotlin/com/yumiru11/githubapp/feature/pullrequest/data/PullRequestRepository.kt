@@ -34,6 +34,7 @@ import com.yumiru11.githubapp.core.githubrest.model.PullRequestReviewCommentDto
 import com.yumiru11.githubapp.core.githubrest.model.PullRequestReviewDto
 import com.yumiru11.githubapp.core.githubrest.model.RepositoryPermissionsDto
 import com.yumiru11.githubapp.core.githubrest.model.UpdateBranchRequest
+import com.yumiru11.githubapp.core.githubrest.model.UpdatePullRequestRequest
 import com.yumiru11.githubapp.core.githubrest.model.UpdateReviewCommentRequest
 import com.yumiru11.githubapp.core.githubrest.model.UserDto
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
@@ -294,6 +295,45 @@ class PullRequestRepository
                 gitRefApi.listBranches(owner, repo).map { it.name }
             }
 
+        // ── #163 L03：编辑 / 关闭 / 重开 ─────────────────────────────────
+
+        /**
+         * 更新 PR（#163 L03；PATCH /repos/{owner}/{repo}/pulls/{number}）。
+         *
+         * 仅非空字段进请求体（[UpdatePullRequestRequest] 自定义序列化器）：
+         * title/body 传 null = 不修改；state 传 "closed"/"open" = 关闭/重开。
+         * 返回服务端最新领域模型（供 HeaderCard 与状态徽章刷新）。
+         */
+        suspend fun updatePr(
+            owner: String,
+            repo: String,
+            number: Int,
+            title: String? = null,
+            body: String? = null,
+            state: String? = null,
+        ): PullRequest =
+            pullRequestApi
+                .updatePullRequest(
+                    owner,
+                    repo,
+                    number,
+                    UpdatePullRequestRequest(title = title, body = body, state = state),
+                ).toDomain()
+
+        /** 关闭 PR（#163 L03；state=closed，不合并） */
+        suspend fun closePr(
+            owner: String,
+            repo: String,
+            number: Int,
+        ): PullRequest = updatePr(owner, repo, number, state = PR_STATE_CLOSED)
+
+        /** 重开 PR（#163 L03；state=open） */
+        suspend fun reopenPr(
+            owner: String,
+            repo: String,
+            number: Int,
+        ): PullRequest = updatePr(owner, repo, number, state = PR_STATE_OPEN)
+
         /** 创建 PR（REST 写优先；返回领域模型供创建后导航打开）。 */
         suspend fun createPullRequest(
             owner: String,
@@ -385,6 +425,10 @@ class PullRequestRepository
 
         private companion object {
             const val PAGE_SIZE = 30
+
+            /** REST state 字段值（#163 L03 关闭/重开） */
+            const val PR_STATE_OPEN = "open"
+            const val PR_STATE_CLOSED = "closed"
         }
     }
 

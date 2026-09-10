@@ -3,6 +3,7 @@
 package com.yumiru11.githubapp.feature.pullrequest
 
 import androidx.lifecycle.SavedStateHandle
+import app.cash.turbine.test
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.feature.pullrequest.data.PullRequestRepository
 import com.yumiru11.githubapp.feature.pullrequest.data.RepositoryControl
@@ -828,5 +829,228 @@ class PullRequestDetailViewModelTest {
 
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertTrue("失败保留入口可重试", state.canDeleteHeadBranch)
+        }
+
+    // ── #163 L03：编辑 / 关闭 / 重开 ──────────────────────────────
+
+    @Test
+    fun load_success_writePermission_exposesEditAndCloseFlags() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertTrue("WRITE 可编辑 PR", state.canEditPr)
+            assertTrue("打开态可关闭", state.canCloseReopenPr)
+            assertTrue("打开态展示 MergeBox", state.canMergeBox)
+        }
+
+    @Test
+    fun load_success_readPermission_hidesEditAndClose() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.READ, defaultBranch = "main")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertFalse(state.canEditPr)
+            assertFalse(state.canCloseReopenPr)
+            assertFalse(state.canMergeBox)
+        }
+
+    @Test
+    fun load_success_mergedPr_hidesCloseReopenAndMergeBox() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returns
+                pullRequest().copy(state = PullRequestState.MERGED, mergedAt = "2026-01-01T00:00:00Z")
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertFalse("已合并不可关闭/重开", state.canCloseReopenPr)
+            assertFalse("已合并不展示 MergeBox", state.canMergeBox)
+        }
+
+    @Test
+    fun editPullRequest_success_optimisticThenServerTitle_emitsEditSucceeded() =
+        runTest {
+            val mockRepo = repository()
+            val gate = CompletableDeferred<PullRequest>()
+            coEvery { mockRepo.updatePr(owner, repo, number, title = "New title", body = "New body") } coAnswers {
+                gate.await()
+            }
+            // 编辑成功后的静默刷新返回服务端最新条目
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returnsMany
+                listOf(pullRequest(), pullRequest().copy(title = "New title", body = "New body"))
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.editPullRequest("New title", "New body")
+
+            val optimistic = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertEquals("乐观更新标题", "New title", optimistic.pullRequest.title)
+            assertEquals("New body", optimistic.pullRequest.body)
+            assertEquals(PullRequestWriteAction.EDIT, optimistic.pendingAction)
+
+            gate.complete(pullRequest().copy(title = "New title", body = "New body"))
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+            assertEquals("New title", state.pullRequest.title)
+            assertNull("完成后解除 pending", state.pendingAction)
+            coVerify(exactly = 1) { mockRepo.updatePr(owner, repo, number, title = "New title", body = "New body") }
+        }
+
+    @Test
+    fun editPullRequest_failure_rollsBackTitleAndBody() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.updatePr(any(), any(), any(), any(), any(), any()) } throws IOException("network down")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.events.test {
+                viewModel.editPullRequest("New title", "New body")
+                advanceUntilIdle()
+
+                val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+                assertEquals("失败回滚标题", "Add feature", state.pullRequest.title)
+                assertNull(state.pullRequest.body)
+                assertNull(state.pendingAction)
+                assertEquals(PullRequestDetailEvent.EditFailed, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun editPullRequest_blankTitle_doesNotSubmit() =
+        runTest {
+            val mockRepo = repository()
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+
+            viewModel.editPullRequest("   ", "body")
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { mockRepo.updatePr(any(), any(), any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun closePullRequest_success_optimisticClosedThenRefreshed_emitsCloseSucceeded() =
+        runTest {
+            val mockRepo = repository()
+            val gate = CompletableDeferred<PullRequest>()
+            coEvery { mockRepo.closePr(owner, repo, number) } coAnswers { gate.await() }
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returnsMany
+                listOf(pullRequest(), pullRequest().copy(state = PullRequestState.CLOSED))
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.events.test {
+                viewModel.closePullRequest()
+
+                val optimistic = viewModel.uiState.value as PullRequestDetailUiState.Success
+                assertEquals("乐观置 CLOSED（状态徽章）", PullRequestState.CLOSED, optimistic.pullRequest.state)
+                assertFalse("关闭后合并按钮 disabled", optimistic.canMerge)
+                assertTrue("MergeBox 仍可见（按钮 disabled）", optimistic.canMergeBox)
+                assertEquals(PullRequestWriteAction.CLOSE, optimistic.pendingAction)
+
+                gate.complete(pullRequest().copy(state = PullRequestState.CLOSED))
+                advanceUntilIdle()
+
+                val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+                assertEquals(PullRequestState.CLOSED, state.pullRequest.state)
+                assertFalse("刷新后仍不可合并", state.canMerge)
+                assertTrue("刷新后仍可重开", state.canCloseReopenPr)
+                assertNull(state.pendingAction)
+                assertEquals(PullRequestDetailEvent.CloseSucceeded, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun closePullRequest_failure_rollsBackStateAndMergeFlag() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.closePr(owner, repo, number) } throws IOException("network down")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.events.test {
+                viewModel.closePullRequest()
+                advanceUntilIdle()
+
+                val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+                assertEquals("失败回滚为 OPEN", PullRequestState.OPEN, state.pullRequest.state)
+                assertTrue("回滚恢复可合并", state.canMerge)
+                assertNull(state.pendingAction)
+                assertEquals(PullRequestDetailEvent.CloseFailed, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun reopenPullRequest_success_mapsOpenStateBack() =
+        runTest {
+            val closed = pullRequest().copy(state = PullRequestState.CLOSED)
+            val mockRepo = repository()
+            // 首次加载 = 关闭态；重开成功后的静默刷新 = 打开态
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returnsMany listOf(closed, pullRequest())
+            coEvery { mockRepo.reopenPr(owner, repo, number) } returns pullRequest()
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            // 关闭态（未合并）仍可重开
+            assertTrue((viewModel.uiState.value as PullRequestDetailUiState.Success).canCloseReopenPr)
+
+            viewModel.events.test {
+                viewModel.reopenPullRequest()
+                advanceUntilIdle()
+
+                val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+                assertEquals(PullRequestState.OPEN, state.pullRequest.state)
+                assertEquals(PullRequestDetailEvent.ReopenSucceeded, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun reopenPullRequest_failure_rollsBackToClosed() =
+        runTest {
+            val closed = pullRequest().copy(state = PullRequestState.CLOSED)
+            val mockRepo = repository()
+            coEvery { mockRepo.getPullRequest(owner, repo, number) } returns closed
+            coEvery { mockRepo.reopenPr(owner, repo, number) } throws IOException("network down")
+
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            viewModel.events.test {
+                viewModel.reopenPullRequest()
+                advanceUntilIdle()
+
+                val state = viewModel.uiState.value as PullRequestDetailUiState.Success
+                assertEquals(PullRequestState.CLOSED, state.pullRequest.state)
+                assertEquals(PullRequestDetailEvent.ReopenFailed, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun closePullRequest_readPermission_doesNotSubmit() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.repositoryControl(owner, repo) } returns
+                RepositoryControl(viewerPermission = ViewerPermission.READ, defaultBranch = "main")
+            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+
+            viewModel.closePullRequest()
+            viewModel.reopenPullRequest()
+            viewModel.editPullRequest("t", "b")
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { mockRepo.closePr(any(), any(), any()) }
+            coVerify(exactly = 0) { mockRepo.reopenPr(any(), any(), any()) }
+            coVerify(exactly = 0) { mockRepo.updatePr(any(), any(), any(), any(), any(), any()) }
         }
 }

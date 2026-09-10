@@ -46,6 +46,15 @@ sealed interface PullRequestDetailUiState {
         val canApprove: Boolean = false,
         /** T17：可合并（WRITE 且 PR 打开；按钮另有 mergeable 约束） */
         val canMerge: Boolean = false,
+        /**
+         * #163 L03：MergeBox 可见（WRITE 且未合并）——关闭态仍展示卡片，
+         * 但合并按钮由 [canMerge]（PR 必须打开）禁用，与 GitHub 网页行为一致。
+         */
+        val canMergeBox: Boolean = false,
+        /** #163 L03：可编辑 PR 标题/正文（WRITE/MAINTAIN/ADMIN → [ViewerPermission.WRITE]） */
+        val canEditPr: Boolean = false,
+        /** #163 L03：可关闭/重开 PR（WRITE 且未合并） */
+        val canCloseReopenPr: Boolean = false,
         /** T17：head 与 base 同仓库（Update branch / 删除分支可用前提） */
         val headSameRepo: Boolean = false,
         /** T17：head == 默认分支（默认分支不可删） */
@@ -85,4 +94,19 @@ sealed interface PullRequestDetailEvent {
     data object DeleteBranchSucceeded : PullRequestDetailEvent
 
     data object DeleteBranchFailed : PullRequestDetailEvent
+
+    /** #163 L03：编辑 PR 成功/失败（失败已回滚标题/正文） */
+    data object EditSucceeded : PullRequestDetailEvent
+
+    data object EditFailed : PullRequestDetailEvent
+
+    /** #163 L03：关闭 PR 成功/失败（失败已回滚状态徽章） */
+    data object CloseSucceeded : PullRequestDetailEvent
+
+    data object CloseFailed : PullRequestDetailEvent
+
+    /** #163 L03：重开 PR 成功/失败 */
+    data object ReopenSucceeded : PullRequestDetailEvent
+
+    data object ReopenFailed : PullRequestDetailEvent
 }

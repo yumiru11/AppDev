@@ -629,6 +629,15 @@ enum class PullRequestWriteAction {
     MERGE,
     UPDATE_BRANCH,
     DELETE_BRANCH,
+
+    /** #163 L03：编辑标题/正文 */
+    EDIT,
+
+    /** #163 L03：关闭 PR */
+    CLOSE,
+
+    /** #163 L03：重开 PR */
+    REOPEN,
 }
 
 /** 已提交的 Review 条目（T17：POST /pulls/{n}/reviews 响应 → 时间线替换乐观项） */
