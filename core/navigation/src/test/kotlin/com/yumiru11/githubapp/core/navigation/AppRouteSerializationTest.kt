@@ -43,6 +43,7 @@ class AppRouteSerializationTest {
         roundTrip(AppRoute.Commit("owner", "repo", "0123456789abcdef"))
         roundTrip(AppRoute.Discussion("owner", "repo", 7))
         roundTrip(AppRoute.User("login"))
+        roundTrip(AppRoute.Gists("login"))
         // 多段文件路径（历史深链崩溃点）：path 经参数序列化器编码，round-trip 保持原样
         roundTrip(AppRoute.Blob("owner", "repo", "main", "app/src/main/kt/Main.kt"))
         roundTrip(AppRoute.Blob("owner", "repo", "main", "My File.kt"))

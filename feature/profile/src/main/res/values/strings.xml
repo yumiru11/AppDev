@@ -20,4 +20,13 @@
     <string name="profile_retry">Retry</string>
     <string name="profile_avatar">Avatar</string>
     <string name="profile_settings">Settings</string>
+
+    <!-- Other user's profile (L10, ui-design.md §3.5) & Gists (L11, §3.7) -->
+    <string name="profile_back">Back</string>
+    <string name="profile_follow">Follow</string>
+    <string name="profile_unfollow">Unfollow</string>
+    <string name="profile_follow_failed">Couldn\'t update follow state</string>
+    <string name="profile_gists_entry">Gists</string>
+    <string name="profile_gists_title">Gists</string>
+    <string name="profile_gists_empty">No gists yet</string>
 </resources>

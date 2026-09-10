@@ -122,6 +122,13 @@ sealed interface AppRoute {
         val login: String,
     ) : AppRoute
 
+    // L11 Gists 列表页（本人/他人主页共用；username 为该主页用户 login）
+    @Serializable
+    @SerialName("gists")
+    data class Gists(
+        val username: String,
+    ) : AppRoute
+
     // path 走 query 参数（默认值 → optional query）：文件路径天然多段（a/b/c.kt），
     // 单段 {path} 占位符无法匹配多段深链（CI 截图段 5.11 首次暴露）。
     // 类型安全路由下 path 由 navigation 参数序列化器编码，不再需要手工 URLEncoder。

@@ -5,6 +5,7 @@ import androidx.paging.testing.asSnapshot
 import com.yumiru11.githubapp.core.githubauth.auth.AuthState
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
 import com.yumiru11.githubapp.core.githubauth.token.SessionData
+import com.yumiru11.githubapp.core.githubrest.api.GistApi
 import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
 import com.yumiru11.githubapp.core.githubrest.api.UserApi
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
@@ -22,6 +23,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import retrofit2.Retrofit
 
 /**
  * ProfileViewModel 四列表 PagingData 流端到端单测（MockWebServer 模拟 GitHub API，零真实网络）。
@@ -111,16 +113,21 @@ class ProfileViewModelPagingTest {
                     SessionData(accessToken = "token"),
                 ),
             )
+        val retrofit = createRetrofit(server)
         return ProfileViewModel(
             savedStateHandle = SavedStateHandle(),
-            profileRepository = ProfileRepository(userApi = createApi(server)),
+            profileRepository =
+                ProfileRepository(
+                    userApi = retrofit.create(UserApi::class.java),
+                    gistApi = retrofit.create(GistApi::class.java),
+                ),
             sessionManager = sessionManager,
         )
     }
 }
 
-/** 构造指向 MockWebServer 的 UserApi（复用 core:github-rest 工厂，零真实网络） */
-private fun createApi(server: MockWebServer): UserApi {
+/** 构造指向 MockWebServer 的 Retrofit（复用 core:github-rest 工厂，零真实网络） */
+private fun createRetrofit(server: MockWebServer): Retrofit {
     val retrofit =
         GitHubRestClient.createRetrofit(
             baseUrl = server.url("/"),
@@ -132,7 +139,7 @@ private fun createApi(server: MockWebServer): UserApi {
                 ),
             json = GitHubRestClient.createJson(),
         )
-    return retrofit.create(UserApi::class.java)
+    return retrofit
 }
 
 private fun jsonResponse(body: String): MockResponse =

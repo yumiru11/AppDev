@@ -1,6 +1,7 @@
 package com.yumiru11.githubapp.feature.profile
 
 import androidx.paging.PagingSource
+import com.yumiru11.githubapp.core.githubrest.api.GistApi
 import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
 import com.yumiru11.githubapp.core.githubrest.api.UserApi
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
@@ -24,7 +25,8 @@ import java.io.IOException
  * ProfileRepository 单测（MockWebServer 模拟 GitHub API，零真实网络）。
  *
  * 覆盖：资料头（self / login 双端点 + 统计字段映射 + 404）；四列表 PagingSource
- * 分页（首页 nextKey / 尾页 null / 错误 → LoadResult.Error）。
+ * 分页（首页 nextKey / 尾页 null / 错误 → LoadResult.Error）；
+ * 关注写操作（isFollowing 204/404/403、follow/unfollow 204/403）。
  */
 class ProfileRepositoryTest {
     private lateinit var server: MockWebServer
@@ -46,7 +48,11 @@ class ProfileRepositoryTest {
                         ),
                 json = GitHubRestClient.createJson(),
             )
-        repository = ProfileRepository(userApi = retrofit.create(UserApi::class.java))
+        repository =
+            ProfileRepository(
+                userApi = retrofit.create(UserApi::class.java),
+                gistApi = retrofit.create(GistApi::class.java),
+            )
     }
 
     @After
@@ -249,13 +255,104 @@ class ProfileRepositoryTest {
                 mockk<UserApi> {
                     coEvery { currentUser() } throws IOException("socket closed")
                 }
-            val failingRepository = ProfileRepository(userApi = failingApi)
+            val failingRepository = ProfileRepository(userApi = failingApi, gistApi = mockk())
 
             try {
                 failingRepository.getProfile(login = null)
                 fail("IOException 应向上传播（非 Paging 路径不收敛为 Error）")
             } catch (e: IOException) {
                 assertEquals("socket closed", e.message)
+            }
+        }
+
+    // ── L10 关注写操作 ──────────────────────────────────────────────────────
+
+    private fun enqueueStatus(code: Int) {
+        server.enqueue(MockResponse.Builder().code(code).build())
+    }
+
+    @Test
+    fun isFollowing_204NoContent_returnsTrueAndHitsFollowingPath() =
+        runTest {
+            enqueueStatus(204)
+
+            val following = repository.isFollowing("torvalds")
+
+            assertTrue(following)
+            assertEquals("/user/following/torvalds", server.takeRequest().url.encodedPath)
+        }
+
+    @Test
+    fun isFollowing_404NotFound_returnsFalse() =
+        runTest {
+            enqueueStatus(404)
+
+            val following = repository.isFollowing("ghost")
+
+            // 404 是「未关注」的正常语义，不能被当成异常吞掉/抛出
+            assertEquals(false, following)
+        }
+
+    @Test
+    fun isFollowing_403Forbidden_throwsHttpException() =
+        runTest {
+            enqueueStatus(403)
+
+            try {
+                repository.isFollowing("torvalds")
+                fail("403 应抛 HttpException（限流/被拉黑，不能静默降级为未关注）")
+            } catch (e: HttpException) {
+                assertEquals(403, e.code())
+            }
+        }
+
+    @Test
+    fun follow_204NoContent_completesAndSendsPut() =
+        runTest {
+            enqueueStatus(204)
+
+            repository.follow("torvalds")
+
+            val request = server.takeRequest()
+            assertEquals("PUT", request.method)
+            assertEquals("/user/following/torvalds", request.url.encodedPath)
+        }
+
+    @Test
+    fun follow_403Forbidden_throwsHttpException() =
+        runTest {
+            enqueueStatus(403)
+
+            try {
+                repository.follow("torvalds")
+                fail("403 应抛 HttpException（交 ViewModel 回滚乐观更新）")
+            } catch (e: HttpException) {
+                assertEquals(403, e.code())
+            }
+        }
+
+    @Test
+    fun unfollow_204NoContent_completesAndSendsDelete() =
+        runTest {
+            enqueueStatus(204)
+
+            repository.unfollow("torvalds")
+
+            val request = server.takeRequest()
+            assertEquals("DELETE", request.method)
+            assertEquals("/user/following/torvalds", request.url.encodedPath)
+        }
+
+    @Test
+    fun unfollow_403Forbidden_throwsHttpException() =
+        runTest {
+            enqueueStatus(403)
+
+            try {
+                repository.unfollow("torvalds")
+                fail("403 应抛 HttpException")
+            } catch (e: HttpException) {
+                assertEquals(403, e.code())
             }
         }
 
