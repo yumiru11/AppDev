@@ -177,6 +177,9 @@ dependencies {
 
     // Core
     implementation(libs.core.ktx)
+    // Baseline Profile 安装器（T25）：把 APK 内 assets/dexopt/baseline.prof 装到 ART。
+    // API 31+ 由编译期 baseline.profm 生效，本依赖主要服务 API 26-30（本项目 minSdk 26）。
+    implementation(libs.profileinstaller)
 
     // 调试工具链（#169 / L14）：Timber 日志（debug 树 + token 脱敏）、
     // Chucker 网络面板（仅 debug 变体，release 走 no-op 空实现）、LeakCanary（仅 debug）
