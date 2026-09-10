@@ -213,13 +213,6 @@ private fun createRetrofit(server: MockWebServer): Retrofit {
     return retrofit
 }
 
-private fun jsonResponse(body: String): MockResponse =
-    MockResponse
-        .Builder()
-        .body(body)
-        .addHeader("Content-Type", "application/json")
-        .build()
-
 private fun userJson(login: String = "octocat"): String =
     """
     {
