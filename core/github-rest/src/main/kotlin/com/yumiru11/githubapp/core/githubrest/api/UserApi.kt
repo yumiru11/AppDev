@@ -1,10 +1,13 @@
 package com.yumiru11.githubapp.core.githubrest.api
 
+import com.yumiru11.githubapp.core.githubrest.model.CreateRepositoryRequest
 import com.yumiru11.githubapp.core.githubrest.model.RepositoryDto
 import com.yumiru11.githubapp.core.githubrest.model.UserDto
 import retrofit2.Response
+import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -84,6 +87,20 @@ interface UserApi {
         @Query("per_page") perPage: Int,
         @Query("page") page: Int,
     ): List<UserDto>
+
+    // ── 仓库创建（L04）───────────────────────────────────────────────────────
+
+    /**
+     * POST /user/repos：为当前认证用户创建仓库（L04，201 返回新仓库 DTO）。
+     *
+     * 422 命名/参数校验失败、403 无权限（如超出配额）、404 模板不存在，
+     * 均抛 [retrofit2.HttpException]，由上层归一化为
+     * [com.yumiru11.githubapp.core.githubdata.error.GitHubError]。
+     */
+    @POST("user/repos")
+    suspend fun createRepository(
+        @Body body: CreateRepositoryRequest,
+    ): RepositoryDto
 
     // ── 关注写操作（L10 他人主页）─────────────────────────────────────────────
     //

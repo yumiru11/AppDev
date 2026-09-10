@@ -174,4 +174,54 @@ class RepositoryApiTest {
                 result.exceptionOrNull() is SerializationException,
             )
         }
+
+    // ---- L04 删除仓库 ----
+
+    @Test
+    fun deleteRepository_204Response_returnsSuccess() =
+        runTest {
+            server.enqueue(MockResponse.Builder().status("HTTP/1.1 204 No Content").build())
+
+            val response = repositoryApi.deleteRepository("octocat", "Hello-World")
+
+            assertTrue(response.isSuccessful)
+            val request = server.takeRequest()
+            assertEquals("DELETE", request.method)
+            assertEquals("/repos/octocat/Hello-World", request.url.encodedPath)
+        }
+
+    @Test
+    fun deleteRepository_403Response_returnsErrorResponse() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 403 Forbidden")
+                    .body("""{"message":"Must have admin rights to Repository."}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            // Response<Unit> 语义：非 2xx 不抛异常，返回 error response（调用方按 isSuccessful 处理）
+            val response = repositoryApi.deleteRepository("octocat", "Hello-World")
+
+            assertEquals(403, response.code())
+        }
+
+    @Test
+    fun deleteRepository_404Response_returnsErrorResponse() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 404 Not Found")
+                    .body("""{"message":"Not Found"}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val response = repositoryApi.deleteRepository("octocat", "gone-repo")
+
+            assertEquals(404, response.code())
+        }
 }

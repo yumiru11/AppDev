@@ -4,6 +4,7 @@ import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.GitHubHeaderInterceptor
 import com.yumiru11.githubapp.core.githubrest.http.GitHubHeaders
 import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
+import com.yumiru11.githubapp.core.githubrest.model.CreateRepositoryRequest
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -308,5 +309,117 @@ class UserApiTest {
             assertEquals("/user", recorded.url.encodedPath)
             assertEquals(GitHubHeaders.ACCEPT_VALUE, recorded.headers["Accept"])
             assertEquals(GitHubHeaders.API_VERSION_VALUE, recorded.headers["X-GitHub-Api-Version"])
+        }
+
+    // ---- L04 创建仓库 ----
+
+    @Test
+    fun createRepository_validRequest_postsBodyWithPrivateAndAutoInit() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 201 Created")
+                    .body(
+                        """
+                        {
+                          "id": 9,
+                          "name": "new-repo",
+                          "full_name": "octocat/new-repo",
+                          "private": true,
+                          "owner": { "login": "octocat", "id": 1 },
+                          "default_branch": "main",
+                          "permissions": { "admin": true, "push": true }
+                        }
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val created =
+                userApi.createRepository(
+                    CreateRepositoryRequest(
+                        name = "new-repo",
+                        description = "demo",
+                        isPrivate = true,
+                        autoInit = true,
+                    ),
+                )
+
+            assertEquals("new-repo", created.name)
+            assertTrue(created.isPrivate)
+            assertEquals("main", created.defaultBranch)
+            assertTrue(created.permissions?.admin == true)
+
+            val request = server.takeRequest()
+            assertEquals("POST", request.method)
+            assertEquals("/user/repos", request.url.encodedPath)
+            val body = request.body?.utf8().orEmpty()
+            assertTrue("请求体应含 name", body.contains("\"name\":\"new-repo\""))
+            assertTrue("private 必须序列化为 private 字段", body.contains("\"private\":true"))
+            assertTrue("autoInit 必须序列化为 auto_init", body.contains("\"auto_init\":true"))
+            assertTrue("请求体应含 description", body.contains("\"description\":\"demo\""))
+        }
+
+    @Test
+    fun createRepository_optionalTemplatesNull_notSerialized() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 201 Created")
+                    .body(
+                        """{"id": 10, "name": "plain", "full_name": "octocat/plain", "private": false, "owner": {"login":"octocat","id":1}}""",
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            userApi.createRepository(CreateRepositoryRequest(name = "plain"))
+
+            val body =
+                server
+                    .takeRequest()
+                    .body
+                    ?.utf8()
+                    .orEmpty()
+            assertTrue("gitignore 模板未选不应序列化", !body.contains("gitignore_template"))
+            assertTrue("license 模板未选不应序列化", !body.contains("license_template"))
+            assertTrue("description 未填不应序列化", !body.contains("description"))
+        }
+
+    @Test
+    fun createRepository_422Response_throwsHttpException() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 422 Unprocessable Entity")
+                    .body("""{"message":"Repository creation failed.","errors":[{"message":"name already exists"}]}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val result = runCatching { userApi.createRepository(CreateRepositoryRequest(name = "taken")) }
+
+            val exception = result.exceptionOrNull()
+            assertTrue("422 应抛 HttpException，实际：$exception", exception is HttpException)
+            assertEquals(422, (exception as HttpException).code())
+        }
+
+    @Test
+    fun createRepository_403Response_throwsHttpException() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 403 Forbidden")
+                    .body("""{"message":"You have exceeded a secondary rate limit"}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val result = runCatching { userApi.createRepository(CreateRepositoryRequest(name = "x")) }
+
+            assertEquals(403, (result.exceptionOrNull() as HttpException).code())
         }
 }

@@ -71,9 +71,10 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:github-rest"))
     implementation(project(":core:database"))
-    // 「仓库」分区（#166）：当前用户仓库的 GraphQL 游标分页源
+    // core:github-data：错误归一化（#164 L04/L05：422/403 → GitHubError）
+    //  + 「仓库」分区的 GraphQL 游标分页源（#166 UI01）
     implementation(project(":core:github-data"))
-    // 布局偏好（通栏/网格）与登录态
+    // 布局偏好（通栏/网格）与登录态（#166 UI01）
     implementation(project(":core:datastore"))
 
     // 登录态（游客只读：Star/Watch/Fork 按钮隐藏）

@@ -125,4 +125,86 @@
     <string name="repos_star_added">已收藏 %1$s</string>
     <string name="repos_star_removed">已取消收藏 %1$s</string>
     <string name="repos_star_failed">收藏状态更新失败，请重试。</string>
+
+    <!-- L04 创建/删除仓库 -->
+    <string name="repo_create_title">新建仓库</string>
+    <string name="repo_create_back">返回</string>
+    <string name="repo_create_name">仓库名</string>
+    <string name="repo_create_name_hint">例如 hello-world</string>
+    <string name="repo_create_description">描述（可选）</string>
+    <string name="repo_create_private">私有仓库</string>
+    <string name="repo_create_private_hint">仅你和协作者可见</string>
+    <string name="repo_create_auto_init">初始化 README</string>
+    <string name="repo_create_auto_init_hint">同时创建默认分支与 README</string>
+    <string name="repo_create_submit">创建仓库</string>
+    <string name="repo_create_submitting">创建中…</string>
+    <string name="repo_name_error_empty">请输入仓库名</string>
+    <string name="repo_name_error_invalid_chars">只能使用字母、数字、连字符、下划线和点</string>
+    <string name="repo_name_error_only_dots">仓库名不能全是点</string>
+    <string name="repo_name_error_git_suffix">仓库名不能以 .git 结尾</string>
+    <string name="repo_name_error_trailing_underscore">仓库名不能以下划线结尾</string>
+    <string name="repo_name_error_too_long">仓库名过长（最多 100 个字符）</string>
+    <string name="repo_create_snackbar_name_taken">该名称已被占用或非法</string>
+    <string name="repo_create_snackbar_permission_denied">没有创建仓库的权限</string>
+    <string name="repo_create_snackbar_failed">创建仓库失败</string>
+    <string name="repo_more">更多操作</string>
+    <string name="repo_delete">删除仓库</string>
+    <string name="repo_delete_title">删除仓库？</string>
+    <string name="repo_delete_message">%1$s 及其全部内容将被永久删除，此操作不可撤销。</string>
+    <string name="repo_delete_confirm_label">输入 %1$s 以确认</string>
+    <string name="repo_delete_confirm_action">永久删除</string>
+    <string name="repo_delete_cancel">取消</string>
+    <string name="repo_delete_snackbar_deleted">仓库已删除</string>
+    <string name="repo_delete_snackbar_forbidden">没有删除该仓库的权限</string>
+    <string name="repo_delete_snackbar_failed">删除仓库失败</string>
+
+    <!-- L05 发布 Release 与上传附件 -->
+    <string name="repo_release_new">新建 Release</string>
+    <string name="repo_release_create_title">新建 Release</string>
+    <string name="repo_release_create_back">返回</string>
+    <string name="repo_release_tag">Tag</string>
+    <string name="repo_release_tag_hint">例如 v1.0.0</string>
+    <string name="repo_release_tag_error">请填写 Tag 名</string>
+    <string name="repo_release_target">目标分支</string>
+    <string name="repo_release_target_hint">默认分支</string>
+    <string name="repo_release_name">标题（可选）</string>
+    <string name="repo_release_body">说明（可选）</string>
+    <string name="repo_release_form_draft">保存为草稿</string>
+    <string name="repo_release_form_prerelease">标记为预发布</string>
+    <string name="repo_release_create_submit">发布 Release</string>
+    <string name="repo_release_create_submitting">发布中…</string>
+    <string name="repo_release_snackbar_validation">Tag 非法或已存在</string>
+    <string name="repo_release_snackbar_forbidden">没有发布 Release 的权限</string>
+    <string name="repo_release_snackbar_failed">发布 Release 失败</string>
+    <string name="repo_release_assets">附件</string>
+    <string name="repo_release_assets_empty">暂无附件</string>
+    <string name="repo_release_asset_meta">%1$s · %2$d 次下载</string>
+    <string name="repo_release_asset_size_b">%1$d B</string>
+    <string name="repo_release_asset_size_kb">%1$d KB</string>
+    <string name="repo_release_asset_size_mb">%1$d MB</string>
+    <string name="repo_release_asset_size_gb">%1$d GB</string>
+    <string name="repo_release_asset_upload">上传附件</string>
+    <string name="repo_release_asset_uploaded">已上传 %1$s</string>
+    <string name="repo_release_asset_upload_failed">附件上传失败</string>
+
+    <!-- L06 Topics -->
+    <string name="repo_topic_search_cd">Topic %1$s，点击搜索</string>
+
+    <!-- L09 COMMIT 详情页 -->
+    <string name="repo_commit_title">提交</string>
+    <string name="repo_commit_back">返回</string>
+    <string name="repo_commit_copy_sha">复制完整 SHA</string>
+    <string name="repo_commit_sha_copied">已复制完整 SHA</string>
+    <string name="repo_commit_author_avatar">提交作者头像</string>
+    <string name="repo_commit_files">文件变更</string>
+    <string name="repo_commit_files_empty">没有文件变更</string>
+    <string name="repo_commit_additions">+%1$d</string>
+    <string name="repo_commit_deletions">−%1$d</string>
+    <string name="repo_commit_back_to_files">返回文件列表</string>
+    <string name="repo_commit_diff_empty">该文件没有可用的 diff（二进制或文件过大）</string>
+    <string name="repo_commit_status_added">新增</string>
+    <string name="repo_commit_status_removed">删除</string>
+    <string name="repo_commit_status_modified">修改</string>
+    <string name="repo_commit_status_renamed">重命名</string>
+    <string name="repo_commit_status_unknown">变更</string>
 </resources>
