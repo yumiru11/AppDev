@@ -160,6 +160,61 @@ class PullRequestDetailViewModel
             }
         }
 
+        /**
+         * 编辑会话评论（#166）：乐观改正文 → 失败回滚（T14 Issue 同款模式）。
+         *
+         * 只改正文，不动时间线顺序与 id —— 编辑不该让评论"跳到最后"。
+         */
+        fun updateComment(
+            commentId: Long,
+            body: String,
+        ) {
+            if (body.isBlank()) return
+            val state = _uiState.value as? PullRequestDetailUiState.Success ?: return
+            val original = state.timeline
+            viewModelScope.launch {
+                _uiState.value =
+                    state.copy(
+                        timeline =
+                            original.map {
+                                if (it.id == commentId && it is PullRequestTimelineItem.Comment) {
+                                    it.copy(body = body)
+                                } else {
+                                    it
+                                }
+                            },
+                    )
+                try {
+                    repository.updateComment(owner, repo, commentId, body)
+                    _events.tryEmit(PullRequestDetailEvent.CommentUpdated)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _uiState.value = state.copy(timeline = original)
+                    _events.tryEmit(PullRequestDetailEvent.CommentFailed)
+                }
+            }
+        }
+
+        /** 删除会话评论（#166）：乐观移除 → 失败恢复（含原位次） */
+        fun deleteComment(commentId: Long) {
+            val state = _uiState.value as? PullRequestDetailUiState.Success ?: return
+            val original = state.timeline
+            viewModelScope.launch {
+                _uiState.value = state.copy(timeline = original.filterNot { it.id == commentId })
+                try {
+                    repository.deleteComment(owner, repo, commentId)
+                    _events.tryEmit(PullRequestDetailEvent.CommentDeleted)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // 恢复原始列表（顺序敏感：filter 后再插回会错位，直接整表还原）
+                    _uiState.value = state.copy(timeline = original)
+                    _events.tryEmit(PullRequestDetailEvent.CommentFailed)
+                }
+            }
+        }
+
         /** 新增/回复行内评论：乐观插入 → 失败回滚 + Snackbar（T16，T14 Issue 同款模式） */
         fun submitLineComment(
             anchor: LineCommentAnchor,
@@ -602,6 +657,10 @@ class PullRequestDetailViewModel
                     val headIsDefaultBranch = control.defaultBranch != null && prHead?.ref == control.defaultBranch
                     val canWrite = control.viewerPermission == ViewerPermission.WRITE
                     val merged = pullRequest.state == PullRequestState.MERGED
+                    // 评论作者判定（#166）：取不到就退化为"没有任何评论可编辑"。
+                    // 这里再包一层 runCatching —— 一个"仅用于决定菜单是否显示"的辅助字段，
+                    // 绝不能把整页资料拖成 Error（与 Star 总数探测同一条原则）。
+                    val viewerLogin = runCatching { repository.viewerLoginOrNull() }.getOrNull()
                     _uiState.value =
                         PullRequestDetailUiState.Success(
                             pullRequest = pullRequest,
@@ -629,6 +688,7 @@ class PullRequestDetailViewModel
                                     headSameRepo &&
                                     !headIsDefaultBranch &&
                                     !prHead?.ref.isNullOrBlank(),
+                            viewerLogin = viewerLogin,
                         )
                 } catch (e: CancellationException) {
                     throw e

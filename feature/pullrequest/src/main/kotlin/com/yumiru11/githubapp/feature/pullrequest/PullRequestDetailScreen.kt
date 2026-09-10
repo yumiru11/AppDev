@@ -122,6 +122,9 @@ fun PullRequestDetailScreen(
     val context = LocalContext.current
     // 会话评论 Sheet 开关声明在事件收集之前：CommentPosted 事件要在这里把它关掉
     var showCommentSheet by remember { mutableStateOf(false) }
+    // #166：正在编辑/待删除的会话评论（null = 无对话框）
+    var editingComment by remember { mutableStateOf<PullRequestTimelineItem.Comment?>(null) }
+    var deletingComment by remember { mutableStateOf<PullRequestTimelineItem.Comment?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -134,6 +137,14 @@ fun PullRequestDetailScreen(
                 PullRequestDetailEvent.CommentPosted -> {
                     showCommentSheet = false
                     snackbarHostState.showSnackbar(context.getString(R.string.pull_request_comment_posted))
+                }
+
+                PullRequestDetailEvent.CommentUpdated -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_comment_updated))
+                }
+
+                PullRequestDetailEvent.CommentDeleted -> {
+                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_comment_deleted))
                 }
 
                 PullRequestDetailEvent.ReviewFailed -> {
@@ -277,6 +288,9 @@ fun PullRequestDetailScreen(
                     SuccessContent(
                         pullRequest = state.pullRequest,
                         timeline = state.timeline,
+                        canEditComment = state::canEditComment,
+                        onEditComment = { editingComment = it },
+                        onDeleteComment = { deletingComment = it },
                         commits = state.commits,
                         files = state.files,
                         checkRuns = state.checkRuns,
@@ -316,6 +330,42 @@ fun PullRequestDetailScreen(
             }
 
             // 评论输入 BottomSheet
+            // 编辑会话评论（#166）：标题 + 正文，保存走乐观更新
+            editingComment?.let { comment ->
+                EditCommentDialog(
+                    initialBody = comment.body.orEmpty(),
+                    onDismiss = { editingComment = null },
+                    onSave = { body ->
+                        editingComment = null
+                        viewModel.updateComment(comment.id, body)
+                    },
+                )
+            }
+
+            // 删除会话评论确认（#166）
+            deletingComment?.let { comment ->
+                AlertDialog(
+                    onDismissRequest = { deletingComment = null },
+                    title = { Text(text = stringResource(R.string.pull_request_comment_delete_title)) },
+                    text = { Text(text = stringResource(R.string.pull_request_comment_delete_message)) },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                deletingComment = null
+                                viewModel.deleteComment(comment.id)
+                            },
+                        ) {
+                            Text(text = stringResource(R.string.pull_request_comment_delete))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { deletingComment = null }) {
+                            Text(text = stringResource(R.string.pull_request_comment_cancel))
+                        }
+                    },
+                )
+            }
+
             if (showCommentSheet) {
                 CommentBottomSheet(
                     onDismiss = { showCommentSheet = false },
@@ -555,6 +605,10 @@ private fun SuccessContent(
     onToggleFileExpanded: (String) -> Unit,
     onInternalLink: (ParsedUrl) -> Unit,
     baseRepoUrl: String,
+    // #166：会话评论编辑/删除（作者判定 + 对话框状态由外层持有）
+    canEditComment: (PullRequestTimelineItem.Comment) -> Boolean,
+    onEditComment: (PullRequestTimelineItem.Comment) -> Unit,
+    onDeleteComment: (PullRequestTimelineItem.Comment) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -578,6 +632,9 @@ private fun SuccessContent(
                         conversationActions = conversationActions,
                         onInternalLink = onInternalLink,
                         baseRepoUrl = baseRepoUrl,
+                        canEditComment = canEditComment,
+                        onEditComment = onEditComment,
+                        onDeleteComment = onDeleteComment,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -984,4 +1041,39 @@ private fun CommentBottomSheet(
             }
         }
     }
+}
+
+/** 编辑会话评论对话框（#166）：只改正文，保存前不允许空白。 */
+@Composable
+private fun EditCommentDialog(
+    initialBody: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+) {
+    var body by remember { mutableStateOf(initialBody) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.pull_request_comment_edit_title)) },
+        text = {
+            OutlinedTextField(
+                value = body,
+                onValueChange = { body = it },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(body) },
+                enabled = body.isNotBlank(),
+            ) {
+                Text(text = stringResource(R.string.pull_request_comment_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.pull_request_comment_cancel))
+            }
+        },
+    )
 }

@@ -73,6 +73,10 @@ internal fun ConversationTab(
     conversationActions: ConversationActions,
     onInternalLink: (ParsedUrl) -> Unit,
     baseRepoUrl: String,
+    // #166：会话评论的编辑/删除（作者判定在 ViewModel 层，这里只透传）
+    canEditComment: (PullRequestTimelineItem.Comment) -> Boolean = { false },
+    onEditComment: (PullRequestTimelineItem.Comment) -> Unit = {},
+    onDeleteComment: (PullRequestTimelineItem.Comment) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -117,6 +121,9 @@ internal fun ConversationTab(
                             item = item,
                             onInternalLink = onInternalLink,
                             baseRepoUrl = baseRepoUrl,
+                            canEdit = canEditComment(item),
+                            onEdit = { onEditComment(item) },
+                            onDelete = { onDeleteComment(item) },
                         )
                     }
 
