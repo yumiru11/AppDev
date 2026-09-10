@@ -104,4 +104,25 @@
     <string name="repo_branch_error_unknown">Unknown error</string>
     <string name="repo_branch_snackbar_created">Branch %1$s created</string>
     <string name="repo_branch_snackbar_deleted">Branch %1$s deleted</string>
+
+    <!-- Repositories tab (issue #166 / UI01+UI02, ui-design §3.2) -->
+    <string name="repos_title">Repositories</string>
+    <string name="repos_layout_switch_to_grid">Switch to grid layout</string>
+    <string name="repos_layout_switch_to_list">Switch to list layout</string>
+    <string name="repos_private_badge">Private</string>
+    <string name="repos_empty_title">No repositories yet</string>
+    <string name="repos_empty_message">Repositories you create or get access to will show up here.</string>
+    <string name="repos_error_title">Could not load repositories</string>
+    <string name="repos_error_message">Check your connection and try again.</string>
+    <string name="repos_error_retry">Retry</string>
+    <string name="repos_login_title">Sign in to see your repositories</string>
+    <string name="repos_login_message">Repositories, stars and issues live behind your GitHub account.</string>
+    <string name="repos_login_action">Sign in with GitHub</string>
+    <string name="repos_menu_copy_link">Copy link</string>
+    <string name="repos_menu_open_browser">Open in browser</string>
+    <string name="repos_menu_share">Share</string>
+    <string name="repos_menu_toggle_star">Star or unstar</string>
+    <string name="repos_star_added">Starred %1$s</string>
+    <string name="repos_star_removed">Unstarred %1$s</string>
+    <string name="repos_star_failed">Could not update star. Try again.</string>
 </resources>

@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.core.datastore.preferences
 
 import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
+import com.yumiru11.githubapp.core.datastore.model.RepoLayoutMode
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 
@@ -72,6 +73,12 @@ interface UserPreferencesRepository {
     /** 代码行号开关（默认开启） */
     val codeLineNumbers: Flow<Boolean>
 
+    /**
+     * 仓库列表布局（#166 / UI01，ui-design §3.2）：网格 / 通栏可切换，默认 [RepoLayoutMode.LIST]。
+     * 用户切换后持久化——「切了又弹回去」是列表页最常见的体验投诉。
+     */
+    val repoLayout: Flow<RepoLayoutMode>
+
     suspend fun setThemeMode(mode: ThemeMode)
 
     suspend fun setBlurEnabled(enabled: Boolean)
@@ -104,4 +111,6 @@ interface UserPreferencesRepository {
     suspend fun setCodeFont(font: CodeFont)
 
     suspend fun setCodeLineNumbers(enabled: Boolean)
+
+    suspend fun setRepoLayout(mode: RepoLayoutMode)
 }

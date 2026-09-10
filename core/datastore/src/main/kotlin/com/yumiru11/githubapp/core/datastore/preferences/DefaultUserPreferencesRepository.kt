@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
+import com.yumiru11.githubapp.core.datastore.model.RepoLayoutMode
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -72,6 +73,13 @@ class DefaultUserPreferencesRepository
 
         override val codeLineNumbers: Flow<Boolean> =
             dataStore.data.map { it[KEY_CODE_LINE_NUMBERS] ?: true }
+
+        override val repoLayout: Flow<RepoLayoutMode> =
+            dataStore.data.map { prefs ->
+                prefs[KEY_REPO_LAYOUT]
+                    ?.let { stored -> runCatching { RepoLayoutMode.valueOf(stored) }.getOrNull() }
+                    ?: RepoLayoutMode.LIST
+            }
 
         override suspend fun setThemeMode(mode: ThemeMode) {
             dataStore.edit { it[KEY_THEME_MODE] = mode.name }
@@ -152,6 +160,10 @@ class DefaultUserPreferencesRepository
             dataStore.edit { it[KEY_CODE_LINE_NUMBERS] = enabled }
         }
 
+        override suspend fun setRepoLayout(mode: RepoLayoutMode) {
+            dataStore.edit { it[KEY_REPO_LAYOUT] = mode.name }
+        }
+
         private companion object {
             val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
             val KEY_LANGUAGE_TAG = stringPreferencesKey("language_tag")
@@ -169,5 +181,6 @@ class DefaultUserPreferencesRepository
             val KEY_ICON_STYLE = stringPreferencesKey("icon_style")
             val KEY_CODE_FONT = stringPreferencesKey("code_font")
             val KEY_CODE_LINE_NUMBERS = booleanPreferencesKey("code_line_numbers")
+            val KEY_REPO_LAYOUT = stringPreferencesKey("repo_layout")
         }
     }

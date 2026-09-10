@@ -70,6 +70,7 @@ import com.yumiru11.githubapp.feature.pullrequest.PullRequestListScreen
 import com.yumiru11.githubapp.feature.repo.FileViewerScreen
 import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
 import com.yumiru11.githubapp.feature.repo.RepoFilesViewModel
+import com.yumiru11.githubapp.feature.repo.ReposScreen
 import com.yumiru11.githubapp.feature.search.SearchScreen
 import com.yumiru11.githubapp.feature.settings.SettingsScreen
 import com.yumiru11.githubapp.feature.settings.SettingsViewModel
@@ -179,20 +180,23 @@ class MainActivity : ComponentActivity() {
                                                 bottomContentPadding = padding.calculateBottomPadding(),
                                             )
                                         },
-                                        reposPage = { padding ->
-                                            // #83：玻璃避让走 contentPadding（节点保持 full-bleed），与 Home/Profile
-                                            // 同一契约——真仓库列表落地时内容即可物理滚进底栏玻璃背后
-                                            PlaceholderScreen(
-                                                contentPadding =
-                                                    PaddingValues(
-                                                        top =
-                                                            padding
-                                                                .calculateTopPadding() +
-                                                                WindowInsets.statusBars
-                                                                    .asPaddingValues()
-                                                                    .calculateTopPadding(),
-                                                        bottom = padding.calculateBottomPadding(),
-                                                    ),
+                                        reposPage = {
+                                            // 「仓库」大分区（#166 / UI01+UI02）：此前是 PlaceholderScreen 占位，
+                                            // 三个底部 Tab 里有一个点进去是空壳。现已落地完整形态（列表/网格切换 +
+                                            // 长按菜单 + 三态占位 + 游客引导），玻璃避让由 ReposScreen 内部
+                                            // 按 Home/Profile 同一契约（contentPadding）处理。
+                                            ReposScreen(
+                                                onOpenRepository = { owner, repo ->
+                                                    navController.navigate(AppRoute.Repo(owner, repo))
+                                                },
+                                                onLoginClick = {
+                                                    navController.navigate(AppRoute.Login) {
+                                                        popUpTo(0) { inclusive = true }
+                                                    }
+                                                },
+                                                onSearchClick = { navController.navigate(AppRoute.Search) },
+                                                onNotificationClick = { notificationPanelVisible = true },
+                                                onProfileClick = { mainTab = MainTab.PROFILE },
                                             )
                                         },
                                         profilePage = { padding ->

@@ -104,4 +104,25 @@
     <string name="repo_branch_error_unknown">未知错误</string>
     <string name="repo_branch_snackbar_created">已创建分支 %1$s</string>
     <string name="repo_branch_snackbar_deleted">已删除分支 %1$s</string>
+
+    <!-- 仓库大分区（#166 / UI01+UI02，ui-design §3.2） -->
+    <string name="repos_title">仓库</string>
+    <string name="repos_layout_switch_to_grid">切换到网格布局</string>
+    <string name="repos_layout_switch_to_list">切换到通栏布局</string>
+    <string name="repos_private_badge">私有</string>
+    <string name="repos_empty_title">还没有仓库</string>
+    <string name="repos_empty_message">你创建或有权限的仓库会显示在这里。</string>
+    <string name="repos_error_title">仓库加载失败</string>
+    <string name="repos_error_message">请检查网络连接后重试。</string>
+    <string name="repos_error_retry">重试</string>
+    <string name="repos_login_title">登录后查看你的仓库</string>
+    <string name="repos_login_message">仓库、星标与 Issue 都在你的 GitHub 账号下。</string>
+    <string name="repos_login_action">使用 GitHub 登录</string>
+    <string name="repos_menu_copy_link">复制链接</string>
+    <string name="repos_menu_open_browser">在浏览器打开</string>
+    <string name="repos_menu_share">分享</string>
+    <string name="repos_menu_toggle_star">收藏 / 取消收藏</string>
+    <string name="repos_star_added">已收藏 %1$s</string>
+    <string name="repos_star_removed">已取消收藏 %1$s</string>
+    <string name="repos_star_failed">收藏状态更新失败，请重试。</string>
 </resources>
