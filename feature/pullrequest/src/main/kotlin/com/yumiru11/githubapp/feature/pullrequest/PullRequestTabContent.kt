@@ -30,7 +30,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +50,7 @@ import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
+import com.yumiru11.githubapp.core.ui.AppImageOverlay
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.pullrequest.data.DiffParser
 import com.yumiru11.githubapp.feature.pullrequest.model.CheckRun
@@ -78,14 +82,10 @@ internal fun ConversationTab(
     ) {
         if (!pullRequest.body.isNullOrBlank()) {
             item(key = "body") {
-                WebViewMarkdownRenderer(
-                    sanitizedHtml = pullRequest.body,
-                    tokenProvider = { null },
-                    bridgeCallback = createPullRequestBridgeCallback(onInternalLink),
+                PullRequestBodyWebView(
+                    body = pullRequest.body,
                     baseRepoUrl = baseRepoUrl,
-                    // PR 无服务端 HTML API → 离线 GFM + 融合样式（WebView 内 markdown-it 渲染）
-                    renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
-                    modifier = Modifier.fillMaxWidth(),
+                    onInternalLink = onInternalLink,
                 )
             }
         }
@@ -145,10 +145,35 @@ internal fun ConversationTab(
     }
 }
 
-/** WebView 正文 bridge：内部链接 → 应用内导航；外部链接 → 浏览器；纯锚点忽略。 */
-@Suppress("EmptyFunctionBlock") // onCodeCopy/onImageClick/onCheckboxClick/onHeightChanged 为预留/T14 占位
+/**
+ * PR 正文 WebView + 图片全屏查看（#166 / UI11）：状态属于这一个 item，不上提到整页 UiState。
+ */
 @Composable
-private fun createPullRequestBridgeCallback(onInternalLink: (ParsedUrl) -> Unit): MarkdownBridgeCallback {
+private fun PullRequestBodyWebView(
+    body: String,
+    baseRepoUrl: String,
+    onInternalLink: (ParsedUrl) -> Unit,
+) {
+    var previewImageUrl by remember { mutableStateOf<String?>(null) }
+    WebViewMarkdownRenderer(
+        sanitizedHtml = body,
+        tokenProvider = { null },
+        bridgeCallback = createPullRequestBridgeCallback(onInternalLink) { previewImageUrl = it },
+        baseRepoUrl = baseRepoUrl,
+        // PR 无服务端 HTML API → 离线 GFM + 融合样式（WebView 内 markdown-it 渲染）
+        renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    AppImageOverlay(imageUrl = previewImageUrl, onDismiss = { previewImageUrl = null })
+}
+
+/** WebView 正文 bridge：内部链接 → 应用内导航；外部链接 → 浏览器；纯锚点忽略。 */
+@Suppress("EmptyFunctionBlock") // onCodeCopy/onCheckboxClick/onHeightChanged 为预留/T14 占位
+@Composable
+private fun createPullRequestBridgeCallback(
+    onInternalLink: (ParsedUrl) -> Unit,
+    onImageClick: (String) -> Unit,
+): MarkdownBridgeCallback {
     val context = LocalContext.current
     return object : MarkdownBridgeCallback {
         override fun onExternalLink(url: String) {
@@ -163,7 +188,9 @@ private fun createPullRequestBridgeCallback(onInternalLink: (ParsedUrl) -> Unit)
 
         override fun onCodeCopy(code: String) {}
 
-        override fun onImageClick(src: String) {}
+        override fun onImageClick(src: String) {
+            onImageClick(src)
+        }
 
         override fun onCheckboxClick(
             index: Int,
