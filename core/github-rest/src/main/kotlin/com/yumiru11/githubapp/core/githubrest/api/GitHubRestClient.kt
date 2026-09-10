@@ -1,5 +1,7 @@
 package com.yumiru11.githubapp.core.githubrest.api
 
+import android.util.Log
+import com.yumiru11.githubapp.core.common.logging.LogRedaction
 import com.yumiru11.githubapp.core.githubrest.auth.AuthTokenInterceptor
 import com.yumiru11.githubapp.core.githubrest.auth.TokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.EtagCacheInterceptor
@@ -47,7 +49,7 @@ object GitHubRestClient {
             .addInterceptor(GitHubHeaderInterceptor())
             .addInterceptor(AuthTokenInterceptor(tokenProvider))
             .addInterceptor(
-                HttpLoggingInterceptor().apply {
+                HttpLoggingInterceptor { message -> Log.d(LOG_TAG, LogRedaction.redact(message)) }.apply {
                     level = if (debugLogging) HttpLoggingInterceptor.Level.BASIC else HttpLoggingInterceptor.Level.NONE
                 },
             ).connectTimeout(DEFAULT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -67,4 +69,7 @@ object GitHubRestClient {
             .build()
 
     private const val DEFAULT_TIMEOUT_SECONDS = 30L
+
+    /** OkHttp 日志 tag（脱敏后输出，见下方 logger 装配） */
+    private const val LOG_TAG = "GitHubRest"
 }

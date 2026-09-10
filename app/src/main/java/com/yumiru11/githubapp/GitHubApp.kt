@@ -7,8 +7,10 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.svg.SvgDecoder
 import com.yumiru11.githubapp.core.githubrest.di.GitHubHttpClient
+import com.yumiru11.githubapp.logging.RedactingDebugTree
 import dagger.hilt.android.HiltAndroidApp
 import okhttp3.OkHttpClient
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
@@ -26,6 +28,15 @@ class GitHubApp :
     @Inject
     @GitHubHttpClient
     lateinit var okHttpClient: OkHttpClient
+
+    override fun onCreate() {
+        super.onCreate()
+        // 调试工具链（#169 / L14）：仅 debug 变体种日志树，且消息体经 LogRedaction 脱敏。
+        // release 不种树 → Timber 调用点被 R8 裁掉，线上零日志开销。
+        if (BuildConfig.DEBUG) {
+            Timber.plant(RedactingDebugTree())
+        }
+    }
 
     override fun newImageLoader(platformContext: PlatformContext): ImageLoader =
         ImageLoader
