@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.theme.extendedColors
 
@@ -68,12 +69,16 @@ fun gitHubStatusColorRole(status: GitHubStatus): AppStateColorRole =
  * - label 由调用方传入本地化文案（stringResource），本组件不内嵌字符串
  * - `mergeDescendants` 合并语义节点，TalkBack 单焦点朗读完整标签（audit 缺陷 #18）
  * - 圆点为纯装饰（无 contentDescription），状态信息由文本承载
+ * - [stateDescription] 补状态播报（issue #168 / UI26）：调用方传本地化**短语**
+ *   （如 en "This item is open" / zh "该项已开启"），与可见标签互补而非逐字重复，
+ *   避免 TalkBack 把同一句话播报两遍
  */
 @Composable
 fun AppStateChip(
     status: GitHubStatus,
     label: String,
     modifier: Modifier = Modifier,
+    stateDescription: String? = null,
 ) {
     val colorScheme = MaterialTheme.colorScheme
     val extended = MaterialTheme.extendedColors
@@ -100,7 +105,10 @@ fun AppStateChip(
             }
         }
     Surface(
-        modifier = modifier.semantics(mergeDescendants = true) {},
+        modifier =
+            modifier.semantics(mergeDescendants = true) {
+                if (stateDescription != null) this.stateDescription = stateDescription
+            },
         shape = RoundedCornerShape(percent = 50),
         color = containerColor,
     ) {

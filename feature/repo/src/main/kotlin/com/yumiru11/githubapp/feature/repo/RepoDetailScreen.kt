@@ -14,6 +14,10 @@ import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.customtabs.CustomTabsIntent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -77,6 +81,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -101,6 +106,7 @@ import com.yumiru11.githubapp.core.data.model.Release
 import com.yumiru11.githubapp.core.data.model.Repository
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
+import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
@@ -118,6 +124,9 @@ private const val TAG = "ReadmeRender"
 
 /** 剪贴板条目名（文件编辑「保留本地更改」） */
 private const val CLIP_LABEL_FILE_EDIT = "file-edit"
+
+/** Star 弹跳峰值缩放（#167 / UI07：§4.2 H2-7 用户确认「星形弹跳可以」） */
+private const val STAR_BOUNCE_SCALE = 1.25f
 
 /**
  * 仓库详情页（T9 README 浏览 tracer bullet + T12 仓库管理）。
@@ -852,8 +861,12 @@ private fun RepoStatsRow(repo: Repository) {
 
 /**
  * Star/Watch/Fork 操作按钮行（登录态显示；pendingAction 期间禁用防重入）。
- * Material You 风格：使用 FilledTonalButton 提供适中的视觉重量。Star/Watch 图标随状态
- * 瞬时切换（动画过渡由 UI 打磨波 Star 动画专项实现，见 docs/ui-audit-2026-08-21.md §4 提案）。
+ * Material You 风格：使用 FilledTonalButton 提供适中的视觉重量。
+ *
+ * Star 动画（#167 / UI07，ui-design §4.2 H2-7 用户确认「星形弹跳可以」+ §4.3 回弹）：
+ * 状态翻转时星形做一次 **1.0 → 1.25 → 1.0 的 spring 回弹**，颜色在 primary 与
+ * onSurfaceVariant 之间过渡。时长/物理曲线全部走 AppMotion 令牌（尊重系统「减弱动画」：
+ * 缩放为 0 时动画即时完成，视觉上仍是"状态直接切换"，不会卡住）。
  */
 @Composable
 private fun ManagementButtons(
@@ -865,6 +878,28 @@ private fun ManagementButtons(
     onFork: () -> Unit,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Star 微缩放 + 颜色过渡（UI07）：只在状态真正翻转时播一次，首次组合不播
+        val starScale = remember { Animatable(1f) }
+        val starTint by
+            animateColorAsState(
+                targetValue =
+                    if (isStarred) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                animationSpec = tween(AppMotion.scaledDuration(AppMotion.DURATION_SMALL_STATE_CHANGE)),
+                label = "star-tint",
+            )
+        LaunchedEffect(isStarred) {
+            if (starScale.value == 1f) {
+                starScale.animateTo(
+                    STAR_BOUNCE_SCALE,
+                    spring(dampingRatio = AppMotion.DampingRatioHighBouncy, stiffness = AppMotion.StiffnessMedium),
+                )
+                starScale.animateTo(1f, spring(dampingRatio = AppMotion.DampingRatioHighBouncy, stiffness = AppMotion.StiffnessMedium))
+            }
+        }
         FilledTonalButton(
             onClick = onToggleStar,
             enabled = pendingAction == null,
@@ -874,7 +909,14 @@ private fun ManagementButtons(
             Icon(
                 imageVector = if (isStarred) Icons.Filled.Star else Icons.Outlined.Star,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp),
+                tint = starTint,
+                modifier =
+                    Modifier
+                        .size(18.dp)
+                        .graphicsLayer {
+                            scaleX = starScale.value
+                            scaleY = starScale.value
+                        },
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(

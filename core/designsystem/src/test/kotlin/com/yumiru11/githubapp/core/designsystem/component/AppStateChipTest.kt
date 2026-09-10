@@ -1,5 +1,8 @@
 package com.yumiru11.githubapp.core.designsystem.component
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -56,6 +59,34 @@ class AppStateChipTest {
     fun appStateChip_openStatus_rendersLabel() {
         composeRule.setContent { AppTheme { AppStateChip(status = GitHubStatus.OPEN, label = "Open") } }
         composeRule.onNodeWithText("Open").assertIsDisplayed()
+    }
+
+    @Test
+    fun appStateChip_withStateDescription_exposesItForTalkBack() {
+        // issue #168 / UI26：状态徽标必须能播报状态本身（不只念标签词）
+        composeRule.setContent {
+            AppTheme {
+                AppStateChip(
+                    status = GitHubStatus.OPEN,
+                    label = "Open",
+                    stateDescription = "This item is open",
+                )
+            }
+        }
+        composeRule
+            .onNodeWithText("Open")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "This item is open"))
+    }
+
+    @Test
+    fun appStateChip_withoutStateDescription_exposesNoStateProperty() {
+        // 未传描述时不引入空语义噪音（调用方没 i18n 文案的场景）
+        composeRule.setContent {
+            AppTheme { AppStateChip(status = GitHubStatus.DRAFT, label = "Draft") }
+        }
+        composeRule
+            .onNodeWithText("Draft")
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
     }
 
     @Test

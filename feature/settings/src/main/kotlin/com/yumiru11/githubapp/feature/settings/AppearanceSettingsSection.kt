@@ -10,6 +10,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -45,8 +47,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.datastore.model.IconStyle
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.designsystem.component.CardGroup
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.AppIcon
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
@@ -54,12 +59,13 @@ import kotlin.math.roundToInt
 
 /**
  * 外观分组（ui-design §3.6，#87 分组卡化）：主题模式 / 动态取色 / seed 色盘 /
- * OLED / 高对比 / 毛玻璃 / 圆角强度滑杆（实时预览）/ 动画强度滑杆（实时预览），
- * 经 [CardGroup] 呈现为分段卡；非开关项副标题显示当前值（原生设置惯例）。
+ * OLED / 高对比 / 毛玻璃 / 圆角强度滑杆（实时预览）/ 动画强度滑杆（实时预览）/
+ * 图标风格预览卡，经 [CardGroup] 呈现为分段卡；非开关项副标题显示当前值（原生设置惯例）。
  *
- * 图标风格 / 代码字体 / 行号三项暂隐藏（FEEDBACK #6 先例：消费点未落地前不暴露
- * 入口）——iconStyle 待 AppIcon 风格消费基建（ADR-0004 挂账），codeFont /
- * lineNumbers 待 Sora 配置接线；DataStore 字段与 [SettingsViewModel] 写入口保留。
+ * 「图标风格」入口随 AppIcon 消费基建落地而解禁（issue #168 / UI12）：底栏与顶栏
+ * 图标已改为经 [AppIcon] 按 LocalIconStyle 取变体，切换即时生效，不再是「点了没反应」的
+ * 空开关（FEEDBACK #6 的先例要求）。代码字体 / 行号仍隐藏（待 Sora 配置接线），
+ * DataStore 字段与 [SettingsViewModel] 写入口保留。
  */
 @Composable
 internal fun AppearanceSettingsSection(
@@ -143,6 +149,13 @@ internal fun AppearanceSettingsSection(
                 onCheckedChange = viewModel::setGlassBottomSheet,
                 enabled = uiState.glassPerItemEnabled,
                 indented = true,
+            )
+        }
+        // 图标风格（#168 / UI12）：三张预览卡，切换即时生效
+        item {
+            IconStyleRow(
+                selected = uiState.iconStyle,
+                onSelect = viewModel::setIconStyle,
             )
         }
         item { CornerScaleRow(scale = uiState.cornerScale, onScaleChange = viewModel::setCornerScale) }
@@ -249,6 +262,100 @@ private fun SeedSwatch(
                         },
                     ),
         )
+    }
+}
+
+/**
+ * 图标风格三选一（issue #168 / UI12，ui-design §3.6「Rounded/Outlined/Filled 预览」）。
+ *
+ * 每张预览卡用同一条 [AppIcons.Settings] 规格、只改 [IconStyle] 渲染 → 所见即所得；
+ * 选中即经 [SettingsViewModel.setIconStyle] 写 DataStore，AppThemeHost 注入的
+ * LocalIconStyle 随之变化，底栏/顶栏图标立即换变体。
+ *
+ * 无障碍：卡片是单选（[Role.RadioButton] + selected 语义，同 seed 色盘模式），
+ * 图标为装饰（CD = null），语义由卡片文本承载；触区 ≥ [AppDimens.minTouchTarget]。
+ */
+@Composable
+internal fun IconStyleRow(
+    selected: IconStyle,
+    onSelect: (IconStyle) -> Unit,
+) {
+    val options =
+        listOf(
+            IconStyle.OUTLINED to R.string.settings_icon_outlined,
+            IconStyle.ROUNDED to R.string.settings_icon_rounded,
+            IconStyle.FILLED to R.string.settings_icon_filled,
+        )
+    val currentName = stringResource(options.first { (style, _) -> style == selected }.second)
+    SettingRow(title = stringResource(R.string.settings_icon_style), valueText = currentName) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (style, labelRes) ->
+                IconStylePreviewCard(
+                    style = style,
+                    label = stringResource(labelRes),
+                    isSelected = style == selected,
+                    onSelect = { onSelect(style) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/** 单张风格预览卡：该风格下的图标 + 风格名；选中态 = primaryContainer 容器 + primary 描边。 */
+@Composable
+private fun IconStylePreviewCard(
+    style: IconStyle,
+    label: String,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val contentColor =
+        if (isSelected) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+    Surface(
+        modifier =
+            modifier
+                .heightIn(min = AppDimens.minTouchTarget)
+                .selectable(
+                    selected = isSelected,
+                    role = Role.RadioButton,
+                    onClick = onSelect,
+                ),
+        shape = MaterialTheme.shapes.medium,
+        color =
+            if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+        // 选中态除容器色再叠描边：高对比/低视力下容器色差不足（无障碍冗余编码）
+        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            AppIcon(
+                spec = AppIcons.Settings,
+                contentDescription = null,
+                style = style,
+                tint = contentColor,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = contentColor,
+            )
+        }
     }
 }
 
