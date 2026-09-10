@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.core.githubrest.api
 
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
+import com.yumiru11.githubapp.core.githubrest.model.CreateReleaseRequest
 import com.yumiru11.githubapp.core.githubrest.model.ReleaseDto
 import com.yumiru11.githubapp.core.githubrest.model.SubscriptionDto
 import com.yumiru11.githubapp.core.githubrest.model.SubscriptionRequest
@@ -11,6 +12,9 @@ import com.yumiru11.githubapp.core.githubrest.model.UserDto
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -392,5 +396,210 @@ class RepoManagementApiTest {
             val request = server.takeRequest()
             assertEquals("DELETE", request.method)
             assertEquals("/repos/octocat/Hello-World/git/refs/heads/feature", request.url.encodedPath)
+        }
+
+    // ---- L05 创建 Release ----
+
+    @Test
+    fun createRelease_validRequest_postsBodyAndParsesAssets() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 201 Created")
+                    .body(
+                        """
+                        {
+                          "id": 7,
+                          "tag_name": "v1.0.0",
+                          "name": "Release 1.0",
+                          "body": "notes",
+                          "target_commitish": "main",
+                          "draft": true,
+                          "prerelease": false,
+                          "assets": [
+                            {
+                              "id": 11,
+                              "name": "app.apk",
+                              "browser_download_url": "https://example.com/app.apk",
+                              "size": 2048,
+                              "download_count": 3
+                            }
+                          ]
+                        }
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val release =
+                api.createRelease(
+                    "octocat",
+                    "Hello-World",
+                    CreateReleaseRequest(
+                        tagName = "v1.0.0",
+                        targetCommitish = "main",
+                        name = "Release 1.0",
+                        body = "notes",
+                        draft = true,
+                        prerelease = false,
+                    ),
+                )
+
+            assertEquals(7L, release.id)
+            assertEquals("v1.0.0", release.tagName)
+            assertEquals("main", release.targetCommitish)
+            assertEquals(1, release.assets.size)
+            assertEquals("app.apk", release.assets[0].name)
+            assertEquals(2048L, release.assets[0].size)
+            assertEquals(3, release.assets[0].downloadCount)
+            assertEquals("https://example.com/app.apk", release.assets[0].browserDownloadUrl)
+
+            val request = server.takeRequest()
+            assertEquals("POST", request.method)
+            assertEquals("/repos/octocat/Hello-World/releases", request.url.encodedPath)
+            val body = request.body?.utf8().orEmpty()
+            assertTrue("请求体应含 tag_name", body.contains("\"tag_name\":\"v1.0.0\""))
+            assertTrue("请求体应含 target_commitish", body.contains("\"target_commitish\":\"main\""))
+            assertTrue("请求体应含 draft", body.contains("\"draft\":true"))
+        }
+
+    @Test
+    fun createRelease_422Response_throwsHttpException() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 422 Unprocessable Entity")
+                    .body("""{"message":"Validation Failed"}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val result =
+                runCatching {
+                    api.createRelease("octocat", "Hello-World", CreateReleaseRequest(tagName = "bad tag"))
+                }
+
+            val exception = result.exceptionOrNull()
+            assertTrue("422 应抛 HttpException，实际：$exception", exception is HttpException)
+            assertEquals(422, (exception as HttpException).code())
+        }
+
+    @Test
+    fun createRelease_403Response_throwsHttpException() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 403 Forbidden")
+                    .body("""{"message":"Forbidden"}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val result =
+                runCatching {
+                    api.createRelease("octocat", "Hello-World", CreateReleaseRequest(tagName = "v2"))
+                }
+
+            val exception = result.exceptionOrNull()
+            assertTrue("403 应抛 HttpException，实际：$exception", exception is HttpException)
+            assertEquals(403, (exception as HttpException).code())
+        }
+
+    // ---- L05 上传 Release 附件（multipart）----
+
+    @Test
+    fun uploadReleaseAsset_multipartRequest_hasNameQueryAndFilePart() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 201 Created")
+                    .body(
+                        """{"id": 12, "name": "app.apk", "size": 4, "download_count": 0}""",
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val part =
+                MultipartBody.Part.createFormData(
+                    "file",
+                    "app.apk",
+                    "data".toRequestBody("application/octet-stream".toMediaType()),
+                )
+
+            val asset = api.uploadReleaseAsset("octocat", "Hello-World", 7L, "app.apk", part)
+
+            assertEquals(12L, asset.id)
+            assertEquals("app.apk", asset.name)
+
+            val request = server.takeRequest()
+            assertEquals("POST", request.method)
+            assertEquals("/repos/octocat/Hello-World/releases/7/assets", request.url.encodedPath)
+            assertEquals("app.apk", request.url.queryParameter("name"))
+            val contentType = request.headers["Content-Type"].orEmpty()
+            assertTrue("应为 multipart/form-data，实际：$contentType", contentType.startsWith("multipart/form-data"))
+            val body = request.body?.utf8().orEmpty()
+            assertTrue("multipart 应含 file part 文件名", body.contains("filename=\"app.apk\""))
+            assertTrue("multipart 应含文件内容", body.contains("data"))
+        }
+
+    @Test
+    fun uploadReleaseAsset_422Response_throwsHttpException() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 422 Unprocessable Entity")
+                    .body("""{"message":"Validation Failed"}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val part = MultipartBody.Part.createFormData("file", "a.bin", "x".toRequestBody())
+
+            val result =
+                runCatching { api.uploadReleaseAsset("octocat", "Hello-World", 7L, "a.bin", part) }
+
+            assertEquals(422, (result.exceptionOrNull() as HttpException).code())
+        }
+
+    // ---- L06 Topics ----
+
+    @Test
+    fun getTopics_namesWrapper_parsesList() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"names":["kotlin","android","compose"]}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val topics = api.getTopics("octocat", "Hello-World")
+
+            assertEquals(listOf("kotlin", "android", "compose"), topics.names)
+            val request = server.takeRequest()
+            assertEquals("GET", request.method)
+            assertEquals("/repos/octocat/Hello-World/topics", request.url.encodedPath)
+        }
+
+    @Test
+    fun getTopics_emptyNames_returnsEmptyList() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"names":[]}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val topics = api.getTopics("octocat", "Hello-World")
+
+            assertTrue(topics.names.isEmpty())
         }
 }

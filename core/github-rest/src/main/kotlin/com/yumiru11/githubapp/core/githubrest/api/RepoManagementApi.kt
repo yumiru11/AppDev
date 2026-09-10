@@ -1,17 +1,24 @@
 package com.yumiru11.githubapp.core.githubrest.api
 
+import com.yumiru11.githubapp.core.githubrest.model.CreateReleaseRequest
+import com.yumiru11.githubapp.core.githubrest.model.ReleaseAssetDto
 import com.yumiru11.githubapp.core.githubrest.model.ReleaseDto
 import com.yumiru11.githubapp.core.githubrest.model.RepositoryDto
 import com.yumiru11.githubapp.core.githubrest.model.SubscriptionDto
 import com.yumiru11.githubapp.core.githubrest.model.SubscriptionRequest
 import com.yumiru11.githubapp.core.githubrest.model.TagDto
+import com.yumiru11.githubapp.core.githubrest.model.TopicsDto
+import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * 仓库管理 REST 接口（T12：Star/Watch/Fork + Releases/Tags/Languages）。
@@ -101,6 +108,45 @@ interface RepoManagementApi {
         @Path("owner") owner: String,
         @Path("repo") repo: String,
     ): Map<String, Long>
+
+    /**
+     * POST /repos/{owner}/{repo}/releases：创建 Release（L05）。
+     *
+     * 403 无写权限 / 422 校验失败（如 tag 非法、已存在）自动抛 [retrofit2.HttpException]。
+     */
+    @POST("repos/{owner}/{repo}/releases")
+    suspend fun createRelease(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Body body: CreateReleaseRequest,
+    ): ReleaseDto
+
+    /**
+     * POST /repos/{owner}/{repo}/releases/{releaseId}/assets?name={name}：上传 Release 附件（L05）。
+     *
+     * 官方示例用 query 参数传 `name`（非表单字段），文件本体走 multipart 的 `file` part；
+     * 403 无权限 / 422 校验失败（重名、附件过大）抛 [retrofit2.HttpException]。
+     */
+    @Multipart
+    @POST("repos/{owner}/{repo}/releases/{releaseId}/assets")
+    suspend fun uploadReleaseAsset(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+        @Path("releaseId") releaseId: Long,
+        @Query("name") name: String,
+        @Part file: MultipartBody.Part,
+    ): ReleaseAssetDto
+
+    /**
+     * GET /repos/{owner}/{repo}/topics：仓库 Topics（L06）。
+     *
+     * 响应为 `{"names": [...]}` 包装对象（与多数 REST 端点直接返回数组不同）。
+     */
+    @GET("repos/{owner}/{repo}/topics")
+    suspend fun getTopics(
+        @Path("owner") owner: String,
+        @Path("repo") repo: String,
+    ): TopicsDto
 
     /**
      * DELETE /repos/{owner}/{repo}/git/refs/heads/{branch}：删除分支（T17 MergeBox，204）。
