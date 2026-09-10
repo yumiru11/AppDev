@@ -16,4 +16,8 @@ data class User(
     val publicRepos: Int = 0,
     val followers: Int = 0,
     val following: Int = 0,
+    // #166 / UI21：GitHub 资料页统计行是「repos / followers / following / stars」四件套，
+    // 而 REST /user 不返回 star 总数（需另探 Link 头），故用可空表示"未取到"——
+    // UI 侧据此决定是否渲染这一项，而不是拿 0 冒充真实值。
+    val starredCount: Int? = null,
 )
