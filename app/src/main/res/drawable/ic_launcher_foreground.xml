@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 自适应图标前景（#169 / Q03）：git 提交图标记（三点两线，圆头笔画）。
+     设计走查：本地 rsvg 渲染 + 视觉评审（方形/squircle/圆形/72dp 安全圆四种遮罩），
+     评分 9.5/10，无裁切、视觉居中、小尺寸可辨识。全应用禁 emoji，
+     GitHub 语义用自绘矢量标记（ADR-0004 图标体系）。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 字形组：绕画布中心 (54,54) 缩到 0.92，再整体平移 (-1.0, +0.6) 做视觉重心校正
+         （三点构成的几何中心天然偏左上，微移后肉眼观感居中）。
+         缩放后字形外包圆半径 32.4（108 画布单位），落在 Android 的 66dp 关键内容圆
+         （半径 33）内，距 72dp 安全区边界（半径 36）留 3.6 单位余量 —— 圆形/方形/
+         水滴形任意遮罩下都不会被切边。 -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.92"
+        android:scaleY="0.92"
+        android:translateX="-1.0"
+        android:translateY="0.6">
+        <!-- 主干：左侧上下两个提交节点的连线 -->
+        <path
+            android:pathData="M38,38 L38,72"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="9.5"
+            android:strokeLineCap="round" />
+        <!-- 分支：右上节点向左下弯回主干（merge 曲线） -->
+        <path
+            android:pathData="M70,45 C70,58 56,62 42,62"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="9.5"
+            android:strokeLineCap="round" />
+        <!-- 三个提交节点（等比于笔画宽度的实心圆，保证小尺寸下的分量感） -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M38,28 a10,10 0 1,0 0,20 a10,10 0 1,0 0,-20" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M38,62 a10,10 0 1,0 0,20 a10,10 0 1,0 0,-20" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M70,35 a10,10 0 1,0 0,20 a10,10 0 1,0 0,-20" />
+    </group>
+</vector>

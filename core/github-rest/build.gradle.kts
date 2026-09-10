@@ -45,6 +45,12 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+    // 调试工具链（#169 / L14）：debug 变体挂 Chucker 网络面板，release 变体用
+    // library-no-op（同 API 空实现）→ 同一份 Kotlin 源码两变体都能编译，
+    // R8 在 release 把 Chucker 调用点整段裁掉。
+    debugImplementation(libs.chucker.library)
+    releaseImplementation(libs.chucker.library.noop)
+
     // 测试：MockWebServer3 模拟 GitHub API（新 API 命名空间 okhttp3.mockwebserver3）
     testImplementation(project(":core:testing"))
     testImplementation(libs.mockwebserver3)
