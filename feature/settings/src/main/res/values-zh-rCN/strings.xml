@@ -30,6 +30,8 @@
     <string name="settings_blur">毛玻璃效果</string>
     <string name="settings_blur_desc">顶/底栏、通知面板与弹出面板背后的模糊</string>
     <!-- 逐项开关（#167 / UI03，ui-design §6.3） -->
+    <string name="settings_stagger">列表入场动效</string>
+    <string name="settings_stagger_desc">首屏条目逐项滑入</string>
     <string name="settings_glass_top_bar">顶栏</string>
     <string name="settings_glass_bottom_bar">底栏</string>
     <string name="settings_glass_panel">通知面板</string>

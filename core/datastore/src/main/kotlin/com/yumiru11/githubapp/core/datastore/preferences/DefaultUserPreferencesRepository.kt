@@ -164,6 +164,12 @@ class DefaultUserPreferencesRepository
             dataStore.edit { it[KEY_REPO_LAYOUT] = mode.name }
         }
 
+        override val staggerEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_STAGGER_ENABLED] ?: true }
+
+        override suspend fun setStaggerEnabled(enabled: Boolean) {
+            dataStore.edit { it[KEY_STAGGER_ENABLED] = enabled }
+        }
+
         private companion object {
             val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
             val KEY_LANGUAGE_TAG = stringPreferencesKey("language_tag")
@@ -182,5 +188,6 @@ class DefaultUserPreferencesRepository
             val KEY_CODE_FONT = stringPreferencesKey("code_font")
             val KEY_CODE_LINE_NUMBERS = booleanPreferencesKey("code_line_numbers")
             val KEY_REPO_LAYOUT = stringPreferencesKey("repo_layout")
+            val KEY_STAGGER_ENABLED = booleanPreferencesKey("stagger_enabled")
         }
     }

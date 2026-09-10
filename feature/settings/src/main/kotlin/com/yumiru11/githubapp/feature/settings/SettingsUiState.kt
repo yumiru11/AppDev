@@ -26,6 +26,8 @@ data class SettingsUiState(
     val languageTag: String? = null,
     /** 毛玻璃总开关（#167 / UI03） */
     val blurEnabled: Boolean = true,
+    /** 列表首屏 stagger 开关（#167 / UI06，§4.2 H2-2） */
+    val staggerEnabled: Boolean = true,
     /** 毛玻璃逐项开关：顶栏 / 底栏 / 通知面板 / BottomSheet（ui-design §6.3 四条允许点位） */
     val glassTopBar: Boolean = true,
     val glassBottomBar: Boolean = true,

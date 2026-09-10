@@ -144,6 +144,38 @@ class UserPreferencesRepositoryTest {
         }
 
     // ── 仓库列表布局（#166 / UI01）──────────────────────────────────────────
+    // ── 列表 stagger 开关（#167 / UI06）────────────────────────────────────
+    @Test
+    fun staggerEnabled_byDefault_emitsTrue() =
+        runTest {
+            val repository = createRepository()
+
+            assertEquals(true, repository.staggerEnabled.first())
+        }
+
+    @Test
+    fun setStaggerEnabled_false_persistsAndEmits() =
+        runTest {
+            val repository = createRepository()
+
+            repository.setStaggerEnabled(false)
+
+            assertEquals(false, repository.staggerEnabled.first())
+        }
+
+    @Test
+    fun setStaggerEnabled_false_newInstance_readsBackPersistedValue() =
+        runTest {
+            val file = newPreferencesFile()
+            val scope = newScope()
+            createRepository(scope, file).setStaggerEnabled(false)
+            scope.cancel()
+
+            val reloaded = createRepository(newScope(), file)
+
+            assertEquals(false, reloaded.staggerEnabled.first())
+        }
+
     @Test
     fun repoLayout_byDefault_emitsList() =
         runTest {
