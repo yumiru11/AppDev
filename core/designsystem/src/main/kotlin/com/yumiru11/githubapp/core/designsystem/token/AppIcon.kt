@@ -1,7 +1,9 @@
 package com.yumiru11.githubapp.core.designsystem.token
 
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.datastore.model.IconStyle
 
 /**
  * 图标体系令牌（Material Symbols + Octicons）。
@@ -40,3 +42,13 @@ object AppIcon {
     /** GRAD 轴：低强调场景 */
     const val GRAD_LOW: Float = -25f
 }
+
+/**
+ * 全局图标风格（由 app 层 AppThemeHost 从 UserPreferencesRepository.iconStyle 注入，
+ * issue #168 / UI12）。消费侧只读本 CompositionLocal——见
+ * [com.yumiru11.githubapp.core.designsystem.icon.AppIcon]。
+ *
+ * static：值为偏好快照，切换时整棵子树重组（图标风格不变则无需逐帧读取）；
+ * 默认 [IconStyle.ROUNDED]（ui-design §5 默认圆润），截图测试/预览不提供时行为与默认一致。
+ */
+val LocalIconStyle = staticCompositionLocalOf { IconStyle.ROUNDED }

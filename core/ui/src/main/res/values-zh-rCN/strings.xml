@@ -59,4 +59,18 @@
     <!-- 图片全屏查看器（#166 / UI11，ui-design §3.11） -->
     <string name="image_viewer_cd">图片预览</string>
     <string name="image_viewer_close_cd">关闭图片预览</string>
+
+    <!-- GitHub 状态播报（issue #168 / UI26）：AppStateChip 的 stateDescription 短语 -->
+    <string name="state_description_open">该项已开启</string>
+    <string name="state_description_closed">该项已关闭</string>
+    <string name="state_description_merged">该 PR 已合并</string>
+    <string name="state_description_draft">草稿 PR</string>
+    <string name="state_description_mergeable">无合并冲突</string>
+    <string name="state_description_conflicting">存在合并冲突</string>
+
+    <!-- 角标数字上限（issue #168 / UI27）：>99 显示 99+，播报同口径 -->
+    <string name="notification_badge_overflow">%1$d+</string>
+    <plurals name="notification_unread_badge_cd_overflow">
+        <item quantity="other">%d+ 条未读通知</item>
+    </plurals>
 </resources>
