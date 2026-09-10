@@ -5,13 +5,16 @@
 
 package com.yumiru11.githubapp.feature.issue.data
 
+import androidx.paging.ExperimentalPagingApi
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.map
 import com.apollographql.apollo.ApolloClient
 import com.apollographql.apollo.api.Optional
 import com.apollographql.cache.normalized.FetchPolicy
 import com.apollographql.cache.normalized.fetchPolicy
+import com.yumiru11.githubapp.core.database.dao.IssueDao
 import com.yumiru11.githubapp.core.githubgraphql.generated.IssueWriteContextQuery
 import com.yumiru11.githubapp.core.githubgraphql.generated.UpdateIssueMutation
 import com.yumiru11.githubapp.core.githubrest.api.IssueApi
@@ -40,6 +43,7 @@ import com.yumiru11.githubapp.feature.issue.model.IssueViewerPermission
 import com.yumiru11.githubapp.feature.issue.model.IssueWriteContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -60,8 +64,16 @@ class IssueRepository
     constructor(
         private val issueApi: IssueApi,
         private val apolloClient: ApolloClient,
+        private val issueDao: IssueDao,
     ) {
-        /** Issue 分页流（按 [filter] 过滤 open/closed） */
+        /**
+         * Issue 分页流（按 [filter] 过滤 open/closed）。
+         *
+         * 远端由 [IssueRemoteMediator] 写 Room，本地数据源 = Room 分页查询（plan.md §4.6）。
+         * 好处：断网/离线可读上次访问列表；下拉刷新（LazyPagingItems.refresh()）触发
+         * RemoteMediator REFRESH → 网络结果与本地缓存合并。
+         */
+        @OptIn(ExperimentalPagingApi::class)
         fun issues(
             owner: String,
             repo: String,
@@ -69,8 +81,9 @@ class IssueRepository
         ): Flow<PagingData<Issue>> =
             Pager(
                 config = PagingConfig(pageSize = PAGE_SIZE),
-                pagingSourceFactory = { IssuePagingSource(issueApi, owner, repo, filter) },
-            ).flow
+                remoteMediator = IssueRemoteMediator(issueApi, issueDao, owner, repo, filter),
+                pagingSourceFactory = { issueDao.pagingSource(owner, repo, filter.toRaw()) },
+            ).flow.map { data -> data.map { entity -> entity.toDomain() } }
 
         /** 单个 Issue 详情 */
         suspend fun getIssue(

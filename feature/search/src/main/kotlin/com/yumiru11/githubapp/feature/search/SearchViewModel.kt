@@ -13,6 +13,7 @@ import com.yumiru11.githubapp.core.data.model.SearchIssue
 import com.yumiru11.githubapp.core.data.model.User
 import com.yumiru11.githubapp.core.githubauth.auth.AuthState
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
+import com.yumiru11.githubapp.core.githubrest.http.RateLimitStore
 import com.yumiru11.githubapp.feature.search.data.SearchHistoryRepository
 import com.yumiru11.githubapp.feature.search.data.SearchPagingRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,11 +22,14 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -38,6 +42,9 @@ import javax.inject.Inject
  * - 代码搜索登录门：未登录不发起请求，UI 展示登录引导；登录后自动补搜
  * - 429/网络错误：数据流构造期异常 → [SearchUiState.Error]（Paging 期错误由
  *   PagingSource 归一化后经 loadState 呈现）
+ * - 结果缓存（issue #165 / L13）：命中缓存由 [com.yumiru11.githubapp.feature.search.data.SearchPagingSource]
+ *   直接出数据（零网络），本 VM 只负责把缓存的限流快照转成提示态
+ * - 限流提示（plan.md §9.3）：[rateLimitWarning] 在剩余配额低于阈值时非空，结果区显示提示条
  */
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
@@ -47,6 +54,7 @@ class SearchViewModel
         private val pagingRepository: SearchPagingRepository,
         private val historyRepository: SearchHistoryRepository,
         private val sessionManager: OAuthSessionManager,
+        private val rateLimitStore: RateLimitStore,
     ) : ViewModel() {
         /** 输入框原文（驱动历史/建议 UI 与防抖搜索） */
         private val _input = MutableStateFlow("")
@@ -68,6 +76,21 @@ class SearchViewModel
 
         private val _uiState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
         val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
+
+        /**
+         * 限流偏低提示（plan.md §9.3）：剩余配额低于阈值时非空，null = 不展示。
+         *
+         * 快照由 OkHttp 拦截器（core:github-rest 的 EtagCacheInterceptor）在每条响应上录制，
+         * 因此这里读到的是"最近一次请求"的配额，对搜索接口即 search 资源配额。
+         */
+        val rateLimitWarning: StateFlow<SearchRateLimitWarning?> =
+            rateLimitStore.snapshot
+                .map { snapshot -> snapshot?.toWarning() }
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.Eagerly,
+                    initialValue = rateLimitStore.snapshot.value?.toWarning(),
+                )
 
         init {
             viewModelScope.launch {

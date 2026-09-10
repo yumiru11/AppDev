@@ -70,6 +70,7 @@ fun SearchScreen(
     val input by viewModel.input.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
     val isLoggedIn by viewModel.isLoggedIn.collectAsStateWithLifecycle()
+    val rateLimitWarning by viewModel.rateLimitWarning.collectAsStateWithLifecycle()
     val keyboard = LocalSoftwareKeyboardController.current
 
     Scaffold(
@@ -124,6 +125,7 @@ fun SearchScreen(
                     SuccessContent(
                         state = state,
                         isLoggedIn = isLoggedIn,
+                        rateLimitWarning = rateLimitWarning,
                         onTabSelected = viewModel::selectTab,
                         onLoginClick = onLoginClick,
                         onResultClick = onResultClick,
@@ -139,12 +141,17 @@ fun SearchScreen(
 private fun SuccessContent(
     state: SearchUiState.Success,
     isLoggedIn: Boolean,
+    rateLimitWarning: SearchRateLimitWarning?,
     onTabSelected: (SearchTab) -> Unit,
     onLoginClick: () -> Unit,
     onResultClick: (ParsedUrl) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
+        // 限流提示条（plan.md §9.3）：剩余配额偏低时置顶于结果区
+        if (rateLimitWarning != null) {
+            SearchRateLimitSection(warning = rateLimitWarning)
+        }
         ResultTabs(
             selectedTab = state.activeTab,
             onTabSelected = onTabSelected,

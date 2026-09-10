@@ -161,6 +161,36 @@ class IssueListViewModelTest {
         }
 
     @Test
+    fun refresh_inSuccessState_invalidatesAndRebuildsPagingFlow() =
+        runTest {
+            val repo = repository()
+            val viewModel = IssueListViewModel(savedState(), repo)
+            assertTrue(viewModel.uiState.value is IssueListUiState.Success)
+
+            viewModel.refresh()
+
+            // invalidate 语义：重建分页流（RemoteMediator 重跑首屏 REFRESH）
+            verify(exactly = 2) { repo.issues("octocat", "Hello-World", IssueFilter.OPEN) }
+            assertTrue(viewModel.uiState.value is IssueListUiState.Success)
+        }
+
+    @Test
+    fun refresh_afterError_recoversToSuccess() =
+        runTest {
+            val repo =
+                mockk<IssueRepository> {
+                    every { issues(any(), any(), any()) } throws IOException("network down")
+                }
+            val viewModel = IssueListViewModel(savedState(), repo)
+            assertEquals(IssueListUiState.Error(IssueErrorType.NETWORK), viewModel.uiState.value)
+
+            every { repo.issues(any(), any(), any()) } returns flowOf(PagingData.empty())
+            viewModel.refresh()
+
+            assertTrue(viewModel.uiState.value is IssueListUiState.Success)
+        }
+
+    @Test
     fun setFilter_afterError_reloadsAndSucceeds() =
         runTest {
             val repo =

@@ -12,7 +12,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * v1/v2/v3 schema 验证 + v1→v2、v2→v3 迁移测试（MigrationTestHelper + Robolectric）。
+ * v1~v4 schema 验证 + v1→v2、v2→v3、v3→v4 迁移测试（MigrationTestHelper + Robolectric）。
+ *
+ * v4（issue #165 / L07）新增 cached_issues 表：必须验证既有 cached_repositories /
+ * cached_readme / search_history 数据在升级后原样保留（禁 destructive migration）。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -133,6 +136,116 @@ class AppDatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun createDatabase_v4_buildsExpectedSchema() {
+        helper.createDatabase(TEST_DB_NAME_V4_SCHEMA, 4).use { db ->
+            val tables = queryTableNames(db)
+            assertTrue("应包含 cached_repositories 表", tables.contains("cached_repositories"))
+            assertTrue("应包含 cached_readme 表", tables.contains("cached_readme"))
+            assertTrue("应包含 search_history 表", tables.contains("search_history"))
+            assertTrue("应包含 cached_issues 表", tables.contains("cached_issues"))
+            assertEquals(4, tables.size)
+        }
+    }
+
+    @Test
+    fun migrate_3to4_addsCachedIssuesTableAndKeepsReadmeCache() {
+        // 先创建 v3 数据库并写入 README/仓库缓存（升级不得丢数据）
+        helper.createDatabase(TEST_DB_NAME_V4, 3).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO cached_repositories (owner, name, etag, payload, updatedAt)
+                VALUES ('octocat', 'Hello-World', 'W/"abc"', '{"id":1}', 1700000000000)
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                INSERT INTO cached_readme (owner, repo, contentHash, themeVersion, html, updatedAt)
+                VALUES ('octocat', 'Hello-World', 'abc123', 'v1', '<h1>Hi</h1>', 1700000000000)
+                """.trimIndent(),
+            )
+            db.execSQL("INSERT INTO search_history (query, updatedAt) VALUES ('kotlin', 1700000000000)")
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB_NAME_V4, 4, true, AppDatabase.MIGRATION_3_4).use { db ->
+            val tables = queryTableNames(db)
+            assertTrue("应包含 cached_issues 表", tables.contains("cached_issues"))
+            assertEquals(4, tables.size)
+
+            // v3 数据全部保留
+            val repoCursor = db.query("SELECT owner, name, etag FROM cached_repositories", emptyArray())
+            repoCursor.use {
+                assertTrue(it.moveToFirst())
+                assertEquals("octocat", it.getString(0))
+                assertEquals("Hello-World", it.getString(1))
+                assertEquals("W/\"abc\"", it.getString(2))
+            }
+            val readmeCursor = db.query("SELECT owner, repo, html FROM cached_readme", emptyArray())
+            readmeCursor.use {
+                assertTrue(it.moveToFirst())
+                assertEquals("octocat", it.getString(0))
+                assertEquals("Hello-World", it.getString(1))
+                assertEquals("<h1>Hi</h1>", it.getString(2))
+            }
+            val historyCursor = db.query("SELECT query FROM search_history", emptyArray())
+            historyCursor.use {
+                assertTrue(it.moveToFirst())
+                assertEquals("kotlin", it.getString(0))
+            }
+
+            // 新表可写可读（列/主键与 IssueEntity 一致）
+            db.execSQL(
+                """
+                INSERT INTO cached_issues
+                    (owner, repo, filter, issueId, number, title, state, authorLogin, authorAvatarUrl,
+                     commentCount, isPullRequest, updatedAt, htmlUrl, page, position, cachedAt)
+                VALUES ('octocat', 'Hello-World', 'open', 1347, 42, 'Bug report', 'open', 'octocat',
+                        'https://avatars.githubusercontent.com/u/1', 3, 0, '2026-09-06T00:00:00Z',
+                        'https://github.com/octocat/Hello-World/issues/42', 1, 0, 1700000000000)
+                """.trimIndent(),
+            )
+            val issueCursor = db.query("SELECT issueId, title, page, position FROM cached_issues", emptyArray())
+            issueCursor.use {
+                assertTrue(it.moveToFirst())
+                assertEquals(1347L, it.getLong(0))
+                assertEquals("Bug report", it.getString(1))
+                assertEquals(1, it.getInt(2))
+                assertEquals(0, it.getInt(3))
+            }
+        }
+    }
+
+    @Test
+    fun migrate_1to4_fullChain_keepsRepositoryCacheAndAddsAllTables() {
+        helper.createDatabase(TEST_DB_NAME_V4_FULL, 1).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO cached_repositories (owner, name, etag, payload, updatedAt)
+                VALUES ('octocat', 'Hello-World', 'W/"v1"', '{"id":1}', 1700000000000)
+                """.trimIndent(),
+            )
+        }
+
+        helper
+            .runMigrationsAndValidate(
+                TEST_DB_NAME_V4_FULL,
+                4,
+                true,
+                AppDatabase.MIGRATION_1_2,
+                AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4,
+            ).use { db ->
+                val tables = queryTableNames(db)
+                assertEquals(4, tables.size)
+                val cursor = db.query("SELECT owner, name, etag FROM cached_repositories", emptyArray())
+                cursor.use {
+                    assertTrue(it.moveToFirst())
+                    assertEquals("octocat", it.getString(0))
+                    assertEquals("W/\"v1\"", it.getString(2))
+                }
+            }
+    }
+
     private fun queryTableNames(db: SupportSQLiteDatabase): Set<String> {
         val names = mutableSetOf<String>()
         val sql =
@@ -154,6 +267,9 @@ class AppDatabaseMigrationTest {
         const val TEST_DB_NAME_V2 = "migration-test-v2"
         const val TEST_DB_NAME_V2_SCHEMA = "migration-test-v2-schema"
         const val TEST_DB_NAME_V3 = "migration-test-v3"
+        const val TEST_DB_NAME_V4 = "migration-test-v4"
+        const val TEST_DB_NAME_V4_SCHEMA = "migration-test-v4-schema"
+        const val TEST_DB_NAME_V4_FULL = "migration-test-v4-full"
         const val SCHEMA_DIRECTORY = "schemas"
     }
 }

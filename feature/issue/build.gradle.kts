@@ -47,6 +47,8 @@ dependencies {
 
     // 数据层（REST IssueApi + T4 认证状态）
     implementation(project(":core:github-rest"))
+    // Room 分页缓存（issue #165 / L07：IssueRemoteMediator + IssueDao）
+    implementation(project(":core:database"))
     implementation(project(":core:github-auth"))
     // GraphQL 通道（T14 任务列表 mutation + 写操作上下文 viewerPermission/node id）
     implementation(project(":core:github-graphql"))

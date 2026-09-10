@@ -1,6 +1,7 @@
 package com.yumiru11.githubapp.feature.issue.data
 
 import com.apollographql.apollo.ApolloClient
+import com.yumiru11.githubapp.core.database.dao.IssueDao
 import com.yumiru11.githubapp.core.githubgraphql.generated.IssueWriteContextQuery
 import com.yumiru11.githubapp.core.githubgraphql.generated.UpdateIssueMutation
 import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
@@ -60,7 +61,8 @@ class IssueRepositoryWriteTest {
         server.close()
     }
 
-    private fun repository(): IssueRepository = IssueRepository(issueApi, apolloClient)
+    // 写操作测试不触达分页缓存：IssueDao 用 relaxed mock（本票 L07 只改读路径）
+    private fun repository(): IssueRepository = IssueRepository(issueApi, apolloClient, mockk<IssueDao>(relaxed = true))
 
     @Test
     fun createIssue_validRequest_returnsDomainIssue() =
