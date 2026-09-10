@@ -106,6 +106,10 @@
     <string name="repo_branch_snackbar_deleted">已删除分支 %1$s</string>
 
     <!-- 仓库大分区（#166 / UI01+UI02，ui-design §3.2） -->
+    <string name="repo_menu_copy_link">复制链接</string>
+    <string name="repo_menu_open_browser">在浏览器打开</string>
+    <string name="repo_menu_share">分享</string>
+    <string name="repo_share_chooser">分享仓库</string>
     <string name="repos_title">仓库</string>
     <string name="repos_layout_switch_to_grid">切换到网格布局</string>
     <string name="repos_layout_switch_to_list">切换到通栏布局</string>

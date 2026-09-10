@@ -106,6 +106,10 @@
     <string name="repo_branch_snackbar_deleted">Branch %1$s deleted</string>
 
     <!-- Repositories tab (issue #166 / UI01+UI02, ui-design §3.2) -->
+    <string name="repo_menu_copy_link">Copy link</string>
+    <string name="repo_menu_open_browser">Open in browser</string>
+    <string name="repo_menu_share">Share</string>
+    <string name="repo_share_chooser">Share repository</string>
     <string name="repos_title">Repositories</string>
     <string name="repos_layout_switch_to_grid">Switch to grid layout</string>
     <string name="repos_layout_switch_to_list">Switch to list layout</string>

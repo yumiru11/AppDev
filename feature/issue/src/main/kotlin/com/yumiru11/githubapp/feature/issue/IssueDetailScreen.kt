@@ -104,6 +104,7 @@ import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
+import com.yumiru11.githubapp.core.ui.AppImageOverlay
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueLabel
@@ -411,14 +412,11 @@ private fun SuccessContent(
 
         if (!issue.body.isNullOrBlank()) {
             item(key = "body") {
-                WebViewMarkdownRenderer(
-                    sanitizedHtml = issue.body,
-                    tokenProvider = { null },
-                    bridgeCallback = createIssueBridgeCallback(onInternalLink, onCheckboxClick),
+                IssueBodyWebView(
+                    body = issue.body,
                     baseRepoUrl = baseRepoUrl,
-                    // Issue 无服务端 HTML API → 离线 GFM + 融合样式（WebView 内 markdown-it 渲染）
-                    renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
-                    modifier = Modifier.fillMaxWidth(),
+                    onInternalLink = onInternalLink,
+                    onCheckboxClick = onCheckboxClick,
                 )
             }
         }
@@ -458,12 +456,40 @@ private fun SuccessContent(
     }
 }
 
+/**
+ * Issue 正文 WebView + 图片全屏查看（#166 / UI11）。
+ *
+ * 单独包一层是为了让"正文渲染 + 图片查看状态"成对出现：状态属于这一个 item，
+ * 不必上提到整页 UiState（也就不会因为滚动回收而丢失/泄漏）。
+ */
+@Composable
+private fun IssueBodyWebView(
+    body: String,
+    baseRepoUrl: String,
+    onInternalLink: (ParsedUrl) -> Unit,
+    onCheckboxClick: (Int, Boolean) -> Unit,
+) {
+    var previewImageUrl by remember { mutableStateOf<String?>(null) }
+    WebViewMarkdownRenderer(
+        sanitizedHtml = body,
+        tokenProvider = { null },
+        bridgeCallback =
+            createIssueBridgeCallback(onInternalLink, onCheckboxClick) { previewImageUrl = it },
+        baseRepoUrl = baseRepoUrl,
+        // Issue 无服务端 HTML API → 离线 GFM + 融合样式（WebView 内 markdown-it 渲染）
+        renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    AppImageOverlay(imageUrl = previewImageUrl, onDismiss = { previewImageUrl = null })
+}
+
 /** WebView 正文 bridge：内部链接 → 应用内导航；外部链接 → 浏览器；checkbox → 任务列表反向同步。 */
-@Suppress("EmptyFunctionBlock") // onCodeCopy/onImageClick/onHeightChanged 为预留占位
+@Suppress("EmptyFunctionBlock") // onCodeCopy/onHeightChanged 为预留占位
 @Composable
 private fun createIssueBridgeCallback(
     onInternalLink: (ParsedUrl) -> Unit,
     onCheckboxClick: (Int, Boolean) -> Unit,
+    onImageClick: (String) -> Unit,
 ): MarkdownBridgeCallback {
     val context = LocalContext.current
     return object : MarkdownBridgeCallback {
@@ -479,7 +505,9 @@ private fun createIssueBridgeCallback(
 
         override fun onCodeCopy(code: String) {}
 
-        override fun onImageClick(src: String) {}
+        override fun onImageClick(src: String) {
+            onImageClick(src)
+        }
 
         override fun onCheckboxClick(
             index: Int,

@@ -56,4 +56,8 @@
         <item quantity="one">%d unread notification</item>
         <item quantity="other">%d unread notifications</item>
     </plurals>
+
+    <!-- Fullscreen image viewer (issue #166 / UI11, ui-design §3.11) -->
+    <string name="image_viewer_cd">Image preview</string>
+    <string name="image_viewer_close_cd">Close image preview</string>
 </resources>
