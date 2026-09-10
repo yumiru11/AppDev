@@ -104,4 +104,82 @@
     <string name="repo_branch_error_unknown">Unknown error</string>
     <string name="repo_branch_snackbar_created">Branch %1$s created</string>
     <string name="repo_branch_snackbar_deleted">Branch %1$s deleted</string>
+
+    <!-- L04 创建/删除仓库（POST /user/repos + DELETE /repos/{owner}/{repo}） -->
+    <string name="repo_create_title">New repository</string>
+    <string name="repo_create_back">Back</string>
+    <string name="repo_create_name">Repository name</string>
+    <string name="repo_create_name_hint">e.g. hello-world</string>
+    <string name="repo_create_description">Description (optional)</string>
+    <string name="repo_create_private">Private repository</string>
+    <string name="repo_create_private_hint">Only you and collaborators can see it</string>
+    <string name="repo_create_auto_init">Initialize with a README</string>
+    <string name="repo_create_auto_init_hint">Creates the default branch and a README</string>
+    <string name="repo_create_submit">Create repository</string>
+    <string name="repo_create_submitting">Creating…</string>
+    <string name="repo_name_error_empty">Enter a repository name</string>
+    <string name="repo_name_error_invalid_chars">Use only letters, numbers, hyphens, underscores and periods</string>
+    <string name="repo_name_error_only_dots">Repository name cannot consist of periods only</string>
+    <string name="repo_name_error_git_suffix">Repository name cannot end with .git</string>
+    <string name="repo_name_error_trailing_underscore">Repository name cannot end with an underscore</string>
+    <string name="repo_name_error_too_long">Repository name is too long (max 100 characters)</string>
+    <string name="repo_create_snackbar_name_taken">That name is already taken or invalid</string>
+    <string name="repo_create_snackbar_permission_denied">No permission to create a repository</string>
+    <string name="repo_create_snackbar_failed">Couldn\'t create the repository</string>
+    <string name="repo_more">More options</string>
+    <string name="repo_delete">Delete repository</string>
+    <string name="repo_delete_title">Delete repository?</string>
+    <string name="repo_delete_message">%1$s and all of its content will be permanently deleted. This action cannot be undone.</string>
+    <string name="repo_delete_confirm_label">Type %1$s to confirm</string>
+    <string name="repo_delete_confirm_action">Delete forever</string>
+    <string name="repo_delete_cancel">Cancel</string>
+    <string name="repo_delete_snackbar_deleted">Repository deleted</string>
+    <string name="repo_delete_snackbar_forbidden">No permission to delete this repository</string>
+    <string name="repo_delete_snackbar_failed">Couldn\'t delete the repository</string>
+
+    <!-- L05 发布 Release 与上传附件 -->
+    <string name="repo_release_new">New release</string>
+    <string name="repo_release_create_title">New release</string>
+    <string name="repo_release_create_back">Back</string>
+    <string name="repo_release_tag">Tag</string>
+    <string name="repo_release_tag_hint">e.g. v1.0.0</string>
+    <string name="repo_release_tag_error">A tag name is required</string>
+    <string name="repo_release_target">Target branch</string>
+    <string name="repo_release_target_hint">Default branch</string>
+    <string name="repo_release_name">Title (optional)</string>
+    <string name="repo_release_body">Description (optional)</string>
+    <string name="repo_release_form_draft">Save as draft</string>
+    <string name="repo_release_form_prerelease">Mark as pre-release</string>
+    <string name="repo_release_create_submit">Publish release</string>
+    <string name="repo_release_create_submitting">Publishing…</string>
+    <string name="repo_release_snackbar_validation">Invalid or duplicate tag name</string>
+    <string name="repo_release_snackbar_forbidden">No permission to publish releases</string>
+    <string name="repo_release_snackbar_failed">Couldn\'t publish the release</string>
+    <string name="repo_release_assets">Assets</string>
+    <string name="repo_release_assets_empty">No assets attached</string>
+    <string name="repo_release_asset_meta">%1$s · %2$d downloads</string>
+    <string name="repo_release_asset_upload">Upload asset</string>
+    <string name="repo_release_asset_uploaded">Uploaded %1$s</string>
+    <string name="repo_release_asset_upload_failed">Asset upload failed</string>
+
+    <!-- L06 Topics -->
+    <string name="repo_topic_search_cd">Topic %1$s, tap to search</string>
+
+    <!-- L09 COMMIT 详情页 -->
+    <string name="repo_commit_title">Commit</string>
+    <string name="repo_commit_back">Back</string>
+    <string name="repo_commit_copy_sha">Copy full SHA</string>
+    <string name="repo_commit_sha_copied">Full SHA copied</string>
+    <string name="repo_commit_author_avatar">Commit author avatar</string>
+    <string name="repo_commit_files">Changed files</string>
+    <string name="repo_commit_files_empty">No file changes</string>
+    <string name="repo_commit_additions">+%1$d</string>
+    <string name="repo_commit_deletions">−%1$d</string>
+    <string name="repo_commit_back_to_files">Back to changed files</string>
+    <string name="repo_commit_diff_empty">No diff available (binary or too large)</string>
+    <string name="repo_commit_status_added">Added</string>
+    <string name="repo_commit_status_removed">Removed</string>
+    <string name="repo_commit_status_modified">Modified</string>
+    <string name="repo_commit_status_renamed">Renamed</string>
+    <string name="repo_commit_status_unknown">Changed</string>
 </resources>

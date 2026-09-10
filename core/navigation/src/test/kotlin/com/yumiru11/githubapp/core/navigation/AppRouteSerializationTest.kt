@@ -27,9 +27,12 @@ class AppRouteSerializationTest {
     fun allRoutes_jsonRoundTrip_preservesEquality() {
         roundTrip(AppRoute.Home)
         roundTrip(AppRoute.Login)
-        roundTrip(AppRoute.Search)
+        roundTrip(AppRoute.Search())
+        roundTrip(AppRoute.Search("topic:kotlin"))
         roundTrip(AppRoute.Settings)
         roundTrip(AppRoute.Editor)
+        roundTrip(AppRoute.CreateRepo)
+        roundTrip(AppRoute.ReleaseCreate("owner", "repo"))
         roundTrip(AppRoute.Repo("owner", "repo"))
         roundTrip(AppRoute.Repo("owner", "repo", "feature/x"))
         roundTrip(AppRoute.Issues("owner", "repo"))

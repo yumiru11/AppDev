@@ -6,7 +6,13 @@ import com.yumiru11.githubapp.core.data.model.Release
 import com.yumiru11.githubapp.core.data.model.Repository
 import com.yumiru11.githubapp.core.data.model.Tag
 import com.yumiru11.githubapp.core.githubrest.api.RepoManagementApi
+import com.yumiru11.githubapp.core.githubrest.model.CreateReleaseRequest
+import com.yumiru11.githubapp.core.githubrest.model.ReleaseAssetDto
+import com.yumiru11.githubapp.core.githubrest.model.ReleaseDto
 import com.yumiru11.githubapp.core.githubrest.model.SubscriptionRequest
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.HttpException
 import java.time.Instant
 import javax.inject.Inject
@@ -115,14 +121,75 @@ class RepoManagementRepository
                 repoManagementApi.listReleases(owner, repo).map { it.toDomain() }
             }
 
-        /** Release 详情（展开时刷新）。 */
+        /** Release 详情（展开时刷新；L05 含附件列表）。 */
         suspend fun getRelease(
             owner: String,
             repo: String,
             releaseId: Long,
+        ): Result<ReleaseDetail> =
+            runCatching {
+                repoManagementApi.getRelease(owner, repo, releaseId).toDetail()
+            }
+
+        /**
+         * 创建 Release（L05，POST /repos/{owner}/{repo}/releases）。
+         *
+         * 失败归一化为 [retrofit2.HttpException]（403 无写权限 / 422 校验失败），
+         * 由 ViewModel 映射事件并归一化为
+         * [com.yumiru11.githubapp.core.githubdata.error.GitHubError]。
+         */
+        suspend fun createRelease(
+            owner: String,
+            repo: String,
+            release: NewRelease,
         ): Result<Release> =
             runCatching {
-                repoManagementApi.getRelease(owner, repo, releaseId).toDomain()
+                repoManagementApi
+                    .createRelease(
+                        owner,
+                        repo,
+                        CreateReleaseRequest(
+                            tagName = release.tagName,
+                            targetCommitish = release.targetCommitish,
+                            name = release.name,
+                            body = release.body,
+                            draft = release.draft,
+                            prerelease = release.prerelease,
+                        ),
+                    ).toDomain()
+            }
+
+        /**
+         * 上传 Release 附件（L05，multipart：`file` part + `name` query）。
+         *
+         * 附件名默认取文件名（GitHub 允许 query 与 part 文件名不一致，此处保持一致）。
+         */
+        suspend fun uploadReleaseAsset(
+            owner: String,
+            repo: String,
+            releaseId: Long,
+            fileName: String,
+            content: ByteArray,
+        ): Result<ReleaseAsset> =
+            runCatching {
+                val part =
+                    MultipartBody.Part.createFormData(
+                        "file",
+                        fileName,
+                        content.toRequestBody(OCTET_STREAM.toMediaType()),
+                    )
+                repoManagementApi
+                    .uploadReleaseAsset(owner, repo, releaseId, fileName, part)
+                    .toAssetDomain()
+            }
+
+        /** Topics（L06；响应为 `{"names": [...]}` 包装对象）。 */
+        suspend fun getTopics(
+            owner: String,
+            repo: String,
+        ): Result<List<String>> =
+            runCatching {
+                repoManagementApi.getTopics(owner, repo).names
             }
 
         /** Tag 列表。 */
@@ -144,8 +211,11 @@ class RepoManagementRepository
             }
     }
 
+/** Release 附件上传的 MIME 类型（八位字节流：GitHub 不校验 Content-Type）。 */
+private const val OCTET_STREAM = "application/octet-stream"
+
 /** ReleaseDto → 领域模型（publishedAt ISO 解析失败回退 null）。 */
-private fun com.yumiru11.githubapp.core.githubrest.model.ReleaseDto.toDomain(): Release =
+private fun ReleaseDto.toDomain(): Release =
     Release(
         id = id,
         tagName = tagName,
@@ -156,4 +226,17 @@ private fun com.yumiru11.githubapp.core.githubrest.model.ReleaseDto.toDomain(): 
         prerelease = prerelease,
         draft = draft,
         authorLogin = author?.login,
+    )
+
+/** ReleaseDto → 详情领域模型（含附件列表，L05）。 */
+private fun ReleaseDto.toDetail(): ReleaseDetail = ReleaseDetail(release = toDomain(), assets = assets.map { it.toAssetDomain() })
+
+/** ReleaseAssetDto → 附件领域模型。 */
+private fun ReleaseAssetDto.toAssetDomain(): ReleaseAsset =
+    ReleaseAsset(
+        id = id,
+        name = name,
+        downloadUrl = browserDownloadUrl,
+        size = size,
+        downloadCount = downloadCount,
     )

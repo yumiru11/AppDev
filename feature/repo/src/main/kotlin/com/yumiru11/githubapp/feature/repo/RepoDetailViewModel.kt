@@ -1,4 +1,9 @@
-@file:Suppress("TooGenericExceptionCaught", "SwallowedException") // 网络/IO 错误统一兜底（T14 细化异常类型）；Star/Watch 失败回滚后异常即事件，无需再抛/记日志
+@file:Suppress("TooGenericExceptionCaught", "SwallowedException", "TooManyFunctions")
+// TooGenericExceptionCaught/SwallowedException：网络/IO 错误统一兜底（T14 细化异常类型）；
+//   Star/Watch 失败回滚后异常即事件，无需再抛/记日志。
+// TooManyFunctions：仓库详情页聚合 Star/Watch/Fork/Releases/Tags/Languages/Topics/权限/
+//   删除仓库/附件上传共 22 个动作，均为「一动作一方法」的扁平写操作；拆子 ViewModel 会让
+//   共享的 uiState/pendingAction 状态跨类同步，得不偿失（RepoDetailScreen 同款先例）。
 
 package com.yumiru11.githubapp.feature.repo
 
@@ -7,6 +12,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yumiru11.githubapp.core.githubauth.auth.AuthState
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
+import com.yumiru11.githubapp.core.githubdata.error.GitHubError
+import com.yumiru11.githubapp.core.githubdata.error.GitHubRequestException
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownThemeTokens
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -33,6 +40,11 @@ import javax.inject.Inject
  * - Fork 失败按 HttpException 码映射事件（403 无权限 / 422 已 Fork）
  * - Releases/Tags 第三个 Tab 懒加载；Release 详情页内展开（不进导航）
  * - 语言栏数据（Linguist）随仓库加载，失败静默（非关键信息）
+ *
+ * L04/L05/L06：
+ * - Topics / 仓库权限（admin）随仓库加载，失败静默（缺失 → 不渲染 chip 行 / 隐藏删除入口）
+ * - 删除仓库（仅 admin；成功后 [RepoEvent.RepositoryDeleted] 由 UI 返回上一页）
+ * - Release 附件上传（[uploadAsset]，失败 [RepoEvent.AssetUploadFailed]）
  */
 @HiltViewModel
 class RepoDetailViewModel
@@ -41,6 +53,7 @@ class RepoDetailViewModel
         savedStateHandle: SavedStateHandle,
         private val repoRepository: RepoRepository,
         private val repoManagementRepository: RepoManagementRepository,
+        private val repoAdminRepository: RepoAdminRepository,
         private val sessionManager: OAuthSessionManager,
     ) : ViewModel() {
         private val owner: String = checkNotNull(savedStateHandle["owner"])
@@ -151,6 +164,88 @@ class RepoDetailViewModel
             }
         }
 
+        /**
+         * 删除当前仓库（L04；仅 owner/admin，UI 侧已二次确认输入完整 owner/repo）。
+         *
+         * 成功 → [RepoEvent.RepositoryDeleted]（UI 返回上一页）；
+         * 403 → [RepoEvent.RepositoryDeleteForbidden]；其余 → [RepoEvent.RepositoryDeleteFailed]。
+         */
+        fun deleteRepository() {
+            val state = _uiState.value as? RepoDetailUiState.Success ?: return
+            if (state.pendingAction != null) return
+            _uiState.value = state.copy(pendingAction = RepoAction.DELETE)
+            viewModelScope.launch {
+                val result = repoAdminRepository.deleteRepository(owner, repo)
+                clearPendingAction()
+                result.fold(
+                    onSuccess = { _events.send(RepoEvent.RepositoryDeleted) },
+                    onFailure = { e ->
+                        _events.send(
+                            if ((e as? GitHubRequestException)?.error == GitHubError.Forbidden) {
+                                RepoEvent.RepositoryDeleteForbidden
+                            } else {
+                                RepoEvent.RepositoryDeleteFailed
+                            },
+                        )
+                    },
+                )
+            }
+        }
+
+        /**
+         * 上传 Release 附件（L05）。
+         *
+         * @param releaseId 目标 Release id
+         * @param fileName 附件名（默认取文件名）
+         * @param content 文件内容（UI 侧经 SAF 读取，ViewModel 不接触 Uri）
+         */
+        fun uploadAsset(
+            releaseId: Long,
+            fileName: String,
+            content: ByteArray,
+        ) {
+            val state = _uiState.value as? RepoDetailUiState.Success ?: return
+            if (state.pendingAssetUpload) return
+            _uiState.value = state.copy(pendingAssetUpload = true)
+            viewModelScope.launch {
+                repoManagementRepository
+                    .uploadReleaseAsset(owner, repo, releaseId, fileName, content)
+                    .fold(
+                        onSuccess = { asset ->
+                            _uiState.update { s ->
+                                if (s is RepoDetailUiState.Success) s.copy(pendingAssetUpload = false) else s
+                            }
+                            refreshExpandedRelease(releaseId)
+                            _events.send(RepoEvent.AssetUploaded(asset.name))
+                        },
+                        onFailure = {
+                            _uiState.update { s ->
+                                if (s is RepoDetailUiState.Success) s.copy(pendingAssetUpload = false) else s
+                            }
+                            _events.send(RepoEvent.AssetUploadFailed)
+                        },
+                    )
+            }
+        }
+
+        /** 上传成功后重取展开中的 Release（附件列表刷新）。 */
+        private fun refreshExpandedRelease(releaseId: Long) {
+            viewModelScope.launch {
+                repoManagementRepository.getRelease(owner, repo, releaseId).onSuccess { detail ->
+                    _uiState.update { s ->
+                        if (s is RepoDetailUiState.Success) {
+                            s.copy(
+                                expandedReleaseId = releaseId,
+                                releaseDetailState = ReleaseDetailState.Loaded(detail.release, detail.assets),
+                            )
+                        } else {
+                            s
+                        }
+                    }
+                }
+            }
+        }
+
         /** 展开 Release 详情（页内展开，不进导航）。 */
         fun loadReleaseDetail(releaseId: Long) {
             val state = _uiState.value as? RepoDetailUiState.Success ?: return
@@ -163,9 +258,13 @@ class RepoDetailViewModel
             viewModelScope.launch {
                 repoManagementRepository
                     .getRelease(owner, repo, releaseId)
-                    .onSuccess { release ->
+                    .onSuccess { detail ->
                         _uiState.update { s ->
-                            if (s is RepoDetailUiState.Success) s.copy(releaseDetailState = ReleaseDetailState.Loaded(release)) else s
+                            if (s is RepoDetailUiState.Success) {
+                                s.copy(releaseDetailState = ReleaseDetailState.Loaded(detail.release, detail.assets))
+                            } else {
+                                s
+                            }
                         }
                     }.onFailure { e ->
                         _uiState.update { s ->
@@ -212,6 +311,8 @@ class RepoDetailViewModel
                         )
                     loadReadme()
                     loadLanguages()
+                    loadTopics()
+                    loadRepositoryPermissions()
                     if (loggedIn) loadStarWatchStatus()
                 } catch (e: Exception) {
                     _uiState.value = RepoDetailUiState.Error(errorType = mapError(e))
@@ -227,6 +328,42 @@ class RepoDetailViewModel
                 val watching = repoManagementRepository.isWatching(owner, repo)
                 _uiState.update { s ->
                     if (s is RepoDetailUiState.Success) s.copy(isStarred = starred, isWatching = watching) else s
+                }
+            }
+        }
+
+        /**
+         * 仓库 Topics（L06）。
+         *
+         * 失败静默：Topics 属非关键信息（无 Topics 的仓库同样返回空列表），
+         * 任何异常都不应打断仓库主内容渲染，故 runCatching 兜底。
+         */
+        private fun loadTopics() {
+            viewModelScope.launch {
+                val result = runCatching { repoManagementRepository.getTopics(owner, repo) }.getOrNull() ?: return@launch
+                result.onSuccess { topics ->
+                    _uiState.update { s ->
+                        if (s is RepoDetailUiState.Success) s.copy(topics = topics) else s
+                    }
+                }
+            }
+        }
+
+        /**
+         * 仓库权限（L04 删除入口 / L05 新建 Release 入口显隐）。
+         *
+         * 失败静默：权限位读取失败 → 保守隐藏写入口（runCatching 兜底，不打断主内容）。
+         */
+        private fun loadRepositoryPermissions() {
+            viewModelScope.launch {
+                val permissions =
+                    runCatching { repoRepository.repositoryPermissions(owner, repo) }.getOrNull() ?: return@launch
+                _uiState.update { s ->
+                    if (s is RepoDetailUiState.Success) {
+                        s.copy(canDeleteRepo = permissions.canAdmin, canPushRepo = permissions.canPush)
+                    } else {
+                        s
+                    }
                 }
             }
         }

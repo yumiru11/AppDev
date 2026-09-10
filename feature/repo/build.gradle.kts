@@ -64,6 +64,8 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:github-rest"))
     implementation(project(":core:database"))
+    // 错误归一化（L04/L05：422/403 → GitHubError.Validation/Forbidden；与 feature:search 同口径）
+    implementation(project(":core:github-data"))
 
     // 登录态（游客只读：Star/Watch/Fork 按钮隐藏）
     implementation(project(":core:github-auth"))

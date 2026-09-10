@@ -38,6 +38,7 @@ import com.yumiru11.githubapp.auth.shouldNavigateForAuthState
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
 import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
+import com.yumiru11.githubapp.core.githubauth.auth.AuthState
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthCallbackException
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthConfig
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
@@ -65,10 +66,14 @@ import com.yumiru11.githubapp.feature.profile.GistsScreen
 import com.yumiru11.githubapp.feature.profile.ProfileScreen
 import com.yumiru11.githubapp.feature.pullrequest.PullRequestDetailScreen
 import com.yumiru11.githubapp.feature.pullrequest.PullRequestListScreen
+import com.yumiru11.githubapp.feature.repo.CommitDetailScreen
+import com.yumiru11.githubapp.feature.repo.CreateRepoScreen
 import com.yumiru11.githubapp.feature.repo.FileViewerScreen
+import com.yumiru11.githubapp.feature.repo.ReleaseCreateScreen
 import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
 import com.yumiru11.githubapp.feature.repo.RepoFilesViewModel
 import com.yumiru11.githubapp.feature.search.SearchScreen
+import com.yumiru11.githubapp.feature.search.SearchViewModel
 import com.yumiru11.githubapp.feature.settings.SettingsScreen
 import com.yumiru11.githubapp.feature.settings.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -158,7 +163,7 @@ class MainActivity : ComponentActivity() {
                                         blurEnabled = blurEnabled,
                                         homePage = { padding ->
                                             HomeScreen(
-                                                onSearchClick = { navController.navigate(AppRoute.Search) },
+                                                onSearchClick = { navController.navigate(AppRoute.Search()) },
                                                 onNotificationClick = { notificationPanelVisible = true },
                                                 onProfileClick = { mainTab = MainTab.PROFILE },
                                                 onCreateIssue = { owner, repo ->
@@ -166,6 +171,16 @@ class MainActivity : ComponentActivity() {
                                                 },
                                                 onViewPullRequests = { owner, repo ->
                                                     navController.navigate(AppRoute.Pulls(owner, repo))
+                                                },
+                                                // L04：未登录先引导登录（游客无法创建仓库）
+                                                onCreateRepo = {
+                                                    if (authState is AuthState.Anonymous) {
+                                                        navController.navigate(AppRoute.Login) {
+                                                            popUpTo(0) { inclusive = true }
+                                                        }
+                                                    } else {
+                                                        navController.navigate(AppRoute.CreateRepo)
+                                                    }
                                                 },
                                                 blurEnabled = blurEnabled,
                                                 onLoginClick = {
@@ -222,14 +237,11 @@ class MainActivity : ComponentActivity() {
                                         onSavePat = { authViewModel.onSavePat(it) },
                                     )
                                 },
-                                searchScreen = {
-                                    SearchScreen(
-                                        onResultClick = { parsed -> navigateToParsedUrl(navController, parsed) },
-                                        onLoginClick = {
-                                            navController.navigate(AppRoute.Login) {
-                                                popUpTo(0) { inclusive = true }
-                                            }
-                                        },
+                                // L06：Topic chip 携带 query 进入搜索页（SearchViewModel 就地提交，不改 feature:search）
+                                searchScreen = { initialQuery ->
+                                    SearchRoute(
+                                        initialQuery = initialQuery,
+                                        navController = navController,
                                     )
                                 },
                                 blobScreen = { owner, repo, ref, path ->
@@ -252,6 +264,34 @@ class MainActivity : ComponentActivity() {
                                             // #90 类型安全路由：ref 由 navigation 参数序列化器编码，不再手工 URLEncoder
                                             navController.navigate(AppRoute.Branches(o, r, currentRef.orEmpty()))
                                         },
+                                        // L05：新建 Release 表单页（ref 为空 → 表单目标分支留空，服务端按默认分支）
+                                        onCreateRelease = { o, r ->
+                                            navController.navigate(AppRoute.ReleaseCreate(o, r, ref))
+                                        },
+                                        // L06：Topic chip → 搜索页 query=topic:xxx
+                                        onTopicClick = { topic ->
+                                            navController.navigate(AppRoute.Search("topic:$topic"))
+                                        },
+                                    )
+                                },
+                                // L04：新建仓库页；成功后清出本页并打开新仓库详情
+                                createRepoScreen = { onCreated ->
+                                    CreateRepoScreen(
+                                        onBackClick = { navController.popBackStack() },
+                                        onCreated = onCreated,
+                                    )
+                                },
+                                // L05：新建 Release 表单页（成功后由 NavHost 重进仓库详情以刷新列表）
+                                releaseCreateScreen = { _, _, _, onCreated ->
+                                    ReleaseCreateScreen(
+                                        onBackClick = { navController.popBackStack() },
+                                        onCreated = onCreated,
+                                    )
+                                },
+                                // L09：COMMIT 详情页（深链/time-line 入口；替换此前占位屏）
+                                commitScreen = { _, _, _ ->
+                                    CommitDetailScreen(
+                                        onBackClick = { navController.popBackStack() },
                                     )
                                 },
                                 // L10 他人主页（USER 路由）：只读资料头 + Follow/Unfollow；
@@ -466,6 +506,36 @@ class MainActivity : ComponentActivity() {
         @Volatile
         var cachedLanguageTag: String? = null
     }
+}
+
+/**
+ * 搜索路由承载（L06）：Topic chip 传入的 query 由宿主就地提交给 [SearchViewModel]。
+ *
+ * 为什么不改 feature:search：本票文件边界禁止修改该模块；[SearchViewModel.submitQuery]
+ * 是既有公开入口，宿主在 LaunchedEffect 里提交一次即可得到与手输一致的搜索态。
+ */
+@Composable
+private fun SearchRoute(
+    initialQuery: String,
+    navController: androidx.navigation.NavHostController,
+    viewModel: SearchViewModel =
+        androidx.hilt.navigation.compose
+            .hiltViewModel(),
+) {
+    val context = LocalContext.current
+    LaunchedEffect(initialQuery) {
+        if (initialQuery.isNotBlank()) viewModel.submitQuery(initialQuery)
+    }
+    SearchScreen(
+        onBackClick = { navController.popBackStack() },
+        onResultClick = { parsed -> navigateToParsedUrl(navController, parsed) },
+        onLoginClick = {
+            navController.navigate(AppRoute.Login) {
+                popUpTo(0) { inclusive = true }
+            }
+        },
+        viewModel = viewModel,
+    )
 }
 
 /**

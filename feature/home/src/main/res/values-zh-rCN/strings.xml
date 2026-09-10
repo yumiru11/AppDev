@@ -31,7 +31,6 @@
     <string name="home_action_create_issue">新建 Issue</string>
     <string name="home_action_view_pulls">查看 Pull Requests</string>
     <string name="home_action_create_repo">新建仓库</string>
-    <string name="home_action_create_repo_cd">即将上线</string>
     <string name="repo_picker_title">选择仓库</string>
     <string name="repo_picker_empty">没有找到仓库</string>
     <string name="repo_picker_error">仓库加载失败</string>
