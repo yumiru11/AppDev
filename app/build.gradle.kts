@@ -190,6 +190,9 @@ dependencies {
 
     // Core
     implementation(libs.core.ktx)
+    // 品牌化启动屏（D3）：API<31 没有系统启动屏，冷启动会先露出一段窗口背景（白/黑）空窗。
+    // androidx 的兼容实现把应用图标带进启动画面，抹掉这段空窗。
+    implementation(libs.core.splashscreen)
     // Baseline Profile 安装器（T25）：把 APK 内 assets/dexopt/baseline.prof 装到 ART。
     // API 31+ 由编译期 baseline.profm 生效，本依赖主要服务 API 26-30（本项目 minSdk 26）。
     implementation(libs.profileinstaller)
