@@ -1,5 +1,7 @@
 package com.yumiru11.githubapp.core.designsystem.component
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -14,7 +16,12 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** [AppEmptyState]/[AppErrorState]/[AppLoadingState] 语义断言（不建截图基线，#84 决策 Q3） */
+/**
+ * [AppEmptyState]/[AppErrorState]/[AppLoadingState] 语义断言（不建截图基线，#84 决策 Q3）。
+ *
+ * [AppLoadingState] 自 M3 Expressive 接入起内部改用 `LoadingIndicator`（形变加载指示，
+ * 替代 `CircularProgressIndicator`）—— 见 ADR-0008；此处断言其**进度语义**未丢失。
+ */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35])
@@ -82,5 +89,23 @@ class AppStateViewsTest {
             AppTheme { AppLoadingState() }
         }
         composeRule.waitForIdle()
+    }
+
+    /**
+     * M3 Expressive 接入后仍须暴露**进度语义**（读屏能播报"加载中"）。
+     *
+     * `LoadingIndicator` 与旧的 `CircularProgressIndicator` 都会往
+     * `SemanticsProperties.ProgressBarRangeInfo` 写值（alpha18 字节码实测：
+     * `LoadingIndicatorImpl` 内 `setProgressBarRangeInfo`），本断言把这层契约钉死——
+     * 若将来换成纯装饰性图形（无 progress 语义）会立刻失败。
+     */
+    @Test
+    fun appLoadingState_rendersIndeterminateProgressSemantics() {
+        composeRule.setContent {
+            AppTheme { AppLoadingState() }
+        }
+        composeRule
+            .onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo))
+            .assertIsDisplayed()
     }
 }

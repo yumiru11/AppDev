@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -80,7 +80,21 @@ fun AppErrorState(
 }
 
 /**
- * 加载态占位：居中圆形进度 + 可选标签。
+ * 加载态占位：居中形变加载指示 + 可选标签。
+ *
+ * 指示器用 M3 Expressive 的 [LoadingIndicator]（形变 `RoundedPolygon` 序列）而非旧
+ * [CircularProgressIndicator]：官方把前者定位为「should replace most uses of the
+ * indeterminate circular progress indicator」，整页首载正是该语义。颜色走
+ * `LoadingIndicatorDefaults.indicatorColor`（= `colorScheme.primary`，与旧指示器一致）
+ * —— 零硬编码颜色。
+ *
+ * ⚠️ alpha 期门控不稳定：material3 **1.5.0-alpha18 的 `LoadingIndicator` 恰好无
+ * `@ExperimentalMaterial3ExpressiveApi` 门控**（字节码实测该文件对该 marker 的引用数
+ * = 0），故此处不需要 `@OptIn`；但官方 release notes 有 "Revert MaterialShapes and
+ * LoadingIndicator promotions to stable"，**alpha19 起又变回门控**。升级 pin 时若编译
+ * 报 opt-in 相关错误，在此处加**局部** `@OptIn(ExperimentalMaterial3ExpressiveApi::class)`
+ * 并写理由，**不要**开全局 `-opt-in`（会让全仓失去门控保护）。详见
+ * `docs/adr/0008-material3-alpha18-pin.md`。
  */
 @Composable
 fun AppLoadingState(
@@ -92,7 +106,7 @@ fun AppLoadingState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        CircularProgressIndicator()
+        LoadingIndicator()
         if (label != null) {
             Text(
                 text = label,
