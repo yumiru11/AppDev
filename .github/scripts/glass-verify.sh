@@ -69,23 +69,39 @@ sleep 1
 
 # ── 2. BottomSheet 玻璃（UI22 的核心问题：M3 ModalBottomSheet 在独立 window，
 #      Haze 能否跨 window 采样）──────────────────────────────────────────
-# 游客可达的入口：首页长条按钮 → 仓库选择 Sheet（RepoPickerSheet）
-tap_desc "Choose repositories" || tap_desc "Repositories" || echo "::warning::仓库选择入口未找到，跳过 BottomSheet 帧"
-shot "bottom-sheet-glass-on"
+# 入口：首页快速操作 → 仓库选择 Sheet（RepoPickerSheet，GlassScope.BOTTOM_SHEET）。
+# 文案取自 feature:home strings（repo_picker_* 是 Sheet 内的，触发按钮在快捷操作区）。
+# 首次实测（run 34564015882）这里用错了 tap_desc —— 按钮是 Text 不是 content-desc，
+# 结果 Sheet 从未打开、三张帧逐字节相同。改用 tap_text 并逐个文案兜底。
+SHEET_OPENED=false
+for label in "Create issue" "View pull requests" "Create repository"; do
+  if tap_text "$label"; then
+    SHEET_OPENED=true
+    break
+  fi
+done
+if [ "$SHEET_OPENED" = true ]; then
+  shot "bottom-sheet-glass-on"
+  report_modes "bottom-sheet-glass-on"
+else
+  echo "::warning::快捷操作入口未找到，跳过 BottomSheet 帧（UI22 判定不完整）"
+fi
 report_modes "bottom-sheet-glass-on"
 adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
 sleep 1
 
 # ── 3. 设置页玻璃开关区（对照用）──────────────────────────────────────────
-tap_desc "Profile" || tap_desc "You" || echo "::warning::Profile tab 未找到"
+# 导航序列抄自 screenshots.sh（已实证）：底栏 Profile → 顶栏齿轮（齿轮是 content-desc）
+wait_for_text "Profile" && tap_text "Profile" || echo "::warning::Profile tab 未找到"
 sleep 2
-tap_desc "Settings" || echo "::warning::设置入口未找到"
+wait_for_desc "Settings" && tap_desc "Settings" || echo "::warning::设置入口未找到"
 shot "settings-glass"
 report_modes "settings-glass"
 
 # ── 4. 对照：关掉毛玻璃总开关，同位置再截一帧 ─────────────────────────────
-# 开关是列表里的第一组「Glass effect」行；点它的 Switch（描述文案固定）
-if tap_desc "Blurred surfaces behind bars, panel and sheets"; then
+# 开关行文案是 Text（不是 content-desc），首次实测用 tap_desc 点了个空。
+# tap_text 命中行标题即切换（M3 ListItem + trailing Switch 的可点行）。
+if tap_text "Glass effect"; then
   sleep 2
   clear_log
   adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
