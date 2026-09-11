@@ -82,6 +82,12 @@ assert_signed_in || true   # 失败只记 ::error::，后续仍尽力产出证�
 # 判定口径：只看 GlassRender 日志里有没有 scope=BOTTOM_SHEET，不看点击返回值。
 launch_app
 sleep 2
+# ⚠️ 必须先回首页：上一步 assert_signed_in 点了 Profile，而快捷操作（Create issue 等）
+# 只在 Home 页。上一轮就是停在 Profile 上直接点快捷操作，三个入口全部落空 ——
+# 看截图一眼就能发现（home-before-sheet.png 明明是 Profile 页），这也是"先看图再改"
+# 比"盲改等 CI"快的直接例证。
+tap_text "Home" || true
+sleep 2
 SHEET_OPENED=false
 sheet_is_open() { adb logcat -d -s GlassRender 2>/dev/null | grep -q "scope=BOTTOM_SHEET"; }
 
