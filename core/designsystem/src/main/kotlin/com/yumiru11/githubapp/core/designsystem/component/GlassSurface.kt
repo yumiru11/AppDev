@@ -34,6 +34,11 @@ import dev.chrisbanes.haze.hazeEffect
  *   （[AppBlur.SCRIM_ALPHA] alpha），不做 bitmap 模糊，性能优先（§6.2）；
  *   API<31 半透明降级策略与旧 AppBlur 方案一致。
  *
+ * **窗口约束**：`hazeEffect` 只能采样**同一 window** 内的 `hazeSource`（Haze 按
+ * `LocalView.current.windowId` 过滤采样区域）。本组件因此**不适用于 `Dialog` /
+ * `ModalBottomSheet` 这类独立 window 弹层**——请改用 [GlassSheetSurface]
+ * （弹层几何结论与理由见 `GlassRenderPolicy.resolveInDialogWindow`）。
+ *
  * 玻璃层颜色一律取自 `MaterialTheme.colorScheme.surface`，禁止硬编码颜色。
  *
  * 性能约束（§6.2，调用方责任）：
@@ -48,7 +53,8 @@ import dev.chrisbanes.haze.hazeEffect
  * - 内容侧：容器组件对「栏背后的滚动内容」挂 `Modifier.hazeSource(hazeState)`，
  *   并用 `CompositionLocalProvider(LocalHazeState provides rememberHazeState())`
  *   覆盖栏与内容的公共父级（见 MainTabPager / HomeScreen 示例）
- * - [blurEnabled] 由 feature 层收集 `UserPreferencesRepository.blurEnabled` 后传入
+ * - [blurEnabled] 由 `LocalGlassSettings` 按 [scope] 下发（#167 / UI03），调用方
+ *   不需要自己收集偏好；显式传值只用于测试/预览
  *
  * @param modifier 应用在玻璃容器上的修饰符（尺寸 / 对齐等）
  * @param shape 玻璃容器形状；圆角时内容同样被裁剪到该形状
@@ -77,7 +83,7 @@ fun GlassSurface(
     // 渲染模式判定收敛到 GlassRenderPolicy（issue #83）：三条降级路径（关开关 /
     // 无 HazeState / API<31）改由纯函数判定并已由单测断言——本组件的分支在
     // Robolectric 下不可像素断言（不渲染 RenderEffect），此前只能靠真机看。
-    val renderMode = GlassRenderPolicy.resolve(blurEnabled = blurEnabled, hasHazeState = hazeState != null)
+    val renderMode = GlassRenderPolicy.resolve(blurEnabled = blurEnabled, backdropReachable = hazeState != null)
     val useHaze = renderMode == GlassRenderMode.BackdropBlur
 
     Box(

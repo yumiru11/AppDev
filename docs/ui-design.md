@@ -354,6 +354,29 @@
 - 禁止：列表 item 内毛玻璃、多图层叠毛玻璃（≤2 层）、动态模糊（性能红线）
   ——首页「顶栏 + 小分区条」算**同一块**玻璃（一个 hazeEffect 矩形），不构成第 2 层
 
+### 6.5 弹层点位（§6.1 #4 BottomSheet）的几何结论（issue #167 / UI22 实现回写）
+
+`project-status` §3.1 曾挂账「M3 `ModalBottomSheet` 在独立 window 内，Haze 能否跨 window 采样
+必须真机确认」。**已核实：不能，且不是能力问题而是几何事实**，无需真机复验：
+
+- `ModalBottomSheet` 走 `ModalBottomSheetDialog`（`Dialog` → 自带 `ViewRootImpl`），与主 window
+  是 SurfaceFlinger 的两层；Haze 1.6.10 在 `HazeEffectNode` 内用 `LocalView.current.windowId`
+  过滤可采样区域（`Utils.android.kt#getWindowId`），跨 window 的 source 会被直接剔除；
+  跨 window 也没有可共享的 `GraphicsLayer`/`RenderNode`
+- 机械核实：`core/designsystem` 的 `GlassSheetSurfaceTest.modalBottomSheet_contentWindowDiffersFromMainWindow`
+  用真实 `ModalBottomSheet` 断言弹层内 `LocalView.windowId` ≠ 主 window（且 `LocalHazeState`
+  **确实**跨 window 下传——所以降级判据是窗口隔离，不是「拿不到 HazeState」）
+- 因此弹层内挂 `hazeEffect` 只会采样同 window 内的纯色 dialog scrim（模糊纯色 = 零视觉差异）
+  → 白付一次离屏 RenderNode。**实现取 §6.2 既有的半透明 scrim 路径**（`GlassSheetSurface`
+  = `surfaceContainerLow` @ `AppBlur.SCRIM_ALPHA`，与栏侧同款取值、同一 token），
+  逐项开关/OLED/高对比照旧裁决该点位是否走玻璃效果
+- 未来若把弹层改成「主 window 内的覆盖层」（自绘 Sheet + 同 window `hazeSource`），
+  只需放开 `GlassRenderPolicy.resolveInDialogWindow` 的返回值并同步单测，
+  五处 `ModalBottomSheet` 调用点无需改动（判定与接线已经分离）
+- **五处已接线**（issue #167 / UI22）：`IssueDetailScreen`（评论 Sheet + Labels/Assignees/Milestone
+  编辑 Sheet）、`LineCommentSheet`、`ReviewSheet`、`PullRequestDetailScreen`（评论 Sheet）、
+  `RepoPickerSheet`
+
 ---
 
 ## 7. 主题系统

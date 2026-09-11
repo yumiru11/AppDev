@@ -33,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.pullrequest.model.LineCommentAnchor
@@ -57,79 +58,83 @@ internal fun LineCommentSheet(
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         modifier = modifier,
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .imePadding()
-                    .padding(16.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.pull_request_review_comment_at, target.anchor.path, target.anchor.line),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            if (target.comments.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                target.comments.forEach { comment ->
-                    LineCommentCard(comment = comment)
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
-                if (canResolve && target.thread != null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
-                    ) {
-                        TextButton(onClick = { onToggleResolve(target.thread) }) {
-                            Text(
-                                text =
-                                    stringResource(
-                                        if (target.thread.isResolved) {
-                                            R.string.pull_request_line_comment_unresolve
-                                        } else {
-                                            R.string.pull_request_line_comment_resolve
-                                        },
-                                    ),
-                            )
-                        }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = commentText,
-                onValueChange = { commentText = it },
+        // 弹层玻璃点位（#167 / UI22，ui-design §6.1 #4）：容器底交 GlassSheetSurface，开关/主题降级由
+        // GlassScope.BOTTOM_SHEET 统一裁决（弹层是独立 window，几何结论见该组件 KDoc）
+        GlassSheetSurface {
+            Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 100.dp),
-                label = {
-                    Text(
-                        text =
-                            stringResource(
-                                if (target.thread != null) {
-                                    R.string.pull_request_line_comment_reply
-                                } else {
-                                    R.string.pull_request_line_comment_new
-                                },
-                            ),
-                    )
-                },
-                placeholder = { Text(text = stringResource(R.string.pull_request_line_comment_placeholder)) },
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
+                        .imePadding()
+                        .padding(16.dp),
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text(text = stringResource(R.string.cancel))
+                Text(
+                    text = stringResource(R.string.pull_request_review_comment_at, target.anchor.path, target.anchor.line),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                if (target.comments.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    target.comments.forEach { comment ->
+                        LineCommentCard(comment = comment)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    if (canResolve && target.thread != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
+                        ) {
+                            TextButton(onClick = { onToggleResolve(target.thread) }) {
+                                Text(
+                                    text =
+                                        stringResource(
+                                            if (target.thread.isResolved) {
+                                                R.string.pull_request_line_comment_unresolve
+                                            } else {
+                                                R.string.pull_request_line_comment_resolve
+                                            },
+                                        ),
+                                )
+                            }
+                        }
+                    }
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = { onSubmit(target.anchor, commentText, target.comments.firstOrNull()?.id) },
-                    enabled = commentText.isNotBlank(),
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = commentText,
+                    onValueChange = { commentText = it },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 100.dp),
+                    label = {
+                        Text(
+                            text =
+                                stringResource(
+                                    if (target.thread != null) {
+                                        R.string.pull_request_line_comment_reply
+                                    } else {
+                                        R.string.pull_request_line_comment_new
+                                    },
+                                ),
+                        )
+                    },
+                    placeholder = { Text(text = stringResource(R.string.pull_request_line_comment_placeholder)) },
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
                 ) {
-                    Text(text = stringResource(R.string.submit))
+                    TextButton(onClick = onDismiss) {
+                        Text(text = stringResource(R.string.cancel))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { onSubmit(target.anchor, commentText, target.comments.firstOrNull()?.id) },
+                        enabled = commentText.isNotBlank(),
+                    ) {
+                        Text(text = stringResource(R.string.submit))
+                    }
                 }
             }
         }

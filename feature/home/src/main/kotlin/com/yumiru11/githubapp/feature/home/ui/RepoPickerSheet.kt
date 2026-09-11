@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.feature.home.R
 import com.yumiru11.githubapp.feature.home.RepoPickerUiState
@@ -46,11 +47,16 @@ internal fun RepoPickerSheet(
 ) {
     if (!visible) return
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        RepoPickerSheetContent(
-            uiState = uiState,
-            onPick = onPick,
-            onRetry = onRetry,
-        )
+        // 弹层玻璃点位（#167 / UI22，ui-design §6.1 #4）：容器底交 GlassSheetSurface，
+        // 开关与主题降级按 GlassScope.BOTTOM_SHEET 统一裁决（弹层是独立 window，
+        // 几何结论见该组件 KDoc / GlassRenderPolicy.resolveInDialogWindow）
+        GlassSheetSurface {
+            RepoPickerSheetContent(
+                uiState = uiState,
+                onPick = onPick,
+                onRetry = onRetry,
+            )
+        }
     }
 }
 
