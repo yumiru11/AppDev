@@ -180,6 +180,23 @@ class SettingsViewModelTest {
         }
 
     @Test
+    fun codeEditorPreferences_externalEmission_isReadBackIntoUiState() =
+        runTest {
+            // T24 死设置收口：UI 回读的是仓库 Flow 的权威值（不只认本 VM 的写入）——
+            // 从 DataStore 侧（或未来其它写入点）改值，设置页两行也必须立刻跟着变
+            val repository = FakeUserPreferencesRepository()
+            val viewModel = createViewModel(repository)
+
+            viewModel.uiState.test {
+                awaitItem()
+                repository.codeFontFlow.value = CodeFont.SYSTEM
+                assertEquals(CodeFont.SYSTEM, awaitItem().codeFont)
+                repository.codeLineNumbersFlow.value = false
+                assertEquals(false, awaitItem().codeLineNumbers)
+            }
+        }
+
+    @Test
     fun setLanguageTag_zh_persistsAndEmits() =
         runTest {
             val viewModel = createViewModel()
@@ -482,8 +499,8 @@ private class FakeUserPreferencesRepository(
     private val cornerScaleFlow = MutableStateFlow(UserPreferencesRepository.DEFAULT_CORNER_SCALE)
     private val motionScaleFlow = MutableStateFlow(UserPreferencesRepository.DEFAULT_MOTION_SCALE)
     private val iconStyleFlow = MutableStateFlow(IconStyle.ROUNDED)
-    private val codeFontFlow = MutableStateFlow(CodeFont.MONO)
-    private val codeLineNumbersFlow = MutableStateFlow(true)
+    val codeFontFlow = MutableStateFlow(CodeFont.MONO)
+    val codeLineNumbersFlow = MutableStateFlow(true)
 
     override val themeMode: Flow<ThemeMode> = themeModeFlow
 
