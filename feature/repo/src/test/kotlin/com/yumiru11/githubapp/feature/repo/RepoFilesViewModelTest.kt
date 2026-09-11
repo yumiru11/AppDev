@@ -89,7 +89,7 @@ class RepoFilesViewModelTest {
         }
 
     @Test
-    fun loadRootTree_notFound_emitsErrorNotFound() =
+    fun loadRootTree_notFound_emitsErrorPathNotFound() =
         runTest {
             val repoRepository =
                 mockk<RepoRepository> {
@@ -99,7 +99,22 @@ class RepoFilesViewModelTest {
 
             viewModel.loadRootTree("main")
 
-            assertEquals(TreeState.Error(RepoErrorType.NOT_FOUND), viewModel.uiState.value.treeState)
+            // #201：404 是「该 ref/路径不存在」，不是「仓库不存在」（仓库级 404 由 RepoDetailViewModel 负责）
+            assertEquals(TreeState.Error(RepoErrorType.PATH_NOT_FOUND), viewModel.uiState.value.treeState)
+        }
+
+    @Test
+    fun loadRootTree_forbidden_emitsErrorForbidden() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns Result.failure(httpException(403))
+                }
+            val viewModel = viewModel(repoRepository)
+
+            viewModel.loadRootTree("main")
+
+            assertEquals(TreeState.Error(RepoErrorType.FORBIDDEN), viewModel.uiState.value.treeState)
         }
 
     @Test
@@ -267,7 +282,23 @@ class RepoFilesViewModelTest {
 
             val state = viewModel.uiState.value
             assertEquals("Main.kt", state.selectedPath)
-            assertEquals(FileViewState.Error(RepoErrorType.NOT_FOUND), state.fileState)
+            // #201：contents 404 = 文件已删除/改名，文案与「仓库未找到」不是一回事
+            assertEquals(FileViewState.Error(RepoErrorType.PATH_NOT_FOUND), state.fileState)
+        }
+
+    @Test
+    fun openDeepLinkFile_missingPath_emitsErrorPathNotFound() =
+        runTest {
+            // CI 实证场景：深链 blob/main/README.md（该文件后来不存在）→ contents 404
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getFileContent(any(), any(), any(), any()) } returns Result.failure(httpException(404))
+                }
+            val viewModel = viewModel(repoRepository)
+
+            viewModel.openDeepLinkFile("README.md")
+
+            assertEquals(FileViewState.Error(RepoErrorType.PATH_NOT_FOUND), viewModel.uiState.value.fileState)
         }
 
     @Test

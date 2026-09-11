@@ -18,6 +18,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
@@ -156,37 +157,70 @@ fun NotificationsPanel(
             ) + fadeOut(tween(AppMotion.scaledDuration(PANEL_EXIT_MILLIS))),
         modifier = modifier.fillMaxSize(),
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // 遮罩：点击关闭；背后不可交互为 §3.4 拍板
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = PANEL_SCRIM_ALPHA))
-                        .clickable(interactionSource = null, indication = null) { onDismiss() },
+        NotificationsPanelSurface(
+            blurEnabled = blurEnabled,
+            onDismiss = onDismiss,
+        ) {
+            NotificationsPanelContent(
+                uiState = uiState,
+                filter = filter,
+                sortOrder = sortOrder,
+                onDismiss = onDismiss,
+                onMarkAllRead = viewModel::markAllRead,
+                onSelectFilter = viewModel::selectFilter,
+                onSelectSortOrder = viewModel::selectSortOrder,
+                onToggleGroup = viewModel::toggleGroup,
+                onMarkRead = viewModel::markRead,
+                onDelete = viewModel::delete,
+                onRetry = viewModel::retry,
+                onLoginClick = onLoginClick,
+                onNotificationClick = onNotificationClick,
             )
-            GlassSurface(
-                modifier = Modifier.fillMaxSize(),
-                windowInsets = WindowInsets.systemBars,
-                scope = GlassScope.PANEL,
-                blurEnabled = blurEnabled,
-            ) {
-                NotificationsPanelContent(
-                    uiState = uiState,
-                    filter = filter,
-                    sortOrder = sortOrder,
-                    onDismiss = onDismiss,
-                    onMarkAllRead = viewModel::markAllRead,
-                    onSelectFilter = viewModel::selectFilter,
-                    onSelectSortOrder = viewModel::selectSortOrder,
-                    onToggleGroup = viewModel::toggleGroup,
-                    onMarkRead = viewModel::markRead,
-                    onDelete = viewModel::delete,
-                    onRetry = viewModel::retry,
-                    onLoginClick = onLoginClick,
-                    onNotificationClick = onNotificationClick,
-                )
-            }
+        }
+    }
+}
+
+/**
+ * 面板玻璃外壳（遮罩 + 全屏玻璃面板），从 [NotificationsPanel] 拆出以便像素级断言
+ * （#201 P0：面板正文区必须完全遮住下层内容）。
+ *
+ * **不透明契约**：本面板铺满全屏，遮罩整块被它盖住 —— 面板自身就是唯一挡住下层内容的层。
+ * 因此 [GlassSurface] 传 `opaqueWhenBlurUnavailable = true`：真实 backdrop blur 生效
+ * （API 31+ 且提供了 [com.yumiru11.githubapp.core.designsystem.component.LocalHazeState]）
+ * 时保持半透明玻璃（糊成雾面，无可读字形，§6.1 点位 3 要的观感）；任何降级路径
+ * （API<31 / 无 HazeState / 用户关开关）改为全不透明 surface，杜绝下层文字以 12.5%
+ * 浓度**不模糊**地透上来与面板文字同像素叠印。判定收敛在
+ * [com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy.layerAlpha]。
+ *
+ * @param blurEnabled 毛玻璃开关（由调用方按 [GlassScope.PANEL] 点位裁决后传入）
+ * @param onDismiss 点面板外的遮罩区域关闭（§3.4「点遮罩关闭」）；面板正文区之外的空白
+ *   命中区由遮罩承担
+ */
+@Composable
+internal fun NotificationsPanelSurface(
+    blurEnabled: Boolean,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        // 遮罩：中浅（§3.4 拍板 ~50%）。面板降级为不透明后遮罩不再参与成像（被面板盖住），
+        // 但仍保留：它是「点遮罩关闭」的命中区（Compose 命中测试落到底层 clickable）。
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = PANEL_SCRIM_ALPHA))
+                    .clickable(interactionSource = null, indication = null) { onDismiss() },
+        )
+        GlassSurface(
+            modifier = Modifier.fillMaxSize(),
+            windowInsets = WindowInsets.systemBars,
+            scope = GlassScope.PANEL,
+            blurEnabled = blurEnabled,
+            opaqueWhenBlurUnavailable = true,
+        ) {
+            content()
         }
     }
 }

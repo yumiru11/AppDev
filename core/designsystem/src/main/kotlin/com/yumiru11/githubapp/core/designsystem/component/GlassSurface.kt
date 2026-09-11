@@ -36,6 +36,8 @@ import dev.chrisbanes.haze.hazeEffect
  * - **API 26–30 / 无 HazeState / [blurEnabled]=false**：纯半透明 surface 层降级
  *   （[AppBlur.SCRIM_ALPHA] alpha），不做 bitmap 模糊，性能优先（§6.2）；
  *   API<31 半透明降级策略与旧 AppBlur 方案一致。
+ *   例外：全屏点位传 [opaqueWhenBlurUnavailable]=true 时降级层取全不透明 surface
+ *   （#201 P0 叠印修复，见该参数说明）。
  *
  * 玻璃层颜色一律取自 `MaterialTheme.colorScheme.surface`，禁止硬编码颜色。
  *
@@ -62,6 +64,13 @@ import dev.chrisbanes.haze.hazeEffect
  *   开关由 [LocalGlassSettings] 按 scope 裁决，调用方不需要自己拼布尔。
  * @param blurEnabled 覆盖用开关；默认取 [LocalGlassSettings] 对 [scope] 的裁决结果。
  *   显式传值只用于测试/预览（例如截图基准要固定走降级路径）。
+ * @param opaqueWhenBlurUnavailable 降级路径（关开关 / 无 HazeState / API<31）是否改用
+ *   **全不透明** surface 底。默认 false = #83 既有半透明降级行为，顶栏 / 底栏 /
+ *   BottomSheet 必须保持 false：它们的内容本就设计成从栏后穿过（§6.2「滚动穿越感」）。
+ *   只有**铺满全屏**的点位（全屏通知面板）该传 true —— 那时遮罩被面板整块盖住，
+ *   面板是唯一挡住下层内容的层，半透明降级会让下层文字以 12.5% 浓度**不模糊**地透
+ *   上来，与面板自身文字同像素叠印（#201 P0：文字不可读）。判定见
+ *   [GlassRenderPolicy.layerAlpha]。
  * @param content 玻璃层之上的内容
  */
 @Composable
@@ -71,28 +80,35 @@ fun GlassSurface(
     windowInsets: WindowInsets = WindowInsets(0.dp),
     scope: GlassScope = GlassScope.TOP_BAR,
     blurEnabled: Boolean = LocalGlassSettings.current.enabledFor(scope),
+    opaqueWhenBlurUnavailable: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
-    // 半透明纯色层：模糊层之上叠加，保证内容可读性（§6.1 静止态 / §6.2 降级层）
-    val glassColor = surfaceColor.copy(alpha = AppBlur.SCRIM_ALPHA)
     val hazeState = LocalHazeState.current
     // 渲染模式判定收敛到 GlassRenderPolicy（issue #83）：三条降级路径（关开关 /
     // 无 HazeState / API<31）改由纯函数判定并已由单测断言——本组件的分支在
     // Robolectric 下不可像素断言（不渲染 RenderEffect），此前只能靠真机看。
     val renderMode = GlassRenderPolicy.resolve(blurEnabled = blurEnabled, hasHazeState = hazeState != null)
     val useHaze = renderMode == GlassRenderMode.BackdropBlur
+    // 半透明纯色层：模糊层之上叠加，保证内容可读性（§6.1 静止态 / §6.2 降级层）；
+    // 全屏点位在降级路径取全不透明（#201 P0 叠印修复，判定收敛在 GlassRenderPolicy）
+    val glassColor =
+        surfaceColor.copy(
+            alpha = GlassRenderPolicy.layerAlpha(renderMode = renderMode, opaqueWhenBlurUnavailable = opaqueWhenBlurUnavailable),
+        )
 
     // 渲染路径留档（glass-verify.yml 的机器判据）。
     // 为什么需要：Robolectric 不渲染 RenderEffect，API 30 的模拟器又低于 MIN_BLUR_API ——
     // 「这块玻璃到底走了模糊、还是静默降级成半透明」此前只能靠肉眼看截图猜。
     // 打一行日志后 CI 可以直接断言 mode=BackdropBlur，而不是"看起来差不多"。
+    // #201 起同时留档叠色 alpha：全屏面板的降级路径必须是 1.0（不透明），否则叠印复现。
     // remember 保证只在路径真正变化时打一次，不随每帧重组刷屏。
-    remember(scope, renderMode, blurEnabled) {
+    remember(scope, renderMode, blurEnabled, opaqueWhenBlurUnavailable) {
         runCatching {
             Log.d(
                 GLASS_LOG_TAG,
                 "scope=$scope mode=$renderMode blurEnabled=$blurEnabled " +
+                    "alpha=${glassColor.alpha} opaqueFallback=$opaqueWhenBlurUnavailable " +
                     "hasHazeState=${hazeState != null} sdk=${Build.VERSION.SDK_INT}",
             )
         }
