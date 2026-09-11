@@ -31,9 +31,22 @@ source "$(dirname "$0")/lib/adb-helpers.sh"
 clear_log() { adb logcat -c 2>/dev/null || true; }
 
 # 抓一帧 + 记录当时的 GlassRender 决策
+# 2026-09-12：与 screenshots.sh 同款「断言前置」——本脚本此前对「到底在哪一屏」
+# 没有任何机器断言（`wait_for_text "Profile" && tap_text` 一类写法失败只 echo 告警、
+# 照样截图），拍错屏时无法从产物分辨。这里加最小断言集：
+# 玻璃帧必须确认前台是 app 自己 + 目标屏的关键文本真的在（期望文本由调用方给）。
 shot() {
-  local name="$1"
+  local name="$1"; shift
+  local expect
   sleep 2
+  if ! wait_for_activity "$PKG"; then
+    echo "::warning::$name 拍摄前 app 不在前台 —— 该帧不可作为毛玻璃证据"
+  fi
+  for expect in "$@"; do
+    if ! wait_for_text "$expect" 10; then
+      echo "::warning::$name 期望文本「$expect」未出现 —— 该帧可能不在目标屏"
+    fi
+  done
   adb exec-out screencap -p > "$OUT/$name.png"
   adb logcat -d -s GlassRender 2>/dev/null | tail -40 > "$OUT/$name.glass.log" || true
   echo "captured $name"
@@ -62,7 +75,7 @@ wait_for_input_service
 # ── 1. 首页（顶栏 + 底栏玻璃）─────────────────────────────────────────────
 clear_log
 launch_app
-shot "home-glass-on"
+shot "home-glass-on" "Home"        # 首页：底栏 Home tab 为屏锚点
 report_modes "home-glass-on"
 
 assert_signed_in || true   # 失败只记 ::error::，后续仍尽力产出证据
@@ -132,7 +145,7 @@ sleep 1
 # ── 3. 通知面板（玻璃面板）───────────────────────────────────────────────
 launch_app
 tap_desc "Notifications" || echo "::warning::通知入口未找到，跳过面板帧"
-shot "notification-panel-glass-on"
+shot "notification-panel-glass-on" "Mark all read"   # 面板头部按钮（比裸 Notifications 更专有）
 report_modes "notification-panel-glass-on"
 # 登录失效时这里会拍到应用自己的「Sign-in expired」错误卡 —— 明确标注，避免误判
 if ui_contains "Sign-in expired"; then
@@ -145,7 +158,7 @@ sleep 1
 wait_for_text "Profile" && tap_text "Profile" || echo "::warning::Profile tab 未找到"
 sleep 2
 wait_for_desc "Settings" && tap_desc "Settings" || echo "::warning::设置入口未找到"
-shot "settings-glass"
+shot "settings-glass" "Appearance"          # 设置分组标题
 report_modes "settings-glass"
 
 # 关掉总开关。判据用**日志**而不是像素比较：像素比较要求两次渲染处在同一状态，
@@ -159,7 +172,7 @@ if try_tap_text "Glass effect"; then
   # force-stop 再冷启动：只 resume 不会重新组合，也就不会重新打点
   adb shell am force-stop "$PKG" >/dev/null 2>&1 || true
   launch_app
-  shot "home-glass-off"
+  shot "home-glass-off" "Home"         # 对照组：同样锚定首页
   report_modes "home-glass-off"
   if grep -q "blurEnabled=false" "$OUT/home-glass-off.glass.log" 2>/dev/null; then
     echo "::notice::关闭总开关后 blurEnabled=false（对照成立）"
