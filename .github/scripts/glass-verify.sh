@@ -86,7 +86,6 @@ if [ "$SHEET_OPENED" = true ]; then
 else
   echo "::warning::快捷操作入口未找到，跳过 BottomSheet 帧（UI22 判定不完整）"
 fi
-report_modes "bottom-sheet-glass-on"
 adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
 sleep 1
 
