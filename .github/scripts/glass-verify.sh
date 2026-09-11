@@ -76,10 +76,16 @@ adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11
 wait_for_activity "$PKG" || true
 # 用 wait_for_text（带超时轮询）而不是 sleep + 一次性查找：Issue 页要拉正文 + 评论，
 # 固定 sleep 容易在"还在加载"时 dump，元素自然找不到（上一轮就是这么漏的）。
+# 无论成败都留一帧 Issue 页 + 一份 UI 层级：上一轮只看到"没点开"，看不到"当时屏幕上
+# 是什么"，排查全靠猜。把现场抓进 artifact，下一次就能直接定位。
+sleep 6
+adb exec-out screencap -p > "$OUT/issue-page.png" || true
 if wait_for_text "Comment" 30 || wait_for_desc "Comment" 10; then
   tap_text "Comment" || tap_desc "Comment" || true
   SHEET_OPENED=true
 else
+  adb shell "rm -f /sdcard/ui.xml; uiautomator dump /sdcard/ui.xml" >/dev/null 2>&1 || true
+  adb pull /sdcard/ui.xml "$OUT/issue-page-ui.xml" >/dev/null 2>&1 || true
   # 兜底：首页快速操作 → 仓库选择 Sheet（游客也开得出来）
   adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
   launch_app
