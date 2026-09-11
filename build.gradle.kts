@@ -409,6 +409,10 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 // *Composer.kt：编辑/预览装配层（MarkdownComposer 等纯 Composable）。
                 // "Composer" 是 Compose 专有词（runtime 的 Composer），不会有同名逻辑类。
                 Regex("""(^|/)[^/]*Composer[^/]*\.kt$"""),
+                // MainActivity.kt：单 Activity 装配层（setContent + 依赖注入接线 + 启动屏安装）。
+                // 里面没有可断言的逻辑分支，装的是"谁来画界面"这件事本身。
+                // 实测（PR #196）：加一行 installSplashScreen() 就被 diff 门禁判成"未覆盖新增行"。
+                Regex("""(^|/)MainActivity\.kt$"""),
                 // app 模块根包下的主题/背景装配层（#167 / UI04）。
                 // 这两处是**纯 Compose 装配**：AppThemeHost 只做"偏好 Flow → CompositionLocal"
                 // 的接线，AppBackground 只做"图 + 蒙版 + 内容"的三层堆叠。

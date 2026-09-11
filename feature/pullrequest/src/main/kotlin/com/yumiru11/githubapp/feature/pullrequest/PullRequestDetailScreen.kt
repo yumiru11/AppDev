@@ -46,12 +46,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -78,7 +78,6 @@ import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
-import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.gitHubStatusStateDescription
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
@@ -681,17 +680,9 @@ private fun PrTabs(
     onTabSelected: (PullRequestTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // 用可滚动 TabRow 而不是固定 TabRow（2026-09-11 模拟器截图实测的缺陷修复）：
-    // pixel_6（411dp 宽）下 4 个固定 Tab 各约 103dp，而 "Conversation" / "Files changed"
-    // 在 labelLarge 下加上 Tab 内边距需要 115~125dp → **标题被强制截断成
-    // 「Conversa…」「Files cha…」**，PR 页的主要导航一半看不懂。
-    // MD3 对"标签放不下"的处方就是可滚动 TabRow；本仓 SearchScreen 已是同款写法，
-    // 视觉与交互保持一致。
-    ScrollableTabRow(
+    TabRow(
         selectedTabIndex = selectedTab.ordinal,
         modifier = modifier.fillMaxWidth(),
-        containerColor = MaterialTheme.colorScheme.surface,
-        edgePadding = AppDimens.cornerSmall,
     ) {
         PullRequestTab.entries.forEach { tab ->
             Tab(
