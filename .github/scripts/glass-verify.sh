@@ -69,47 +69,42 @@ assert_signed_in || true   # 失败只记 ::error::，后续仍尽力产出证�
 
 # ── 2. BottomSheet 玻璃（UI22 的核心问题：M3 ModalBottomSheet 在独立 window，
 #      Haze 能否跨 window 采样）──────────────────────────────────────────
-# 入口优先用**登录态才可达**的 Issue 评论输入 Sheet（§6.1 允许点位里的
-# "评论输入 / 行评论 / Review / 仓库选择"），它才是 UI22 真正要回答的对象。
+# 入口选择：**首页快捷操作 → 仓库选择 Sheet（RepoPickerSheet）**。
+#
+# 为什么不用 Issue 详情页的「Comment」扩展 FAB（前面试了三轮都失败）：
+#   - uiautomator dump 里**完全没有**该 FAB 节点（实测 93 个节点里底部区域一个都没有），
+#     Compose 的 ExtendedFloatingActionButton 在该层级下不进 dump → 文本/desc 查找天然不可用；
+#   - 退而用坐标，但 FAB 的 y 位置随 WebView 内容高度浮动，像素取证量到的 bbox 与
+#     目测差 80px，写死坐标不可靠（实测点空两次）。
+# 快捷操作是**普通 Text 节点**（通知面板截图里可见 "Create issue" 等），文本查找可靠，
+# 且它打开的正是一个 M3 ModalBottomSheet —— 对 UI22 的判定等价。
+#
+# 判定口径：只看 GlassRender 日志里有没有 scope=BOTTOM_SHEET，不看点击返回值。
+launch_app
+sleep 2
 SHEET_OPENED=false
-adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues/71" -p "$PKG" >/dev/null 2>&1 || true
-wait_for_activity "$PKG" || true
-# 用 wait_for_text（带超时轮询）而不是 sleep + 一次性查找：Issue 页要拉正文 + 评论，
-# 固定 sleep 容易在"还在加载"时 dump，元素自然找不到（上一轮就是这么漏的）。
-# 无论成败都留一帧 Issue 页 + 一份 UI 层级：上一轮只看到"没点开"，看不到"当时屏幕上
-# 是什么"，排查全靠猜。把现场抓进 artifact，下一次就能直接定位。
-sleep 6
-adb exec-out screencap -p > "$OUT/issue-page.png" || true
-# 点击「Comment」扩展 FAB。
-# 为什么坐标优先：uiautomator dump 里**完全没有**这个 FAB 节点（实测 93 个节点里
-# 底部区域一个都没有），而同一次运行的 issue-page.png 里它清晰可见 —— Compose 的
-# ExtendedFloatingActionButton 在该层级下不进 dump，文本查找天然不可用。
-# 坐标依据：pixel_6 = 1080x2400，Issue 详情页右下角扩展 FAB 中心 ≈ (875, 1972)
-# （由 issue-page.png 量得；FAB 固定停靠，不随列表滚动）。（我们已知 FAB 位置，且 dump 里根本没有这个节点）；
-# 再读日志确认是否真的打开了 —— 不看"点了没"，只看"开了没"。
-# 为什么不再靠 try_tap_text：它会命中别处的同名文本并成功返回，把坐标兜底短路掉
-# （连续两轮实测都栽在这上面）。判定权交给 GlassRender 日志，不交给点击返回值。
-adb shell input tap 875 1972
-sleep 3
 sheet_is_open() { adb logcat -d -s GlassRender 2>/dev/null | grep -q "scope=BOTTOM_SHEET"; }
-if sheet_is_open; then
-  SHEET_OPENED=true
-else
-  echo "::warning::坐标点击后未见 BOTTOM_SHEET，尝试文本/desc 兜底"
-  if try_tap_text "Comment" || try_tap_desc "Comment"; then
+
+for label in "Create issue" "View pull requests" "Create repository"; do
+  echo "尝试快捷操作入口：$label"
+  if try_tap_text "$label"; then
     sleep 3
-    sheet_is_open && SHEET_OPENED=true
+    if sheet_is_open; then
+      SHEET_OPENED=true
+      echo "::notice::Sheet 已打开（入口：$label）"
+      break
+    fi
+    adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
+    sleep 1
   fi
-fi
+done
+
+# 兜底：即使入口没成功，也留一份现场（首页帧 + UI 层级）供下一轮定位
 if [ "$SHEET_OPENED" != true ]; then
+  adb exec-out screencap -p > "$OUT/home-before-sheet.png" || true
   adb shell "rm -f /sdcard/ui.xml; uiautomator dump /sdcard/ui.xml" >/dev/null 2>&1 || true
-  adb pull /sdcard/ui.xml "$OUT/issue-page-ui.xml" >/dev/null 2>&1 || true
-  # 兜底：首页快速操作 → 仓库选择 Sheet（游客也开得出来）
-  adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
-  launch_app
-  for label in "Create issue" "View pull requests" "Create repository"; do
-    if try_tap_text "$label"; then SHEET_OPENED=true; break; fi
-  done
+  adb pull /sdcard/ui.xml "$OUT/home-ui.xml" >/dev/null 2>&1 || true
+  echo "::warning::快捷操作入口未点开 Sheet，已留现场（home-before-sheet.png / home-ui.xml）"
 fi
 
 if [ "$SHEET_OPENED" = true ]; then
