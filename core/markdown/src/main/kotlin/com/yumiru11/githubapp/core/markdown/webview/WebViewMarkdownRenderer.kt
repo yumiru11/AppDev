@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -67,6 +68,14 @@ fun WebViewMarkdownRenderer(
     renderMode: RenderMode = RenderMode.SERVER_HTML,
     baseRepoUrl: String? = null,
     fillAvailableHeight: Boolean = false,
+    /**
+     * 内容滚动回调（#167 / UI10）：上报 WebView 的 scrollY（像素）。
+     *
+     * 为什么需要把它暴露出来：README 正文的滚动**发生在 WebView 内部**，Compose 侧的
+     * 任何 scroll 状态都观察不到。"下滑时收起仓库头部"这类联动因此必须由 WebView 反向
+     * 上报 —— 这是本渲染架构（WebView 主渲染）下唯一的办法。
+     */
+    onScrollChanged: (Int) -> Unit = {},
 ) {
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
@@ -79,6 +88,9 @@ fun WebViewMarkdownRenderer(
         remember(isDark, colorScheme) {
             MaterialYouFusionMapper.buildStartScript(colorScheme, isDark = isDark)
         }
+
+    // 滚动回调每次重组刷新（同 onTextChanged 的既有做法）：宿主闭包会捕获新的状态
+    val currentOnScrollChanged by rememberUpdatedState(onScrollChanged)
 
     val assetLoader =
         remember(context) {
@@ -144,6 +156,12 @@ fun WebViewMarkdownRenderer(
         factory = { ctx ->
             WebView(ctx).apply {
                 webViewRef.value = this
+                // #167 / UI10：把 WebView 内部滚动反向上报给 Compose（README 下滑收起头部用）。
+                // 用 View.setOnScrollChangeListener 而不是 JS bridge：后者要等页面与脚本就绪，
+                // 首屏滚动会漏报；前者是原生回调，从第一帧起就有效。
+                setOnScrollChangeListener { _, _, scrollY, _, _ ->
+                    currentOnScrollChanged(scrollY)
+                }
                 WebViewSecurity.apply(this)
                 // body 背景 transparent（markdown-you.css），此处必须同步透明，
                 // 否则 WebView 控件默认白底在深色主题下与页面不融合（2026-08-15 真机验证）。
