@@ -80,8 +80,13 @@ wait_for_activity "$PKG" || true
 # 是什么"，排查全靠猜。把现场抓进 artifact，下一次就能直接定位。
 sleep 6
 adb exec-out screencap -p > "$OUT/issue-page.png" || true
-if wait_for_text "Comment" 30 || wait_for_desc "Comment" 10; then
-  tap_text "Comment" || tap_desc "Comment" || true
+# 点击「Comment」扩展 FAB。**文本查找不可靠**：本次实测 uiautomator dump 里**完全没有**
+# 该 FAB 节点（93 个节点里底部区域一个都没有），而同一次运行的 issue-page.png 里它
+# 清晰可见 —— Compose 的 ExtendedFloatingActionButton 在该层级下不进 dump。
+# 所以顺序是：先试文本（万一哪天进了），失败即按坐标兜底。
+# 坐标依据：pixel_6 = 1080x2400，Issue 详情页右下角扩展 FAB 中心 ≈ (875, 1972)
+# （由 issue-page.png 量得；FAB 是固定停靠位，不随列表滚动）。
+if tap_text "Comment" || tap_desc "Comment" || { adb shell input tap 875 1972 && true; }; then
   SHEET_OPENED=true
 else
   adb shell "rm -f /sdcard/ui.xml; uiautomator dump /sdcard/ui.xml" >/dev/null 2>&1 || true
