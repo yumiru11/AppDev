@@ -229,3 +229,55 @@ long_shot() {
     fi
   done
 }
+
+# ── 截图登录（CI 机密 SCREENSHOT_TOKEN）─────────────────────────────────
+# 为什么必须登录：未登录时首页是空的、仓库页只有只读态、评论/Review/行评论这些
+# BottomSheet 根本进不去 —— 拿这种状态去「看效果」等于测了个寂寞。
+# 注入方式沿用 screenshots.sh 的既有实现（debug 专用 Receiver 写 EncryptedTokenStorage）。
+inject_screenshot_token() {
+  if [ -z "${SCREENSHOT_TOKEN:-}" ]; then
+    echo "::warning::SCREENSHOT_TOKEN 未配置 —— 本次截图是未登录态，部分界面不可达"
+    return 1
+  fi
+  adb shell am start -n "$PKG/com.yumiru11.githubapp.ScreenshotTokenReceiver" -e pat "$SCREENSHOT_TOKEN" >/dev/null 2>&1 || true
+  sleep 2
+  return 0
+}
+
+# 当前 UI 层级里是否出现某个正则
+ui_contains() {
+  dump_ui || return 1
+  grep -qE "$1" /tmp/ui.xml 2>/dev/null
+}
+
+# 与 tap_text 同源，但**找不到就返回 1**（tap_text 只告警）。
+# 需要「多个候选文案逐个兜底」的调用方必须用这个 —— 否则第一个候选无论找没找到
+# 都会被当成命中（glass-verify 首版就踩了这个坑）。
+try_tap_text() {
+  local text="$1"
+  dump_ui || return 1
+  local bounds
+  bounds=$(python3 -c "import re; xml=open('/tmp/ui.xml').read(); m=re.search(r'text=\"$text\"[^>]*bounds=\"\[(\\d+),(\\d+)\]\[(\\d+),(\\d+)\]\"', xml); print((int(m.group(1))+int(m.group(3)))//2, (int(m.group(2))+int(m.group(4)))//2) if m else ''" 2>/dev/null || true)
+  if [ -n "$bounds" ]; then
+    adb shell input tap $bounds >/dev/null
+    return 0
+  fi
+  return 1
+}
+
+# 登录态断言：底栏 Profile → 页面上应出现登录名（默认取仓库 owner）。
+# 失败即 ::error:: —— 因为「拍到了登录失败的应用」比「没拍」更糟：它会让人误以为
+# 看到的是真实体验（本项目已实际发生过：SCREENSHOT_TOKEN 过期后，通知面板截图一直
+# 显示应用自己的「Sign-in expired. Please sign in again.」错误卡，而没人发现）。
+assert_signed_in() {
+  local expect="${1:-yumiru11}"
+  tap_text "Profile"
+  sleep 3
+  if ui_contains "$expect"; then
+    echo "::notice::登录态确认：Profile 页出现 $expect"
+    return 0
+  fi
+  echo "::error::未确认登录态（Profile 页未出现 $expect）—— SCREENSHOT_TOKEN 可能已过期；本次截图不代表真实登录体验"
+  return 1
+}
+

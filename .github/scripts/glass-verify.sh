@@ -53,65 +53,96 @@ report_modes() {
 
 wait_for_input_service
 
-# ── 1. 默认（毛玻璃开）───────────────────────────────────────────────────
+# ── 0. 登录（必需）───────────────────────────────────────────────────────
+# 未登录时首页为空、评论/Review 这些 BottomSheet 根本进不去 —— 那样测的是"寂寞"。
+inject_screenshot_token || true
+
+wait_for_input_service
+
+# ── 1. 首页（顶栏 + 底栏玻璃）─────────────────────────────────────────────
 clear_log
 launch_app
 shot "home-glass-on"
 report_modes "home-glass-on"
 
-# 通知面板（玻璃面板：顶栏铃铛）
-tap_desc "Notifications" || echo "::warning::通知入口未找到，跳过面板帧"
-shot "notification-panel-glass-on"
-report_modes "notification-panel-glass-on"
-# 关闭面板（返回键最稳，点 X 依赖面板内文案）
-adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
-sleep 1
+assert_signed_in || true   # 失败只记 ::error::，后续仍尽力产出证据
 
 # ── 2. BottomSheet 玻璃（UI22 的核心问题：M3 ModalBottomSheet 在独立 window，
 #      Haze 能否跨 window 采样）──────────────────────────────────────────
-# 入口：首页快速操作 → 仓库选择 Sheet（RepoPickerSheet，GlassScope.BOTTOM_SHEET）。
-# 文案取自 feature:home strings（repo_picker_* 是 Sheet 内的，触发按钮在快捷操作区）。
-# 首次实测（run 34564015882）这里用错了 tap_desc —— 按钮是 Text 不是 content-desc，
-# 结果 Sheet 从未打开、三张帧逐字节相同。改用 tap_text 并逐个文案兜底。
+# 入口优先用**登录态才可达**的 Issue 评论输入 Sheet（§6.1 允许点位里的
+# "评论输入 / 行评论 / Review / 仓库选择"），它才是 UI22 真正要回答的对象。
 SHEET_OPENED=false
-for label in "Create issue" "View pull requests" "Create repository"; do
-  if tap_text "$label"; then
-    SHEET_OPENED=true
-    break
-  fi
-done
-if [ "$SHEET_OPENED" = true ]; then
-  shot "bottom-sheet-glass-on"
-  report_modes "bottom-sheet-glass-on"
+adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues/71" -p "$PKG" >/dev/null 2>&1 || true
+wait_for_activity "$PKG" || true
+sleep 5
+if try_tap_text "Comment"; then
+  SHEET_OPENED=true
 else
-  echo "::warning::快捷操作入口未找到，跳过 BottomSheet 帧（UI22 判定不完整）"
+  # 兜底：首页快速操作 → 仓库选择 Sheet（游客也开得出来）
+  adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
+  launch_app
+  for label in "Create issue" "View pull requests" "Create repository"; do
+    if try_tap_text "$label"; then SHEET_OPENED=true; break; fi
+  done
+fi
+
+if [ "$SHEET_OPENED" = true ]; then
+  sleep 2
+  adb exec-out screencap -p > "$OUT/bottom-sheet-glass-on.png"
+  adb logcat -d -s GlassRender 2>/dev/null | tail -40 > "$OUT/bottom-sheet-glass-on.glass.log" || true
+  if grep -q "scope=BOTTOM_SHEET" "$OUT/bottom-sheet-glass-on.glass.log" 2>/dev/null; then
+    echo "::notice::BottomSheet 已打开，且 GlassScope.BOTTOM_SHEET 参与了解析"
+    grep "scope=BOTTOM_SHEET" "$OUT/bottom-sheet-glass-on.glass.log" | tail -1
+  else
+    echo "::error::未观察到 scope=BOTTOM_SHEET —— Sheet 没打开，UI22 判定不成立"
+  fi
+else
+  echo "::error::所有 Sheet 入口都没点开 —— UI22 判定不完整"
 fi
 adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
 sleep 1
 
-# ── 3. 设置页玻璃开关区（对照用）──────────────────────────────────────────
-# 导航序列抄自 screenshots.sh（已实证）：底栏 Profile → 顶栏齿轮（齿轮是 content-desc）
+# ── 3. 通知面板（玻璃面板）───────────────────────────────────────────────
+launch_app
+tap_desc "Notifications" || echo "::warning::通知入口未找到，跳过面板帧"
+shot "notification-panel-glass-on"
+report_modes "notification-panel-glass-on"
+# 登录失效时这里会拍到应用自己的「Sign-in expired」错误卡 —— 明确标注，避免误判
+if ui_contains "Sign-in expired"; then
+  echo "::error::通知面板显示 Sign-in expired —— 注入的 SCREENSHOT_TOKEN 已被 GitHub 拒绝（401/403）"
+fi
+adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
+sleep 1
+
+# ── 4. 设置页玻璃开关 → 关掉后回首页（对照）──────────────────────────────
 wait_for_text "Profile" && tap_text "Profile" || echo "::warning::Profile tab 未找到"
 sleep 2
 wait_for_desc "Settings" && tap_desc "Settings" || echo "::warning::设置入口未找到"
 shot "settings-glass"
 report_modes "settings-glass"
 
-# ── 4. 对照：关掉毛玻璃总开关，同位置再截一帧 ─────────────────────────────
-# 开关行文案是 Text（不是 content-desc），首次实测用 tap_desc 点了个空。
-# tap_text 命中行标题即切换（M3 ListItem + trailing Switch 的可点行）。
-if tap_text "Glass effect"; then
+# 关掉总开关。判据用**日志**而不是像素比较：像素比较要求两次渲染处在同一状态，
+# 实测受时钟/状态栏干扰；而 GlassRender 直接打出 blurEnabled=false + mode=TranslucentScrim，
+# 机器可判、无歧义。
+if try_tap_text "Glass effect"; then
   sleep 2
   clear_log
   adb shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
+  sleep 1
+  # force-stop 再冷启动：只 resume 不会重新组合，也就不会重新打点
+  adb shell am force-stop "$PKG" >/dev/null 2>&1 || true
   launch_app
   shot "home-glass-off"
   report_modes "home-glass-off"
-  # 同位置对照：两帧逐字节比较，相同即模糊未生效
-  if cmp -s "$OUT/home-glass-on.png" "$OUT/home-glass-off.png"; then
-    echo "::error::开/关毛玻璃后首页截图逐字节相同 —— 模糊未生效（UI22 判定：Haze 未跨 window / 未采样到内容）"
+  if grep -q "blurEnabled=false" "$OUT/home-glass-off.glass.log" 2>/dev/null; then
+    echo "::notice::关闭总开关后 blurEnabled=false（对照成立）"
+    if grep -q "mode=TranslucentScrim" "$OUT/home-glass-off.glass.log" 2>/dev/null; then
+      echo "::notice::降级模式确认为 TranslucentScrim"
+    else
+      echo "::error::总开关已关但仍报告 BackdropBlur —— 开关未接线"
+    fi
   else
-    echo "::notice::开/关毛玻璃首页截图不同 —— 模糊路径确实生效，请人工确认视觉效果"
+    echo "::warning::关闭总开关后没有新的 GlassRender 日志（开关可能未点中）"
   fi
 else
   echo "::warning::未找到 Glass effect 开关，跳过对照帧（UI22 判定不完整）"

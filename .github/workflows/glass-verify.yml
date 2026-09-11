@@ -72,6 +72,11 @@ jobs:
 
       - name: Run glass verification on emulator
         uses: reactivecircus/android-emulator-runner@v2
+        # 与 ci.yml 的截图 job 同款：注入只读 PAT 让应用进入登录态。
+        # **未登录时首页为空、评论/Review 这些 BottomSheet 根本进不去** ——
+        # 拿未登录态去"看玻璃效果"等于测了个寂寞。
+        env:
+          SCREENSHOT_TOKEN: ${{ secrets.SCREENSHOT_TOKEN }}
         with:
           # API 31 = RenderEffect 模糊的最低版本；也是 runner 上能稳定 boot 的较新镜像
           # （API 34 google_apis 实测 boot 卡死，见 ci.yml 注释）
