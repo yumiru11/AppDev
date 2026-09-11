@@ -80,10 +80,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -574,6 +577,22 @@ private fun RepoDetailContent(
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
 
+    // ── README 下滑收起头部（#167 / UI10，ui-design §3.8 A 版）────────────────
+    // A 版口径（用户拍板）：README 下滑时，仓库头（名称/描述/统计/Star·Watch·Fork）
+    // **跟手渐隐并收缩高度**，滚过一段距离后完全收起，只留下分区 Tab。
+    //
+    // 为什么要把 scrollY 从 WebView 里捞出来：README 正文是 WebView 主渲染，滚动发生在
+    // WebView 内部，Compose 侧完全观察不到 —— 所以由 WebViewMarkdownRenderer 反向回调。
+    // 这也是本渲染架构下唯一可行的联动方式（不引入嵌套滚动/手势冲突）。
+    var readmeScrollY by remember { mutableIntStateOf(0) }
+    val collapseDistancePx = with(LocalDensity.current) { HEADER_COLLAPSE_DISTANCE.toPx() }
+    // 只在 README 分区生效：文件/Releases 分区有自己的滚动，不该被 README 的滚动位置影响
+    val headerCollapse =
+        if (tab == README_TAB_INDEX) (readmeScrollY / collapseDistancePx).coerceIn(0f, 1f) else 0f
+    // 头部自然高度只在实际展开时更新：收起过程中的测量值会被压缩后的约束污染，
+    // 若持续更新会形成"越收越小"的反馈回路。
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+
     Column(
         modifier =
             modifier
@@ -582,17 +601,40 @@ private fun RepoDetailContent(
                 // （用户实测目标边距）接管——全局 16 + 内层 37 = 53dp 太宽（2026-08-17 真机）
                 .padding(top = 16.dp),
     ) {
-        Box(Modifier.padding(horizontal = 16.dp)) {
-            RepoHeader(
-                state = state,
-                onToggleStar = managementCallbacks.onToggleStar,
-                onToggleWatch = managementCallbacks.onToggleWatch,
-                onFork = managementCallbacks.onFork,
-                onTopicClick = onTopicClick,
-            )
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    // 高度收缩 + 裁剪 = "收起"；alpha 同步淡出 = "渐隐"
+                    .height(
+                        with(LocalDensity.current) {
+                            (headerHeightPx * (1f - headerCollapse)).toDp()
+                        },
+                    ).clipToBounds()
+                    .padding(horizontal = 16.dp),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .onSizeChanged { size -> if (headerCollapse == 0f) headerHeightPx = size.height }
+                        .graphicsLayer {
+                            alpha = 1f - headerCollapse
+                            // 向上位移收进裁剪区，避免"高度在收、内容却在原地下沉"的割裂感
+                            translationY = -headerCollapse * headerHeightPx * HEADER_COLLAPSE_DRIFT
+                        },
+            ) {
+                RepoHeader(
+                    state = state,
+                    onToggleStar = managementCallbacks.onToggleStar,
+                    onToggleWatch = managementCallbacks.onToggleWatch,
+                    onFork = managementCallbacks.onFork,
+                    onTopicClick = onTopicClick,
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        // 头部收起时不再需要那段留白，否则会留下一块"空气隙"
+        Spacer(modifier = Modifier.height(16.dp * (1f - headerCollapse)))
 
         Box(Modifier.padding(horizontal = 16.dp)) {
             TabRow(selectedTabIndex = tab) {
@@ -623,6 +665,7 @@ private fun RepoDetailContent(
                     actions = actions,
                     onRetryReadme = onRetryReadme,
                     baseRepoUrl = buildRepoUrl(state.repo),
+                    onScrollChanged = { readmeScrollY = it },
                 )
             }
 
@@ -1602,6 +1645,8 @@ private fun ReadmeSection(
     actions: RepoDetailActions,
     onRetryReadme: () -> Unit,
     baseRepoUrl: String,
+    /** #167 / UI10：把 WebView 内部滚动上报给上层，用于 README 下滑收起头部 */
+    onScrollChanged: (Int) -> Unit = {},
 ) {
     // 图片全屏查看（#166 / UI11）：README 正文里的图片此前点了没反应（onImageClick 是空桩）
     var previewImageUrl by remember { mutableStateOf<String?>(null) }
@@ -1642,6 +1687,7 @@ private fun ReadmeSection(
                 bridgeCallback = createBridgeCallback(actions) { previewImageUrl = it },
                 baseRepoUrl = baseRepoUrl,
                 renderMode = readmeState.webViewRenderMode,
+                onScrollChanged = onScrollChanged,
             )
         }
 
@@ -1758,3 +1804,22 @@ private fun buildRepoUrl(repo: Repository): String = "https://github.com/${repo.
 
 /** Release 发布日期格式（yyyy-MM-dd，本地时区） */
 private val RELEASE_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+
+/** README 分区索引（头部收起只在 README 分区生效，见 RepoDetailContent 注释） */
+private const val README_TAB_INDEX = 0
+
+/**
+ * README 下滑多少距离后头部完全收起（#167 / UI10，A 版跟手渐隐）。
+ *
+ * 120dp 的取法：约等于仓库头可视高度的一半 —— 太短会"一滑就没"（失去跟手感），
+ * 太长则读正文时头部长期占着大半屏。
+ */
+private val HEADER_COLLAPSE_DISTANCE = 120.dp
+
+/**
+ * 收起过程中头部内容向上位移的比例（相对自然高度）。
+ *
+ * 只收缩容器高度而不位移的话，内容会"原地被裁"，看起来像被切掉而不是收起来。
+ * 0.6 让内容在收起过程中向上滑走，观感更接近"折叠"。
+ */
+private const val HEADER_COLLAPSE_DRIFT = 0.6f
