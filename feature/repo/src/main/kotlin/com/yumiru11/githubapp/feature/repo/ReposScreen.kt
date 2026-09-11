@@ -10,7 +10,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
@@ -46,7 +45,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -56,7 +54,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,16 +88,11 @@ import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
 import com.yumiru11.githubapp.core.designsystem.token.GlassScope
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
-import com.yumiru11.githubapp.core.designsystem.token.LocalStaggerEnabled
+import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 import com.yumiru11.githubapp.core.ui.AppTopBar
+import com.yumiru11.githubapp.core.ui.rememberStaggerEnterModifier
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
-
-/** 参与首屏 stagger 的最大行数（超出者直出，避免深页滚动反复入场） */
-private const val STAGGER_MAX_ITEMS = 12
-
-/** 进入动效的位移量（slide-up 起点） */
-private val ENTER_SLIDE_DISTANCE = 12.dp
 
 /**
  * 「仓库」大分区（#166 / UI01+UI02，ui-design §3.2）。
@@ -165,7 +157,7 @@ fun ReposScreen(
         Scaffold(
             modifier = modifier,
             contentWindowInsets = WindowInsets(0.dp),
-            snackbarHost = { SnackbarHost(snackbarHostState) },
+            snackbarHost = { AppSnackbarHost(snackbarHostState) },
             topBar = {
                 Box(modifier = Modifier.graphicsLayer { }) {
                     AppTopBar(
@@ -234,7 +226,17 @@ fun ReposScreen(
                     }
 
                     else -> {
-                        Crossfade(targetState = layout, label = "repo-layout") { mode ->
+                        // 布局切换 Crossfade（§3.2）：时长/曲线走 AppMotion 令牌
+                        // （此前用 M3 默认规格，设置页「动画强度」滑杆对它无效）
+                        Crossfade(
+                            targetState = layout,
+                            animationSpec =
+                                tween(
+                                    durationMillis = AppMotion.scaledDuration(AppMotion.DURATION_LIST_ITEM),
+                                    easing = AppMotion.EmphasizedDecelerate,
+                                ),
+                            label = "repo-layout",
+                        ) { mode ->
                             RepoCollection(
                                 mode = mode,
                                 repositories = repositories,
@@ -419,7 +421,7 @@ private fun RepoListCard(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = AppDimens.contentPadding)
-                    .then(rememberEnterModifier(index))
+                    .then(rememberStaggerEnterModifier(index))
                     .combinedClickable(
                         onClick = onClick,
                         onLongClick = onLongClick,
@@ -466,7 +468,7 @@ private fun RepoGridCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .then(rememberEnterModifier(index))
+                    .then(rememberStaggerEnterModifier(index))
                     .combinedClickable(
                         onClick = onClick,
                         onLongClick = onLongClick,
@@ -647,37 +649,6 @@ private fun RepoMetaRow(repository: Repository) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-    }
-}
-
-/**
- * 列表项进入动效（slide-up + fade）：间隔 [AppMotion.LIST_STAGGER_INTERVAL_MILLIS]，
- * 时长 [AppMotion.DURATION_LIST_ITEM] 经动效缩放折算（设置滑杆 × 系统缩放取 min，0 = 立即完成）。
- * 已播过的行用 rememberSaveable 记账，滚动回收后不重播。
- */
-@Composable
-private fun rememberEnterModifier(index: Int): Modifier {
-    // 全局 stagger 开关（#167 / UI06，§4.2 H2-2）：关掉即一次性直出
-    val staggerEnabled = LocalStaggerEnabled.current
-    val played = rememberSaveable { mutableStateOf(false) }
-    val progress = remember { Animatable(if (played.value) 1f else 0f) }
-    val duration = AppMotion.scaledDuration(AppMotion.DURATION_LIST_ITEM)
-    LaunchedEffect(duration, staggerEnabled) {
-        if (progress.value < 1f) {
-            if (!staggerEnabled || duration <= 0) {
-                progress.snapTo(1f)
-                played.value = true
-                return@LaunchedEffect
-            }
-            val delay = if (index < STAGGER_MAX_ITEMS) index * AppMotion.LIST_STAGGER_INTERVAL_MILLIS else 0
-            if (delay > 0) kotlinx.coroutines.delay(delay.toLong())
-            progress.animateTo(1f, tween(durationMillis = duration, easing = AppMotion.EmphasizedDecelerate))
-            played.value = true
-        }
-    }
-    return Modifier.graphicsLayer {
-        alpha = progress.value
-        translationY = (1f - progress.value) * ENTER_SLIDE_DISTANCE.toPx()
     }
 }
 

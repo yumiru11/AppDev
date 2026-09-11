@@ -1,12 +1,11 @@
-package com.yumiru11.githubapp.feature.home
+package com.yumiru11.githubapp.core.ui
 
-import com.yumiru11.githubapp.feature.home.ui.STAGGER_MAX_ITEMS
-import com.yumiru11.githubapp.feature.home.ui.staggerDelayMillis
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * stagger 延迟纯函数契约（#89）：24ms 步进、首屏窗口封顶、越界归零。
+ * stagger 延迟纯函数契约（#89，UI17 上移到 core:ui 后原样保留）：
+ * 24ms 步进、首屏窗口封顶、越界归零。
  */
 class StaggerDelayTest {
     @Test
