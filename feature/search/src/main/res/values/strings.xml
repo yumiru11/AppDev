@@ -21,6 +21,7 @@
     <string name="search_tab_code">Code</string>
 
     <!-- States -->
+    <string name="search_loading">Searching…</string>
     <string name="search_empty">No results</string>
     <string name="search_retry">Retry</string>
     <string name="search_load_more_failed">Failed to load more</string>

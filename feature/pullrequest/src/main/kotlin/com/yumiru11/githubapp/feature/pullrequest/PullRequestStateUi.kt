@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,13 +14,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestErrorType
 
-/** 加载中：居中圆形进度条 */
+/**
+ * 加载中：居中进度 + 本地化文案。
+ *
+ * C3 同源修复：改用项目共享的 [AppLoadingState]（#84/#185 建立），
+ * 与搜索页及其他屏的加载态保持一致（原先只有裸 `CircularProgressIndicator`）。
+ * 文案复用既有的 `pull_request_loading`（en/zh 成对已就位）。
+ */
 @Composable
 internal fun PullRequestLoadingContent(modifier: Modifier = Modifier) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+        AppLoadingState(label = stringResource(R.string.pull_request_loading))
     }
 }
 

@@ -20,10 +20,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -47,6 +46,7 @@ import com.yumiru11.githubapp.core.data.model.Repository
 import com.yumiru11.githubapp.core.data.model.SearchCodeItem
 import com.yumiru11.githubapp.core.data.model.SearchIssue
 import com.yumiru11.githubapp.core.data.model.User
+import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.feature.search.qualifier.QUALIFIER_SUGGESTIONS
@@ -320,17 +320,31 @@ private fun QualifierSection(
     }
 }
 
+/**
+ * 结果 Tab 行（C1 修复，docs/ui-design.md §3.3）。
+ *
+ * 原实现是已废弃的 `ScrollableTabRow`：其 `minTabWidth` 在 SubcomposeLayout 实现里被
+ * 硬编码为 90.dp 且无法调参，5 个 tab 需 450.dp，超过 360–411.dp 机型的可用宽度，
+ * 于是「Code」被屏幕右缘裁成半个字（CI 截图 `search-tabs.png`）。
+ *
+ * 改用 M3 1.4 的 [PrimaryScrollableTabRow]（primary tabs，TopAppBar 下的一级目的地）：
+ * - tab 宽度 = max(minTabWidth, 文本宽 + 32.dp 内边距)，在滚动容器里测量宽度不受限，
+ *   故标签**永不被省略号截断**——要么完整可见，要么整体滚出视口（滚动可读回）
+ * - `edgePadding` 提供首尾留白；M3 明确说明该留白本身就是「此行可横向滚动」的视觉提示
+ * - 字号 / 语言 / 字体缩放导致放不下时按 M3 语义横向滚动，而不是挤压或裁字
+ */
 @Composable
 private fun ResultTabs(
     selectedTab: SearchTab,
     onTabSelected: (SearchTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ScrollableTabRow(
+    PrimaryScrollableTabRow(
         selectedTabIndex = selectedTab.ordinal,
         modifier = modifier.fillMaxWidth(),
         containerColor = MaterialTheme.colorScheme.surface,
-        edgePadding = 8.dp,
+        edgePadding = TAB_ROW_EDGE_PADDING,
+        minTabWidth = TAB_ROW_MIN_TAB_WIDTH,
     ) {
         SearchTab.entries.forEach { tab ->
             Tab(
@@ -470,7 +484,10 @@ private fun <T : Any> SearchPagingList(
             }
 
             lazyItems.loadState.refresh is LoadState.Loading && lazyItems.itemCount == 0 -> {
-                item { LoadingContent() }
+                // C3 修复：LazyColumn 的 item 默认 wrap + start 对齐，直接放加载态会缩在
+                // 左上角（CI 截图 search-tabs.png 的裸左上角转圈）。fillParentMaxSize 撑满
+                // 视口后由 LoadingContent 居中，与全 app 其他屏的加载态一致。
+                item { LoadingContent(modifier = Modifier.fillParentMaxSize()) }
             }
 
             lazyItems.itemCount == 0 -> {
@@ -515,10 +532,16 @@ private fun CodeLoginGateContent(
     }
 }
 
+/**
+ * 加载态：项目共享的 [AppLoadingState]（#84/#185 建立）+ 本地化文案。
+ *
+ * C3 修复：原先只有一个裸 `CircularProgressIndicator`，无文案、无说明，
+ * 且与全 app 其他屏的加载态不一致（那些屏都走 AppLoadingState）。
+ */
 @Composable
 private fun LoadingContent(modifier: Modifier = Modifier) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+        AppLoadingState(label = stringResource(R.string.search_loading))
     }
 }
 
@@ -597,3 +620,24 @@ private fun errorMessage(errorType: SearchErrorType): String =
         SearchErrorType.UNAUTHORIZED -> stringResource(R.string.search_error_unauthorized)
         SearchErrorType.UNKNOWN -> stringResource(R.string.search_error_unknown)
     }
+
+/**
+ * 结果 Tab 行首尾留白（C1）。
+ *
+ * M3 语义：滚动 tab 行与首/尾 tab 之间的留白本身就是「此行可横向滚动」的视觉提示
+ * （M3 `PrimaryScrollableTabRow` 的 `edgePadding` 文档原话）。16.dp 与全 app 内容
+ * 边距（AppDimens.contentPadding）同量级，避免与上方搜索框视觉错位。
+ */
+private val TAB_ROW_EDGE_PADDING = 16.dp
+
+/**
+ * 结果 Tab 行 tab 最小宽度（C1）。
+ *
+ * M3 滚动 tab 行的默认下限是 90.dp，本页 5 个标签都是短词（en 最长 "Issues"，
+ * labelLarge 14sp 下约 40.dp 文本 + 32.dp 内边距 ≈ 72.dp），90.dp 会把总宽推到
+ * 450.dp+，在 360–411.dp 机型上必然把最后一个 tab 挤出屏外。
+ *
+ * 64.dp 仍远高于 Material 48.dp 的最小触摸目标，且让 5 个短标签在常见机型上一屏
+ * 放得下；放不下（超大字号 / 更长的语种 / 窄屏）时按 M3 语义横向滚动。
+ */
+private val TAB_ROW_MIN_TAB_WIDTH = 64.dp
