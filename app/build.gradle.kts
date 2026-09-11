@@ -143,6 +143,9 @@ dependencies {
 
     // 主题（core:designsystem）
     implementation(project(":core:designsystem"))
+    // 代码编辑器查找状态（#166 UI14）：FileViewerScreen 的 findState 参数类型来自 core:editor
+    // （feature:repo 以 implementation 依赖该模块，类型不外泄 → 消费端需自备编译类路径）
+    implementation(project(":core:editor"))
     // Haze（#88：MainActivity 根级 hazeSource，通知面板玻璃 backdrop-blur 整个导航内容）
     implementation(libs.haze)
 
@@ -190,6 +193,9 @@ dependencies {
 
     // Core
     implementation(libs.core.ktx)
+    // 品牌化启动屏（D3）：API<31 没有系统启动屏，冷启动会先露出一段窗口背景（白/黑）空窗。
+    // androidx 的兼容实现把应用图标带进启动画面，抹掉这段空窗。
+    implementation(libs.core.splashscreen)
     // Baseline Profile 安装器（T25）：把 APK 内 assets/dexopt/baseline.prof 装到 ART。
     // API 31+ 由编译期 baseline.profm 生效，本依赖主要服务 API 26-30（本项目 minSdk 26）。
     implementation(libs.profileinstaller)

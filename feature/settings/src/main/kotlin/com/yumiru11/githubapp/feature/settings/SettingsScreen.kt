@@ -96,7 +96,13 @@ fun SettingsScreen(
                         SectionHeader(text = stringResource(R.string.settings_appearance_group))
                     }
                     item {
-                        AppearanceSettingsSection(uiState = uiState, viewModel = viewModel)
+                        AppearanceSettingsSection(
+                            uiState = uiState,
+                            viewModel = viewModel,
+                            // #167 / UI04：Photo Picker 选中 → 交给 ViewModel 持久化。
+                            // 持久化读权限在 AppearanceSettingsSection 内取（那里才有 Context 与 launcher）。
+                            onPickBackgroundImage = viewModel::setBackgroundImageUri,
+                        )
                     }
                     item {
                         SectionHeader(text = stringResource(R.string.settings_developer_group))

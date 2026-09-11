@@ -229,6 +229,8 @@ fun RepoDetailScreen(
                             viewModel = filesViewModel,
                             actions = actions,
                             baseRepoUrl = buildRepoUrl(state.repo),
+                            findState = filesState.findState,
+                            isFindOpen = filesState.isFindOpen,
                             editable = state.isLoggedIn,
                             onClose = { filesViewModel.closeFile() },
                             modifier = Modifier.fillMaxSize(),
@@ -922,7 +924,10 @@ private fun ManagementButtons(
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         // Star 微缩放 + 颜色过渡（UI07）：只在状态真正翻转时播一次，首次组合不播
+        // （#167 / UI17 补齐：原实现首次组合也会弹一下——进详情页时星星无故自弹，
+        //   且与「滚动/进场中不触发动画」的约束相悖；这里用 rememberSaveable 记账跳过首帧）
         val starScale = remember { Animatable(1f) }
+        var starFirstComposition by rememberSaveable { mutableStateOf(true) }
         val starTint by
             animateColorAsState(
                 targetValue =
@@ -934,8 +939,12 @@ private fun ManagementButtons(
                 animationSpec = tween(AppMotion.scaledDuration(AppMotion.DURATION_SMALL_STATE_CHANGE)),
                 label = "star-tint",
             )
+        // 减弱动画（滑轮到底 / 系统「移除动画」）→ 直接跳过弹跳，状态色照常切换
+        val starBounceEnabled = AppMotion.scaledDuration(AppMotion.DURATION_SMALL_STATE_CHANGE) > 0
         LaunchedEffect(isStarred) {
-            if (starScale.value == 1f) {
+            if (starFirstComposition) {
+                starFirstComposition = false
+            } else if (starBounceEnabled && starScale.value == 1f) {
                 starScale.animateTo(
                     STAR_BOUNCE_SCALE,
                     spring(dampingRatio = AppMotion.DampingRatioHighBouncy, stiffness = AppMotion.StiffnessMedium),

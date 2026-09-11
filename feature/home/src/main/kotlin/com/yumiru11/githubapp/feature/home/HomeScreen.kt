@@ -5,7 +5,9 @@
 
 package com.yumiru11.githubapp.feature.home
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,13 +34,17 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -63,13 +69,13 @@ import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppTopBar
+import com.yumiru11.githubapp.core.ui.STAGGER_MAX_ITEMS
+import com.yumiru11.githubapp.core.ui.rememberStaggerEnterModifier
 import com.yumiru11.githubapp.feature.home.model.FeedItem
 import com.yumiru11.githubapp.feature.home.model.TrendItem
 import com.yumiru11.githubapp.feature.home.ui.FeedRow
 import com.yumiru11.githubapp.feature.home.ui.RepoPickerSheet
-import com.yumiru11.githubapp.feature.home.ui.STAGGER_MAX_ITEMS
 import com.yumiru11.githubapp.feature.home.ui.TrendingSection
-import com.yumiru11.githubapp.feature.home.ui.rememberStaggerEnterModifier
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.flow.Flow
@@ -89,6 +95,8 @@ internal const val TRENDING_SECTION_KEY = "home-trending-section"
  * - 登录态驱动：未登录 → 登录引导（T10 验收第 1 条）
  * - #89：分区改 [HorizontalPager] 跟手滑动；点 Tab 弹簧微回弹滚页（ui-design.md §2.1/§4.2 H1-1），
  *   拖页时 TabRow 指示条经 targetPage 即时跟随
+ * - #167 / UI16：点 Tab 切分区在弹簧滚页之上再叠一层 **fade-through 透明度**（§4.3 渐入渐出）；
+ *   跟手拖拽不触发（只在点击计数变化时启动），时长走 AppMotion 折算（减弱动画 = 跳过）
  * - #89：动态页头部 LongBarAction ×3（新建 Issue / 查看 Pull Requests / 新建仓库占位禁用）。
  *   前两者经仓库选择器（[RepoPickerSheet]）取得 {owner}/{repo} 后由调用方路由到 T14/T15 页面
  * - 列表：Paging 分页（T10）+ PullToRefreshBox 下拉刷新（只作用于动态分区，B1-4）
@@ -148,6 +156,11 @@ fun HomeScreen(
     // pager 状态上提到这里：分区条已进玻璃头（顶栏插槽），两者要读写同一份状态
     val pagerState = rememberPagerState { HomeTab.entries.size }
 
+    // #167 / UI16：点 Tab 切分区时的 fade-through 透明度叠加信号。
+    // 用"点击计数"而不是 pagerState：只有点 Tab 才自增，跟手拖拽（#89）不动它，
+    // 因此拖拽期间不会有任何叠加动画打断手势（§4.4 滚动性能优先）。
+    var tabClickTicks by remember { mutableIntStateOf(0) }
+
     CompositionLocalProvider(LocalHazeState provides hazeState) {
         Scaffold(
             modifier = modifier,
@@ -160,6 +173,7 @@ fun HomeScreen(
                     onSearchClick = onSearchClick,
                     onNotificationClick = onNotificationClick,
                     onProfileClick = onProfileClick,
+                    onTabClick = { tabClickTicks++ },
                 )
             },
         ) { paddingValues ->
@@ -205,6 +219,7 @@ fun HomeScreen(
                             feed = state.feed,
                             trending = trending,
                             pagerState = pagerState,
+                            tabClickTicks = tabClickTicks,
                             onFeedItemClick = onFeedItemClick,
                             topGlassPadding = topGlassPadding,
                             bottomContentPadding = bottomContentPadding,
@@ -234,6 +249,7 @@ private fun HomeGlassHeader(
     onSearchClick: () -> Unit,
     onNotificationClick: () -> Unit,
     onProfileClick: () -> Unit,
+    onTabClick: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     Box(modifier = Modifier.zIndex(1f)) {
@@ -247,6 +263,9 @@ private fun HomeGlassHeader(
                     selectedTabIndex = pagerState.targetPage.coerceIn(0, HomeTab.entries.lastIndex),
                     onTabSelected = { tab ->
                         if (tab.ordinal != pagerState.targetPage) {
+                            // 点 Tab：叠一层 fade-through 透明度（#167 / UI16）；
+                            // 滚页本身仍是 #89 的弹簧微回弹（H1-1），未被替换
+                            onTabClick()
                             scope.launch {
                                 pagerState.animateScrollToPage(
                                     page = tab.ordinal,
@@ -276,6 +295,7 @@ private fun HomeSuccessContent(
     feed: Flow<PagingData<FeedItem>>,
     trending: List<TrendItem>,
     pagerState: PagerState,
+    tabClickTicks: Int,
     onFeedItemClick: (ParsedUrl) -> Unit,
     topGlassPadding: Dp,
     bottomContentPadding: Dp,
@@ -288,9 +308,32 @@ private fun HomeSuccessContent(
     var pickerVisible by rememberSaveable { mutableStateOf(false) }
     var pickerTarget by rememberSaveable { mutableStateOf(PickerTarget.CREATE_ISSUE) }
 
+    // 点 Tab 切换的 fade-through 透明度叠加（#167 / UI16，ui-design §4.3 渐入渐出）：
+    // 与 #89 的弹簧滚页**同时**进行——内容先淡出、再淡入（出场 40% 时长 + 进场 60%），
+    // 时长走 AppMotion 令牌并按设置滑杆 × 系统缩放折算（0 = 直接跳过，不进动画路径）。
+    // 只读 Animatable 值（graphicsLayer 内），不触发重组，也不会在拖拽期启动（见 tabClickTicks）。
+    val sectionFade = remember { Animatable(1f) }
+    val sectionFadeMillis = AppMotion.scaledDuration(AppMotion.DURATION_LIST_ITEM)
+    LaunchedEffect(tabClickTicks) {
+        if (tabClickTicks <= 0 || sectionFadeMillis <= 0) {
+            sectionFade.snapTo(1f)
+            return@LaunchedEffect
+        }
+        val outMillis = (sectionFadeMillis * SECTION_FADE_OUT_FRACTION).toInt()
+        sectionFade.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(outMillis, easing = AppMotion.EmphasizedAccelerate),
+        )
+        sectionFade.animateTo(
+            targetValue = 1f,
+            animationSpec =
+                tween(sectionFadeMillis - outMillis, easing = AppMotion.EmphasizedDecelerate),
+        )
+    }
+
     HorizontalPager(
         state = pagerState,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().graphicsLayer { alpha = sectionFade.value },
     ) { page ->
         HomePage(
             page = page,
@@ -675,3 +718,6 @@ private fun HomeTabBar(
         }
     }
 }
+
+/** 点 Tab 分区切换时"先淡出"占整段 fade 的比例（其余留给淡入，避免中途出现长空白）。 */
+private const val SECTION_FADE_OUT_FRACTION = 0.4f

@@ -7,7 +7,12 @@
 
 开发一个**功能全面的 Android GitHub 客户端**（轻量、流畅、全 Material You）。技术规划 = `plan.md`（41KB，必读），需求来源 = `request.txt`。应用名/包名仍为占位符：applicationId 与 namespace = `com.yumiru11.githubapp`（模块 namespace 用 `core.github_xxx` 下划线写法），产品定名后统一改。
 
-**当前状态（2026-09-06）**：`main@2b7071d`。**T1–T26 中 25 票已合入 main 并关闭**，唯一未开工的功能票是 **T25（#26，性能与发布收尾）**；ui-audit 8 票（#83–#90）与 Task B 渲染架构切换（PR #70/#73）全部合入。全量审计（`docs/agents/task-audit-2026-09-06.md`）已把 51 项遗留发现合并立项为 **9 张分类票 #163–#171**——当前活动票就这 9 张 + #26（#1 Spec 与 #71 测试面板按约定常开）。剩余工作与执行顺序见 `docs/agents/project-status.md`。
+**当前状态（2026-09-11）**：`main@698c48f`。**T1–T26 全部合入 main 并关闭**（T23 有接线缺口，见下）；ui-audit 8 票（#83–#90）与 Task B 渲染架构切换（PR #70/#73）全部合入。本轮完成三份审计（需求符合性 / 提交级 / UI 真机截图）并立项新票，**当前活动票**：**#200 #201（P0）**、**#202 #203**、**#166 #167** 挂账项、**#26（T25 真机项）**；#1（Spec）与 #71（测试面板）按约定常开。剩余工作见 `docs/agents/project-status.md`。
+
+> ⚠️ **已知 P0 缺口（2026-09-11 提交级审计实证；修复合入前勿沿用旧结论）**
+> 1. **T23 两个页面从未接线** —— `MainActivity.kt` 漏传 `branchesScreen` / `createPullRequestScreen`，两者走 `AppNavHost` 的默认空实现 → 用户点进去是**白屏**（票面曾记为「已交付」）。修复分支 `fix/t23-nav-wiring`。
+> 2. **OAuth 开箱必失败** —— `OAuthConfig.kt` 的 `PLACEHOLDER_CLIENT_ID = "YOUR_OAUTH_APP_CLIENT_ID"`，全仓无 `buildConfigField` 注入点；真机 PKCE 登录前必须先配 client id。
+> 3. **仓库（Repos）分区底部 contentPadding 恒为 0** —— `MainActivity.kt` 的 `reposPage` lambda 丢弃了 `MainTabPager` 传入的 `PaddingValues`，列表末行被底栏压住（#200）。
 
 ## 核心决策（来自 plan.md，勿偏离）
 
@@ -47,7 +52,7 @@
 ```bash
 ./gradlew :app:compileDebugKotlin    # 全量编译入口（增量 ~13s）
 ./gradlew :core:markdown:compileDebugKotlin   # 单模块编译
-./gradlew :core:test --tests "*XxxRepositoryTest*"   # 单模块单类
+./gradlew :core:markdown:testDebugUnitTest --tests "*XxxRepositoryTest*"   # 单模块单类（注意：没有 :core 聚合项目）
 ```
 
 **⚠️ 铁律（血泪教训）**：

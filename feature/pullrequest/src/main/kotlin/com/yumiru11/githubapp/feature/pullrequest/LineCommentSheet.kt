@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
+import com.yumiru11.githubapp.core.ui.appTransientEnterAlpha
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.pullrequest.model.LineCommentAnchor
 import com.yumiru11.githubapp.feature.pullrequest.model.LineCommentTarget
@@ -55,7 +56,8 @@ internal fun LineCommentSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        modifier = modifier,
+        // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）
+        modifier = modifier.appTransientEnterAlpha(),
     ) {
         Column(
             modifier =

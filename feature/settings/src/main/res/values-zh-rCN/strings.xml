@@ -30,6 +30,13 @@
     <string name="settings_blur">毛玻璃效果</string>
     <string name="settings_blur_desc">顶/底栏、通知面板与弹出面板背后的模糊</string>
     <!-- 逐项开关（#167 / UI03，ui-design §6.3） -->
+    <string name="settings_background">背景图</string>
+    <string name="settings_background_none">未设置 —— 选一张图片个性化应用</string>
+    <string name="settings_background_selected">铺在所有页面之下（不随内容滚动）</string>
+    <string name="settings_background_pick">选择图片</string>
+    <string name="settings_background_change">更换图片</string>
+    <string name="settings_background_clear">移除</string>
+    <string name="settings_background_opacity">不透明度 %1$d%%</string>
     <string name="settings_stagger">列表入场动效</string>
     <string name="settings_stagger_desc">首屏条目逐项滑入</string>
     <string name="settings_glass_top_bar">顶栏</string>
