@@ -4,6 +4,10 @@
 
 package com.yumiru11.githubapp.feature.settings
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -29,12 +33,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -42,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -49,6 +56,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
+import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.designsystem.component.CardGroup
 import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
 import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
@@ -71,6 +79,12 @@ import kotlin.math.roundToInt
 internal fun AppearanceSettingsSection(
     uiState: SettingsUiState,
     viewModel: SettingsViewModel,
+    /**
+     * 背景图选择回调（#167 / UI04）。由外层把「Photo Picker 选中的 URI」交给 ViewModel ——
+     * launcher 必须在 Composable 里注册（ActivityResult 契约），而持久化权限与写入是
+     * ViewModel 的活，故这里只透传最终 URI。
+     */
+    onPickBackgroundImage: (String) -> Unit,
 ) {
     CardGroup {
         item { ThemeModeRow(uiState = uiState, viewModel = viewModel) }
@@ -170,6 +184,125 @@ internal fun AppearanceSettingsSection(
                 onCheckedChange = viewModel::setStaggerEnabled,
             )
         }
+        // 全局背景图（#167 / UI04，ui-design §7.4 用户拍板）：
+        // 默认无图；选择走系统 Photo Picker（Android 13+ 即 Material You 风格的系统选择器，
+        // 低版本由 androidx 回移版本接管），选中后可调统一不透明度。
+        item {
+            BackgroundImageRow(
+                imageUri = uiState.backgroundImageUri,
+                opacity = uiState.backgroundOpacity,
+                onPick = onPickBackgroundImage,
+                onClear = { viewModel.setBackgroundImageUri(null) },
+                onOpacityChange = viewModel::setBackgroundOpacity,
+            )
+        }
+    }
+}
+
+/**
+ * 背景图设置行（#167 / UI04）。
+ *
+ * 「选择图片」走 [ActivityResultContracts.PickVisualMedia] —— 这就是系统 Photo Picker，
+ * 在 Android 13+ 上本身就是 Material You 风格；低版本由 androidx 回移实现接管，
+ * 三档设备观感一致。**不申请 READ_MEDIA_IMAGES 权限**：Photo Picker 是「用户选哪张
+ * 就给哪张」的授权模型，比全库读权限既省事又更尊重隐私。
+ *
+ * 选完必须 takePersistableUriPermission，否则进程重启后 URI 失效、背景图变空白。
+ */
+@Composable
+private fun BackgroundImageRow(
+    imageUri: String?,
+    opacity: Float,
+    onPick: (String) -> Unit,
+    onClear: () -> Unit,
+    onOpacityChange: (Float) -> Unit,
+) {
+    val context = LocalContext.current
+    val picker =
+        rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            if (uri != null) {
+                // 持久化读权限：不取的话下次冷启动就没有读权限了（背景图会消失）
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
+                }
+                onPick(uri.toString())
+            }
+        }
+
+    // 与 SwitchSettingRow 同款内边距（AppDimens.contentPadding） —— 同一分组内左对齐一致
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppDimens.contentPadding, vertical = 8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_background),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text =
+                if (imageUri == null) {
+                    stringResource(R.string.settings_background_none)
+                } else {
+                    stringResource(R.string.settings_background_selected)
+                },
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton(
+                onClick = {
+                    picker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                    )
+                },
+            ) {
+                Text(
+                    text =
+                        stringResource(
+                            if (imageUri == null) {
+                                R.string.settings_background_pick
+                            } else {
+                                R.string.settings_background_change
+                            },
+                        ),
+                )
+            }
+            if (imageUri != null) {
+                TextButton(onClick = onClear) {
+                    Text(text = stringResource(R.string.settings_background_clear))
+                }
+            }
+        }
+        // 不透明度只在选了图之后才有意义 —— 没图时显示滑杆只会让人疑惑"调了没反应"
+        if (imageUri != null) {
+            BackgroundOpacitySlider(opacity = opacity, onOpacityChange = onOpacityChange)
+        }
+    }
+}
+
+/** 背景图不透明度滑杆（#167 / UI04，§7.4「可选统一图片不透明度设置」）。 */
+@Composable
+private fun BackgroundOpacitySlider(
+    opacity: Float,
+    onOpacityChange: (Float) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Text(
+            text = stringResource(R.string.settings_background_opacity, (opacity * 100).roundToInt()),
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Slider(
+            value = opacity,
+            onValueChange = onOpacityChange,
+            valueRange =
+                UserPreferencesRepository.MIN_BACKGROUND_OPACITY..UserPreferencesRepository.MAX_BACKGROUND_OPACITY,
+        )
     }
 }
 

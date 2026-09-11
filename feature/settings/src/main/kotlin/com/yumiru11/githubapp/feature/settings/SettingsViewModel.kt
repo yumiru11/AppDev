@@ -1,4 +1,13 @@
-@file:Suppress("EmptyCatchBlock", "TooGenericExceptionCaught", "SwallowedException") // 偏好持久化失败静默降级（T24 补测修复）：catch 块仅注释说明意图，异常有意丢弃，不崩溃
+@file:Suppress(
+    "EmptyCatchBlock",
+    "TooGenericExceptionCaught",
+    "SwallowedException",
+    "TooManyFunctions",
+)
+// EmptyCatchBlock/TooGenericExceptionCaught/SwallowedException：偏好持久化失败静默降级（T24 补测修复）：
+//   catch 块仅注释说明意图，异常有意丢弃，不崩溃。
+// TooManyFunctions：设置页每个开关一个 setter 是"扁平面"设计的必然结果（#167 / UI04 背景图触顶 21 个）。
+//   把 setter 拆到别的类只会让调用方多记一个间接层，可读性更差 —— 精准抑制（T3 先例）。
 
 package com.yumiru11.githubapp.feature.settings
 
@@ -66,10 +75,16 @@ class SettingsViewModel
                 ) { blur, topBar, bottomBar, panel, bottomSheet ->
                     GlassPrefs(blur, topBar, bottomBar, panel, bottomSheet)
                 },
+                // 背景图两项并进 misc 组：外层 combine 最多支持 5 个流，单独再开一组会超。
+                // 语义上也算「杂项偏好」，合并无碍。
                 combine(
                     preferences.languageTag,
                     preferences.staggerEnabled,
-                ) { languageTag, stagger -> MiscPrefs(languageTag, stagger) },
+                    preferences.backgroundImageUri,
+                    preferences.backgroundOpacity,
+                ) { languageTag, stagger, backgroundUri, backgroundOpacity ->
+                    MiscPrefs(languageTag, stagger, backgroundUri, backgroundOpacity)
+                },
                 sessionManager.authState,
             ) { theme, style, glass, misc, authState ->
                 SettingsUiState(
@@ -90,6 +105,8 @@ class SettingsViewModel
                     glassPanel = glass.panel,
                     glassBottomSheet = glass.bottomSheet,
                     staggerEnabled = misc.staggerEnabled,
+                    backgroundImageUri = misc.backgroundUri,
+                    backgroundOpacity = misc.backgroundOpacity,
                     authState = authState,
                 )
             }.stateIn(
@@ -145,6 +162,21 @@ class SettingsViewModel
         /** 列表首屏 stagger 开关（#167 / UI06） */
         fun setStaggerEnabled(enabled: Boolean) {
             persist { preferences.setStaggerEnabled(enabled) }
+        }
+
+        /**
+         * 选择/更换背景图（#167 / UI04）。
+         *
+         * 传 null 即清除。URI 由设置页的 Photo Picker 提供，持久化读权限在那边取
+         * （takePersistableUriPermission）—— 这里只负责存。
+         */
+        fun setBackgroundImageUri(uri: String?) {
+            persist { preferences.setBackgroundImageUri(uri) }
+        }
+
+        /** 背景图不透明度（#167 / UI04，§7.4「可选统一图片不透明度设置」） */
+        fun setBackgroundOpacity(opacity: Float) {
+            persist { preferences.setBackgroundOpacity(opacity) }
         }
 
         // ── 毛玻璃逐项开关（#167 / UI03：ui-design §6.3 四条允许点位）──────────────
@@ -224,4 +256,7 @@ private data class GlassPrefs(
 private data class MiscPrefs(
     val languageTag: String?,
     val staggerEnabled: Boolean,
+    /** #167 / UI04：背景图 URI 与不透明度 */
+    val backgroundUri: String?,
+    val backgroundOpacity: Float,
 )

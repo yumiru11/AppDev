@@ -144,6 +144,48 @@ class UserPreferencesRepositoryTest {
         }
 
     // ── 仓库列表布局（#166 / UI01）──────────────────────────────────────────
+    // ── 全局背景图（#167 / UI04）──────────────────────────────────────────
+    @Test
+    fun backgroundImageUri_byDefault_isNull() =
+        runTest {
+            assertEquals(null, createRepository().backgroundImageUri.first())
+        }
+
+    @Test
+    fun backgroundOpacity_byDefault_isRecommendation() =
+        runTest {
+            assertEquals(
+                UserPreferencesRepository.DEFAULT_BACKGROUND_OPACITY,
+                createRepository().backgroundOpacity.first(),
+                0.0001f,
+            )
+        }
+
+    @Test
+    fun setBackgroundImageUri_persistsAndClears() =
+        runTest {
+            val repository = createRepository()
+
+            repository.setBackgroundImageUri("content://media/picked/1")
+            assertEquals("content://media/picked/1", repository.backgroundImageUri.first())
+
+            // 清除：写 null 应回到"无图"，而不是留下空串
+            repository.setBackgroundImageUri(null)
+            assertEquals(null, repository.backgroundImageUri.first())
+        }
+
+    @Test
+    fun setBackgroundOpacity_outOfRange_isClamped() =
+        runTest {
+            val repository = createRepository()
+
+            repository.setBackgroundOpacity(5f)
+            assertEquals(UserPreferencesRepository.MAX_BACKGROUND_OPACITY, repository.backgroundOpacity.first(), 0.0001f)
+
+            repository.setBackgroundOpacity(-1f)
+            assertEquals(UserPreferencesRepository.MIN_BACKGROUND_OPACITY, repository.backgroundOpacity.first(), 0.0001f)
+        }
+
     // ── 列表 stagger 开关（#167 / UI06）────────────────────────────────────
     @Test
     fun staggerEnabled_byDefault_emitsTrue() =

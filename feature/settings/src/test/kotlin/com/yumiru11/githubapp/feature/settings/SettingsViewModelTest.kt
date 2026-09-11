@@ -232,6 +232,30 @@ class SettingsViewModelTest {
         }
 
     @Test
+    fun setBackgroundImageUri_emitsPickedUri() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                assertEquals(null, awaitItem().backgroundImageUri)
+                viewModel.setBackgroundImageUri("content://media/picked/7")
+                assertEquals("content://media/picked/7", awaitItem().backgroundImageUri)
+            }
+        }
+
+    @Test
+    fun setBackgroundOpacity_emitsNewValue() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                assertEquals(0.25f, awaitItem().backgroundOpacity, 0.0001f)
+                viewModel.setBackgroundOpacity(0.4f)
+                assertEquals(0.4f, awaitItem().backgroundOpacity, 0.0001f)
+            }
+        }
+
+    @Test
     fun setStaggerEnabled_false_persistsAndEmits() =
         runTest {
             val viewModel = createViewModel()
@@ -499,6 +523,13 @@ private class FakeUserPreferencesRepository(
 
     override val staggerEnabled: Flow<Boolean> = staggerEnabledFlow
 
+    private val backgroundUriFlow = MutableStateFlow<String?>(null)
+    private val backgroundOpacityFlow = MutableStateFlow(0.25f)
+
+    override val backgroundImageUri: Flow<String?> = backgroundUriFlow
+
+    override val backgroundOpacity: Flow<Float> = backgroundOpacityFlow
+
     override suspend fun setThemeMode(mode: ThemeMode) {
         if (failOnSetThemeMode) throw IOException("disk full")
         themeModeFlow.value = mode
@@ -566,6 +597,14 @@ private class FakeUserPreferencesRepository(
 
     override suspend fun setStaggerEnabled(enabled: Boolean) {
         staggerEnabledFlow.value = enabled
+    }
+
+    override suspend fun setBackgroundImageUri(uri: String?) {
+        backgroundUriFlow.value = uri
+    }
+
+    override suspend fun setBackgroundOpacity(opacity: Float) {
+        backgroundOpacityFlow.value = opacity
     }
 
     override suspend fun setRepoLayout(mode: RepoLayoutMode) {

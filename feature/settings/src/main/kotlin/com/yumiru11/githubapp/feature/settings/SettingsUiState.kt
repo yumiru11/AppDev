@@ -33,6 +33,10 @@ data class SettingsUiState(
     val glassBottomBar: Boolean = true,
     val glassPanel: Boolean = true,
     val glassBottomSheet: Boolean = true,
+    /** 全局背景图 URI（#167 / UI04；null = 默认无图） */
+    val backgroundImageUri: String? = null,
+    /** 背景图统一不透明度（#167 / UI04，§7.4） */
+    val backgroundOpacity: Float = 0.25f,
     val authState: AuthState = AuthState.Anonymous,
 ) {
     /**
