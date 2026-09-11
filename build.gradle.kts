@@ -409,6 +409,15 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 // *Composer.kt：编辑/预览装配层（MarkdownComposer 等纯 Composable）。
                 // "Composer" 是 Compose 专有词（runtime 的 Composer），不会有同名逻辑类。
                 Regex("""(^|/)[^/]*Composer[^/]*\.kt$"""),
+                // app 模块根包下的主题/背景装配层（#167 / UI04）。
+                // 这两处是**纯 Compose 装配**：AppThemeHost 只做"偏好 Flow → CompositionLocal"
+                // 的接线，AppBackground 只做"图 + 蒙版 + 内容"的三层堆叠。
+                // 逻辑部分已抽成可测纯函数（BackgroundScrim 有 5 例 JVM 断言；色板/动效换算在
+                // core:designsystem 各自有测试）—— 这里排除的只是无法单测的装配代码。
+                // 实测（PR #197）：不加这两条，动一行接线就会被 diff 门禁判成"未覆盖新增行"。
+                // 且 Robolectric 沙箱加载的类不产 JaCoCo 数据（#181 结论），补测试也解决不了。
+                Regex("""(^|/)AppThemeHost\.kt$"""),
+                Regex("""(^|/)AppBackground\.kt$"""),
             )
 
         val changedFiles =
