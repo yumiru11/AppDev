@@ -114,7 +114,7 @@ feature/                   auth, home, repo, issue, pullrequest, search, editor,
 | UI 设计规范（权威，2026-08-15 拍板版） | `docs/ui-design.md` |
 | **UI 审查问题清单（2026-08-21 快照，缺陷/挂账/提案）** | `docs/ui-audit-2026-08-21.md` |
 | **全量审计报告（2026-09-06，9 张分类票来源）** | `docs/agents/task-audit-2026-09-06.md` |
-| 架构决策记录（ADR-0001~0006） | `docs/adr/` |
+| 架构决策记录（ADR-0001~0008） | `docs/adr/` |
 | 术语表 | `CONTEXT.md` |
 | 真机走查反馈与状态 | `FEEDBACK.md` |
 | 调研报告 | `docs/research/`（webview-material-you-fusion、highlight-engine-analysis） |

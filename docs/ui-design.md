@@ -270,6 +270,45 @@
 - 滚动性能优先：不做无谓横向缩放与弹跳；列表滚动中禁用进入动画（首帧后）
 - 所有动效时长 token 化（AppDimens 同级：AppMotion）
 
+### 4.5 M3 Expressive 动效方案（2026-09-12 接入，ADR-0008）
+
+**已接入官方的 Expressive 弹簧物理**，不再只有「时长 + 缓动」一层。
+
+| 层 | 令牌 | 表达 | 管什么 |
+|---|---|---|---|
+| 1 转场 | `AppMotion`（§4.1/§4.3） | **显式时长**（ms）+ `Easing` | 页面进入/退出、fade-through 这类「A→B 有始有终」的编排 |
+| 2 组件 | `AppMotionScheme` | **弹簧物理**（dampingRatio / stiffness） | 组件内可中断的位移/尺寸/形状/颜色（按压回弹、形变、展开） |
+
+- `AppMotionScheme.standard()` / `expressive()` **直接委托官方**
+  `MotionScheme.standard()` / `MotionScheme.expressive()`，不在项目内复刻 spring 常量
+  （alpha 期官方调数值可自动跟进，也不会出现「项目常量与官方漂移」的隐性 bug）
+- `AppTheme(motionScheme = AppMotionScheme.forMotionScale(motionScale))` —— 全树的
+  `MaterialTheme.motionScheme` 消费方自动拿到 Expressive 物理；组件用自己的 spec 时
+  应优先取 `MaterialTheme.motionScheme.*` 而不是新写 `spring(...)`
+- 官方 Expressive 数值（1.5.0-alpha18 字节码实测）：spatial damping 0.6/0.8（**有回弹**）、
+  effects damping **恒为 1.0（零回弹）**；spatial stiffness 200/380/800，effects 800/1600/3800。
+  语义：**弹性只允许出现在空间维度**（位移/尺寸），颜色与透明度不得过冲
+- **⚠️ spring 不受 `LocalMotionScale` 影响**：`LocalMotionScale` 只被
+  `AppMotion.scaledDuration` 消费，作用对象是**时长**；`MotionScheme` 返回的 spec 没有任何
+  缩放入口。系统侧「移除动画」由 Compose 内建 `MotionDurationScale` 兜底（整条动画被时间
+  缩放，= 0 时下一帧结束），但**设置页「动画强度」滑杆管不到 spring**。故约定：
+  **可感知的弹性动效，调用方必须自行判定缩放为 0 时跳过动画、直接落终态**
+  （`CardGroup` 的 `if (motionScale <= NO_MOTION_SCALE) snap() else spring(...)` 是既有范式）；
+  缩放为 0 时 `forMotionScale` 另会退化为 `standard()`（去回弹）。
+
+### 4.6 Expressive 组件替换落地记录（2026-09-12）
+
+全仓裸 `CircularProgressIndicator` 用量 **26 处 / 17 文件**，逐个判定如下：
+
+| 组件 | 结论 | 依据 |
+|---|---|---|
+| **整页 / 分区首载** → `LoadingIndicator`（形变加载） | ✅ **已替换 16 处** | 官方定位「should replace most uses of the indeterminate circular progress indicator」。统一入口 `AppLoadingState`（一处改动让 Home / RepoPicker / Notifications / Gists / Profile / Repos 自动受益）+ RepoDetail 整页与 Releases/Tags/ReleaseDetail/Readme 四分区 + Branches / CommitDetail / FileTree / FileViewer / Search 结果区 / PullRequestCreate |
+| **按钮内 pending**（16~24dp, strokeWidth 2dp） | ⬜ **保持 flat `CircularProgressIndicator`（18 处）** | 官方明令「In very small buttons, use the flat shape since the wavy shape is not as visible at that size」；同理 `LoadingIndicator` 默认容器约 48dp，塞进 18dp 按钮不可读 |
+| **搜索进行中通栏条** → `LinearWavyProgressIndicator` | ✅ **已替换 1 处** | wavy 的官方适配区间是「让较长过程不显得静止」且**需要足够宽度**；通栏搜索等待条宽度足够、波形可见。testTag / 读屏语义原样保留 |
+| **Issue / PR 列表与详情的整页加载态** | ⬜ **未替换（有意回退）** | `IssueStateUi.kt` / `PullRequestStateUi.kt` 不在 `uiSourceExcludes`，且实测在覆盖率报告中 **0/24 行已覆盖**（Robolectric 加载的 Composable 不产 JaCoCo 数据，#181）。diff 门禁按比例判定，这两处会成为唯一纳入统计的文件 → 必然 0% 失败。**不自行放宽门禁排除名单**，留待单独决策（见 ADR-0008「已知遗留」） |
+| **`SplitButtonLayout`**（MergeBox 主按钮 + 方法下拉） | ⬜ **未替换（本票不做）** | 语义上确是全仓唯一契合点（`Button` + 间距 + `FilledTonalIconButton` + `DropdownMenu` 手搓）。但不做的理由充分：① alpha18 的 SplitButton API 处于剧烈变动期（`SplitButtonShapes` + `SplitButtonDefaults.Leading/Trailing{For,Tonal…}` 重载族，现行官方示例里的 `leadingButtonShape` 在该版**不存在**，且 alpha20 才去门控）；② `SplitButtonLayout` 是自定义 **Box** measure policy（字节码实测 `maybeCachedBoxMeasurePolicy`，无 Row/weight），而现有合并行靠 `Modifier.weight(1f)` 撑满，leading 插槽类型是 `@Composable () -> Unit`（非 `RowScope`）→ 现有宽度行为无法机械保留；③ `feature:pullrequest` **无任何截图基线**且本票禁跑 record → 几何回归无法可视验证，而这条路径上是**合并 / 删除分支**等破坏性写操作。建议单独立票并附 Roborazzi 基线 |
+| **`Medium/LargeFlexibleTopAppBar`** | ⬜ **本票不换** | 见 §6.5 |
+
 ---
 
 ## 5. 图标规范（Material Symbols，圆角 + 稍细）
@@ -353,6 +392,32 @@
   顶栏 → 顶栏只剩静止 scrim。两条都不满足时的表现就是「玻璃完全没效果」。
 - 禁止：列表 item 内毛玻璃、多图层叠毛玻璃（≤2 层）、动态模糊（性能红线）
   ——首页「顶栏 + 小分区条」算**同一块**玻璃（一个 hazeEffect 矩形），不构成第 2 层
+
+### 6.5 为什么**不**换用 M3 Expressive 的 `Medium/LargeFlexibleTopAppBar`（2026-09-12 决策）
+
+M3 Expressive 提供了 `MediumFlexibleTopAppBar` / `LargeFlexibleTopAppBar`（1.5.0-alpha18 的
+`AppBarKt` 实测存在，alpha25 起去门控）。**本票明确不采用**，理由如下：
+
+1. **与 §6.4 的玻璃几何契约正面冲突**。本应用顶栏不是「一个 M3 顶栏组件」，而是
+   `GlassSurface`（`hazeEffect` 矩形）**包住** `TopAppBar` + 副行插槽 `sectionBar` 的
+   复合结构，且 `AppTopBar` KDoc 写死：「玻璃矩形的尺寸决定 backdrop 能糊到什么」、
+   「分区条若留在内容列里，会把列表视口整体下推、滚动内容永远进不了顶栏矩形」。
+   Flexible 系顶栏是**随滚动改变自身高度**的折叠栏——矩形高度逐帧变化，与
+   `hazeEffect` 在布局期确定的采样矩形无法静态对齐：收缩时玻璃要么被裁掉一截（露出
+   未模糊的内容），要么在栏下方留一条空白玻璃。这正是 #83「玻璃完全没效果」的同类根因。
+2. **insets 契约会被推翻**。现方案是 `windowInsets = statusBars`（玻璃铺进状态栏）+
+   `TopAppBar` 自身 insets 归零避免双重内缩；Flexible 系自带 `TopAppBarScrollBehavior`
+   与自己的 insets/高度动画，两套 insets 语义叠加需要重新推导一遍并将 #83 的真机结论作废。
+3. **`sectionBar` 副行必须与主行同处一个 hazeEffect 矩形**（首页小分区条）。折叠栏把
+   主行高度做成滚动函数后，「主行 + 副行」的合计矩形不再是静态值，`AppTopBar` 对外
+   暴露的「玻璃头总高度」契约（供 HomeScreen 决定内容 top inset）随之失效。
+4. **收益与风险不成比例**。Flexible 顶栏的可见收益是「大标题随滚动折叠」，而本应用
+   顶栏是**胶囊搜索框 + 铃铛 + 头像**的功能栏（没有 M3 意义上的 large title 可折），
+   换过去等于用一次高风险的玻璃几何重做，换一个本场景并不存在的折叠大标题。
+
+> 结论：**顶栏保持自建玻璃头**。若将来要试，必须单独立票，前置条件是把 #83 的玻璃几何
+> 契约（§6.4）在真机上重新验证一遍，并明确「collapsing 矩形如何与 hazeEffect 静态采样
+> 对齐」的技术方案。
 
 ---
 
