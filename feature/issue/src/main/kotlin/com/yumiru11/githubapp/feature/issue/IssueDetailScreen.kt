@@ -94,6 +94,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
@@ -222,7 +223,7 @@ fun IssueDetailScreen(
         ) {
             when (val state = uiState) {
                 is IssueDetailUiState.Loading -> {
-                    IssueLoadingContent(modifier = Modifier.fillMaxSize())
+                    AppCenteredLoadingState(modifier = Modifier.fillMaxSize())
                 }
 
                 is IssueDetailUiState.Error -> {
