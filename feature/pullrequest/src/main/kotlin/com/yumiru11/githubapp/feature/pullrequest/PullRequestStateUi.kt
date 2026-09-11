@@ -17,14 +17,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestErrorType
 
-/** 加载中：居中圆形进度条 */
-@Composable
-internal fun PullRequestLoadingContent(modifier: Modifier = Modifier) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
-    }
-}
-
 /** 错误态：错误文案 + 重试按钮 */
 @Composable
 internal fun PullRequestErrorContent(
