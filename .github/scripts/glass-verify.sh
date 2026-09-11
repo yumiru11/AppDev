@@ -80,18 +80,28 @@ wait_for_activity "$PKG" || true
 # 是什么"，排查全靠猜。把现场抓进 artifact，下一次就能直接定位。
 sleep 6
 adb exec-out screencap -p > "$OUT/issue-page.png" || true
-# 点击「Comment」扩展 FAB。**文本查找不可靠**：本次实测 uiautomator dump 里**完全没有**
-# 该 FAB 节点（93 个节点里底部区域一个都没有），而同一次运行的 issue-page.png 里它
-# 清晰可见 —— Compose 的 ExtendedFloatingActionButton 在该层级下不进 dump。
-# 所以顺序是：先试文本（万一哪天进了），失败即按坐标兜底。
+# 点击「Comment」扩展 FAB。
+# 为什么坐标优先：uiautomator dump 里**完全没有**这个 FAB 节点（实测 93 个节点里
+# 底部区域一个都没有），而同一次运行的 issue-page.png 里它清晰可见 —— Compose 的
+# ExtendedFloatingActionButton 在该层级下不进 dump，文本查找天然不可用。
 # 坐标依据：pixel_6 = 1080x2400，Issue 详情页右下角扩展 FAB 中心 ≈ (875, 1972)
-# （由 issue-page.png 量得；FAB 是固定停靠位，不随列表滚动）。
-# ⚠️ 必须用 try_* 版本：tap_text/tap_desc 找不到也只告警、返回 0，放进 || 链会让
-# 链在第一个元素就短路 —— 坐标兜底永远不执行（上一轮就是这么漏的：产物帧与
-# issue-page.png 逐字节相同，说明压根没点）。
-if try_tap_text "Comment" || try_tap_desc "Comment" || adb shell input tap 875 1972; then
+# （由 issue-page.png 量得；FAB 固定停靠，不随列表滚动）。（我们已知 FAB 位置，且 dump 里根本没有这个节点）；
+# 再读日志确认是否真的打开了 —— 不看"点了没"，只看"开了没"。
+# 为什么不再靠 try_tap_text：它会命中别处的同名文本并成功返回，把坐标兜底短路掉
+# （连续两轮实测都栽在这上面）。判定权交给 GlassRender 日志，不交给点击返回值。
+adb shell input tap 875 1972
+sleep 3
+sheet_is_open() { adb logcat -d -s GlassRender 2>/dev/null | grep -q "scope=BOTTOM_SHEET"; }
+if sheet_is_open; then
   SHEET_OPENED=true
 else
+  echo "::warning::坐标点击后未见 BOTTOM_SHEET，尝试文本/desc 兜底"
+  if try_tap_text "Comment" || try_tap_desc "Comment"; then
+    sleep 3
+    sheet_is_open && SHEET_OPENED=true
+  fi
+fi
+if [ "$SHEET_OPENED" != true ]; then
   adb shell "rm -f /sdcard/ui.xml; uiautomator dump /sdcard/ui.xml" >/dev/null 2>&1 || true
   adb pull /sdcard/ui.xml "$OUT/issue-page-ui.xml" >/dev/null 2>&1 || true
   # 兜底：首页快速操作 → 仓库选择 Sheet（游客也开得出来）
