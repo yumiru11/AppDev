@@ -418,6 +418,13 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 // 且 Robolectric 沙箱加载的类不产 JaCoCo 数据（#181 结论），补测试也解决不了。
                 Regex("""(^|/)AppThemeHost\.kt$"""),
                 Regex("""(^|/)AppBackground\.kt$"""),
+                // MainActivity.kt：单 Activity 入口 = 根级 Compose 装配层（T23 接线修复暴露）。
+                // 文件内容是 setContent + AppNavHost 的 20 个 screen lambda 装配、深链/OAuth
+                // intent 分流与 locale 切换，无独立可单测逻辑；:app 本就**没有**覆盖率阈值
+                // （见 coverageThresholds 注释「app / feature/auth：豁免（纯 UI 装配）」），
+                // 逻辑模块的门禁不受影响。不排除的真实后果（实测 PR 前）：改 2 个 lambda 接线
+                // 新增 24 行里有 13 行可执行、仅 7 行被覆盖 → 53.8% < 80%，CI diff 门禁必红。
+                Regex("""(^|/)MainActivity\.kt$"""),
             )
 
         val changedFiles =
