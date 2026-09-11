@@ -1,5 +1,7 @@
 package com.yumiru11.githubapp.core.designsystem.component
 
+import android.os.Build
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -7,6 +9,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
@@ -80,6 +83,22 @@ fun GlassSurface(
     val renderMode = GlassRenderPolicy.resolve(blurEnabled = blurEnabled, hasHazeState = hazeState != null)
     val useHaze = renderMode == GlassRenderMode.BackdropBlur
 
+    // 渲染路径留档（glass-verify.yml 的机器判据）。
+    // 为什么需要：Robolectric 不渲染 RenderEffect，API 30 的模拟器又低于 MIN_BLUR_API ——
+    // 「这块玻璃到底走了模糊、还是静默降级成半透明」此前只能靠肉眼看截图猜。
+    // 打一行日志后 CI 可以直接断言 mode=BackdropBlur，而不是"看起来差不多"。
+    // remember 保证只在路径真正变化时打一次，不随每帧重组刷屏。
+    remember(scope, renderMode, blurEnabled) {
+        runCatching {
+            Log.d(
+                GLASS_LOG_TAG,
+                "scope=$scope mode=$renderMode blurEnabled=$blurEnabled " +
+                    "hasHazeState=${hazeState != null} sdk=${Build.VERSION.SDK_INT}",
+            )
+        }
+        renderMode
+    }
+
     Box(
         modifier =
             modifier
@@ -106,3 +125,11 @@ fun GlassSurface(
         }
     }
 }
+
+/**
+ * 玻璃渲染路径日志 tag（glass-verify.yml 用 adb logcat -s GlassRender 消费）。
+ *
+ * 只在 [GlassSurface] 里打点，不打在 [GlassRenderPolicy] 里 —— 后者是纯函数，
+ * 加了 Android 依赖就没法在纯 JVM 单测里断言了。
+ */
+private const val GLASS_LOG_TAG = "GlassRender"
