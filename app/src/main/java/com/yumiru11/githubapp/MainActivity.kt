@@ -124,6 +124,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // 三键导航栏不再由系统叠半透明 scrim（P0 系统栏 insets 修复）：
+        // 官方 edge-to-edge 指南要求显式置 false，否则系统那层 ~50% 黑会盖在
+        // 延伸进导航栏区域的底栏玻璃之上，把底缘压成黑带（完整依据见
+        // disableNavigationBarContrastScrim 的 KDoc）。手势导航不受影响。
+        window.disableNavigationBarContrastScrim()
         handleIntentData(intent?.data)
 
         setContent {
@@ -195,11 +200,16 @@ class MainActivity : ComponentActivity() {
                                                 bottomContentPadding = padding.calculateBottomPadding(),
                                             )
                                         },
-                                        reposPage = {
+                                        reposPage = { padding ->
                                             // 「仓库」大分区（#166 / UI01+UI02）：此前是 PlaceholderScreen 占位，
                                             // 三个底部 Tab 里有一个点进去是空壳。现已落地完整形态（列表/网格切换 +
-                                            // 长按菜单 + 三态占位 + 游客引导），玻璃避让由 ReposScreen 内部
-                                            // 按 Home/Profile 同一契约（contentPadding）处理。
+                                            // 长按菜单 + 三态占位 + 游客引导）。
+                                            // 底部避让与 Home/Profile 同一契约：MainTabPager 的底栏不在
+                                            // Scaffold 的 contentWindowInsets 里（容器显式归零），必须把
+                                            // padding 形参转成 ReposScreen 的 bottomContentPadding——
+                                            // 曾经这里丢弃形参且注释自称「ReposScreen 内部处理」，导致
+                                            // 仓库分区列表整体少预留一个底栏总高（含系统导航栏 inset），
+                                            // 末行被底栏压字（P0）。
                                             ReposScreen(
                                                 onOpenRepository = { owner, repo ->
                                                     navController.navigate(AppRoute.Repo(owner, repo))
@@ -212,6 +222,7 @@ class MainActivity : ComponentActivity() {
                                                 onSearchClick = { navController.navigate(AppRoute.Search()) },
                                                 onNotificationClick = { notificationPanelVisible = true },
                                                 onProfileClick = { mainTab = MainTab.PROFILE },
+                                                bottomContentPadding = padding.calculateBottomPadding(),
                                             )
                                         },
                                         profilePage = { padding ->
