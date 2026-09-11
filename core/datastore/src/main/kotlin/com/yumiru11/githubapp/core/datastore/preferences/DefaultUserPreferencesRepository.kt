@@ -1,3 +1,8 @@
+@file:Suppress("TooManyFunctions")
+// 偏好项天然是"一项一对读写"的扁平面：每加一个设置项就 +2 个函数。
+// 拆接口/拆实现只会把同一份偏好表切成几块、调用方还得记住哪项在哪块 —— 可读性更差。
+// detekt 阈值 20 已在 #167（UI04 背景图）触顶，此处精准抑制（T3/T24 先例）。
+
 package com.yumiru11.githubapp.core.datastore.preferences
 
 import androidx.datastore.core.DataStore
@@ -170,6 +175,30 @@ class DefaultUserPreferencesRepository
             dataStore.edit { it[KEY_STAGGER_ENABLED] = enabled }
         }
 
+        override val backgroundImageUri: Flow<String?> = dataStore.data.map { it[KEY_BACKGROUND_IMAGE_URI] }
+
+        override val backgroundOpacity: Flow<Float> =
+            dataStore.data.map {
+                it[KEY_BACKGROUND_OPACITY] ?: UserPreferencesRepository.DEFAULT_BACKGROUND_OPACITY
+            }
+
+        override suspend fun setBackgroundImageUri(uri: String?) {
+            dataStore.edit { prefs ->
+                // null = 清除背景图：直接移除键，避免留一个空串让下游判空判不干净
+                if (uri == null) prefs.remove(KEY_BACKGROUND_IMAGE_URI) else prefs[KEY_BACKGROUND_IMAGE_URI] = uri
+            }
+        }
+
+        override suspend fun setBackgroundOpacity(opacity: Float) {
+            dataStore.edit {
+                it[KEY_BACKGROUND_OPACITY] =
+                    opacity.coerceIn(
+                        UserPreferencesRepository.MIN_BACKGROUND_OPACITY,
+                        UserPreferencesRepository.MAX_BACKGROUND_OPACITY,
+                    )
+            }
+        }
+
         private companion object {
             val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
             val KEY_LANGUAGE_TAG = stringPreferencesKey("language_tag")
@@ -189,5 +218,7 @@ class DefaultUserPreferencesRepository
             val KEY_CODE_LINE_NUMBERS = booleanPreferencesKey("code_line_numbers")
             val KEY_REPO_LAYOUT = stringPreferencesKey("repo_layout")
             val KEY_STAGGER_ENABLED = booleanPreferencesKey("stagger_enabled")
+            val KEY_BACKGROUND_IMAGE_URI = stringPreferencesKey("background_image_uri")
+            val KEY_BACKGROUND_OPACITY = floatPreferencesKey("background_opacity")
         }
     }

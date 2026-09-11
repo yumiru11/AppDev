@@ -166,6 +166,12 @@ class RepoRepository
                         onFailure = { failure ->
                             // 服务端 HTML 获取失败 → 降级离线 GFM（WebView 内 markdown-it 渲染），renderMode 仍 WEBVIEW
                             if (rawMarkdown.isNotBlank()) {
+                                // 降级留档（#201：失败/降级路径此前一行日志都没有，CI 只能靠截图猜）
+                                Log.i(
+                                    TAG,
+                                    "repo=$owner/$repo serverHtmlFailed → OFFLINE_MARKDOWN_IT " +
+                                        "cause=${failure.javaClass.simpleName}",
+                                )
                                 ReadmeContent(
                                     markdown = rawMarkdown,
                                     html = rawMarkdown,
@@ -173,6 +179,11 @@ class RepoRepository
                                     webViewRenderMode = RenderMode.OFFLINE_MARKDOWN_IT,
                                 )
                             } else {
+                                // 两级都失败：没有 markdown 可离线渲染 → 上抛，由调用方按错误域给准确状态/文案
+                                Log.i(
+                                    TAG,
+                                    "repo=$owner/$repo renderFailed noMarkdown cause=${failure.javaClass.simpleName}",
+                                )
                                 throw failure
                             }
                         },

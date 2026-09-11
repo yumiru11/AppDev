@@ -46,7 +46,10 @@ import org.robolectric.annotation.GraphicsMode
  *    `hazeState == null` 那条降级路径）的原因。
  *
  * 若哪天赋层改成「主 window 内的覆盖层」导致本测试 fail（windowId 相同），
- * [GlassRenderPolicy.resolveInDialogWindow] 应同步放开 BackdropBlur 并补 `hazeEffect` 接线。
+ * [GlassRenderPolicy.resolveInDialogWindow] 应同步放开 BackdropBlur，并同步改
+ * [GlassSheetSurface] 传给 [GlassSurface] 的 `backdropReachable = false` 以补 `hazeEffect` 接线。
+ * 收敛后测试类名与「独立组件」的说法已对齐：[GlassSheetSurface] 现在是 [GlassSurface]
+ * 的薄封装，本类同时覆盖「窗口隔离」与「薄封装的开关落点」两件事。
  *
  * 后半组（`sheetGlassAlpha_*` / `glassSheetSurface_*`）锁住 §6.3 开关语义在弹层层面的落点：
  * 半透明层取值与栏侧一致（[AppBlur.SCRIM_ALPHA]），且**点位隔离**——关掉顶栏/底栏/面板
@@ -111,7 +114,7 @@ class GlassSheetSurfaceTest {
     }
 
     // ── §6.3 开关 / 主题在该点位的落点 ──────────────────────────────────────────
-    // 断言 [GlassRenderPolicy.sheetGlassAlpha]（生产组件唯一的判定入口）而非像素：
+    // 断言「薄封装实际走的生产判定入口」而非像素：
     // 弹层这条路径的可见结果就是那一层半透明 scrim，断言决策函数既精确又不依赖
     // Robolectric 的渲染语义。「该点位是否被裁决为禁用」由 GlassSettingsTest 断言，
     // 这里断言**组件实际拿到的值**（含点位隔离：关别的点位不影响弹层）。
@@ -129,8 +132,8 @@ class GlassSheetSurfaceTest {
     @Test
     fun sheetGlassAlpha_masterSwitchOff_keepsScrimAlpha() {
         // 设置页总开关关掉 → 与栏侧同款：照旧叠同一层半透明 scrim（关闭的是玻璃的**效果**
-        // 即模糊/背景图，不是把容器换色）。开关确实被消费：它决定走哪条判定出口
-        // （resolveInDialogWindow），并已由单测锁住。
+        // 即模糊/背景图，不是把容器换色）。开关确实被消费：它决定 §6.3 该点位的裁决
+        // 结果并流进唯一的 alpha 出口（layerAlpha）。
         assertEquals(AppBlur.SCRIM_ALPHA, sheetGlassAlphaFor(GlassSettings(masterEnabled = false)), 0.0001f)
     }
 
@@ -194,9 +197,15 @@ class GlassSheetSurfaceTest {
 
     /**
      * 走生产同一条 seam：先按 §6.3 裁决点位开关（[GlassSettings.enabledFor]），
-     * 再交给 [GlassRenderPolicy.sheetGlassAlpha]——两步都是生产调用链上的函数，
-     * 测试不复制任何判定逻辑。
+     * 再交给**全仓唯一的降级叠色出口** [GlassRenderPolicy.layerAlpha]。
+     *
+     * 收敛前这里调的是弹层专用的 `GlassRenderPolicy.sheetGlassAlpha`，与 #219 合入的
+     * `layerAlpha` 构成两条并行降级实现；该函数已随收敛删除（「降级该叠多厚」不再有两个
+     * 事实来源）。断言口径不变，被测路径改走与栏侧/面板共用的那一条。
      */
     private fun sheetGlassAlphaFor(settings: GlassSettings): Float =
-        GlassRenderPolicy.sheetGlassAlpha(glassAllowed = settings.enabledFor(GlassScope.BOTTOM_SHEET))
+        GlassRenderPolicy.layerAlpha(
+            renderMode = GlassRenderPolicy.resolveInDialogWindow(glassAllowed = settings.enabledFor(GlassScope.BOTTOM_SHEET)),
+            opaqueWhenBlurUnavailable = false,
+        )
 }

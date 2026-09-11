@@ -3,4 +3,18 @@
      深色模式经 enableEdgeToEdge() + Compose AppTheme 处理，主题仅保证 NoActionBar + edge-to-edge。 -->
 <resources>
     <style name="Theme.AppDev" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!--
+      品牌化启动屏（D3 修复，2026-09-11）。
+      为什么需要：API < 31 没有系统启动屏，MainActivity 起来到 Compose 画第一帧之间，
+      用户看到的是窗口背景色 —— 浅色下就是**整屏纯白**。这不是推测：模拟器截图
+      （home-light.png）实测冷启动 +2s 时整屏空白，连顶栏/底栏都没画出来。
+      Theme.SplashScreen 把应用图标放进这段空窗；postSplashScreenTheme 负责交棒给
+      Theme.AppDev —— 二者是 androidx core-splashscreen 的固定契约。
+    -->
+    <style name="Theme.AppDev.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.AppDev</item>
+    </style>
 </resources>

@@ -1,0 +1,70 @@
+# 清理 CI 截图 release（治「Releases 页被截图刷屏」）。
+#
+# ## 问题是什么
+#
+# ci.yml 的截图 job **每个 PR 每次运行**都会建一个 release。本次清理前，
+# 仓库累计 38 个 release，其中 **37 个是 CI 截图**（最早从 8-20 起）——
+# Releases 页已经看不出「真正的发布」在哪。
+#
+# ## 为什么当初用 release（而不是 artifact）
+#
+# GitHub artifact 的下载 URL 需要登录，且**不能内联渲染进 PR 评论**；而公开仓库的
+# release asset URL 可以直接 `![]()` 内联（决策记录见
+# docs/research/actions-emulator-feasibility.md Q5）。也就是说「PR 评论里直接看图」
+# 这个体验，当初是用 release 换来的。
+#
+# ## 三条出路
+#
+# 1. **保留 release + 定期清理**（本 workflow）：内联体验不变，Releases 页只留最近的。← 采用
+# 2. 改用 `ci-screenshots` 孤儿分支 + raw.githubusercontent 内联：完全不产生 release，
+#    但要自己维护分支体积与每个 PR 目录的清理，机制更重。
+# 3. 改贴 artifact 链接（不内联）：最省事，但审阅者要下载 zip 才能看图 —— 等于放弃
+#    「PR 里一眼看效果」，不推荐。
+#
+# ## 清理口径（保守，宁可不删）
+#
+# - 只碰 tag 以 `screenshots-` 开头的 release —— **绝不碰真实发布 tag**
+# - 永远保留最近 5 个（避免刚跑的 PR 评论图失效）
+# - 其余满足其一才删：① 关联 PR 已 MERGED/CLOSED；② 创建超过 14 天
+#
+# 逻辑实现在 .github/scripts/prune-screenshot-releases.sh —— 单独成脚本是为了能
+# **本地跑 --dry-run 验证**（塞在 YAML 里就只能 push 上去看结果，本仓库已有多次
+# 「CI 逻辑没本地验证 → 连红」的教训）。
+name: Cleanup screenshot releases
+
+on:
+  schedule:
+    # 每天 03:17 UTC（避开整点排队）
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只列出将要删除的 release，不实际删除'
+        type: boolean
+        default: true
+      keep:
+        description: '始终保留最近几个截图 release'
+        type: string
+        default: '5'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    name: Prune screenshots-* releases
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prune screenshot releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # schedule 事件没有 inputs → 直接真删；手动触发默认 dry-run，先看清单再决定
+          ARGS=(--keep "${{ inputs.keep || '5' }}")
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" != "false" ]; then
+            ARGS+=(--dry-run)
+          fi
+          bash .github/scripts/prune-screenshot-releases.sh "${ARGS[@]}"

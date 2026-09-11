@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
+import com.yumiru11.githubapp.core.ui.appTransientEnterAlpha
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewConclusion
 
 /** 对话页「Review changes」入口行（T17）：打开审查 BottomSheet；READ 及以上可见 */
@@ -76,7 +77,8 @@ internal fun ReviewSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        modifier = modifier,
+        // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）
+        modifier = modifier.appTransientEnterAlpha(),
     ) {
         // 弹层玻璃点位（#167 / UI22，ui-design §6.1 #4）：容器底交 GlassSheetSurface，开关/主题降级由
         // GlassScope.BOTTOM_SHEET 统一裁决（弹层是独立 window，几何结论见该组件 KDoc）

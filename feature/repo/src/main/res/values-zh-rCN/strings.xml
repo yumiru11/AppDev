@@ -10,6 +10,7 @@
     <string name="repo_language">%s</string>
     <string name="repo_error_forbidden">当前登录无权访问该资源</string>
     <string name="repo_error_not_found">仓库未找到</string>
+    <string name="repo_error_path_not_found">文件不存在，可能已被删除或改名</string>
     <string name="repo_error_network">网络错误，请检查连接</string>
     <string name="repo_error_unknown">未知错误</string>
     <string name="repo_retry">重试</string>
@@ -25,6 +26,13 @@
     <string name="repo_file_rendered">渲染</string>
     <string name="repo_file_source">源码</string>
     <string name="repo_file_search">在文件中搜索</string>
+    <string name="repo_file_find_hint">在文件中查找</string>
+    <string name="repo_file_find_close">关闭搜索</string>
+    <string name="repo_file_find_previous">上一处匹配</string>
+    <string name="repo_file_find_next">下一处匹配</string>
+    <!-- 文件内查找计数（第 n / 共 m 项）；占位符顺序：当前序号、匹配总数 -->
+    <string name="repo_file_find_counter">第 %1$d / 共 %2$d 项</string>
+    <string name="repo_file_find_no_results">无匹配结果</string>
     <string name="repo_file_jump_to_line">跳转到行</string>
     <string name="repo_file_line_number">行号</string>
     <string name="repo_file_go">跳转</string>

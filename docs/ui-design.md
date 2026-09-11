@@ -376,6 +376,15 @@
 - **五处已接线**（issue #167 / UI22）：`IssueDetailScreen`（评论 Sheet + Labels/Assignees/Milestone
   编辑 Sheet）、`LineCommentSheet`、`ReviewSheet`、`PullRequestDetailScreen`（评论 Sheet）、
   `RepoPickerSheet`
+- **两条降级实现已收敛为一条（2026-09-11 UI22 × #219 merge 回写）**：`GlassSheetSurface`
+  现为 `GlassSurface` 的**薄封装**（传 `scope = GlassScope.BOTTOM_SHEET` +
+  `backdropReachable = false` + 弹层基色 `surfaceContainerLow`），**不再拥有独立渲染实现**。
+  收敛前 UI22 自带 `GlassRenderPolicy.sheetGlassAlpha`、#219 引入
+  `GlassRenderPolicy.layerAlpha`，两者各自回答「降级该叠多厚」——正是本项目反复吃亏的
+  「同一语义两套事实来源」。前者已删除：
+  **全仓唯一的降级叠色出口 = `GlassRenderPolicy.layerAlpha`**，唯一的渲染路径判定 =
+  `GlassRenderPolicy.resolve`。今后某点位若需要「降级即不透明」，一律透传
+  `opaqueWhenBlurUnavailable`，**不得**再新写 alpha 分支。
 
 ---
 

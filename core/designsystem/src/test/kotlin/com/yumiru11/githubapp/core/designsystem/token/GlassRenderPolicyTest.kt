@@ -15,7 +15,8 @@ import org.junit.Test
  *
  * [GlassRenderPolicy.resolveInDialogWindow] 那组（UI22）：弹层是独立 window，Haze 按
  * `LocalView.current.windowId` 过滤采样区域 → 弹层内不存在可糊的 backdrop，一律降级。
- * 窗口隔离本身由 `GlassSheetWindowIsolationTest` 用真实 `ModalBottomSheet` 实测断言。
+ * 窗口隔离本身由 `GlassSheetSurfaceTest.modalBottomSheet_contentWindowDiffersFromMainWindow`
+ * 用真实 `ModalBottomSheet` 实测断言。
  *
  * 命名规范：methodName_scenario_expectedBehavior。
  */
@@ -83,6 +84,9 @@ class GlassRenderPolicyTest {
     }
 
     // ── 弹层点位（issue #167 / UI22，ui-design §6.1 #4）────────────────────────────
+    // 收敛后（merge）：生产入口是 GlassSurface(backdropReachable = false)，它内部调 resolve()，
+    // 与本组 resolveInDialogWindow 的返回值恒等 —— 本组是「独立 window」这条几何事实的
+    // 规范锚点（布尔量本身说不出为什么，理由只在这里成文）。
 
     @Test
     fun resolveInDialogWindow_api35WithBlurEnabled_returnsTranslucentScrim() {
@@ -96,8 +100,8 @@ class GlassRenderPolicyTest {
 
     @Test
     fun resolveInDialogWindow_blurDisabled_returnsTranslucentScrim() {
-        // §6.3 逐项开关（BottomSheet）关闭：仍走降级路径，只是该点位连半透明层都不加
-        // （不透明 surface 底，由 GlassSheetSurface 依 renderMode 决定 alpha）
+        // §6.3 逐项开关（BottomSheet）关闭：仍走降级路径（几何决定的），开关只影响
+        // §6.3 的「该点位是否走玻璃效果」裁决本身，不改变渲染模式
         assertEquals(
             GlassRenderMode.TranslucentScrim,
             GlassRenderPolicy.resolveInDialogWindow(glassAllowed = false, sdkInt = API_35),
@@ -116,7 +120,8 @@ class GlassRenderPolicyTest {
     fun resolveInDialogWindow_apiBeyond31_neverReturnsBackdropBlur() {
         // 饱和断言：弹层点位的返回值与 API 无关（窗口隔离是几何事实，不是版本能力）。
         // 若哪天本断言失败，说明 resolveInDialogWindow 放开了 BackdropBlur —— 此时必须
-        // 同步给 GlassSheetSurface 补 hazeEffect 接线，否则会「声明了模糊其实没挂」。
+        // 同步改 GlassSheetSurface 的 backdropReachable（放开 hazeEffect 接线），
+        // 否则会「声明了模糊其实没挂」。
         val sdkRange = listOf(API_26, API_30, AppBlur.MIN_BLUR_API, API_35, API_36)
         val modes = sdkRange.map { sdk -> GlassRenderPolicy.resolveInDialogWindow(glassAllowed = true, sdkInt = sdk) }
         assertTrue(
@@ -131,6 +136,79 @@ class GlassRenderPolicyTest {
         assertEquals(
             GlassRenderMode.TranslucentScrim,
             GlassRenderPolicy.resolveInDialogWindow(glassAllowed = true),
+        )
+    }
+
+    // ── layerAlpha（#201 P0 全屏面板叠印）────────────────────────────────────
+    // 四条组合把「哪种情况必须不透明」钉死：只有真的在模糊时才可以半透明。
+    // 全屏面板的降级路径若回到 SCRIM_ALPHA，下层文字会以 12.5% 浓度不模糊地透上来叠印。
+    // 收敛后本函数是**全仓唯一**的降级叠色出口（弹层薄封装也走这里）。
+
+    @Test
+    fun layerAlpha_backdropBlurOpaqueRequested_keepsTranslucentGlass() {
+        // 模糊生效：透上来的是糊掉的色块（无字形），玻璃观感必须保留 → 半透明
+        assertEquals(
+            AppBlur.SCRIM_ALPHA,
+            GlassRenderPolicy.layerAlpha(
+                renderMode = GlassRenderMode.BackdropBlur,
+                opaqueWhenBlurUnavailable = true,
+            ),
+        )
+    }
+
+    @Test
+    fun layerAlpha_translucentScrimOpaqueRequested_returnsFullyOpaque() {
+        // 降级 + 调用方要求不透明（全屏面板）→ 1.0，这是 P0 的修复点
+        assertEquals(
+            1f,
+            GlassRenderPolicy.layerAlpha(
+                renderMode = GlassRenderMode.TranslucentScrim,
+                opaqueWhenBlurUnavailable = true,
+            ),
+        )
+    }
+
+    @Test
+    fun layerAlpha_translucentScrimDefault_keepsTranslucentScrim() {
+        // 顶栏/底栏/BottomSheet 不传该开关：行为与 #83 完全一致（内容从栏后穿过）
+        assertEquals(
+            AppBlur.SCRIM_ALPHA,
+            GlassRenderPolicy.layerAlpha(
+                renderMode = GlassRenderMode.TranslucentScrim,
+                opaqueWhenBlurUnavailable = false,
+            ),
+        )
+    }
+
+    @Test
+    fun layerAlpha_backdropBlurDefault_keepsTranslucentScrim() {
+        assertEquals(
+            AppBlur.SCRIM_ALPHA,
+            GlassRenderPolicy.layerAlpha(
+                renderMode = GlassRenderMode.BackdropBlur,
+                opaqueWhenBlurUnavailable = false,
+            ),
+        )
+    }
+
+    @Test
+    fun layerAlpha_sheetDialogWindowMode_keepsTranslucentScrim() {
+        // 收敛交叉断言：弹层的渲染模式（恒 TranslucentScrim）流进唯一的 alpha 出口后，
+        // 得到的就是栏侧同款半透明 scrim ——「弹层关掉开关也不换色」由这一条钉死，
+        // 无需再有一条弹层专用的 alpha 函数。
+        assertEquals(
+            AppBlur.SCRIM_ALPHA,
+            GlassRenderPolicy.layerAlpha(
+                renderMode = GlassRenderPolicy.resolveInDialogWindow(glassAllowed = true),
+                opaqueWhenBlurUnavailable = false,
+            ),
+        )
+        assertEquals(
+            AppBlur.SCRIM_ALPHA,
+            GlassRenderPolicy.layerAlpha(
+                renderMode = GlassRenderPolicy.resolveInDialogWindow(glassAllowed = false),
+                opaqueWhenBlurUnavailable = false,
+            ),
         )
     }
 

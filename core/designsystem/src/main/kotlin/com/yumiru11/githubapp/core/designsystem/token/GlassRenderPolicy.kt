@@ -56,9 +56,22 @@ object GlassRenderPolicy {
      *
      * 结论：弹层点位一律走**半透明 surface 降级**（[GlassRenderMode.TranslucentScrim]，
      * §6.2 API 26–30 同款路径）。开关语义仍然完整：§6.3 总开关/逐项开关/OLED/高对比的裁决
-     * 结果决定该点位是否走玻璃效果，只是弹层这条路径的可见结果与栏侧一致（同一层半透明 scrim，
-     * 详见 [sheetGlassAlpha]）。未来若把弹层改成「主 window 内的覆盖层」（自绘 Sheet，
-     * 内容侧同 window 挂 `hazeSource`），只需改本函数的返回值并同步单测，五处调用点无需改动。
+     * 结果决定该点位是否走玻璃效果，只是弹层这条路径的可见结果与栏侧一致——**同一层半透明
+     * scrim、同一个 alpha 出口 [layerAlpha]**（本函数只回答「走哪条渲染路径」，「叠多厚」
+     * 一律归 [layerAlpha]，全仓不再有第二条写死 alpha 的降级实现）。
+     * 未来若把弹层改成「主 window 内的覆盖层」（自绘 Sheet，内容侧同 window 挂 `hazeSource`），
+     * 只需改本函数的返回值并同步单测，五处调用点无需改动。
+     *
+     * **收敛后的角色说明**（本次 merge）：渲染路径的**生产入口**已统一到
+     * [com.yumiru11.githubapp.core.designsystem.component.GlassSurface]
+     * ——薄封装 [com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface] 传
+     * `backdropReachable = false`，[GlassSurface] 内部调 [resolve] 得到的
+     * `TranslucentScrim` 与本函数返回值**恒等**。本函数保留为这条几何结论的
+     * **规范出口与单测锚点**（`backdropReachable = false` 这个布尔量本身说不出「为什么」，
+     * 「独立 window」这条事实只在这里成文；单测也直接钉它）。
+     * 因此**不存在**两条实现——只有一条计算路径（[resolve]）与一处几何事实陈述（本函数）。
+     * 若哪天放开弹层模糊，必须同时改这里、`GlassSheetSurface` 的 `backdropReachable`
+     * 与 `GlassSheetSurfaceTest`，三者任一漏改都会被 `resolveInDialogWindow_*` 那组单测拦下。
      *
      * @param glassAllowed §6.3 在该点位的裁决结果（总开关 ∧ 逐项开关 ∧ 非 OLED/高对比，
      *   即 [GlassSettings.enabledFor] 的返回值）。参数名不叫 `blurEnabled`：弹层**不可能**真模糊，
@@ -69,34 +82,6 @@ object GlassRenderPolicy {
         glassAllowed: Boolean,
         sdkInt: Int = Build.VERSION.SDK_INT,
     ): GlassRenderMode = resolve(blurEnabled = glassAllowed, backdropReachable = false, sdkInt = sdkInt)
-
-    /**
-     * 弹层玻璃层的 alpha（[com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface]
-     * 实际消费）。收敛成纯函数的理由与 [resolve] 同源：可见差异只有「叠不叠、叠多厚」这一条，
-     * 断言本函数比断言 Robolectric 截图像素更精确，也不依赖渲染语义。
-     *
-     * **与 [com.yumiru11.githubapp.core.designsystem.component.GlassSurface] 同一条降级路径**：
-     * 半透明 scrim（[AppBlur.SCRIM_ALPHA]）。开关关掉时**不**把 alpha 抬到 1f——栏侧
-     * （[GlassSurface]）关掉开关照样叠同一层 scrim（否则栏内文字失去可读性），弹层沿用同款
-     * 数值才能保证「同一个玻璃点位关掉后视觉一致」；`1f` 分支留给未来弹层真能模糊时的
-     * tint 分工（那时 tint 由 `HazeStyle.backgroundColor` 负责，scrim 不再叠）。
-     *
-     * 采样基色由调用方给（弹层用 `BottomSheetDefaults.ContainerColor`
-     * = `surfaceContainerLow`），本函数只管 alpha，不掺颜色。
-     *
-     * @param glassAllowed §6.3 在 BOTTOM_SHEET 点位的裁决结果（总开关 ∧ 逐项开关 ∧ 非 OLED/高对比，
-     *   即 [GlassSettings.enabledFor]；[GlassSettings.withAccessibilityOverrides] 已把
-     *   OLED/高对比合并进总开关，所以这三条降级共用本函数一条出口）
-     * @see resolveInDialogWindow
-     */
-    fun sheetGlassAlpha(
-        glassAllowed: Boolean,
-        sdkInt: Int = Build.VERSION.SDK_INT,
-    ): Float {
-        val mode = resolveInDialogWindow(glassAllowed = glassAllowed, sdkInt = sdkInt)
-        // 有效果层时 tint 由 HazeStyle.backgroundColor 负责，此处不叠；降级路径（含弹层恒定路径）叠 scrim
-        return if (mode == GlassRenderMode.BackdropBlur) 1f else AppBlur.SCRIM_ALPHA
-    }
 
     /**
      * 内容侧（source）门禁：是否应当给滚动内容挂 `hazeSource`。
@@ -111,4 +96,46 @@ object GlassRenderPolicy {
         blurEnabled: Boolean,
         sdkInt: Int = Build.VERSION.SDK_INT,
     ): Boolean = resolve(blurEnabled = blurEnabled, backdropReachable = true, sdkInt = sdkInt) == GlassRenderMode.BackdropBlur
+
+    /**
+     * 玻璃层叠色 alpha（#201 / P0 全屏面板叠印修复）。
+     *
+     * **为什么需要它**：全屏玻璃点位（[GlassScope.PANEL]）铺满屏幕时，遮罩整块被面板
+     * 盖住，「挡住下层内容」这件事只剩面板自身这一层。此时若仍按 [AppBlur.SCRIM_ALPHA]
+     * （0.75）走降级，合成结果 = 0.75×surface + 0.25×(0.5 遮罩 + 下层内容)，下层**仍有
+     * 12.5% 的对比度透上来且一点没糊**（API<31 无 RenderEffect；CI 截图模拟器正是 API 30）
+     * ——真机表现就是面板标题与下层顶栏文字同像素叠印（CI release
+     * `screenshots-pr199-34600531043` 的 `notification-panel.png` 实测：面板滤镜行处
+     * 亮度跨度 39 级，下层字形清晰可读）。
+     *
+     * **判定**：backdrop blur 真实生效时保持半透明玻璃——Haze 把模糊后的 backdrop
+     * **不透明地**画在 effect 矩形内，透上来的只有糊掉的色块、没有可读字形（同 release
+     * 的 API 31 玻璃验证帧实证：同一位置已是雾面），玻璃观感必须保留。
+     * 降级路径（关开关 / 背景不可达 / API<31）不模糊 → 必须全不透明，否则就是 P0 叠印。
+     *
+     * **本函数是全仓唯一的不透明降级通道**（merge 后收敛结论）：薄封装
+     * [com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface] 也走这里
+     * （`opaqueWhenBlurUnavailable` 透传），不再有第二条写死 alpha 的降级实现——
+     * 「同一语义两套事实来源」是本项目反复吃亏的模式（见 `AppTypography` 票与
+     * `GlassRenderPolicy` 本身的收敛史）。
+     *
+     * @param renderMode [resolve] 的判定结果
+     * @param opaqueWhenBlurUnavailable 调用方是否要求「降级即不透明」。只有铺满全屏、
+     *   背后内容无处可露的点位（全屏通知面板）该传 true；顶栏/底栏/BottomSheet 的内容
+     *   本就设计成从栏后穿过（§6.2「滚动穿越感」），必须保持半透明，故默认 false，
+     *   行为与 #83 一致。
+     * @return 玻璃层叠色 alpha（0..1）
+     */
+    fun layerAlpha(
+        renderMode: GlassRenderMode,
+        opaqueWhenBlurUnavailable: Boolean,
+    ): Float =
+        if (opaqueWhenBlurUnavailable && renderMode != GlassRenderMode.BackdropBlur) {
+            OPAQUE_ALPHA
+        } else {
+            AppBlur.SCRIM_ALPHA
+        }
+
+    /** 全不透明（面板降级路径用；显式 1f 而非省略 alpha，保持叠色语义统一） */
+    private const val OPAQUE_ALPHA = 1f
 }

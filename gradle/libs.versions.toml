@@ -22,6 +22,8 @@ navigation-compose = "2.8.4"
 androidx-browser = "1.8.0"
 androidx-webkit = "1.12.1"
 core-ktx = "1.13.1"
+# 品牌化启动屏（D3 修复）：消除冷启动"白屏空窗"，并把应用图标带进启动画面
+core-splashscreen = "1.0.1"
 # ProfileInstaller（T25）：API 24-30 上把打包进 APK 的 baseline profile 安装到 ART
 # （API 31+ 由编译期 baseline.profm 直接生效，无需运行时安装）
 profileinstaller = "1.4.1"
@@ -98,6 +100,7 @@ androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "a
 
 # Core
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }
+core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "core-splashscreen" }
 profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
 
 # Paging

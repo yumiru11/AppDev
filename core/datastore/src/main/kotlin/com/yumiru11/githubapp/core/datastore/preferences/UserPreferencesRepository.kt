@@ -1,3 +1,8 @@
+@file:Suppress("TooManyFunctions")
+// 偏好项天然是"一项一对读写"的扁平面：每加一个设置项就 +2 个函数。
+// 拆接口/拆实现只会把同一份偏好表切成几块、调用方还得记住哪项在哪块 —— 可读性更差。
+// detekt 阈值 20 已在 #167（UI04 背景图）触顶，此处精准抑制（T3/T24 先例）。
+
 package com.yumiru11.githubapp.core.datastore.preferences
 
 import com.yumiru11.githubapp.core.datastore.model.CodeFont
@@ -19,6 +24,18 @@ interface UserPreferencesRepository {
 
         /** 默认动画强度缩放（1.0 = AppMotion 原值） */
         const val DEFAULT_MOTION_SCALE: Float = 1f
+
+        /**
+         * 背景图默认不透明度（#167 / UI04，ui-design §7.4）。
+         *
+         * 0.25 是用户拍板"先按推荐值来、之后看模拟器截图再调"的起始值：
+         * 再高正文对比度会被压下去（尤其是深色下的卡片与文字）。
+         */
+        const val DEFAULT_BACKGROUND_OPACITY: Float = 0.25f
+
+        /** 不透明度可调范围：0.05 保证"选了图却几乎看不见"不会发生，0.6 是正文可读上限 */
+        const val MIN_BACKGROUND_OPACITY: Float = 0.05f
+        const val MAX_BACKGROUND_OPACITY: Float = 0.6f
     }
 
     /** 主题模式（默认跟随系统） */
@@ -85,6 +102,20 @@ interface UserPreferencesRepository {
      */
     val staggerEnabled: Flow<Boolean>
 
+    /**
+     * 全局背景图 URI（#167 / UI04，ui-design §7.4 用户拍板）。
+     *
+     * null = 默认无图（用户显式选择后才有值）。存的是 content:// URI（Photo Picker 授权），
+     * 取持久化读权限后跨进程重启依然可读。
+     */
+    val backgroundImageUri: Flow<String?>
+
+    /**
+     * 背景图统一不透明度（0..1）。默认 [DEFAULT_BACKGROUND_OPACITY]。
+     * 实际观感还要叠加深浅色蒙版，见 app 层 AppBackground 的换算。
+     */
+    val backgroundOpacity: Flow<Float>
+
     suspend fun setThemeMode(mode: ThemeMode)
 
     suspend fun setBlurEnabled(enabled: Boolean)
@@ -121,4 +152,8 @@ interface UserPreferencesRepository {
     suspend fun setRepoLayout(mode: RepoLayoutMode)
 
     suspend fun setStaggerEnabled(enabled: Boolean)
+
+    suspend fun setBackgroundImageUri(uri: String?)
+
+    suspend fun setBackgroundOpacity(opacity: Float)
 }

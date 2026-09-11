@@ -28,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -66,8 +67,10 @@ import com.yumiru11.githubapp.feature.issue.IssueListScreen
 import com.yumiru11.githubapp.feature.notifications.ui.NotificationsPanel
 import com.yumiru11.githubapp.feature.profile.GistsScreen
 import com.yumiru11.githubapp.feature.profile.ProfileScreen
+import com.yumiru11.githubapp.feature.pullrequest.PullRequestCreateScreen
 import com.yumiru11.githubapp.feature.pullrequest.PullRequestDetailScreen
 import com.yumiru11.githubapp.feature.pullrequest.PullRequestListScreen
+import com.yumiru11.githubapp.feature.repo.BranchesScreen
 import com.yumiru11.githubapp.feature.repo.CommitDetailScreen
 import com.yumiru11.githubapp.feature.repo.CreateRepoScreen
 import com.yumiru11.githubapp.feature.repo.FileViewerScreen
@@ -122,6 +125,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 品牌化启动屏（D3）：必须在 super.onCreate 之前安装 ——
+        // 它负责把 window 主题从 Theme.AppDev.Splash 交棒给 postSplashScreenTheme。
+        // 放在后面会抛 IllegalStateException，且冷启动空窗依旧。
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleIntentData(intent?.data)
@@ -372,6 +379,28 @@ class MainActivity : ComponentActivity() {
                                         onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
                                     )
                                 },
+                                // T23：分支管理页（仓库文件 Tab 的分支 Chip 入口）。
+                                // 选中分支 → 带 ref 重进仓库详情并弹出旧 REPO 页（AppNavHost 内已写好该
+                                // 导航回调，此处只透传；currentRef 空串 = 未指定当前分支，转 null 表示不高亮）
+                                branchesScreen = { owner, repo, currentRef, onBackClick, onBranchSelected ->
+                                    BranchesScreen(
+                                        owner = owner,
+                                        repo = repo,
+                                        currentRef = currentRef,
+                                        onBackClick = onBackClick,
+                                        onBranchSelected = onBranchSelected,
+                                    )
+                                },
+                                // T23：创建 PR 页（PR 列表顶栏「新建」入口）。onCreated 由 AppNavHost 接线
+                                // 到「清出本页并打开新 PR 详情」
+                                createPullRequestScreen = { owner, repo, onCreated ->
+                                    PullRequestCreateScreen(
+                                        owner = owner,
+                                        repo = repo,
+                                        onBackClick = { navController.popBackStack() },
+                                        onCreated = onCreated,
+                                    )
+                                },
                                 editorScreen = { initialContent, onClose ->
                                     MarkdownEditorScreen(
                                         initialContent = initialContent,
@@ -577,6 +606,8 @@ private fun BlobRoute(
                 onEditMarkdown = null,
             ),
         baseRepoUrl = "https://github.com/$owner/$repo",
+        findState = fileState.findState,
+        isFindOpen = fileState.isFindOpen,
         editable = true,
         onClose = { navController.popBackStack() },
         modifier = Modifier.fillMaxSize(),

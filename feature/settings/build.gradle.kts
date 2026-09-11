@@ -33,6 +33,9 @@ dependencies {
 
     // Lifecycle（viewModelScope）
     implementation(libs.lifecycle.viewmodel.compose)
+    // #167 / UI04：背景图的系统 Photo Picker（rememberLauncherForActivityResult +
+    // PickVisualMedia —— Android 13+ 即 Material You 风格的系统选择器）
+    implementation(libs.activity.compose)
 
     // 偏好仓库（T24 全部设置项持久化）
     implementation(project(":core:datastore"))
