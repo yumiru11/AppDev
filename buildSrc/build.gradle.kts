@@ -6,7 +6,7 @@ plugins {
 // dl.google.com 不可达，镜像优先）
 
 dependencies {
-    implementation("com.android.tools.build:gradle:8.7.3")
+    implementation("com.android.tools.build:gradle:9.1.1")
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.21")
     implementation("org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin:2.3.21")
 }

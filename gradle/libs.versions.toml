@@ -1,11 +1,14 @@
 [versions]
-agp = "8.7.3"
+agp = "9.1.1"
 kotlin = "2.3.21"
-# KSP2 纯版本号；2.3.8 起调用 AGP 9 才有的 addKspConfigurations(boolean)，
-# 与锁定基线 AGP 8.7.3 不兼容（NoSuchMethodError），取 AGP8 兼容最高版 2.3.7
-ksp = "2.3.7"
+# KSP2 纯版本号。2.3.8 起调用 AGP 9 才有的 addKspConfigurations(boolean)：
+#   - 与 AGP 8.7.3 不兼容（NoSuchMethodError）→ 旧基线被迫停 2.3.7
+#   - 升到 AGP 9.1.1 后反过来解锁 2.3.8+（AGP 官方 skill 要求 AGP 9 下 KSP ≥ 2.3.6）
+ksp = "2.3.12"
 compose-bom = "2026.06.01"
-hilt = "2.57.2"
+# Hilt 2.57.2 在 AGP 9 下硬失败（"Android BaseExtension not found." —— 旧 variant API 已被移除）；
+# AGP 官方 skill 要求 AGP 9 下 Hilt ≥ 2.59.2
+hilt = "2.59.2"
 apollo = "5.0.1"
 retrofit = "3.0.0"
 okhttp = "5.4.0"

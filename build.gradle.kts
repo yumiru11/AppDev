@@ -211,29 +211,24 @@ val coverageVerify =
     }
 
 subprojects {
-    plugins.withId("com.android.application") {
-        extensions.configure<com.android.build.gradle.AppExtension> {
-            buildTypes.getByName("debug") { enableUnitTestCoverage = true }
-        }
-        configureJacocoVersion()
-        this@subprojects.registerCoverageTasks()
-    }
-    plugins.withId("com.android.library") {
-        extensions.configure<com.android.build.gradle.LibraryExtension> {
-            buildTypes.getByName("debug") { enableUnitTestCoverage = true }
-        }
-        configureJacocoVersion()
-        this@subprojects.registerCoverageTasks()
-    }
+    // AGP 9 breaking change：旧实现类 com.android.build.gradle.AppExtension / LibraryExtension
+    // 在 newDsl（AGP 9 默认 true）下不再实现公开 DSL 接口，`extensions.configure<AppExtension>`
+    // 直接失败。统一改成：getByName("android") 后转成【非泛型】的 CommonExtension 接口
+    // （AGP 9.0 同时移除了 CommonExtension 的泛型参数）。
+    // CommonExtension 上同时有 buildTypes（BuildType.enableUnitTestCoverage 在 AGP 9.1 仍在）
+    // 与 testCoverage（TestCoverage.jacocoVersion），一处转换即可覆盖两个用途。
+    plugins.withId("com.android.application") { configureAndroidCoverage() }
+    plugins.withId("com.android.library") { configureAndroidCoverage() }
 }
 
 // T1：锁定 JaCoCo 0.8.13（AGP 官方 DSL testCoverage.jacocoVersion，TestCoverage 接口）。
-// testCoverage 在 CommonExtension（新 DSL 接口）上，legacy 的 AppExtension/LibraryExtension 没有；
-// 且 Gradle 的 configure<CommonExtension> 按注册类型精确匹配（android 扩展注册为 BaseAppModuleExtension），
+// testCoverage 在 CommonExtension（新 DSL 接口）上；且 Gradle 的 configure<T> 按注册类型匹配，
 // 必须 getByName("android") 后强转（plugins.withId 回调里 jacoco 插件尚未应用，无法改 toolVersion）。
-fun Project.configureJacocoVersion() {
-    val androidExt = extensions.getByName("android") as com.android.build.api.dsl.CommonExtension<*, *, *, *, *, *>
+fun Project.configureAndroidCoverage() {
+    val androidExt = extensions.getByName("android") as com.android.build.api.dsl.CommonExtension
+    androidExt.buildTypes.getByName("debug") { enableUnitTestCoverage = true }
     androidExt.testCoverage.jacocoVersion = libs.versions.jacoco.get()
+    registerCoverageTasks()
 }
 
 // 为模块注册 jacocoTestReport（T2 全量分母）+ jacocoTestCoverageVerification（T3，有阈值时），并接入根聚合。
