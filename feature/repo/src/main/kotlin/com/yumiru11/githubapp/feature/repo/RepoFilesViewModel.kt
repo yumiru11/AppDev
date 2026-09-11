@@ -1,10 +1,16 @@
-@file:Suppress("TooGenericExceptionCaught") // 网络/IO 错误统一兜底（同 RepoDetailViewModel 先例）
+@file:Suppress("TooGenericExceptionCaught", "TooManyFunctions")
+// - TooGenericExceptionCaught：网络/IO 错误统一兜底（同 RepoDetailViewModel 先例）
+// - TooManyFunctions（25 ≥ 20）：本类是「仓库」分区**唯一状态层**（树/目录/文件/编辑提交/文件内
+//   查找），查找的 6 个方法均为对 core:editor 状态机的薄转发（一行 update），拆类反而把
+//   同一屏幕的状态源切成两处（IssueDetailScreen 同款装配豁免先例）
 
 package com.yumiru11.githubapp.feature.repo
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.yumiru11.githubapp.core.editor.FileFindState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -129,7 +135,14 @@ class RepoFilesViewModel
             ref: String,
         ) {
             if (node.isDirectory || _uiState.value.fileState is FileViewState.Loading) return
-            _uiState.update { it.copy(selectedPath = node.path, fileState = FileViewState.Loading) }
+            _uiState.update {
+                it.copy(
+                    selectedPath = node.path,
+                    fileState = FileViewState.Loading,
+                    isFindOpen = false,
+                    findState = FileFindState(),
+                )
+            }
             viewModelScope.launch {
                 repoRepository.getFileContent(owner, repo, node.path, ref).fold(
                     onSuccess = { data ->
@@ -144,7 +157,9 @@ class RepoFilesViewModel
 
         fun retryLoadFile(ref: String) {
             val path = _uiState.value.selectedPath ?: return
-            _uiState.update { it.copy(fileState = FileViewState.Loading) }
+            _uiState.update {
+                it.copy(fileState = FileViewState.Loading, isFindOpen = false, findState = FileFindState())
+            }
             viewModelScope.launch {
                 repoRepository.getFileContent(owner, repo, path, ref).fold(
                     onSuccess = { data ->
@@ -163,7 +178,14 @@ class RepoFilesViewModel
          */
         fun openDeepLinkFile(path: String) {
             if (_uiState.value.fileState is FileViewState.Loading) return
-            _uiState.update { it.copy(selectedPath = path, fileState = FileViewState.Loading) }
+            _uiState.update {
+                it.copy(
+                    selectedPath = path,
+                    fileState = FileViewState.Loading,
+                    isFindOpen = false,
+                    findState = FileFindState(),
+                )
+            }
             viewModelScope.launch {
                 repoRepository.getFileContent(owner, repo, path, loadedRef ?: refArg).fold(
                     onSuccess = { data ->
@@ -177,7 +199,56 @@ class RepoFilesViewModel
         }
 
         fun closeFile() {
-            _uiState.update { it.copy(selectedPath = null, fileState = FileViewState.Idle) }
+            _uiState.update {
+                it.copy(
+                    selectedPath = null,
+                    fileState = FileViewState.Idle,
+                    isFindOpen = false,
+                    findState = FileFindState(),
+                )
+            }
+        }
+
+        // ─── #166 / UI14 文件内查找（代码浏览屏）──────────────────────────────
+        //
+        // 职责边界：本层是查找状态的**展示事实源**（序号/计数/面板开合），纯逻辑在
+        // core:editor 的 [FileFindState]（单测 FileFindStateTest）；真正的高亮与跳转由
+        // View 侧的 [com.yumiru11.githubapp.core.editor.CodeEditorController] 执行
+        // （编辑器句柄只在组合期存在，不能塞进 ViewModel）。
+        //
+        // [onFindNext]/[onFindPrevious] 乐观推进序号（立即刷新「第 n / 共 m 项」），
+        // [onFindResults] 随后回灌编辑器匹配表的权威值收敛（与 Sora 环形跳转语义一致）。
+
+        /** 展开查找面板（代码文件；查询词为空，等待输入）。 */
+        fun openFind() {
+            _uiState.update { it.copy(isFindOpen = true) }
+        }
+
+        /** 关闭查找面板并复位状态（编辑器高亮由 View 侧 clearFindText 清除）。 */
+        fun closeFind() {
+            _uiState.update { it.copy(isFindOpen = false, findState = FileFindState()) }
+        }
+
+        /** 查询词变更：计数与序号立即复位（匹配结果由编辑器异步回灌 [onFindResults]）。 */
+        fun onFindQueryChanged(query: String) {
+            _uiState.update { it.copy(findState = it.findState.withQuery(query)) }
+        }
+
+        /** 下一处匹配：乐观推进序号（循环语义，回绕由 [FileFindState.cycledNext] 负责）。 */
+        fun onFindNext() {
+            _uiState.update { it.copy(findState = it.findState.cycledNext()) }
+        }
+
+        /** 上一处匹配：乐观回退序号（首项之前回到末项）。 */
+        fun onFindPrevious() {
+            _uiState.update { it.copy(findState = it.findState.cycledPrevious()) }
+        }
+
+        /** 回灌编辑器的权威查找结果（匹配总数 / 当前序号；越界序号在状态机内收敛）。 */
+        fun onFindResults(result: FileFindState) {
+            _uiState.update {
+                it.copy(findState = it.findState.withResults(result.matchCount, result.currentMatchIndex))
+            }
         }
 
         // ─── T22 文件编辑提交 ─────────────────────────────────────────────────
@@ -457,6 +528,8 @@ class RepoFilesViewModel
                     fileState = FileViewState.Idle,
                     editState = FileEditState.Idle,
                     treeState = TreeState.Loading,
+                    isFindOpen = false,
+                    findState = FileFindState(),
                 )
             }
             loadedRef = null
@@ -482,15 +555,37 @@ class RepoFilesViewModel
             return TreeState.Loaded(transform(current.rootNodes))
         }
 
-        /** 异常 → 错误类型（404 → NOT_FOUND，IO → NETWORK，其余 → UNKNOWN） */
-        private fun mapError(e: Throwable): RepoErrorType =
-            when {
-                e is HttpException && (e.code() == 401 || e.code() == 403) -> RepoErrorType.FORBIDDEN
-                e is HttpException && e.code() == 404 -> RepoErrorType.NOT_FOUND
-                e is IOException -> RepoErrorType.NETWORK
-                else -> RepoErrorType.UNKNOWN
-            }
+        /**
+         * 异常 → 错误域。
+         *
+         * **404 一律是「路径不存在」而非「仓库不存在」**（#201 P0）：本 ViewModel 的每个
+         * 请求都发生在仓库已加载之后（`GET /repos/{o}/{r}` 已 200 才可能走到这里），
+         * 所以 contents/blob 的 404 只能说明**该文件/目录已删除或改名**。旧实现映射为
+         * [RepoErrorType.NOT_FOUND]，界面把「文件不存在」说成「Repository not found」，
+         * 还配了一个必然再次 404 的 Retry（CI 帧 `editor.png` 实证）。
+         */
+        private fun mapError(e: Throwable): RepoErrorType {
+            val type =
+                when {
+                    e is HttpException && (e.code() == 401 || e.code() == 403) -> RepoErrorType.FORBIDDEN
+                    e is HttpException && e.code() == 404 -> RepoErrorType.PATH_NOT_FOUND
+                    e is IOException -> RepoErrorType.NETWORK
+                    else -> RepoErrorType.UNKNOWN
+                }
+            // 失败留档：错误域映射是排查的起点（CI logcat 过滤 RepoFiles 即可定位是
+            // 「路径没了」还是「网络挂了」；#201 的问题正是靠 logcat 里的 contents 404 反查出来的）
+            Log.i(TAG, "loadFailed type=$type httpCode=${(e as? HttpException)?.code()} cause=${e.javaClass.simpleName}")
+            return type
+        }
     }
+
+/**
+ * 文件域加载失败日志 tag（CI/真机 logcat 过滤：`adb logcat -s RepoFiles`）。
+ *
+ * #201 的定位链就是靠 logcat 里的 `contents/README.md → 404` 反查出来的；
+ * 之前这条路径**一行日志都没有**，只能靠 UI 截图猜。
+ */
+private const val TAG = "RepoFiles"
 
 /**
  * 文件编辑流程事件（T22；UI 层消费——Snackbar 文案 / 剪贴板复制）。

@@ -1,6 +1,9 @@
-package com.yumiru11.githubapp.feature.issue
+package com.yumiru11.githubapp.feature.issue.ui
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -115,6 +118,46 @@ class ReactionChipTouchTargetTest {
             .performTouchInput { click(Offset(centerX, bottom - 1f)) }
 
         assertEquals(1, toggles)
+    }
+
+    /**
+     * 反应翻转要真的走弹跳路径（#167 / UI17）：`reacted` 由 false → true 时，
+     * `rememberReactionBounceScale` 必须进入冲击段 + 回落段的动画（而不是首帧直接返回），
+     * 且弹跳是**纯视觉**的 `graphicsLayer` 缩放——命中区与胶囊布局尺寸都不受影响。
+     *
+     * 附带锁住"首次组合不播"：首帧只记账，动画在翻转后才发生（见实现注释）。
+     */
+    @Test
+    fun reactionChip_toggleReacted_runsBounceAndKeepsLayoutGeometry() {
+        var reacted by mutableStateOf(false)
+        composeRule.setContent {
+            AppTheme {
+                ReactionChip(
+                    content = "+1",
+                    count = 1,
+                    reacted = reacted,
+                    reactedStateText = "Reacted",
+                    onToggle = { reacted = !reacted },
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(REACTION_CHIP_HIT_TAG).performTouchInput { click() }
+        // 弹跳（冲击 200ms + HighBouncy 回落）跑完再断言几何：缩放不该动布局
+        composeRule.mainClock.advanceTimeBy(1_000L)
+        composeRule.waitForIdle()
+
+        assertTrue("toggle must have flipped the state", reacted)
+        val hit = composeRule.onNodeWithTag(REACTION_CHIP_HIT_TAG).getUnclippedBoundsInRoot()
+        assertTrue("hit height ${hit.bottom - hit.top} < 48dp", hit.bottom - hit.top >= 48.dp)
+        val pill =
+            composeRule
+                .onNodeWithTag(REACTION_CHIP_PILL_TAG, useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+        assertTrue(
+            "bounce must not inflate the visual pill: ${pill.bottom - pill.top}",
+            pill.bottom - pill.top <= REACTION_CHIP_MAX_VISUAL_HEIGHT,
+        )
     }
 
     @Test

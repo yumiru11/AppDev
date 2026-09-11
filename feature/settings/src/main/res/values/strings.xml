@@ -30,6 +30,13 @@
     <string name="settings_blur">Glass effect</string>
     <string name="settings_blur_desc">Blurred surfaces behind bars, panel and sheets</string>
     <!-- Per-surface glass switches (issue #167 / UI03, ui-design §6.3) -->
+    <string name="settings_background">Background image</string>
+    <string name="settings_background_none">None — pick an image to personalise the app</string>
+    <string name="settings_background_selected">Applied behind all screens (does not scroll)</string>
+    <string name="settings_background_pick">Choose image</string>
+    <string name="settings_background_change">Change image</string>
+    <string name="settings_background_clear">Remove</string>
+    <string name="settings_background_opacity">Opacity %1$d%%</string>
     <string name="settings_stagger">Animate list entrance</string>
     <string name="settings_stagger_desc">First screen items slide in one after another</string>
     <string name="settings_glass_top_bar">Top bar</string>

@@ -25,6 +25,7 @@ import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.ui.appTransientEnterAlpha
 import com.yumiru11.githubapp.feature.home.R
 import com.yumiru11.githubapp.feature.home.RepoPickerUiState
 import com.yumiru11.githubapp.feature.home.model.RepoOption
@@ -45,7 +46,11 @@ internal fun RepoPickerSheet(
     onRetry: () -> Unit,
 ) {
     if (!visible) return
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）
+        modifier = Modifier.appTransientEnterAlpha(),
+    ) {
         RepoPickerSheetContent(
             uiState = uiState,
             onPick = onPick,

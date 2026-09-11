@@ -50,4 +50,40 @@ object GlassRenderPolicy {
         blurEnabled: Boolean,
         sdkInt: Int = Build.VERSION.SDK_INT,
     ): Boolean = resolve(blurEnabled = blurEnabled, hasHazeState = true, sdkInt = sdkInt) == GlassRenderMode.BackdropBlur
+
+    /**
+     * 玻璃层叠色 alpha（#201 / P0 全屏面板叠印修复）。
+     *
+     * **为什么需要它**：全屏玻璃点位（[GlassScope.PANEL]）铺满屏幕时，遮罩整块被面板
+     * 盖住，「挡住下层内容」这件事只剩面板自身这一层。此时若仍按 [AppBlur.SCRIM_ALPHA]
+     * （0.75）走降级，合成结果 = 0.75×surface + 0.25×(0.5 遮罩 + 下层内容)，下层**仍有
+     * 12.5% 的对比度透上来且一点没糊**（API<31 无 RenderEffect；CI 截图模拟器正是 API 30）
+     * ——真机表现就是面板标题与下层顶栏文字同像素叠印（CI release
+     * `screenshots-pr199-34600531043` 的 `notification-panel.png` 实测：面板滤镜行处
+     * 亮度跨度 39 级，下层字形清晰可读）。
+     *
+     * **判定**：backdrop blur 真实生效时保持半透明玻璃——Haze 把模糊后的 backdrop
+     * **不透明地**画在 effect 矩形内，透上来的只有糊掉的色块、没有可读字形（同 release
+     * 的 API 31 玻璃验证帧实证：同一位置已是雾面），玻璃观感必须保留。
+     * 降级路径（关开关 / 无 HazeState / API<31）不模糊 → 必须全不透明，否则就是 P0 叠印。
+     *
+     * @param renderMode [resolve] 的判定结果
+     * @param opaqueWhenBlurUnavailable 调用方是否要求「降级即不透明」。只有铺满全屏、
+     *   背后内容无处可露的点位（全屏通知面板）该传 true；顶栏/底栏/BottomSheet 的内容
+     *   本就设计成从栏后穿过（§6.2「滚动穿越感」），必须保持半透明，故默认 false，
+     *   行为与 #83 一致。
+     * @return 玻璃层叠色 alpha（0..1）
+     */
+    fun layerAlpha(
+        renderMode: GlassRenderMode,
+        opaqueWhenBlurUnavailable: Boolean,
+    ): Float =
+        if (opaqueWhenBlurUnavailable && renderMode != GlassRenderMode.BackdropBlur) {
+            OPAQUE_ALPHA
+        } else {
+            AppBlur.SCRIM_ALPHA
+        }
+
+    /** 全不透明（面板降级路径用；显式 1f 而非省略 alpha，保持叠色语义统一） */
+    private const val OPAQUE_ALPHA = 1f
 }

@@ -1,10 +1,12 @@
 @file:Suppress("LargeClass")
-// 704 行：T11 树/目录/文件 + T22 编辑提交（提交/冲突三选项/删除/失败路径）全流程单测聚一文件
-// （单一被测类，拆分收益低于同文件聚合；后续测试膨胀再拆 EditTest 子类）
+// 1037 行：T11 树/目录/文件 + T22 编辑提交（提交/冲突三选项/删除/失败路径）+ #166 UI14
+// 文件内查找状态层全流程单测聚一文件（单一被测类，拆分收益低于同文件聚合；
+// 后续测试膨胀再拆 EditTest / FindTest 子类）
 
 package com.yumiru11.githubapp.feature.repo
 
 import androidx.lifecycle.SavedStateHandle
+import com.yumiru11.githubapp.core.editor.FileFindState
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -15,6 +17,7 @@ import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -86,7 +89,7 @@ class RepoFilesViewModelTest {
         }
 
     @Test
-    fun loadRootTree_notFound_emitsErrorNotFound() =
+    fun loadRootTree_notFound_emitsErrorPathNotFound() =
         runTest {
             val repoRepository =
                 mockk<RepoRepository> {
@@ -96,7 +99,22 @@ class RepoFilesViewModelTest {
 
             viewModel.loadRootTree("main")
 
-            assertEquals(TreeState.Error(RepoErrorType.NOT_FOUND), viewModel.uiState.value.treeState)
+            // #201：404 是「该 ref/路径不存在」，不是「仓库不存在」（仓库级 404 由 RepoDetailViewModel 负责）
+            assertEquals(TreeState.Error(RepoErrorType.PATH_NOT_FOUND), viewModel.uiState.value.treeState)
+        }
+
+    @Test
+    fun loadRootTree_forbidden_emitsErrorForbidden() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns Result.failure(httpException(403))
+                }
+            val viewModel = viewModel(repoRepository)
+
+            viewModel.loadRootTree("main")
+
+            assertEquals(TreeState.Error(RepoErrorType.FORBIDDEN), viewModel.uiState.value.treeState)
         }
 
     @Test
@@ -264,7 +282,23 @@ class RepoFilesViewModelTest {
 
             val state = viewModel.uiState.value
             assertEquals("Main.kt", state.selectedPath)
-            assertEquals(FileViewState.Error(RepoErrorType.NOT_FOUND), state.fileState)
+            // #201：contents 404 = 文件已删除/改名，文案与「仓库未找到」不是一回事
+            assertEquals(FileViewState.Error(RepoErrorType.PATH_NOT_FOUND), state.fileState)
+        }
+
+    @Test
+    fun openDeepLinkFile_missingPath_emitsErrorPathNotFound() =
+        runTest {
+            // CI 实证场景：深链 blob/main/README.md（该文件后来不存在）→ contents 404
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getFileContent(any(), any(), any(), any()) } returns Result.failure(httpException(404))
+                }
+            val viewModel = viewModel(repoRepository)
+
+            viewModel.openDeepLinkFile("README.md")
+
+            assertEquals(FileViewState.Error(RepoErrorType.PATH_NOT_FOUND), viewModel.uiState.value.fileState)
         }
 
     @Test
@@ -872,5 +906,164 @@ class RepoFilesViewModelTest {
             )
             assertEquals(FileEditEvent.Failed(RepoErrorType.NETWORK), events.single())
             job.cancel()
+        }
+
+    // ─── #166 / UI14 文件内查找（状态层；纯逻辑状态机单测见 core:editor FileFindStateTest）───
+
+    /** 打开代码文件查看器（查找入口只在 CODE 分支出现）。 */
+    private fun viewerSetup(repoRepository: RepoRepository): RepoFilesViewModel {
+        coEvery { repoRepository.getTree(any(), any(), any()) } returns
+            Result.success(listOf(treeNode("Main.kt", "Main.kt")))
+        coEvery { repoRepository.getFileContent(any(), any(), any(), any()) } returns
+            Result.success(FileContentData("Main.kt", "Main.kt", 4L, FileKind.CODE, "code"))
+        val vm = viewModel(repoRepository)
+        vm.loadRootTree("main")
+        vm.openFile(treeNode("Main.kt", "Main.kt"), "main")
+        return vm
+    }
+
+    @Test
+    fun openFind_setsPanelOpenKeepingEmptyQuery() =
+        runTest {
+            val vm = viewerSetup(mockk())
+
+            vm.openFind()
+
+            val state = vm.uiState.value
+            assertTrue(state.isFindOpen)
+            assertEquals(FileFindState(), state.findState)
+        }
+
+    @Test
+    fun onFindQueryChanged_afterMatches_resetsCounterAndEntersSearching() =
+        runTest {
+            val vm = viewerSetup(mockk())
+            vm.openFind()
+            vm.onFindResults(FileFindState(query = "fun", matchCount = 5, currentMatchIndex = 2))
+
+            vm.onFindQueryChanged("func")
+
+            val state = vm.uiState.value.findState
+            assertEquals("func", state.query)
+            assertEquals("新查询结果未到，不得沿用上一查询词计数", 0, state.matchCount)
+            assertEquals(0, state.matchOrdinal)
+            assertTrue(state.isSearching)
+        }
+
+    @Test
+    fun onFindNext_withMatches_advancesOrdinalAndWrapsToFirst() =
+        runTest {
+            val vm = viewerSetup(mockk())
+            vm.openFind()
+            vm.onFindResults(FileFindState(query = "fun", matchCount = 3, currentMatchIndex = 0))
+
+            vm.onFindNext()
+            assertEquals(2, vm.uiState.value.findState.matchOrdinal)
+
+            vm.onFindNext()
+            assertEquals(3, vm.uiState.value.findState.matchOrdinal)
+
+            vm.onFindNext()
+            assertEquals("末项之后回到第一项", 1, vm.uiState.value.findState.matchOrdinal)
+        }
+
+    @Test
+    fun onFindPrevious_withMatches_wrapsBackToLastMatch() =
+        runTest {
+            val vm = viewerSetup(mockk())
+            vm.openFind()
+            vm.onFindResults(FileFindState(query = "fun", matchCount = 4, currentMatchIndex = 0))
+
+            vm.onFindPrevious()
+
+            assertEquals("首项之前回到末项", 4, vm.uiState.value.findState.matchOrdinal)
+        }
+
+    @Test
+    fun onFindResults_noMatches_clearsOrdinalAndCounter() =
+        runTest {
+            val vm = viewerSetup(mockk())
+            vm.openFind()
+            vm.onFindQueryChanged("zzz")
+
+            vm.onFindResults(FileFindState(query = "zzz", matchCount = 0, currentMatchIndex = FileFindState.NO_MATCH))
+
+            val state = vm.uiState.value.findState
+            assertEquals(0, state.matchCount)
+            assertEquals(0, state.matchOrdinal)
+            assertFalse(state.isSearching)
+            assertFalse(state.hasMatches)
+        }
+
+    @Test
+    fun onFindResults_authoritativeIndex_overridesOptimisticOrdinal() =
+        runTest {
+            val vm = viewerSetup(mockk())
+            vm.openFind()
+            vm.onFindResults(FileFindState(query = "fun", matchCount = 3, currentMatchIndex = 0))
+            vm.onFindNext()
+            assertEquals("乐观推进后为第 2 项", 2, vm.uiState.value.findState.matchOrdinal)
+
+            // 编辑器权威结果（Sora 匹配表）为准：光标在首处匹配上 → 收敛回第 1 项
+            vm.onFindResults(FileFindState(query = "fun", matchCount = 3, currentMatchIndex = 0))
+
+            assertEquals(1, vm.uiState.value.findState.matchOrdinal)
+            assertEquals(3, vm.uiState.value.findState.matchCount)
+        }
+
+    @Test
+    fun onFindResults_outOfRangeIndex_dropsOrdinalNotCounter() =
+        runTest {
+            val vm = viewerSetup(mockk())
+            vm.openFind()
+            vm.onFindQueryChanged("fun")
+
+            vm.onFindResults(FileFindState(query = "fun", matchCount = 2, currentMatchIndex = 7))
+
+            val state = vm.uiState.value.findState
+            assertEquals(2, state.matchCount)
+            assertEquals("越界序号记为未选中，不臆造第 n 项", 0, state.matchOrdinal)
+        }
+
+    @Test
+    fun closeFind_resetsFindStateAndClosesPanel() =
+        runTest {
+            val vm = viewerSetup(mockk())
+            vm.openFind()
+            vm.onFindResults(FileFindState(query = "fun", matchCount = 5, currentMatchIndex = 1))
+
+            vm.closeFind()
+
+            val state = vm.uiState.value
+            assertFalse(state.isFindOpen)
+            assertEquals(FileFindState(), state.findState)
+        }
+
+    @Test
+    fun closeFile_endsFindSession() =
+        runTest {
+            val vm = viewerSetup(mockk())
+            vm.openFind()
+            vm.onFindResults(FileFindState(query = "fun", matchCount = 5, currentMatchIndex = 1))
+
+            vm.closeFile()
+
+            val state = vm.uiState.value
+            assertFalse("关闭查看器不得残留查找会话", state.isFindOpen)
+            assertEquals(FileFindState(), state.findState)
+        }
+
+    @Test
+    fun openFile_anotherFile_endsFindSession() =
+        runTest {
+            val vm = viewerSetup(mockk())
+            vm.openFind()
+            vm.onFindResults(FileFindState(query = "fun", matchCount = 5, currentMatchIndex = 1))
+
+            vm.openFile(treeNode("Other.kt", "Other.kt"), "main")
+
+            val state = vm.uiState.value
+            assertFalse("换文件不得残留上一文件的查找会话（高亮由 View 侧 clearFindText 清除）", state.isFindOpen)
+            assertEquals(FileFindState(), state.findState)
         }
 }

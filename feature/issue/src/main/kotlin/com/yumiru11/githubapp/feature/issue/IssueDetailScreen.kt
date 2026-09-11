@@ -69,7 +69,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -110,6 +109,8 @@ import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppImageOverlay
+import com.yumiru11.githubapp.core.ui.AppSnackbarHost
+import com.yumiru11.githubapp.core.ui.appTransientEnterAlpha
 import com.yumiru11.githubapp.core.ui.gitHubStatusStateDescription
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.issue.model.Issue
@@ -120,6 +121,7 @@ import com.yumiru11.githubapp.feature.issue.model.IssueState
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineEventType
 import com.yumiru11.githubapp.feature.issue.model.IssueTimelineItem
 import com.yumiru11.githubapp.feature.issue.model.IssueUser
+import com.yumiru11.githubapp.feature.issue.ui.ReactionChip
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -173,7 +175,7 @@ fun IssueDetailScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(text = "$owner/$repo #$number") },
@@ -913,7 +915,12 @@ private fun IssueMetaEditSheet(
     onSave: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）
+        modifier = Modifier.appTransientEnterAlpha(),
+    ) {
         Column(
             modifier =
                 Modifier
@@ -1153,6 +1160,8 @@ private fun CommentInputSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
+        // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）
+        modifier = Modifier.appTransientEnterAlpha(),
         // 圆角 + 顶部把手：ModalBottomSheet 自带把手，圆角走全局形状令牌
         shape =
             RoundedCornerShape(

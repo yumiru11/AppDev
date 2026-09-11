@@ -113,6 +113,11 @@ val coverageThresholds =
         ":core:designsystem" to 0.69, // 实测 71.2%（UI/渲染，地板 66.7）
         ":feature:settings" to 0.98, // 实测 100.0%
         ":core:github-rest" to 0.80, // 实测 82.3%（v1 误将 ContentApi/FileContentDto 排除致 0.75，v2 回正）
+        // 2026-09-11 新增：提交级审计发现该模块是**三重盲区**（0 张截图基线 / 不在 CI 任何门禁 /
+        // 6 个 UI 类被 JaCoCo 排除且排除理由声称的"截图兜底"在本模块并不存在）。
+        // 纳入后至少让 dto/mapper/ViewModel 这些**单测可达**的逻辑层进报告与门禁。
+        // 阈值取实测值向下取整（项目惯例）：73.9% → 0.73。
+        ":feature:pullrequest" to 0.73, // 实测 73.9%（2026-09-11 首次纳入：此前该模块不在阈值表 → 无 jacocoTestReport → diff 门禁看不见它的新增行）
     )
 
 // JaCoCo 分析排除：生成代码/样板（R/BuildConfig/Manifest/Hilt 产物）+ UI 层，不计入分母
@@ -409,6 +414,26 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 // *Composer.kt：编辑/预览装配层（MarkdownComposer 等纯 Composable）。
                 // "Composer" 是 Compose 专有词（runtime 的 Composer），不会有同名逻辑类。
                 Regex("""(^|/)[^/]*Composer[^/]*\.kt$"""),
+                // MainActivity.kt：单 Activity 装配层（setContent + 依赖注入接线 + 启动屏安装）。
+                // 里面没有可断言的逻辑分支，装的是"谁来画界面"这件事本身。
+                // 实测（PR #196）：加一行 installSplashScreen() 就被 diff 门禁判成"未覆盖新增行"。
+                Regex("""(^|/)MainActivity\.kt$"""),
+                // app 模块根包下的主题/背景装配层（#167 / UI04）。
+                // 这两处是**纯 Compose 装配**：AppThemeHost 只做"偏好 Flow → CompositionLocal"
+                // 的接线，AppBackground 只做"图 + 蒙版 + 内容"的三层堆叠。
+                // 逻辑部分已抽成可测纯函数（BackgroundScrim 有 5 例 JVM 断言；色板/动效换算在
+                // core:designsystem 各自有测试）—— 这里排除的只是无法单测的装配代码。
+                // 实测（PR #197）：不加这两条，动一行接线就会被 diff 门禁判成"未覆盖新增行"。
+                // 且 Robolectric 沙箱加载的类不产 JaCoCo 数据（#181 结论），补测试也解决不了。
+                Regex("""(^|/)AppThemeHost\.kt$"""),
+                Regex("""(^|/)AppBackground\.kt$"""),
+                // MainActivity.kt：单 Activity 入口 = 根级 Compose 装配层（T23 接线修复暴露）。
+                // 文件内容是 setContent + AppNavHost 的 20 个 screen lambda 装配、深链/OAuth
+                // intent 分流与 locale 切换，无独立可单测逻辑；:app 本就**没有**覆盖率阈值
+                // （见 coverageThresholds 注释「app / feature/auth：豁免（纯 UI 装配）」），
+                // 逻辑模块的门禁不受影响。不排除的真实后果（实测 PR 前）：改 2 个 lambda 接线
+                // 新增 24 行里有 13 行可执行、仅 7 行被覆盖 → 53.8% < 80%，CI diff 门禁必红。
+                Regex("""(^|/)MainActivity\.kt$"""),
             )
 
         val changedFiles =
@@ -478,8 +503,22 @@ abstract class DiffCoverageCheck : DefaultTask() {
             val known = key?.let { knownByKey[it] } ?: emptySet()
             // 只统计 JaCoCo 认账的行：不在报告里的行视为不可执行（不计入分母也不计入未覆盖）
             val uncovered = codeLines.filter { it in known && it !in covered }
-            totalCovered += codeLines.size - uncovered.size
-            if (uncovered.isNotEmpty()) uncoveredByFile[file] = uncovered
+            // ★ 门禁修复（2026-09-11，PR #210 实证）：文件**完全不在覆盖率报告里**时，
+            // known/covered 都是空集 → 上面那条 filter 恒为空 → `codeLines.size - 0`
+            // 把**整个文件的每一行都算成"已覆盖"**。即"没有任何测试触及的模块"在 diff
+            // 门禁里反而是 100% 绿的假象（PR #210 实测：feature:pullrequest 无覆盖率任务，
+            // LineCommentSheet/ReviewSheet 的新增行就这样被计为已覆盖）。
+            //
+            // 修正：报告缺席 = 无法证明被覆盖 → 一律计入未覆盖。这样"未测模块"不再刷绿，
+            // 要么补测试，要么把文件加进上面的 uiSourceExcludes（并写明不可测理由）。
+            val unreported = key == null || key !in coveredByKey
+            if (unreported) {
+                totalCovered += 0
+                uncoveredByFile[file] = codeLines
+            } else {
+                totalCovered += codeLines.size - uncovered.size
+                if (uncovered.isNotEmpty()) uncoveredByFile[file] = uncovered
+            }
             if (key == null || key !in coveredByKey) noReport += file
         }
         logger.lifecycle("diffCoverageCheck: 新增 $rawAdded 行，其中可执行 $totalAdded 行（base=$base）")

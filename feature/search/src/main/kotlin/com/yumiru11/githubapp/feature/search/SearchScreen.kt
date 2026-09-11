@@ -1,9 +1,17 @@
+@file:Suppress("TooManyFunctions", "LongMethod")
+// - TooManyFunctions：结果区/历史/qualifier/错误态各是一个小 Composable，Compose 惯用结构，
+//   拆文件反损可读性（RepoDetailScreen/BranchesScreen 同款先例；#167 / UI16 新增顶部细进度条后越阈值）
+// - LongMethod：SearchScreen 是入口装配（搜索框回调 + 顶部进度条 + 四态内容分发），
+//   分支聚合在一处才好对照（IssueDetailScreen/PullRequestDetailScreen 同款先例）
 @file:OptIn(ExperimentalLayoutApi::class)
 
 package com.yumiru11.githubapp.feature.search
 
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +28,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
@@ -28,11 +38,19 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -49,9 +67,13 @@ import com.yumiru11.githubapp.core.data.model.User
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
+import com.yumiru11.githubapp.core.ui.appFadeThroughTransform
 import com.yumiru11.githubapp.feature.search.qualifier.QUALIFIER_SUGGESTIONS
 import com.yumiru11.githubapp.feature.search.qualifier.appendQualifier
 import kotlinx.coroutines.flow.Flow
+
+/** 顶部细进度条测试标记（「搜索中不整区闪 loading」断言用）。 */
+internal const val SEARCH_PROGRESS_TAG = "search-progress"
 
 /**
  * 搜索页（T18，docs/ui-design.md §3.3）。
@@ -61,6 +83,9 @@ import kotlinx.coroutines.flow.Flow
  * - 代码搜索需登录：未登录展示登录引导（T18 验收第 4 条）
  * - 限流（429）与网络错误：分页错误按 GitHubError 分类展示友好文案（验收第 5 条）
  * - 点击结果 → GitHubLinkParser 解析 html_url → 应用内路由（回调由宿主接线）
+ * - **结果区动效（#167 / UI16）**：换关键词 / 切 Tab 走 M3 fade-through（[appFadeThroughTransform]，
+ *   动画键 = 查询词 + 选中 Tab）；搜索中只在**顶部**显示细 [LinearProgressIndicator]，
+ *   结果区保留上一份成功结果——不再整区闪 loading
  */
 @Composable
 fun SearchScreen(
@@ -76,6 +101,17 @@ fun SearchScreen(
     val rateLimitWarning by viewModel.rateLimitWarning.collectAsStateWithLifecycle()
     val keyboard = LocalSoftwareKeyboardController.current
 
+    // #167 / UI16：Loading 期间保留上一份成功结果（记在本地而非 VM——纯展示态，
+    // 配置变更后重来一次也无妨），配合顶部细进度条，避免整区闪 loading。
+    var lastResults by remember { mutableStateOf<SearchUiState.Success?>(null) }
+    LaunchedEffect(uiState) {
+        (uiState as? SearchUiState.Success)?.let { lastResults = it }
+    }
+    // 活动 Tab 的 Paging 首屏刷新（真正的网络等待期）也计入"搜索中"
+    var resultsRefreshing by remember { mutableStateOf(false) }
+    val results = (uiState as? SearchUiState.Success) ?: lastResults
+    val isSearching = uiState is SearchUiState.Loading || resultsRefreshing
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
@@ -90,64 +126,104 @@ fun SearchScreen(
             )
         },
     ) { paddingValues ->
-        Box(
+        Column(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
         ) {
-            when (val state = uiState) {
-                is SearchUiState.Idle -> {
-                    IdleContent(
-                        history = history,
-                        input = input,
-                        onHistoryClick = { viewModel.submitQuery(it) },
-                        onClearHistory = viewModel::clearHistory,
-                        onQualifierClick = { qualifier ->
-                            val next = appendQualifier(input, qualifier)
-                            viewModel.onQueryChange(next)
-                            viewModel.submitQuery(next)
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+            // 搜索中的唯一进度反馈（细条，不挤占结果区）
+            SearchProgressBar(visible = isSearching)
+            Box(modifier = Modifier.fillMaxSize()) {
+                val state = uiState
+                when {
+                    state is SearchUiState.Idle -> {
+                        IdleContent(
+                            history = history,
+                            input = input,
+                            onHistoryClick = { viewModel.submitQuery(it) },
+                            onClearHistory = viewModel::clearHistory,
+                            onQualifierClick = { qualifier ->
+                                val next = appendQualifier(input, qualifier)
+                                viewModel.onQueryChange(next)
+                                viewModel.submitQuery(next)
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
 
-                is SearchUiState.Loading -> {
-                    LoadingContent(modifier = Modifier.fillMaxSize())
-                }
+                    state is SearchUiState.Error -> {
+                        ErrorContent(
+                            errorType = state.errorType,
+                            onRetry = viewModel::retry,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
 
-                is SearchUiState.Error -> {
-                    ErrorContent(
-                        errorType = state.errorType,
-                        onRetry = viewModel::retry,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+                    // Loading（有历史结果）与 Success 走同一分支：加载中不换掉内容
+                    results != null -> {
+                        // 结果区整块离场（清空输入 / 转错误态）时清掉刷新标记，
+                        // 否则顶部进度条会一直亮着（子内容已卸载，没人再上报）
+                        DisposableEffect(Unit) { onDispose { resultsRefreshing = false } }
+                        ResultsContent(
+                            results = results,
+                            isLoggedIn = isLoggedIn,
+                            rateLimitWarning = rateLimitWarning,
+                            onTabSelected = viewModel::selectTab,
+                            onLoginClick = onLoginClick,
+                            onResultClick = onResultClick,
+                            onRefreshingChange = { resultsRefreshing = it },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
 
-                is SearchUiState.Success -> {
-                    SuccessContent(
-                        state = state,
-                        isLoggedIn = isLoggedIn,
-                        rateLimitWarning = rateLimitWarning,
-                        onTabSelected = viewModel::selectTab,
-                        onLoginClick = onLoginClick,
-                        onResultClick = onResultClick,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    // 首次搜索：没有可保留的结果，保留居中占位（顶部仍有细进度条）
+                    else -> {
+                        LoadingContent(modifier = Modifier.fillMaxSize())
+                    }
                 }
             }
         }
     }
 }
 
+/**
+ * 顶部细进度条（#167 / UI16）：搜索中在结果区**顶部**显示不确定进度条，
+ * 出现/消失的淡入淡出走 fade-through 出场时长令牌（折算为 0 即直接显隐）。
+ */
 @Composable
-private fun SuccessContent(
-    state: SearchUiState.Success,
+private fun SearchProgressBar(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val label = stringResource(R.string.search_in_progress)
+    val fadeMillis = AppMotion.scaledDuration(AppMotion.DURATION_FADE_THROUGH_OUT)
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier.fillMaxWidth(),
+        enter = fadeIn(animationSpec = tween(fadeMillis, easing = AppMotion.EmphasizedDecelerate)),
+        exit = fadeOut(animationSpec = tween(fadeMillis, easing = AppMotion.EmphasizedAccelerate)),
+    ) {
+        LinearProgressIndicator(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .testTag(SEARCH_PROGRESS_TAG)
+                    // 读屏播报"正在搜索"（M3 进度条自带 progress 语义，这里补可读文案）
+                    .semantics { contentDescription = label },
+        )
+    }
+}
+
+@Composable
+private fun ResultsContent(
+    results: SearchUiState.Success,
     isLoggedIn: Boolean,
     rateLimitWarning: SearchRateLimitWarning?,
     onTabSelected: (SearchTab) -> Unit,
     onLoginClick: () -> Unit,
     onResultClick: (ParsedUrl) -> Unit,
+    onRefreshingChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -156,50 +232,55 @@ private fun SuccessContent(
             SearchRateLimitSection(warning = rateLimitWarning)
         }
         ResultTabs(
-            selectedTab = state.activeTab,
+            selectedTab = results.activeTab,
             onTabSelected = onTabSelected,
         )
-        // 结果区 Crossfade（#167 / UI16，ui-design §3.3「输入防抖 300ms 后结果区 Crossfade」）。
-        // 切 Tab / 换关键词都是"同一块区域换内容"，Crossfade 比硬切更贴近 M3 的
-        // fade-through 语义；时长与曲线走 AppMotion 令牌（系统减弱动画下退化为瞬时）。
-        Crossfade(
-            targetState = state.activeTab,
-            animationSpec =
-                tween(
-                    durationMillis = AppMotion.scaledDuration(AppMotion.DURATION_LIST_ITEM),
-                    easing = AppMotion.EmphasizedDecelerate,
-                ),
+        // 结果区 M3 fade-through（#167 / UI16，ui-design §3.3「输入防抖 300ms 后结果区 Crossfade」
+        // + §4.3 渐入渐出）：换关键词与切 Tab 都是"同一块区域换内容"——
+        // 旧内容先淡出，新内容延迟同样的时长后淡入 + 自 92% 放大。
+        // 动画键 = 查询词 + 选中 Tab（contentKey）：只有这两者变化才播动效，
+        // 限流提示、登录态等旁路更新不触发闪烁；时长经 AppMotion 折算（0 = 直接切换）。
+        val fadeInMillis = AppMotion.scaledDuration(AppMotion.DURATION_FADE_THROUGH_IN)
+        val fadeOutMillis = AppMotion.scaledDuration(AppMotion.DURATION_FADE_THROUGH_OUT)
+        AnimatedContent(
+            targetState = results,
+            transitionSpec = { appFadeThroughTransform(fadeInMillis, fadeOutMillis) },
+            contentKey = { it.query to it.activeTab },
             label = "search-results",
-        ) { activeTab ->
-            when (activeTab) {
+        ) { resultsState ->
+            when (resultsState.activeTab) {
                 SearchTab.REPOSITORIES -> {
                     RepositoriesContent(
-                        flow = state.repositories,
+                        flow = resultsState.repositories,
                         onResultClick = onResultClick,
+                        onRefreshingChange = onRefreshingChange,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
 
                 SearchTab.USERS -> {
                     UsersContent(
-                        flow = state.users,
+                        flow = resultsState.users,
                         onResultClick = onResultClick,
+                        onRefreshingChange = onRefreshingChange,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
 
                 SearchTab.ISSUES -> {
                     IssuesContent(
-                        flow = state.issues,
+                        flow = resultsState.issues,
                         onResultClick = onResultClick,
+                        onRefreshingChange = onRefreshingChange,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
 
                 SearchTab.PULL_REQUESTS -> {
                     IssuesContent(
-                        flow = state.pullRequests,
+                        flow = resultsState.pullRequests,
                         onResultClick = onResultClick,
+                        onRefreshingChange = onRefreshingChange,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -207,8 +288,9 @@ private fun SuccessContent(
                 SearchTab.CODE -> {
                     if (isLoggedIn) {
                         CodeContent(
-                            flow = state.code,
+                            flow = resultsState.code,
                             onResultClick = onResultClick,
+                            onRefreshingChange = onRefreshingChange,
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
@@ -376,6 +458,7 @@ private fun tabLabel(tab: SearchTab): String =
 private fun RepositoriesContent(
     flow: Flow<PagingData<Repository>>,
     onResultClick: (ParsedUrl) -> Unit,
+    onRefreshingChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lazyItems = flow.collectAsLazyPagingItems()
@@ -383,6 +466,7 @@ private fun RepositoriesContent(
         lazyItems = lazyItems,
         keyOf = { it.fullName },
         modifier = modifier,
+        onRefreshingChange = onRefreshingChange,
         row = { repository ->
             RepositoryRow(
                 repository = repository,
@@ -399,6 +483,7 @@ private fun RepositoriesContent(
 private fun UsersContent(
     flow: Flow<PagingData<User>>,
     onResultClick: (ParsedUrl) -> Unit,
+    onRefreshingChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lazyItems = flow.collectAsLazyPagingItems()
@@ -406,6 +491,7 @@ private fun UsersContent(
         lazyItems = lazyItems,
         keyOf = { it.login },
         modifier = modifier,
+        onRefreshingChange = onRefreshingChange,
         row = { user ->
             UserRow(
                 user = user,
@@ -419,6 +505,7 @@ private fun UsersContent(
 private fun IssuesContent(
     flow: Flow<PagingData<SearchIssue>>,
     onResultClick: (ParsedUrl) -> Unit,
+    onRefreshingChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lazyItems = flow.collectAsLazyPagingItems()
@@ -426,6 +513,7 @@ private fun IssuesContent(
         lazyItems = lazyItems,
         keyOf = { it.id },
         modifier = modifier,
+        onRefreshingChange = onRefreshingChange,
         row = { issue ->
             IssueRow(
                 issue = issue,
@@ -439,6 +527,7 @@ private fun IssuesContent(
 private fun CodeContent(
     flow: Flow<PagingData<SearchCodeItem>>,
     onResultClick: (ParsedUrl) -> Unit,
+    onRefreshingChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val lazyItems = flow.collectAsLazyPagingItems()
@@ -447,6 +536,7 @@ private fun CodeContent(
         // 代码搜索结果无唯一 id，用「仓库 + 文件路径」组合键（同一文件在结果集中至多一条）
         keyOf = { "${it.repoFullName}/${it.path}" },
         modifier = modifier,
+        onRefreshingChange = onRefreshingChange,
         row = { item ->
             CodeRow(
                 item = item,
@@ -459,6 +549,10 @@ private fun CodeContent(
 /**
  * 通用分页结果列表：刷新错误 → 全屏错误（按错误类型本地化文案）；
  * 追加错误 → 底部重试行；空结果 → 空态。
+ *
+ * #167 / UI16：首屏刷新**不再**在结果区闪 loading（[LoadingContent]）——
+ * 进度反馈统一由顶部细进度条承担（[onRefreshingChange] 把它上抛），
+ * 这里留空以避免"无结果"空态在加载期误闪。
  */
 @Composable
 private fun <T : Any> SearchPagingList(
@@ -466,7 +560,11 @@ private fun <T : Any> SearchPagingList(
     keyOf: (T) -> Any,
     row: @Composable (T) -> Unit,
     modifier: Modifier = Modifier,
+    onRefreshingChange: (Boolean) -> Unit = {},
 ) {
+    // 只有"首屏还没有任何行"的刷新才算搜索中（顶部细进度条）；已有内容的缓存命中不闪进度条
+    val refreshing = lazyItems.loadState.refresh is LoadState.Loading && lazyItems.itemCount == 0
+    LaunchedEffect(refreshing) { onRefreshingChange(refreshing) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -483,10 +581,13 @@ private fun <T : Any> SearchPagingList(
                 }
             }
 
-            lazyItems.loadState.refresh is LoadState.Loading && lazyItems.itemCount == 0 -> {
-                // C3 修复：LazyColumn 的 item 默认 wrap + start 对齐，直接放加载态会缩在
-                // 左上角（CI 截图 search-tabs.png 的裸左上角转圈）。fillParentMaxSize 撑满
-                // 视口后由 LoadingContent 居中，与全 app 其他屏的加载态一致。
+            refreshing -> {
+                // 加载中：顶部细进度条已在 SearchTopBar 表达「搜索中」，内容区同步给出
+                // 居中的共享加载态（#202 修复：LazyColumn 的 item 默认 wrap + start 对齐，
+                // 裸加载态会缩在左上角 —— CI 截图 search-tabs.png 的裸左上角转圈）。
+                // fillParentMaxSize 撑满视口后由 LoadingContent 居中，与全 app 其他屏一致。
+                // 判据与顶部进度条同源（都在 `refreshing` 上），不会出现
+                // 「进度条在跑但内容区已空」的不一致。
                 item { LoadingContent(modifier = Modifier.fillParentMaxSize()) }
             }
 

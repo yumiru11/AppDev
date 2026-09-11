@@ -1,7 +1,9 @@
 package com.yumiru11.githubapp.feature.repo
 
+import com.yumiru11.githubapp.core.editor.FileFindState
+
 /**
- * 仓库文件浏览 UI 状态（T11 文件树 + 代码浏览 + T22 文件编辑提交）。
+ * 仓库文件浏览 UI 状态（T11 文件树 + 代码浏览 + T22 文件编辑提交 + #166 文件内查找）。
  *
  * 树 / 文件内容 / 文件编辑三块独立子状态：互不阻塞（树加载失败不影响已打开的查看器，反之亦然）。
  */
@@ -12,6 +14,10 @@ data class RepoFilesUiState(
     val editState: FileEditState = FileEditState.Idle,
     /** 当前查看分支（T23：文件 Tab 分支 Chip 显示源；loadRootTree 时回写） */
     val currentRef: String? = null,
+    /** 文件内查找面板是否展开（#166 / UI14；仅代码文件用） */
+    val isFindOpen: Boolean = false,
+    /** 文件内查找状态机（#166 / UI14；序号/计数的纯逻辑在 core:editor，测试见 FileFindStateTest） */
+    val findState: FileFindState = FileFindState(),
 )
 
 /** 文件树子状态。 */

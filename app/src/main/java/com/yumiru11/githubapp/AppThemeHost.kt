@@ -89,6 +89,12 @@ fun AppThemeHost(
     // 与动效缩放（LocalMotionScale）语义不同，故单独下发。
     val staggerEnabled by repository.staggerEnabled.collectAsStateWithLifecycle(initialValue = true)
 
+    // 全局背景图（#167 / UI04，ui-design §7.4）：默认无图 → 整层不存在。
+    // OLED / 高对比下禁用：那两项是无障碍诉求（纯黑面板、高对比文字），叠背景图会直接破坏它们。
+    val backgroundImageUri by repository.backgroundImageUri.collectAsStateWithLifecycle(initialValue = null)
+    val backgroundOpacity by repository.backgroundOpacity
+        .collectAsStateWithLifecycle(initialValue = UserPreferencesRepository.DEFAULT_BACKGROUND_OPACITY)
+
     CompositionLocalProvider(
         LocalGlassSettings provides glassSettings,
         LocalStaggerEnabled provides staggerEnabled,
@@ -101,7 +107,16 @@ fun AppThemeHost(
             seedColor = seedColor.takeIf { it != UserPreferencesRepository.DEFAULT_SEED_COLOR }?.let(::Color),
             cornerScale = cornerScale,
             motionScale = effectiveMotionScale,
-            content = content,
-        )
+        ) {
+            // 背景图铺在**主题之内、内容之外**：主题之内是为了深浅色蒙版能取到正确的
+            // darkTheme；内容之外是为了"固定不动"（不参与任何滚动容器）。
+            AppBackground(
+                imageUri = backgroundImageUri,
+                opacity = backgroundOpacity,
+                darkTheme = isSystemInDarkTheme(),
+                enabled = !oledEnabled && !highContrastEnabled,
+                content = content,
+            )
+        }
     }
 }

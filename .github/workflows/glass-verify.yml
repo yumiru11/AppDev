@@ -1,0 +1,103 @@
+# 毛玻璃专项验证（UI22 + 全 UI 的视觉验收基线）。
+#
+# ## 为什么必须独立成一支（不能塞进 ci.yml 的截图 job）
+#
+# ci.yml 的截图 job 跑 **API 30**，而 RenderEffect 模糊要求 **API 31+**
+# （AppBlur.MIN_BLUR_API）。也就是说**现有所有 CI 截图里毛玻璃从来就没生效过**，
+# 拿它们判断「Haze 能不能跨 window 采样」没有意义 —— 那正是 UI22 至今悬而未决的原因。
+#
+# 本 workflow 用 API 31 + swiftshader 软件渲染，专门回答这一个问题，并给出**两类证据**：
+#   GlassRender 日志（走了哪条渲染路径）+ 开/关对照帧（逐字节比较）。
+#
+# ## 为什么不建 Codespace
+#
+# Codespaces 无嵌套虚拟化（拿不到 /dev/kvm），Android 模拟器只能纯软件跑，启动 10-30 分钟
+# 且常 boot 失败。GitHub 托管 runner 本来就暴露 /dev/kvm，复用它是唯一稳的路。
+#
+# ## 产物
+#
+# **只上传 artifact，不建 release**（诊断用途，不进 PR 评论，也就不该往 Releases 页堆东西）。
+name: Glass verification (API 31+)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'core/designsystem/src/main/kotlin/**/token/**'
+      - 'core/designsystem/src/main/kotlin/**/component/GlassSurface.kt'
+      - 'core/datastore/src/main/kotlin/**/preferences/**'
+      - '.github/scripts/glass-verify.sh'
+      - '.github/scripts/lib/adb-helpers.sh'
+      - '.github/workflows/glass-verify.yml'
+
+concurrency:
+  group: glass-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  glass:
+    name: Glass (API 31, swiftshader)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Override local JDK path for CI
+        run: python3 -c "import re; p='gradle.properties'; s=open(p).read(); open(p,'w').write(re.sub(r'(?m)^org\\.gradle\\.java\\.home.*\\n?', '', s))"
+
+      - name: Seed plugin artifacts into mavenLocal
+        run: bash .github/gradle/seed-plugins.sh
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      # 暴露 /dev/kvm 组权限（ci.yml 同款：不加这一步 action 会报
+      # hardware acceleration is not available）
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run glass verification on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        # 与 ci.yml 的截图 job 同款：注入只读 PAT 让应用进入登录态。
+        # **未登录时首页为空、评论/Review 这些 BottomSheet 根本进不去** ——
+        # 拿未登录态去"看玻璃效果"等于测了个寂寞。
+        env:
+          SCREENSHOT_TOKEN: ${{ secrets.SCREENSHOT_TOKEN }}
+        with:
+          # API 31 = RenderEffect 模糊的最低版本；也是 runner 上能稳定 boot 的较新镜像
+          # （API 34 google_apis 实测 boot 卡死，见 ci.yml 注释）
+          api-level: 31
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          # swiftshader_indirect：软件渲染下 RenderEffect 仍可执行，避免宿主 GPU 差异
+          # 导致「模糊在 CI 上永远测不出来」。截图不需要帧率。
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect
+          disable-animations: true
+          script: |
+            adb wait-for-device
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            bash .github/scripts/glass-verify.sh
+
+      - name: Upload glass evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: glass-verification
+          path: artifacts/glass/**
+          if-no-files-found: warn
