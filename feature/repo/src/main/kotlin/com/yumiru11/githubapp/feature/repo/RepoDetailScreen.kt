@@ -229,6 +229,8 @@ fun RepoDetailScreen(
                             viewModel = filesViewModel,
                             actions = actions,
                             baseRepoUrl = buildRepoUrl(state.repo),
+                            findState = filesState.findState,
+                            isFindOpen = filesState.isFindOpen,
                             editable = state.isLoggedIn,
                             onClose = { filesViewModel.closeFile() },
                             modifier = Modifier.fillMaxSize(),

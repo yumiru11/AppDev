@@ -143,6 +143,9 @@ dependencies {
 
     // 主题（core:designsystem）
     implementation(project(":core:designsystem"))
+    // 代码编辑器查找状态（#166 UI14）：FileViewerScreen 的 findState 参数类型来自 core:editor
+    // （feature:repo 以 implementation 依赖该模块，类型不外泄 → 消费端需自备编译类路径）
+    implementation(project(":core:editor"))
     // Haze（#88：MainActivity 根级 hazeSource，通知面板玻璃 backdrop-blur 整个导航内容）
     implementation(libs.haze)
 

@@ -582,6 +582,8 @@ private fun BlobRoute(
                 onEditMarkdown = null,
             ),
         baseRepoUrl = "https://github.com/$owner/$repo",
+        findState = fileState.findState,
+        isFindOpen = fileState.isFindOpen,
         editable = true,
         onClose = { navController.popBackStack() },
         modifier = Modifier.fillMaxSize(),

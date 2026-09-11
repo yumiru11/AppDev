@@ -82,6 +82,10 @@ fun CodeEditorView(
         update = { editor ->
             if (editor.text.toString() != content) {
                 editor.setText(content)
+                // 内容被外部整体替换（切换文件 / 冲突重载）：结束查找会话。
+                // Sora 的 EditorSearcher 订阅了文本变更事件，会用**旧查询词**自动重扫新内容，
+                // 残留高亮会误导用户（#166 UI14 验收：查找会话随文件切换结束）。
+                controller?.clearFindText()
             }
             val language = editorLanguage
             if (language != null && editor.editorLanguage !== language) {
