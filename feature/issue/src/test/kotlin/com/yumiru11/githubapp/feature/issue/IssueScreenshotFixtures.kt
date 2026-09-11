@@ -70,7 +70,7 @@ internal fun issueDetailViewModel(): IssueDetailViewModel {
                     author = IssueUser(login = "octocat"),
                     labels = listOf(IssueLabel(name = "bug", color = "d73a4a")),
                     assignees = listOf(IssueUser(login = "octocat"), IssueUser(login = "hubot")),
-                    createdAt = "2026-01-01T10:00:00Z",
+                    createdAt = isoDaysAgo(days = 240),
                     htmlUrl = "https://github.com/octocat/Hello-World/issues/42",
                 )
             coEvery { timeline("octocat", "Hello-World", 42) } returns
@@ -79,7 +79,7 @@ internal fun issueDetailViewModel(): IssueDetailViewModel {
                         id = 10L,
                         author = IssueUser(login = "hubot"),
                         body = "Looks good to me, thanks!",
-                        createdAt = "2026-01-01T10:00:00Z",
+                        createdAt = isoDaysAgo(days = 240),
                     ),
                     IssueTimelineItem.Event(
                         id = 11L,
@@ -102,3 +102,20 @@ internal fun issueDetailViewModel(): IssueDetailViewModel {
         draftSaver(RecordingDraftRepository()),
     )
 }
+
+/**
+ * 相对时间夹具（**截图用例必须相对，不能写死绝对时间**）。
+ *
+ * 详情页渲染的是相对时间（"8 months ago"），写死绝对时间戳就是**时间炸弹**：
+ * 到某个不可预测的日期会突然翻桶变红，而且本机复现不了（本机与 CI 渲染基线本就不同）。
+ * 姊妹用例 NotificationsPanelScreenshotTest 就是这么炸的（"2 weeks"→"3 weeks"）。
+ *
+ * 取 240 天：分桶为 minutes/(60*24*30) = days/30，240/30 = 8 → "8 months ago"，
+ * 且渲染时刻必然晚于夹具构造 → 差值只会更大；稳定区间 240~269 天（整整一个月）。
+ * 阈值口径核对自 core:ui 的 computeRelativeTime。
+ */
+internal fun isoDaysAgo(days: Long): String =
+    java.time.Instant
+        .now()
+        .minus(days, java.time.temporal.ChronoUnit.DAYS)
+        .toString()
