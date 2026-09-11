@@ -35,6 +35,17 @@ object AppMotion {
     /** 按压反馈 — Standard accelerate */
     const val DURATION_PRESS_FEEDBACK: Int = 150
 
+    /**
+     * 同一区域换内容（M3 fade-through，ui-design §4.3「渐入渐出」）—— 出场时长。
+     *
+     * 用于搜索结果区 / 首页小分区这类「旧内容先退、新内容再进」的切换：
+     * 出场 90ms（Emphasized accelerate）+ 进场 210ms（Emphasized decelerate）= 300ms。
+     */
+    const val DURATION_FADE_THROUGH_OUT: Int = 90
+
+    /** 同一区域换内容（M3 fade-through）—— 进场时长（详见 [DURATION_FADE_THROUGH_OUT]）。 */
+    const val DURATION_FADE_THROUGH_IN: Int = 210
+
     // ── Easing ──
 
     /** M3 Emphasized（大转场：短暂快速加速后长程缓慢减速） */

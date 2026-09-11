@@ -45,6 +45,9 @@ dependencies {
     // 语义色（Issue 状态点 success/danger）
     implementation(project(":core:designsystem"))
 
+    // 共享动效（#167 / UI17：M3 fade-through 过渡规格 appFadeThroughTransform）
+    implementation(project(":core:ui"))
+
     // Testing
     testImplementation(project(":core:testing"))
     testImplementation(libs.mockwebserver3)
