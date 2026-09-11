@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 启动屏配色（深色，D3）：与 values/colors.xml 成对，见该文件说明。 -->
+<resources>
+    <color name="splash_background">#1C1B1F</color>
+</resources>
