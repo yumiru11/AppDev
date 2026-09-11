@@ -370,6 +370,13 @@ private class FakeUserPreferencesRepository(
 
     override val staggerEnabled: Flow<Boolean> = staggerEnabledFlow
 
+    private val backgroundUriFlow = MutableStateFlow<String?>(null)
+    private val backgroundOpacityFlow = MutableStateFlow(0.25f)
+
+    override val backgroundImageUri: Flow<String?> = backgroundUriFlow
+
+    override val backgroundOpacity: Flow<Float> = backgroundOpacityFlow
+
     override suspend fun setThemeMode(mode: ThemeMode) {
         themeModeFlow.value = mode
     }
@@ -436,6 +443,14 @@ private class FakeUserPreferencesRepository(
 
     override suspend fun setStaggerEnabled(enabled: Boolean) {
         staggerEnabledFlow.value = enabled
+    }
+
+    override suspend fun setBackgroundImageUri(uri: String?) {
+        backgroundUriFlow.value = uri
+    }
+
+    override suspend fun setBackgroundOpacity(opacity: Float) {
+        backgroundOpacityFlow.value = opacity
     }
 
     override suspend fun setRepoLayout(mode: RepoLayoutMode) {
