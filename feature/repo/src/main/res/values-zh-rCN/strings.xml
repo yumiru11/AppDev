@@ -10,6 +10,7 @@
     <string name="repo_language">%s</string>
     <string name="repo_error_forbidden">当前登录无权访问该资源</string>
     <string name="repo_error_not_found">仓库未找到</string>
+    <string name="repo_error_path_not_found">文件不存在，可能已被删除或改名</string>
     <string name="repo_error_network">网络错误，请检查连接</string>
     <string name="repo_error_unknown">未知错误</string>
     <string name="repo_retry">重试</string>

@@ -10,6 +10,7 @@
     <string name="repo_language">%s</string>
     <string name="repo_error_forbidden">No access with current sign-in</string>
     <string name="repo_error_not_found">Repository not found</string>
+    <string name="repo_error_path_not_found">File not found. It may have been deleted or renamed.</string>
     <string name="repo_error_network">Network error. Check your connection.</string>
     <string name="repo_error_unknown">Unknown error</string>
     <string name="repo_retry">Retry</string>

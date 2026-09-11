@@ -352,7 +352,13 @@ private fun branchErrorText(
 ): String =
     when (errorType) {
         RepoErrorType.FORBIDDEN -> context.getString(R.string.repo_branch_error_forbidden)
+
         RepoErrorType.NOT_FOUND -> context.getString(R.string.repo_branch_error_not_found)
+
+        // 分支域的 404 一律「该分支/分支列表不存在」：本屏文案本就按分支表述（与仓库级文案天然分离）
+        RepoErrorType.PATH_NOT_FOUND -> context.getString(R.string.repo_branch_error_not_found)
+
         RepoErrorType.NETWORK -> context.getString(R.string.repo_branch_error_network)
+
         RepoErrorType.UNKNOWN -> context.getString(R.string.repo_branch_error_unknown)
     }

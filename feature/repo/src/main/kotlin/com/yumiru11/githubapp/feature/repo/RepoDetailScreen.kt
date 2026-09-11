@@ -437,6 +437,7 @@ private fun editErrorText(
     when (errorType) {
         RepoErrorType.FORBIDDEN -> context.getString(R.string.repo_error_forbidden)
         RepoErrorType.NOT_FOUND -> context.getString(R.string.repo_error_not_found)
+        RepoErrorType.PATH_NOT_FOUND -> context.getString(R.string.repo_error_path_not_found)
         RepoErrorType.NETWORK -> context.getString(R.string.repo_error_network)
         RepoErrorType.UNKNOWN -> context.getString(R.string.repo_error_unknown)
     }
@@ -1765,6 +1766,17 @@ private fun createBridgeCallback(
     }
 }
 
+/**
+ * 加载失败态（仓库详情 / README / 文件 / Release 各分区共用）。
+ *
+ * **Retry 只给可重试的错误**（#201 要求 2，判定见 [RepoErrorType.isRetryable]）：
+ * 404 类是确定性失败 —— [RepoErrorType.NOT_FOUND]（仓库不存在）、
+ * [RepoErrorType.PATH_NOT_FOUND]（文件已删除/改名）重试必然原样再失败，
+ * 旧实现却照样画一个 Retry（CI 帧 `editor.png`：文件 404 上挂着
+ * 「Repository not found」+ Retry，点了几次都没用），这类状态的出口是顶栏返回。
+ * 网络/超时（[RepoErrorType.NETWORK] / [RepoErrorType.UNKNOWN]）与
+ * [RepoErrorType.FORBIDDEN]（403 也可能只是限流）保留重试入口。
+ */
 @Composable
 internal fun ErrorContent(
     errorType: RepoErrorType,
@@ -1781,9 +1793,11 @@ internal fun ErrorContent(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.error,
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onRetry) {
-                Text(text = stringResource(R.string.repo_retry))
+            if (errorType.isRetryable) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = onRetry) {
+                    Text(text = stringResource(R.string.repo_retry))
+                }
             }
         }
     }
@@ -1795,6 +1809,7 @@ private fun errorMessage(errorType: RepoErrorType): String =
     when (errorType) {
         RepoErrorType.FORBIDDEN -> stringResource(R.string.repo_error_forbidden)
         RepoErrorType.NOT_FOUND -> stringResource(R.string.repo_error_not_found)
+        RepoErrorType.PATH_NOT_FOUND -> stringResource(R.string.repo_error_path_not_found)
         RepoErrorType.NETWORK -> stringResource(R.string.repo_error_network)
         RepoErrorType.UNKNOWN -> stringResource(R.string.repo_error_unknown)
     }
