@@ -113,6 +113,11 @@ val coverageThresholds =
         ":core:designsystem" to 0.69, // 实测 71.2%（UI/渲染，地板 66.7）
         ":feature:settings" to 0.98, // 实测 100.0%
         ":core:github-rest" to 0.80, // 实测 82.3%（v1 误将 ContentApi/FileContentDto 排除致 0.75，v2 回正）
+        // 2026-09-11 新增：提交级审计发现该模块是**三重盲区**（0 张截图基线 / 不在 CI 任何门禁 /
+        // 6 个 UI 类被 JaCoCo 排除且排除理由声称的"截图兜底"在本模块并不存在）。
+        // 纳入后至少让 dto/mapper/ViewModel 这些**单测可达**的逻辑层进报告与门禁。
+        // 阈值取实测值向下取整（项目惯例）：73.9% → 0.73。
+        ":feature:pullrequest" to 0.73, // 实测 73.9%（2026-09-11 首次纳入：此前该模块不在阈值表 → 无 jacocoTestReport → diff 门禁看不见它的新增行）
     )
 
 // JaCoCo 分析排除：生成代码/样板（R/BuildConfig/Manifest/Hilt 产物）+ UI 层，不计入分母
@@ -491,8 +496,22 @@ abstract class DiffCoverageCheck : DefaultTask() {
             val known = key?.let { knownByKey[it] } ?: emptySet()
             // 只统计 JaCoCo 认账的行：不在报告里的行视为不可执行（不计入分母也不计入未覆盖）
             val uncovered = codeLines.filter { it in known && it !in covered }
-            totalCovered += codeLines.size - uncovered.size
-            if (uncovered.isNotEmpty()) uncoveredByFile[file] = uncovered
+            // ★ 门禁修复（2026-09-11，PR #210 实证）：文件**完全不在覆盖率报告里**时，
+            // known/covered 都是空集 → 上面那条 filter 恒为空 → `codeLines.size - 0`
+            // 把**整个文件的每一行都算成"已覆盖"**。即"没有任何测试触及的模块"在 diff
+            // 门禁里反而是 100% 绿的假象（PR #210 实测：feature:pullrequest 无覆盖率任务，
+            // LineCommentSheet/ReviewSheet 的新增行就这样被计为已覆盖）。
+            //
+            // 修正：报告缺席 = 无法证明被覆盖 → 一律计入未覆盖。这样"未测模块"不再刷绿，
+            // 要么补测试，要么把文件加进上面的 uiSourceExcludes（并写明不可测理由）。
+            val unreported = key == null || key !in coveredByKey
+            if (unreported) {
+                totalCovered += 0
+                uncoveredByFile[file] = codeLines
+            } else {
+                totalCovered += codeLines.size - uncovered.size
+                if (uncovered.isNotEmpty()) uncoveredByFile[file] = uncovered
+            }
             if (key == null || key !in coveredByKey) noReport += file
         }
         logger.lifecycle("diffCoverageCheck: 新增 $rawAdded 行，其中可执行 $totalAdded 行（base=$base）")
