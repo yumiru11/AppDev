@@ -281,3 +281,19 @@ assert_signed_in() {
   return 1
 }
 
+
+# 与 tap_desc 同源，但**找不到就返回 1**（tap_desc 只告警）。
+# 与 try_tap_text 同理：任何要参与 `||` 兜底链的调用都必须用 try_* 版本，
+# 否则链在第一个元素就短路（glass-verify 连踩两次）。
+try_tap_desc() {
+  local value="$1"
+  dump_ui || return 1
+  local bounds
+  bounds=$(python3 -c "import re; xml=open('/tmp/ui.xml').read(); m=re.search(r'content-desc=\"$value\"[^>]*bounds=\"\[(\\d+),(\\d+)\]\[(\\d+),(\\d+)\]\"', xml); print((int(m.group(1))+int(m.group(3)))//2, (int(m.group(2))+int(m.group(4)))//2) if m else ''" 2>/dev/null || true)
+  if [ -n "$bounds" ]; then
+    adb shell input tap $bounds >/dev/null
+    return 0
+  fi
+  return 1
+}
+

@@ -86,7 +86,10 @@ adb exec-out screencap -p > "$OUT/issue-page.png" || true
 # 所以顺序是：先试文本（万一哪天进了），失败即按坐标兜底。
 # 坐标依据：pixel_6 = 1080x2400，Issue 详情页右下角扩展 FAB 中心 ≈ (875, 1972)
 # （由 issue-page.png 量得；FAB 是固定停靠位，不随列表滚动）。
-if tap_text "Comment" || tap_desc "Comment" || { adb shell input tap 875 1972 && true; }; then
+# ⚠️ 必须用 try_* 版本：tap_text/tap_desc 找不到也只告警、返回 0，放进 || 链会让
+# 链在第一个元素就短路 —— 坐标兜底永远不执行（上一轮就是这么漏的：产物帧与
+# issue-page.png 逐字节相同，说明压根没点）。
+if try_tap_text "Comment" || try_tap_desc "Comment" || adb shell input tap 875 1972; then
   SHEET_OPENED=true
 else
   adb shell "rm -f /sdcard/ui.xml; uiautomator dump /sdcard/ui.xml" >/dev/null 2>&1 || true
