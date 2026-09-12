@@ -221,62 +221,63 @@ fun RepoDetailScreen(
                 }
 
                 is RepoDetailUiState.Success -> {
-                    if (filesState.editState !is FileEditState.Idle) {
-                        // T22：文件编辑全屏覆盖（编辑/预览/提交/删除/冲突对话框；返回键回查看器）
-                        FileEditScreen(
-                            editState = filesState.editState,
-                            filePath = filesState.selectedPath,
-                            baseRepoUrl = buildRepoUrl(state.repo),
-                            defaultRef = state.repo.defaultBranch ?: DEFAULT_REF,
-                            viewModel = filesViewModel,
-                            onClose = { filesViewModel.dismissEdit() },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else if (filesState.selectedPath != null) {
-                        // T11：文件查看器全屏覆盖（树/README 内容隐藏，返回键回文件树）
-                        FileViewerScreen(
-                            fileState = filesState.fileState,
-                            selectedPath = filesState.selectedPath.orEmpty(),
-                            ref = state.repo.defaultBranch ?: DEFAULT_REF,
-                            viewModel = filesViewModel,
-                            actions = actions,
-                            baseRepoUrl = buildRepoUrl(state.repo),
-                            findState = filesState.findState,
-                            isFindOpen = filesState.isFindOpen,
-                            editable = state.isLoggedIn,
-                            onClose = { filesViewModel.closeFile() },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        RepoDetailContent(
-                            state = state,
-                            filesState = filesState,
-                            filesViewModel = filesViewModel,
-                            actions = actions,
-                            onRetryReadme = { viewModel.retry() },
-                            initialRef = initialRef,
-                            initialShowFiles = initialShowFiles,
-                            initialTreePath = initialTreePath,
-                            initialShowReleases = initialShowReleases,
-                            initialReleaseTag = initialReleaseTag,
-                            onBranchesClick = { onBranchesClick(owner, repo, filesState.currentRef) },
-                            onTopicClick = onTopicClick,
-                            managementCallbacks =
-                                RepoManagementCallbacks(
-                                    onToggleStar = { viewModel.toggleStar() },
-                                    onToggleWatch = { viewModel.toggleWatch() },
-                                    onFork = { viewModel.fork() },
-                                    onEnsureReleasesLoaded = { viewModel.ensureReleasesLoaded() },
-                                    onEnsureTagsLoaded = { viewModel.ensureTagsLoaded() },
-                                    onReleaseClick = { viewModel.loadReleaseDetail(it) },
-                                    onCollapseRelease = { viewModel.collapseReleaseDetail() },
-                                    onDeleteRepository = { viewModel.deleteRepository() },
-                                    onCreateRelease = { onCreateRelease(owner, repo) },
-                                    onUploadAsset = { releaseId, fileName, content ->
-                                        viewModel.uploadAsset(releaseId, fileName, content)
-                                    },
-                                ),
-                        )
+                    // T22：文件编辑全屏覆盖（编辑/预览/提交/删除/冲突对话框；返回键回查看器）。
+                    // 编辑态消费固化在 [FileEditHost]，与 BLOB 深链路由共用（防两处入口再次漂移）
+                    FileEditHost(
+                        editState = filesState.editState,
+                        filePath = filesState.selectedPath,
+                        baseRepoUrl = buildRepoUrl(state.repo),
+                        defaultRef = state.repo.defaultBranch ?: DEFAULT_REF,
+                        viewModel = filesViewModel,
+                        onClose = { filesViewModel.dismissEdit() },
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        if (filesState.selectedPath != null) {
+                            // T11：文件查看器全屏覆盖（树/README 内容隐藏，返回键回文件树）
+                            FileViewerScreen(
+                                fileState = filesState.fileState,
+                                selectedPath = filesState.selectedPath.orEmpty(),
+                                ref = state.repo.defaultBranch ?: DEFAULT_REF,
+                                viewModel = filesViewModel,
+                                actions = actions,
+                                baseRepoUrl = buildRepoUrl(state.repo),
+                                findState = filesState.findState,
+                                isFindOpen = filesState.isFindOpen,
+                                editable = state.isLoggedIn,
+                                onClose = { filesViewModel.closeFile() },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            RepoDetailContent(
+                                state = state,
+                                filesState = filesState,
+                                filesViewModel = filesViewModel,
+                                actions = actions,
+                                onRetryReadme = { viewModel.retry() },
+                                initialRef = initialRef,
+                                initialShowFiles = initialShowFiles,
+                                initialTreePath = initialTreePath,
+                                initialShowReleases = initialShowReleases,
+                                initialReleaseTag = initialReleaseTag,
+                                onBranchesClick = { onBranchesClick(owner, repo, filesState.currentRef) },
+                                onTopicClick = onTopicClick,
+                                managementCallbacks =
+                                    RepoManagementCallbacks(
+                                        onToggleStar = { viewModel.toggleStar() },
+                                        onToggleWatch = { viewModel.toggleWatch() },
+                                        onFork = { viewModel.fork() },
+                                        onEnsureReleasesLoaded = { viewModel.ensureReleasesLoaded() },
+                                        onEnsureTagsLoaded = { viewModel.ensureTagsLoaded() },
+                                        onReleaseClick = { viewModel.loadReleaseDetail(it) },
+                                        onCollapseRelease = { viewModel.collapseReleaseDetail() },
+                                        onDeleteRepository = { viewModel.deleteRepository() },
+                                        onCreateRelease = { onCreateRelease(owner, repo) },
+                                        onUploadAsset = { releaseId, fileName, content ->
+                                            viewModel.uploadAsset(releaseId, fileName, content)
+                                        },
+                                    ),
+                            )
+                        }
                     }
                 }
             }
@@ -406,9 +407,14 @@ private fun DeleteRepoDialog(
     )
 }
 
-/** 文件编辑事件 → Snackbar/剪贴板（UI 层 stringResource 映射，ViewModel 不产文案）。 */
+/**
+ * 文件编辑事件 → Snackbar/剪贴板（UI 层 stringResource 映射，ViewModel 不产文案）。
+ *
+ * 仓库详情与 BLOB 深链路由共用：两处都必须消费 [RepoFilesViewModel.editEvents]，
+ * 否则草稿恢复提示（含「丢弃草稿」动作）与提交结果事件无人接收（PR #234 流程断链）。
+ */
 @Composable
-private fun FileEditEventSnackbar(
+fun FileEditEventSnackbar(
     viewModel: RepoFilesViewModel,
     snackbarHostState: SnackbarHostState,
 ) {
