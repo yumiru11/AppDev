@@ -1,6 +1,7 @@
 package com.yumiru11.githubapp.core.designsystem.component
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -147,5 +148,25 @@ private fun AppMessageState(
                 Text(text = actionLabel)
             }
         }
+    }
+}
+
+/*
+ * 整页/整分区加载态：把 AppLoadingState 垂直+水平居中后铺满给定区域。
+ *
+ * 为什么单独有这一个（2026-09-11）：feature:issue / feature:pullrequest 各自有一份
+ * IssueLoadingContent / PullRequestLoadingContent，实现逐字相同（居中 Box + 裸 Material
+ * 圆形指示器）—— 两处重复，且于是那 4 屏成了全应用仅存的「加载态与其他屏不一致」的地方。
+ *
+ * 收敛到本文件（core/designsystem/）的理由：这里是加载态的唯一事实来源；各 feature 只留调用点。
+ * 用法：AppCenteredLoadingState(modifier = Modifier.fillMaxSize())
+ */
+@Composable
+fun AppCenteredLoadingState(
+    modifier: Modifier = Modifier,
+    label: String? = null,
+) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        AppLoadingState(label = label)
     }
 }

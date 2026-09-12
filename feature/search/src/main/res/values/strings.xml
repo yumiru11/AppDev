@@ -21,6 +21,7 @@
     <string name="search_tab_code">Code</string>
 
     <!-- States -->
+    <string name="search_loading">Searching…</string>
     <string name="search_empty">No results</string>
     <!-- 顶部细进度条读屏文案（#167 / UI16） -->
     <string name="search_in_progress">Searching…</string>

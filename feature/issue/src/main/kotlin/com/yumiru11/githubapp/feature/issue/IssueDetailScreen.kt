@@ -94,8 +94,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
+import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
@@ -222,7 +224,7 @@ fun IssueDetailScreen(
         ) {
             when (val state = uiState) {
                 is IssueDetailUiState.Loading -> {
-                    IssueLoadingContent(modifier = Modifier.fillMaxSize())
+                    AppCenteredLoadingState(modifier = Modifier.fillMaxSize())
                 }
 
                 is IssueDetailUiState.Error -> {
@@ -921,135 +923,139 @@ private fun IssueMetaEditSheet(
         // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）
         modifier = Modifier.appTransientEnterAlpha(),
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.issue_meta_sheet_title),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            when {
-                state.loading -> {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.issue_loading),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
-                state.errorType != null -> {
-                    Text(
-                        text = stringResource(R.string.issue_meta_load_failed),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    TextButton(onClick = onRetry) {
-                        Text(text = stringResource(R.string.issue_retry))
-                    }
-                }
-
-                else -> {
-                    MetaSection(title = stringResource(R.string.issue_meta_section_labels)) {
-                        if (state.labels.isEmpty()) {
-                            MetaEmptyHint()
-                        } else {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                state.labels.forEach { label ->
-                                    val selected = label.name in state.selectedLabels
-                                    FilterChip(
-                                        selected = selected,
-                                        onClick = { onToggleLabel(label.name) },
-                                        label = { Text(text = label.name) },
-                                        leadingIcon =
-                                            if (selected) {
-                                                {
-                                                    Icon(
-                                                        imageVector = Icons.Filled.Check,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(16.dp),
-                                                    )
-                                                }
-                                            } else {
-                                                null
-                                            },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    MetaSection(title = stringResource(R.string.issue_meta_section_assignees)) {
-                        if (state.assignees.isEmpty()) {
-                            MetaEmptyHint()
-                        } else {
-                            state.assignees.forEach { user ->
-                                ListItem(
-                                    headlineContent = { Text(text = user.login) },
-                                    leadingContent = {
-                                        AsyncImage(
-                                            model = user.avatarUrl,
-                                            contentDescription = user.login,
-                                            modifier =
-                                                Modifier
-                                                    .size(32.dp)
-                                                    .clip(CircleShape),
-                                        )
-                                    },
-                                    trailingContent = {
-                                        Checkbox(
-                                            checked = user.login in state.selectedAssignees,
-                                            onCheckedChange = { onToggleAssignee(user.login) },
-                                        )
-                                    },
-                                    modifier = Modifier.clickable { onToggleAssignee(user.login) },
-                                )
-                            }
-                        }
-                    }
-                    MetaSection(title = stringResource(R.string.issue_meta_section_milestone)) {
-                        MilestoneOptionCard(
-                            title = stringResource(R.string.issue_meta_milestone_none),
-                            selected = state.selectedMilestone == null,
-                            onClick = { onSelectMilestone(null) },
-                        )
-                        state.milestones.forEach { milestone ->
-                            MilestoneOptionCard(
-                                title = milestone.title,
-                                dueOn = milestone.dueOn,
-                                closed = milestone.state == IssueState.CLOSED,
-                                selected = milestone.number != null && milestone.number == state.selectedMilestone,
-                                onClick = { onSelectMilestone(milestone.number) },
-                            )
-                        }
-                    }
-                    Button(
-                        onClick = onSave,
-                        enabled = !state.saving,
-                        modifier = Modifier.align(Alignment.End),
-                    ) {
-                        if (state.saving) {
+        // 弹层玻璃点位（#167 / UI22，ui-design §6.1 #4）：容器底交 GlassSheetSurface，开关/主题降级由
+        // GlassScope.BOTTOM_SHEET 统一裁决（弹层是独立 window，几何结论见该组件 KDoc）
+        GlassSheetSurface {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.issue_meta_sheet_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                when {
+                    state.loading -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(18.dp),
                                 strokeWidth = 2.dp,
                             )
                             Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.issue_loading),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
-                        Text(text = stringResource(R.string.issue_save))
+                    }
+
+                    state.errorType != null -> {
+                        Text(
+                            text = stringResource(R.string.issue_meta_load_failed),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        TextButton(onClick = onRetry) {
+                            Text(text = stringResource(R.string.issue_retry))
+                        }
+                    }
+
+                    else -> {
+                        MetaSection(title = stringResource(R.string.issue_meta_section_labels)) {
+                            if (state.labels.isEmpty()) {
+                                MetaEmptyHint()
+                            } else {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    state.labels.forEach { label ->
+                                        val selected = label.name in state.selectedLabels
+                                        FilterChip(
+                                            selected = selected,
+                                            onClick = { onToggleLabel(label.name) },
+                                            label = { Text(text = label.name) },
+                                            leadingIcon =
+                                                if (selected) {
+                                                    {
+                                                        Icon(
+                                                            imageVector = Icons.Filled.Check,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(16.dp),
+                                                        )
+                                                    }
+                                                } else {
+                                                    null
+                                                },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        MetaSection(title = stringResource(R.string.issue_meta_section_assignees)) {
+                            if (state.assignees.isEmpty()) {
+                                MetaEmptyHint()
+                            } else {
+                                state.assignees.forEach { user ->
+                                    ListItem(
+                                        headlineContent = { Text(text = user.login) },
+                                        leadingContent = {
+                                            AsyncImage(
+                                                model = user.avatarUrl,
+                                                contentDescription = user.login,
+                                                modifier =
+                                                    Modifier
+                                                        .size(32.dp)
+                                                        .clip(CircleShape),
+                                            )
+                                        },
+                                        trailingContent = {
+                                            Checkbox(
+                                                checked = user.login in state.selectedAssignees,
+                                                onCheckedChange = { onToggleAssignee(user.login) },
+                                            )
+                                        },
+                                        modifier = Modifier.clickable { onToggleAssignee(user.login) },
+                                    )
+                                }
+                            }
+                        }
+                        MetaSection(title = stringResource(R.string.issue_meta_section_milestone)) {
+                            MilestoneOptionCard(
+                                title = stringResource(R.string.issue_meta_milestone_none),
+                                selected = state.selectedMilestone == null,
+                                onClick = { onSelectMilestone(null) },
+                            )
+                            state.milestones.forEach { milestone ->
+                                MilestoneOptionCard(
+                                    title = milestone.title,
+                                    dueOn = milestone.dueOn,
+                                    closed = milestone.state == IssueState.CLOSED,
+                                    selected = milestone.number != null && milestone.number == state.selectedMilestone,
+                                    onClick = { onSelectMilestone(milestone.number) },
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = onSave,
+                            enabled = !state.saving,
+                            modifier = Modifier.align(Alignment.End),
+                        ) {
+                            if (state.saving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text(text = stringResource(R.string.issue_save))
+                        }
                     }
                 }
             }
@@ -1169,47 +1175,51 @@ private fun CommentInputSheet(
                 topEnd = AppDimens.cornerExtraLarge,
             ),
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = AppDimens.contentPadding)
-                    .padding(bottom = AppDimens.contentPadding)
-                    .imePadding(),
-        ) {
-            MarkdownComposer(
-                text = body,
-                isPreview = isPreview,
-                onTogglePreview = { isPreview = it },
-                onTextChanged = { body = it },
-                onEditorReady = { editorController = it },
-                onToolbarAction = { editorController?.applySyntax(it) },
-                themeTokens = editorTokens,
-                preview = {
-                    MarkdownViewer(
-                        markdown = body.ifBlank { previewPlaceholder },
-                        // Sheet 自身可滚动：预览不再开内层滚动（避免嵌套滚动手势打架）
-                        scrollable = false,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = AppDimens.cornerSmall),
-                    )
-                },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp, max = 380.dp),
-            )
-            Spacer(modifier = Modifier.height(AppDimens.cornerMedium))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
+        // 弹层玻璃点位（#167 / UI22，ui-design §6.1 #4）：容器底交 GlassSheetSurface，开关/主题降级由
+        // GlassScope.BOTTOM_SHEET 统一裁决（弹层是独立 window，几何结论见该组件 KDoc）
+        GlassSheetSurface {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AppDimens.contentPadding)
+                        .padding(bottom = AppDimens.contentPadding)
+                        .imePadding(),
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text(text = stringResource(R.string.issue_comment_cancel))
-                }
-                Spacer(modifier = Modifier.width(AppDimens.cornerSmall))
-                Button(
-                    onClick = { onSubmit(body) },
-                    enabled = body.isNotBlank(),
+                MarkdownComposer(
+                    text = body,
+                    isPreview = isPreview,
+                    onTogglePreview = { isPreview = it },
+                    onTextChanged = { body = it },
+                    onEditorReady = { editorController = it },
+                    onToolbarAction = { editorController?.applySyntax(it) },
+                    themeTokens = editorTokens,
+                    preview = {
+                        MarkdownViewer(
+                            markdown = body.ifBlank { previewPlaceholder },
+                            // Sheet 自身可滚动：预览不再开内层滚动（避免嵌套滚动手势打架）
+                            scrollable = false,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = AppDimens.cornerSmall),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp, max = 380.dp),
+                )
+                Spacer(modifier = Modifier.height(AppDimens.cornerMedium))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(text = stringResource(R.string.issue_comment_submit))
+                    TextButton(onClick = onDismiss) {
+                        Text(text = stringResource(R.string.issue_comment_cancel))
+                    }
+                    Spacer(modifier = Modifier.width(AppDimens.cornerSmall))
+                    Button(
+                        onClick = { onSubmit(body) },
+                        enabled = body.isNotBlank(),
+                    ) {
+                        Text(text = stringResource(R.string.issue_comment_submit))
+                    }
                 }
             }
         }

@@ -53,6 +53,7 @@
     <string name="settings_code_font_mono">等宽</string>
     <string name="settings_code_font_system">系统默认</string>
     <string name="settings_code_line_numbers">行号</string>
+    <string name="settings_code_line_numbers_desc">在代码编辑器中显示行号</string>
 
     <!-- 开发者分组 -->
     <string name="settings_developer_group">开发者</string>

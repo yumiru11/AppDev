@@ -6,12 +6,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.model.resolveEffectiveThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.designsystem.token.CodeEditorPreferences
 import com.yumiru11.githubapp.core.designsystem.token.GlassSettings
+import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferences
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import com.yumiru11.githubapp.core.designsystem.token.LocalIconStyle
 import com.yumiru11.githubapp.core.designsystem.token.LocalStaggerEnabled
@@ -29,6 +32,8 @@ import com.yumiru11.githubapp.core.designsystem.token.resolveEffectiveMotionScal
  * - 仓库 Flow 发射新值（T24 设置页 setXxx）→ collectAsStateWithLifecycle
  *   重组 → [AppTheme] 切换色板，无需 activity 重启
  * - #168 / UI12：iconStyle 经 [LocalIconStyle] 下发，AppIcon 据此选 Material Symbols 变体
+ * - T24 死设置收口：codeFont / codeLineNumbers 经 [LocalCodeEditorPreferences] 下发，
+ *   `core:editor` 的代码视图与 Markdown 编辑器据此设置 Sora 的 typeface 与行号开关
  * - 单一测试缝：装配行为在 AppThemeHostTest 用假仓库验证（色板选择/重组）
  *
  * @param repository 用户偏好仓库（Hilt 注入的单例）
@@ -73,6 +78,10 @@ fun AppThemeHost(
     // 图标风格（#168 / UI12）：设置页「图标风格」→ DataStore → LocalIconStyle →
     // 底栏/顶栏图标经 AppIcon 立即切换 Material Symbols 变体（无需重启）。
     val iconStyle by repository.iconStyle.collectAsStateWithLifecycle(initialValue = IconStyle.ROUNDED)
+    // 代码编辑器外观（T24 死设置收口）：设置页「代码字体」「行号」→ DataStore →
+    // LocalCodeEditorPreferences → 代码视图 / Markdown 编辑器即时改 Sora 字体与行号。
+    val codeFont by repository.codeFont.collectAsStateWithLifecycle(initialValue = CodeFont.MONO)
+    val codeLineNumbers by repository.codeLineNumbers.collectAsStateWithLifecycle(initialValue = true)
     val glassSettings =
         GlassSettings(
             masterEnabled = blurEnabled,
@@ -99,6 +108,7 @@ fun AppThemeHost(
         LocalGlassSettings provides glassSettings,
         LocalStaggerEnabled provides staggerEnabled,
         LocalIconStyle provides iconStyle,
+        LocalCodeEditorPreferences provides CodeEditorPreferences(codeFont = codeFont, lineNumbers = codeLineNumbers),
     ) {
         AppTheme(
             themeMode = effectiveMode,

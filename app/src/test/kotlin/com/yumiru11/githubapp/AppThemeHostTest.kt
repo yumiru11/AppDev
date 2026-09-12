@@ -19,8 +19,10 @@ import com.yumiru11.githubapp.core.designsystem.theme.highContrastDarkPalette
 import com.yumiru11.githubapp.core.designsystem.theme.highContrastLightPalette
 import com.yumiru11.githubapp.core.designsystem.theme.lightPalette
 import com.yumiru11.githubapp.core.designsystem.theme.oledPalette
+import com.yumiru11.githubapp.core.designsystem.token.CodeEditorPreferences
 import com.yumiru11.githubapp.core.designsystem.token.GlassScope
 import com.yumiru11.githubapp.core.designsystem.token.GlassSettings
+import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferences
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import com.yumiru11.githubapp.core.designsystem.token.LocalIconStyle
 import kotlinx.coroutines.flow.Flow
@@ -124,6 +126,74 @@ class AppThemeHostTest {
         composeRule.waitForIdle()
 
         assertEquals(IconStyle.OUTLINED, seen.last())
+    }
+
+    @Test
+    fun themeHost_codeEditorPreferences_providesLocalCodeEditorPreferences() {
+        // T24 死设置收口：设置页「代码字体」「行号」经 LocalCodeEditorPreferences 下发
+        // （core:editor 的代码视图 / Markdown 编辑器据此设 Sora typeface 与行号开关）
+        var captured: CodeEditorPreferences? = null
+
+        composeRule.setContent {
+            val lifecycleOwner = remember { TestLifecycleOwner() }
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                AppThemeHost(
+                    repository =
+                        FakeUserPreferencesRepository(
+                            codeFont = CodeFont.SYSTEM,
+                            codeLineNumbers = false,
+                        ),
+                ) {
+                    captured = LocalCodeEditorPreferences.current
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(CodeEditorPreferences(codeFont = CodeFont.SYSTEM, lineNumbers = false), captured)
+    }
+
+    @Test
+    fun themeHost_codeFontChange_recomposesToNewFont() {
+        // 「切换后立即变化」：仓库 Flow 发射新值 → CompositionLocal 跟随重组（无需重启/重进编辑器）
+        val repository = FakeUserPreferencesRepository(codeFont = CodeFont.MONO)
+        val seen = mutableListOf<CodeFont>()
+
+        composeRule.setContent {
+            val lifecycleOwner = remember { TestLifecycleOwner() }
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                AppThemeHost(repository = repository) {
+                    seen += LocalCodeEditorPreferences.current.codeFont
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle { repository.codeFontFlow.value = CodeFont.SYSTEM }
+        composeRule.waitForIdle()
+
+        assertEquals(CodeFont.SYSTEM, seen.last())
+    }
+
+    @Test
+    fun themeHost_lineNumbersChange_recomposesToNewValue() {
+        val repository = FakeUserPreferencesRepository(codeLineNumbers = true)
+        val seen = mutableListOf<Boolean>()
+
+        composeRule.setContent {
+            val lifecycleOwner = remember { TestLifecycleOwner() }
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                AppThemeHost(repository = repository) {
+                    seen += LocalCodeEditorPreferences.current.lineNumbers
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle { repository.codeLineNumbersFlow.value = false }
+        composeRule.waitForIdle()
+
+        assertEquals(false, seen.last())
     }
 
     @Test
@@ -313,6 +383,8 @@ private class FakeUserPreferencesRepository(
     oledEnabled: Boolean = false,
     glassPanel: Boolean = true,
     iconStyle: IconStyle = IconStyle.ROUNDED,
+    codeFont: CodeFont = CodeFont.MONO,
+    codeLineNumbers: Boolean = true,
 ) : UserPreferencesRepository {
     val themeModeFlow = MutableStateFlow(themeMode)
 
@@ -329,8 +401,8 @@ private class FakeUserPreferencesRepository(
     private val cornerScaleFlow = MutableStateFlow(UserPreferencesRepository.DEFAULT_CORNER_SCALE)
     private val motionScaleFlow = MutableStateFlow(UserPreferencesRepository.DEFAULT_MOTION_SCALE)
     val iconStyleFlow = MutableStateFlow(iconStyle)
-    private val codeFontFlow = MutableStateFlow(CodeFont.MONO)
-    private val codeLineNumbersFlow = MutableStateFlow(true)
+    val codeFontFlow = MutableStateFlow(codeFont)
+    val codeLineNumbersFlow = MutableStateFlow(codeLineNumbers)
 
     override val themeMode: Flow<ThemeMode> = themeModeFlow
 
