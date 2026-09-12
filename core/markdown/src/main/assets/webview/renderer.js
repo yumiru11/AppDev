@@ -13,6 +13,9 @@
  *    补 GitHub Alert / 任务列表 / emoji 短码 / 脚注 / 标题锚点五个最小 GFM 插件，
  *    并用 highlight.js 高亮代码块；渲染产物再按仓库上下文改写相对链接/图片
  *    （见 renderOfflineHtml 的说明）
+ * 4. 服务端 HTML 主通道（SERVER_HTML）同样用 highlight.js 高亮代码块（双预算护栏，
+ *    见 highlightCodeBlocks）；图片统一补 loading="lazy" / decoding="async"
+ *    （离线产物在 renderOfflineHtml 内联注入，服务端 HTML 由 decorateImages 在清洗后补）
  *
  * 安全：本脚本不接收任何 token；token 仅由 PrivateImageInterceptor 加到网络请求。
  * 仓库上下文（`owner/repo`）不是凭据，由 `data-base-repo` 属性传入（公开信息）。
@@ -85,6 +88,14 @@
     }
   }
 
+  /**
+   * 代码块复制按钮。
+   *
+   * 视觉全部交给 markdown-you.css 的 .md-copy-btn 规则：hover 设备悬停/聚焦才显示，
+   * 触屏设备（@media (hover: none)）低强调常显 + :active 按压反馈。此前按钮靠内联
+   * `opacity: 0` + mouseenter/mouseleave 显隐——手机上既没有 hover、按钮又不可见，
+   * 等于不存在（2026-09-12 审计缺口）。内联样式会压过媒体查询，因此这里不再写视觉样式。
+   */
   function bindCodeCopy(root) {
     var pres = root.querySelectorAll('pre');
     for (var i = 0; i < pres.length; i++) {
@@ -92,22 +103,10 @@
         if (pre.querySelector('.md-copy-btn')) return;
         var btn = document.createElement('button');
         btn.className = 'md-copy-btn';
+        btn.type = 'button';
         btn.textContent = 'Copy';
-        btn.style.position = 'absolute';
-        btn.style.top = '4px';
-        btn.style.right = '4px';
-        btn.style.fontSize = '12px';
-        btn.style.padding = '2px 8px';
-        btn.style.borderRadius = '4px';
-        btn.style.background = 'var(--md-sys-color-primary)';
-        btn.style.color = '#fff';
-        btn.style.border = 'none';
-        btn.style.cursor = 'pointer';
-        btn.style.opacity = '0';
         pre.style.position = 'relative';
         pre.appendChild(btn);
-        pre.addEventListener('mouseenter', function () { btn.style.opacity = '1'; });
-        pre.addEventListener('mouseleave', function () { btn.style.opacity = '0'; });
         btn.addEventListener('click', function (event) {
           event.preventDefault();
           var code = pre.querySelector('code');
@@ -133,15 +132,71 @@
     observer.observe(root);
   }
 
-  function highlightCodeBlocks(root) {
-    if (typeof window.hljs === 'undefined') return;
+  // 高亮双预算护栏（2026-09-12 审计缺口 1）：服务端 HTML 主通道此前完全不高亮；
+  // 但 README/Issue 的产品化 HTML 可能含大量/超长代码块，全量 hljs 高亮会阻塞首屏
+  // 与滚动手感。策略：按「块数 + 总字符数」设预算，预算内逐块高亮；单块超预算则跳过
+  // 该块（继续尝试后续更小的块），预算耗尽后其余保持原文——可读性无损，只是不着色。
+  // 阈值有回归断言（core/markdown 的 ServerHtmlChannelExecutionTest，Node 真实执行）。
+  var HIGHLIGHT_MAX_BLOCKS = 30;
+  var HIGHLIGHT_MAX_TOTAL_CHARS = 120000;
+
+  /**
+   * 高亮 root 下的语言代码块（两条通道共用）。
+   *
+   * @param {Element} root 内容根节点
+   * @param {{maxBlocks: (number|undefined), maxTotalChars: (number|undefined)}} [options] 预算覆盖（测试用）
+   * @returns {number} 实际高亮的块数
+   */
+  function highlightCodeBlocks(root, options) {
+    if (typeof window.hljs === 'undefined') return 0;
+    var opts = options || {};
+    var maxBlocks = opts.maxBlocks || HIGHLIGHT_MAX_BLOCKS;
+    var maxTotalChars = opts.maxTotalChars || HIGHLIGHT_MAX_TOTAL_CHARS;
     var codes = root.querySelectorAll('code[class*="language-"]');
-    for (var i = 0; i < codes.length; i++) {
+    var budget = maxTotalChars;
+    var highlighted = 0;
+    for (var i = 0; i < codes.length && highlighted < maxBlocks; i++) {
+      var size = (codes[i].textContent || '').length;
+      if (size > budget) continue; // 单块超预算：跳过，留给后续更小的块
+      budget -= size;
       try {
         window.hljs.highlightElement(codes[i]);
+        highlighted++;
       } catch (e) {
         // 未知语言/解析失败时保留原文，不阻断渲染
       }
+    }
+    return highlighted;
+  }
+
+  var IMG_TAG_REGEX = /<img\b[^>]*>/gi;
+
+  /**
+   * 给 HTML 字符串里的 `<img>` 补 loading="lazy" / decoding="async"（不覆盖已有值）。
+   *
+   * 作用于离线渲染产物（markdown-it 输出）——此时图片已是真实属性，代码块里的
+   * 示例文本已被转义，正则不会误伤。服务端 HTML 通道不走这里（见 decorateImages）。
+   */
+  function addImageLoadingAttributes(html) {
+    return html.replace(IMG_TAG_REGEX, function (tag) {
+      var out = tag;
+      if (!/\sloading\s*=/i.test(out)) out = out.replace(/<img\b/i, '<img loading="lazy"');
+      if (!/\sdecoding\s*=/i.test(out)) out = out.replace(/<img\b/i, '<img decoding="async"');
+      return out;
+    });
+  }
+
+  /**
+   * DOM 后处理：给 root 下所有图片补懒加载/异步解码（服务端 HTML 主通道）。
+   *
+   * 必须在 DOMPurify 清洗**之后**执行：清洗可能剥掉未知属性，且这里用 hasAttribute
+   * 保证不覆盖服务端已经给出的 loading="eager" 等显式取值。
+   */
+  function decorateImages(root) {
+    var imgs = root.querySelectorAll('img');
+    for (var i = 0; i < imgs.length; i++) {
+      if (!imgs[i].hasAttribute('loading')) imgs[i].setAttribute('loading', 'lazy');
+      if (!imgs[i].hasAttribute('decoding')) imgs[i].setAttribute('decoding', 'async');
     }
   }
 
@@ -743,7 +798,8 @@
     var md = createMarkdownIt();
     var env = {};
     var html = appendFootnotes(md, md.render(raw, env), env);
-    return rewriteRelativeUrls(html, opts.repoContext);
+    // 懒加载属性在 URL 改写前注入：两者都只动属性，互不依赖；产物由 Node 回归断言
+    return rewriteRelativeUrls(addImageLoadingAttributes(html), opts.repoContext);
   }
 
   function renderOfflineMarkdown() {
@@ -776,6 +832,10 @@
     rewriteRelativeUrls: rewriteRelativeUrls,
     parseRepoContext: parseRepoContext,
     scrollToAnchor: scrollToAnchor,
+    highlightCodeBlocks: highlightCodeBlocks,
+    addImageLoadingAttributes: addImageLoadingAttributes,
+    decorateImages: decorateImages,
+    highlightLimits: { maxBlocks: HIGHLIGHT_MAX_BLOCKS, maxTotalChars: HIGHLIGHT_MAX_TOTAL_CHARS },
   };
 
   function init() {
@@ -783,12 +843,17 @@
     if (!root) return;
 
     // 离线模式优先渲染 markdown
-    if (document.getElementById('markdown-raw')) {
+    var offline = !!document.getElementById('markdown-raw');
+    if (offline) {
       root = renderOfflineMarkdown() || root;
     }
 
     // 权威清洗
     sanitizeNode(root);
+
+    // 图片懒加载/异步解码：服务端 HTML 主通道在清洗后补属性；离线产物已在
+    // renderOfflineHtml 里写好，这里兜底一次清洗可能剥掉属性的情况（hasAttribute 不覆盖已有值）
+    decorateImages(root);
 
     // 绑定白名单事件
     bindLinks(root);
@@ -796,6 +861,12 @@
     bindCheckboxes(root);
     bindCodeCopy(root);
     observeHeight(root);
+
+    // 服务端 HTML 主通道的代码块高亮（离线通道已在 renderOfflineMarkdown 内完成）。
+    // 双预算护栏见 highlightCodeBlocks：GitHub 产物可能含数百个代码块。
+    if (!offline) {
+      highlightCodeBlocks(root);
+    }
   }
 
   if (document.readyState === 'loading') {

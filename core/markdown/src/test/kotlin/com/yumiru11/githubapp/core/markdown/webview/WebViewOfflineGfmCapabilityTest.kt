@@ -118,14 +118,14 @@ class WebViewOfflineGfmCapabilityTest {
     }
 
     @Test
-    fun rendererJs_setsNoLazyLoadingAttribute_asDocumentedGap() {
+    fun rendererJs_injectsLazyLoadingAndAsyncDecoding() {
         val renderer = rendererJs()
 
-        assertFalse("尚未注入 loading=\"lazy\"（§2.3「图片懒加载」未实现）", renderer.contains("loading=\"lazy\""))
-        assertFalse("尚未注入 loading='lazy'", renderer.contains("loading='lazy'"))
+        assertTrue("离线产物必须注入 loading=\"lazy\"", renderer.contains("loading=\"lazy\""))
+        assertTrue("离线产物必须注入 decoding=\"async\"", renderer.contains("decoding=\"async\""))
         assertTrue(
-            "29-image-lazy 必须被登记为无渲染路径",
-            MarkdownGfmFixtures.byId("29-image-lazy").paths.isEmpty(),
+            "29-image-lazy 必须被登记为离线通道已支持",
+            MarkdownGfmFixtures.RenderPath.OFFLINE_GFM in MarkdownGfmFixtures.byId("29-image-lazy").paths,
         )
     }
 
@@ -168,7 +168,6 @@ class WebViewOfflineGfmCapabilityTest {
                 "23-mention-org-team",
                 "24-issue-ref",
                 "25-commit-sha-ref",
-                "29-image-lazy",
                 "33-math-katex",
                 "34-mermaid",
             )
@@ -189,8 +188,8 @@ class WebViewOfflineGfmCapabilityTest {
                 .map { it.id }
 
         assertEquals(
-            "离线通道覆盖的 §2.3 条目数（2026-09-12 修复后：23 + 相对图/相对链/emoji/锚点/脚注）",
-            28,
+            "离线通道覆盖的 §2.3 条目数（2026-09-12 修复后：23 + 相对图/相对链/emoji/锚点/脚注/图片懒加载）",
+            29,
             offlineIds.size,
         )
     }
@@ -242,6 +241,7 @@ class WebViewOfflineGfmCapabilityTest {
                 "26-emoji-shortcode" to "emojiPlugin",
                 "27-github-alerts" to "githubAlertPlugin",
                 "28-anchor-jump" to "scrollToAnchor",
+                "29-image-lazy" to "loading=\"lazy\"",
                 "30-image-zoom" to "onImageClick",
                 "31-image-gif" to MARKDOWN_IT_BANNER,
                 "32-inline-html" to "html: true",

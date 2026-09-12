@@ -185,6 +185,31 @@ class WebViewHtmlBuilderTest {
     }
 
     @Test
+    fun build_serverHtmlWithCodeBlock_loadsHighlightBundle() {
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<div class=\"highlight\"><pre><code class=\"language-kotlin\">val x = 1</code></pre></div>",
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                renderMode = RenderMode.SERVER_HTML,
+            )
+
+        assertTrue("服务端 HTML 含代码块时必须加载 highlight.js（主通道此前 0 高亮）", html.contains("highlight.min.js"))
+        assertFalse("服务端 HTML 仍不得加载 markdown-it", html.contains("markdown-it.min.js"))
+    }
+
+    @Test
+    fun build_serverHtmlWithoutCodeBlock_omitsHighlightBundle() {
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "<h1>No code</h1><p>plain text</p>",
+                tokens = MarkdownThemeTokens.fromLightScheme(),
+                renderMode = RenderMode.SERVER_HTML,
+            )
+
+        assertFalse("无代码块的页面不应为 highlight.js 付解析成本", html.contains("highlight.min.js"))
+    }
+
+    @Test
     fun build_escapesContentForOfflineMode() {
         // 离线模式下原始 markdown 注入 data-markdown-raw，需转义引号
         val markdown = "# Title with \"quotes\" and `backtick`"

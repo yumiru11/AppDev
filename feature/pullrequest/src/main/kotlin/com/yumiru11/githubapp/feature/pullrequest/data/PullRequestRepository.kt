@@ -73,6 +73,8 @@ import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThreadContext
 import com.yumiru11.githubapp.feature.pullrequest.model.ViewerPermission
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import java.util.Collections
+import java.util.LinkedHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -105,6 +107,20 @@ class PullRequestRepository
         private val userApi: UserApi,
         private val tokenStorage: TokenStorage,
     ) {
+        /**
+         * PR 文件列表缓存（key = `owner/repo/number@headSha`，LRU）。
+         *
+         * spec-audit §3.6：plan §4.6 要求 PR 文件列表按 PR head sha 缓存，此前 0 命中。
+         * 同步包装保证并发调用下 get/put 原子（LinkedHashMap 本身非线程安全）。
+         */
+        private val fileListCache: MutableMap<String, List<PullRequestFile>> =
+            Collections.synchronizedMap(
+                object : LinkedHashMap<String, List<PullRequestFile>>(CACHE_INITIAL_CAPACITY, CACHE_LOAD_FACTOR, true) {
+                    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<PullRequestFile>>): Boolean =
+                        size > FILE_LIST_CACHE_ENTRIES
+                },
+            )
+
         /** PR 分页流（按 [filter] 过滤 open/closed/all） */
         fun pulls(
             owner: String,
@@ -195,12 +211,38 @@ class PullRequestRepository
             number: Int,
         ): List<PullRequestCommit> = pullRequestApi.listCommits(owner, repo, number).map { it.toDomain() }
 
-        /** PR 文件变更列表 */
+        /**
+         * PR 文件变更列表（无 head sha 时直连网络；生产调用方走带 `headSha` 的重载）。
+         */
         suspend fun files(
             owner: String,
             repo: String,
             number: Int,
-        ): List<PullRequestFile> = pullRequestApi.listFiles(owner, repo, number).map { it.toDomain() }
+        ): List<PullRequestFile> = files(owner, repo, number, headSha = null)
+
+        /**
+         * PR 文件变更列表（按 head sha 缓存）。
+         *
+         * 为什么 key 必须含 head SHA：PR 每推一个新提交，变更文件列表可能整体变化；只按
+         * owner/repo/number 缓存会把上一个 revision 的列表当作当前列表返回（陈旧数据）。
+         * `headSha == null`（详情未取到 head 的理论边界）不缓存，直连网络。
+         */
+        suspend fun files(
+            owner: String,
+            repo: String,
+            number: Int,
+            headSha: String?,
+        ): List<PullRequestFile> {
+            val cacheKey = headSha?.let { "$owner/$repo/$number@$it" }
+            if (cacheKey != null) {
+                fileListCache[cacheKey]?.let { return it }
+            }
+            val files = pullRequestApi.listFiles(owner, repo, number).map { it.toDomain() }
+            if (cacheKey != null) {
+                fileListCache[cacheKey] = files
+            }
+            return files
+        }
 
         /** 行内评论列表（T16；GET /pulls/{number}/comments） */
         suspend fun reviewComments(
@@ -520,6 +562,11 @@ class PullRequestRepository
 
             /** 降级不支持的操作名（异常消息用，非 UI 文案） */
             const val RESOLVE_THREAD_OPERATION = "resolveReviewThread/unresolveReviewThread"
+
+            /** PR 文件列表缓存容量（LRU；列表项轻，无需太大） */
+            const val FILE_LIST_CACHE_ENTRIES = 8
+            const val CACHE_INITIAL_CAPACITY = 8
+            const val CACHE_LOAD_FACTOR = 0.75f
         }
     }
 

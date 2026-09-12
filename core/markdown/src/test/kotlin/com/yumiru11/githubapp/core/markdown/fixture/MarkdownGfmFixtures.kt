@@ -223,8 +223,11 @@ object MarkdownGfmFixtures {
             Fixture(
                 "29-image-lazy",
                 "图片：懒加载",
-                emptySet(),
-                note = "未实现：全仓无 loading=\"lazy\" 注入点（plan §2.13 约定未落地）",
+                setOf(RenderPath.SERVER_HTML, RenderPath.OFFLINE_GFM),
+                note =
+                    "离线产物由 renderOfflineHtml 字符串层注入 loading=\"lazy\"/decoding=\"async\"；" +
+                        "服务端 HTML 主通道由 renderer.js 的 decorateImages 在 DOMPurify 清洗后补，" +
+                        "不覆盖显式值（2026-09-12）。原生链（Coil AsyncImage）未纳入本项判定",
             ),
             Fixture(
                 "30-image-zoom",

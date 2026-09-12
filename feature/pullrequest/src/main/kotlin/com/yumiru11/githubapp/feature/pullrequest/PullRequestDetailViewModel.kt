@@ -694,7 +694,7 @@ class PullRequestDetailViewModel
                         coroutineScope {
                             val timelineDeferred = async { repository.timeline(owner, repo, number) }
                             val commitsDeferred = async { repository.commits(owner, repo, number) }
-                            val filesDeferred = async { repository.files(owner, repo, number) }
+                            val filesDeferred = async { repository.files(owner, repo, number, headSha) }
                             val checksDeferred =
                                 async {
                                     headSha?.let { repository.checkRuns(owner, repo, it) } ?: emptyList()

@@ -91,9 +91,9 @@ class MarkdownConsistencyReportTest {
 
         listOf(
             "| §2.3 原子条目总数 | 35 |" to (MarkdownGfmFixtures.ALL.size == 35),
-            "**8**" to (webViewOnlyReady == 8),
+            "**9**" to (webViewOnlyReady == 9),
             "**24**" to (native == 24),
-            "**3**" to (unimplemented == 3),
+            "**2**" to (unimplemented == 2),
         ).forEach { (needle, ok) ->
             assertTrue("报告统计与目录不一致：期望报告中出现「$needle」", ok && text.contains(needle))
         }
@@ -105,10 +105,10 @@ class MarkdownConsistencyReportTest {
         val offline = MarkdownGfmFixtures.ALL.count { MarkdownGfmFixtures.RenderPath.OFFLINE_GFM in it.paths }
         val text = reportFile.readText()
 
-        assertEquals("服务端 HTML 覆盖数（报告写到 31/35）", 31, serverHtml)
-        assertEquals("离线 GFM 覆盖数（报告写到 28/35，2026-09-12 修复后）", 28, offline)
-        assertTrue("报告必须写出 31 / 35", text.contains("31 / 35"))
-        assertTrue("报告必须写出 28 / 35", text.contains("28 / 35"))
+        assertEquals("服务端 HTML 覆盖数（报告写到 32/35）", 32, serverHtml)
+        assertEquals("离线 GFM 覆盖数（报告写到 29/35，2026-09-12 修复后）", 29, offline)
+        assertTrue("报告必须写出 32 / 35", text.contains("32 / 35"))
+        assertTrue("报告必须写出 29 / 35", text.contains("29 / 35"))
     }
 
     private fun parseFixtureTable(): List<ReportRow> {
