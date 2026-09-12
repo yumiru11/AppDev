@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("appdev.android.application")
     alias(libs.plugins.roborazzi)
@@ -6,6 +8,29 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// ── OAuth client id 构建期注入（真机 PKCE 登录前置）────────────────────────────
+// 解析优先级（先命中先取）：Gradle 属性 -PoauthClientId → local.properties:oauthClientId
+// → 环境变量 OAUTH_CLIENT_ID → 占位符（与 core:github-auth 的 OAuthConfig.PLACEHOLDER_CLIENT_ID 一致）。
+// 真实 client id 只进 BuildConfig 构建产物，不落库；local.properties 已在 .gitignore。
+// 未配置时照常构建（CI/截图/测试走占位符），仅真机 PKCE 登录前需要配置。
+val oauthClientId: String =
+    run {
+        val fromLocalProperties =
+            rootProject
+                .file("local.properties")
+                .takeIf { it.exists() }
+                ?.let { file ->
+                    Properties()
+                        .apply { file.inputStream().use { load(it) } }
+                        .getProperty("oauthClientId")
+                }
+        listOf(
+            project.findProperty("oauthClientId")?.toString(),
+            fromLocalProperties,
+            System.getenv("OAUTH_CLIENT_ID"),
+        ).firstOrNull { !it.isNullOrBlank() } ?: "YOUR_OAUTH_APP_CLIENT_ID"
+    }
+
 android {
     namespace = "com.yumiru11.githubapp"
 
@@ -13,6 +38,14 @@ android {
         applicationId = "com.yumiru11.githubapp"
         versionCode = 1
         versionName = "0.1.0"
+
+        // OAuth App client id（公开客户端，无 client_secret）：由上一段解析注入 BuildConfig，
+        // 运行期经 app 装配层（OAuthConfigModule）交给 core:github-auth 的 OAuthConfig。
+        buildConfigField(
+            "String",
+            "OAUTH_CLIENT_ID",
+            "\"${oauthClientId.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
+        )
 
         // AppAuth 库 manifest 的 RedirectUriReceiverActivity 用 ${appAuthRedirectScheme} 占位符
         // （core:github-auth 声明，ADR-0001 自定义 scheme）；库 manifest 合入 app 时须由 app 提供值。
