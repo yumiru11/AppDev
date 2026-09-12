@@ -7,23 +7,30 @@
 
 开发一个**功能全面的 Android GitHub 客户端**（轻量、流畅、全 Material You）。技术规划 = `plan.md`（41KB，必读），需求来源 = `request.txt`。应用名/包名仍为占位符：applicationId 与 namespace = `com.yumiru11.githubapp`（模块 namespace 用 `core.github_xxx` 下划线写法），产品定名后统一改。
 
-**当前状态（2026-09-12）**：`main@e2437b5`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、以及**四张新缺陷票 #200–#203 全部关闭**。#166 / #167 已关闭（条目逐条对账）。
-**当前活动票只剩三张**：**#26（T25 真机项，需用户配 Secrets）**、#1（Spec，常开）、#71（截图测试面板，勿关）。**缺陷队列已清空。**
+**当前状态（2026-09-12 修复波末）**：`main@217cdd7`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、**四张新缺陷票 #200–#203** 全部关闭；#166 / #167 已关闭（条目逐条对账）。本轮修复波合入 **26 张 PR（#229–#255，全部 squash）**；#256（9 屏 20 帧截图基线扩展）截至本版仍 **open**。
+**当前活动票四张**：**#26（T25 真机项，需用户配 Secrets）**、#1（Spec，常开）、#71（截图测试面板，勿关）、**#250（commit-dialog 探针断言 bug——已由 #252 修复，待关）**。
+**已知真实缺陷（修复中）**：**RepoDetail 仓库头整块不渲染（UI-C01）**——Avatar/描述/统计/Star·Watch·Fork/语言栏全缺；#252 给 `repo-actions` 探针补 `desc:"Avatar"` 闸门后由假绿转红坐实（`screenshots.sh:421` 的 `repo-star` 亦同证）。修复分支 `fix/repodetail-header-render`（worktree `repo-header-fix`，截至本版**尚无提交**）。**验收 = `repo-star` / `repo-actions` 帧转绿。**
 
 > 🔴 **四份审计报告已入库（2026-09-12，开工前必读其一）**
 > `docs/agents/` 下：`spec-audit-2026-09-11.md`（需求符合性 106 条判定 / 16 条缺口 / 20 条文档漂移）· `commit-audit-2026-09-11.md`（296 提交逐票核对）· `ui-audit-2026-09-11.md`（**含系统栏的 CI 真机帧**逐张读图，Roborazzi 基线看不到系统栏）· `markdown-consistency-2026-09-11.md`（GFM §2.3 逐条 + 三层回归说明）· `agp9-feasibility-2026-09-11.md`（工具链迁移实测）
+>
+> 🔴 **本轮新增入库（2026-09-12）**：`docs/agents/remaining-backlog-2026-09-12.md`（残余审计缺口收敛：已闭环钉死 / 仍待实现 / 过时反证）· `docs/research/katex-mermaid-offline-feasibility.md`（离线 KaTeX/Mermaid 体积实测）· `docs/adr/0009-graphql-read-path-deviation.md`（读路径全 REST 的架构决定）
 
 > ⚠️ **唯一需要用户操作的前置（其余已知 P0 均已修复）**
-> **OAuth 开箱必失败** —— `OAuthConfig.kt` 的 `PLACEHOLDER_CLIENT_ID = "YOUR_OAUTH_APP_CLIENT_ID"`，全仓无 `buildConfigField` 注入点；**真机 PKCE 登录前必须先配 client id**。不阻塞模拟器截图（CI 用 `SCREENSHOT_TOKEN` 注入 PAT）与全部测试。
+> **OAuth 真机 PKCE 仍需你申请并填写 client id**（注入点已实现，#239）。`app/build.gradle.kts:11-48` 三级解析、**先命中先取**：Gradle 属性 `-PoauthClientId` → `local.properties:oauthClientId` → 环境变量 `OAUTH_CLIENT_ID`，写入 `BuildConfig.OAUTH_CLIENT_ID`；由 app 装配层 `OAuthConfigModule` 构造 `OAuthConfig`（core:github-auth 不感知 BuildConfig，Konsist 禁 core→app）。
+> **未配置时的行为**：回落到 `OAuthConfig.PLACEHOLDER_CLIENT_ID = "YOUR_OAUTH_APP_CLIENT_ID"`——构建/测试照常，仅**真机 PKCE 授权失败**；用 `OAuthConfig.isConfigured` 判定。不阻塞模拟器截图（CI 用 `SCREENSHOT_TOKEN` 注入 PAT）与全部测试。
 
 > 📌 **本轮已修复的三个 P0（勿再当成未修）**
 > 1. **T23 白屏** ✅ PR #220 —— `MainActivity` 补 `branchesScreen` / `createPullRequestScreen` 接线；并新增 **`NavHostWiringTest`** 结构化守卫（断言 19 个 screen lambda 无默认空实现残留）
 > 2. **Repos 分区 padding 恒 0** ✅ PR #215 —— 三键导航栏下末行被底栏压住；附 16 例**几何数值**回归测试（含反例灵敏度）
 > 3. **通知面板同像素叠印** ✅ PR #219 —— 根因是 API 30 模拟器走**降级路径**（无模糊）+ 0.75 底色 → 下层透印；改为降级路径不透明
 
-> 🧭 **两条此后必须遵守的方法学（本轮实测教训，代价很大）**
+> 🧭 **此后必须遵守的方法学（本轮/修复波实测教训，代价很大）**
 > 1. **判断 Kotlin 库成员可用性，`javap` 不够** —— JVM `public` 可能是 Kotlin `internal`（`javap` 看不到 `@Metadata` 那一层）。**唯一可靠做法：用真实 Kotlin 编译探针引用目标符号、跑 `compileDebugKotlin`、读错误原文。** 本轮在 material3 1.4.0 与 1.5.0-alpha18 上各撞一次。
-> 2. **断言/门禁必须做「红→绿双向验证」** —— 本轮三次出现「看起来在检查、实际恒假或抢跑」：Compose TabRow 的 `selected` 与 `text` 不在同一 node（17/32 帧假红）、`minidom` 从 Document 节点遍历会跳过属性、日志正则与实现不符。**不经红证明的守卫会以「在跑但什么都没查」的形态上线。**
+> 2. **断言/门禁必须做「红→绿双向验证」** —— 任何守卫/断言先证明「缺陷形态下必红」。修复波两次抓到恒真守卫：**i18n lint canary 自引用断言**（期望值取自被检查的同一清单 → 恒真；已改为独立 `REQUIRED_I18N_LINT_RULES` + 运行期 canary，见 `buildSrc/.../AppDevI18nLint.kt:43,66,72`）、**`repo-actions` 探针空洞**（仓库头缺失仍假绿，补 `desc:"Avatar"` 闸门后才转红，#252）。RTL 旧写法 `@Config(qualifiers="...ldrtl")` 亦是「永远绿的假测试」，改组合内显式注入 + SHA 互斥断言（#245）。**不经红证明的守卫会以「在跑但什么都没查」的形态上线。**
+> 3. **含无限动画的屏必须用 `captureScreenshotDeterministic`** —— Roborazzi `captureRoboImage(content)` 截图前会 `ShadowLooper.idle()` 排空主 looper，而无限动画（转圈 / 下拉刷新指示器）每帧经 Choreographer 续订 → `idle()` 永不返回 → verify/record 挂死（`:feature:issue` 7min+ 挂起根因）。`core:testing` 的 `captureScreenshotDeterministic`（冻结 `mainClock.autoAdvance=false` + 固定 `advanceTimeBy` + 手工 `decorView.draw(Canvas)` + `Bitmap.captureRoboImage` 不做 idle 等待）才稳。⏳ 待核实：普通 `testDebugUnitTest`（未开 record/verify）下 `captureRoboImage` 不落盘，需当心「测试绿≠拍了帧」。
+> 4. **截图基线只能由 CI canonical 录制** —— `record-screenshots.yml`（`Record screenshots (CI canonical)`）是唯一权威录制环境；本机 `recordRoborazziDebug` **禁止**（渲染与 runner 非逐字节相同，本机录的基线 CI verify 全红）。⏳ 待核实：录制前需先 rebase 到最新 main。
+> 5. **截图探针语义 + 时间炸弹** —— Compose `TabRow` 选中态是 `selected`，M3 `SegmentedButton` 是 `checkable/checked`（radio 语义，`selected` 恒 false，pr-diff 两帧假红根因）；`ExtendedFAB` 文案不进 uiautomator dump，须 `try_tap_fab` 结构性定位（**判据必须限制右下角 x ≥ 0.7w 且 y ≥ 0.85h**，放宽到「底部最大可点区域」会误点 diff 行，`adb-helpers.sh:840-842`）；M3 `OutlinedTextField` 的 placeholder 仅在聚焦且为空时渲染，**不得当就绪信号**（#250）。截图/测试夹具**禁止写死绝对时间戳**，一律相对时间（`isoDaysAgo`，#246）。探针不得静默降级为 `opt:`。
 
 ## 核心决策（来自 plan.md，勿偏离）
 
@@ -122,7 +129,8 @@ feature/                   auth, home, repo, issue, pullrequest, search, editor,
 
 - 分支命名：`feature/tX-<kebab>`（如 `feature/t12-repo-management`）
 - **提交信息 = Conventional Commits**：`type(scope): description`（type: feat/fix/refactor/chore/docs/test/perf）
-- **PR 合并策略**：复杂/多提交修复波用 **merge commit 保留历史**（不 squash）；单一小改动可 squash。PR body 写 `Fixes #N` 自动关票
+- **PR 合并策略**：默认 **squash**（用户偏好线性历史；2026-09-12 修复波 26 张全 squash）；确需保留多提交历史的复杂修复波可用 merge commit。PR body 写 `Fixes #N` 自动关票
+- **分支保护**：必需检查只有 **`Quality Gate`**；截图 job 名为 **`Screenshots (emulator + adb)`** 且**非必需**（红榜要读但不挡合并）。`strict=true` → PR 落后 main（BEHIND）时 `gh pr merge` 会拒，改用 REST：`gh api -X PUT repos/yumiru11/AppDev/pulls/<n>/merge -f merge_method=squash`
 - **铁律：不提交 main、不 push main 之外的分支**；worktree 并行时子代理 prompt 必须带 WORKDIR
 - 参考仓库（~/dev/）：`rikkahub`（原生 Markdown 参考，**AGPL-3.0 只参考思路零复制**）、`PiliPlus`（卡片风格）、`XMSLEEP`（MD3）、`gh4a`（WebView markdown + Trending 数据源）
 
@@ -137,10 +145,11 @@ feature/                   auth, home, repo, issue, pullrequest, search, editor,
 | UI 设计规范（权威，2026-08-15 拍板版） | `docs/ui-design.md` |
 | **UI 审查问题清单（2026-08-21 快照，缺陷/挂账/提案）** | `docs/ui-audit-2026-08-21.md` |
 | **全量审计报告（2026-09-06，9 张分类票来源）** | `docs/agents/task-audit-2026-09-06.md` |
-| 架构决策记录（ADR-0001~0008） | `docs/adr/` |
+| **残余缺口清单（2026-09-12，修复波后收敛）** | `docs/agents/remaining-backlog-2026-09-12.md` |
+| 架构决策记录（ADR-0001~0009） | `docs/adr/` |
 | 术语表 | `CONTEXT.md` |
 | 真机走查反馈与状态 | `FEEDBACK.md` |
-| 调研报告 | `docs/research/`（webview-material-you-fusion、highlight-engine-analysis） |
+| 调研报告 | `docs/research/`（webview-material-you-fusion、highlight-engine-analysis、katex-mermaid-offline-feasibility） |
 | Issue 管理 | `docs/agents/issue-tracker.md` |
 | Triage 标签 | `docs/agents/triage-labels.md` |
 | 领域文档布局 | `docs/agents/domain.md` |
