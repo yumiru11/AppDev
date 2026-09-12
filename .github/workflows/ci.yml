@@ -336,13 +336,13 @@ jobs:
           PYEOF
           gh pr comment "$PR_NUMBER" --body-file /tmp/coverage-comment.md
 
-  # ── 截图回归（screenshot-automation.md 调研：自建 KVM 模拟器 + Maestro，$0）──────
+  # ── 截图回归（screenshot-automation.md 调研：自建 KVM 模拟器 + adb，$0）──────────
   # 依赖 quality 门禁（全绿才开模拟器）；KVM 由 android-emulator-runner 在 ubuntu-latest
-  # 上配置（runner 暴露 /dev/kvm）。Maestro 流契约：.maestro/screenshots/*.yaml
-  # （并行 agent 所有，本 job 只消费，详见契约注释在 Maestro 步骤）。
+  # 上配置（runner 暴露 /dev/kvm）。截图唯一实现 = .github/scripts/screenshots.sh（纯 adb；
+  # 该脚本头部解释了为什么不用 Maestro：安装 3 次翻车 + 画面已被 adb 全量覆盖）。
   # PR 评论用 sticky comment（GitHub artifact URL 不能内联渲染 → 文本链接到 artifact）。
   screenshots:
-    name: Screenshots (emulator + Maestro)
+    name: Screenshots (emulator + adb)
     needs: quality
     # release asset 上传需 contents: write（顶层只有 read——第 12 轮 release 创建
     # 静默失败致评论图 404）
@@ -376,10 +376,10 @@ jobs:
           path: app/build/outputs/apk/debug
 
       # 模拟器 boot 由 action 处理（KVM udev + 等待 sys.boot_completed）；adb 暴露在
-      # localhost:5554，Maestro 自动发现设备。Maestro CLI 在此脚本内安装（~/.maestro/bin）。
-      # 流契约（并行 agent 遵守）：.maestro/screenshots/*.yaml，launchApp appId 为
-      # com.yumiru11.githubapp；maestro test 会把截图自动拉到 ~/.maestro/tests/<flow-name>/。
-      - name: Run Maestro screenshot flows on emulator
+      # localhost:5554，脚本直接驱动 adb（无需设备发现）。截图契约唯一来源 =
+      # .github/scripts/screenshots.sh：帧清单/断言/坏帧判定/门禁口径全写在该脚本里，
+      # 本 job 只负责提供模拟器与上传产物。
+      - name: Run adb screenshot script on emulator
         uses: reactivecircus/android-emulator-runner@v2
         # 截图登录机密：提供则 screenshots.sh 注入只读 PAT（Star/评论框/PR 操作可见）。
         # 未配置时脚本自动跳过登录段，其余截图不受影响。
@@ -398,7 +398,8 @@ jobs:
           emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            # 轻量 adb 截图方案（Maestro 3 次安装翻车——见 docs/research/actions-emulator-feasibility.md Q5）；
+            # 纯 adb 截图方案（历史上试过 Maestro：3 次安装翻车，见
+            # docs/research/actions-emulator-feasibility.md Q5；相关 flow 已删除）；
             # 脚本输出到 artifacts/screenshots/，供后续 Collect/Upload/评论步骤
             bash .github/scripts/screenshots.sh
 
