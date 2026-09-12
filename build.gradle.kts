@@ -434,6 +434,19 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 // 逻辑模块的门禁不受影响。不排除的真实后果（实测 PR 前）：改 2 个 lambda 接线
                 // 新增 24 行里有 13 行可执行、仅 7 行被覆盖 → 53.8% < 80%，CI diff 门禁必红。
                 Regex("""(^|/)MainActivity\.kt$"""),
+                // 纯 Composable 的 BottomSheet：*Sheet.kt（feature 模块把 UI 混在根包，如
+                // feature/pullrequest/{ReviewSheet,LineCommentSheet}.kt —— 包目录排除够不着）。
+                // 为什么必须排除：这两个文件是**整文件 @Composable**，而「被 Robolectric 沙箱加载的
+                // 类不产出 JaCoCo 覆盖数据」（#181，见 docs/agents/project-status.md §3.2）——
+                // `SheetRenderCoverageTest` 3 例全绿且真的渲染了这两个 Sheet，报告里却仍是
+                // 0/104 与 0/69。即**补测试解决不了**，这不是「测试还没写」，是工具链边界；
+                // 与同文件下方 AppThemeHost/AppBackground 的排除理由同源。
+                // 实测（UI22 × #219 merge）：不加这条，仅因这五处 Sheet 套一层玻璃容器
+                // （-w 口径下净增 30 行：每文件 1 行 import + 几行调用）就带出 103 行新增
+                // 可执行行、覆盖 0/103 → diff 门禁必红。故此排除是**工具链事实**，非放水；
+                // 「Sheet 该长什么样」由 Roborazzi 截图基线（app 模块）与真机走查兜底。
+                // 命名安全性：*Sheet.kt 只命中 BottomSheet Composable，全仓无逻辑类同名。
+                Regex("""(^|/)[^/]*Sheet\.kt$"""),
             )
 
         val changedFiles =

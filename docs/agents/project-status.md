@@ -82,7 +82,7 @@
 |---|---|---|
 | **UI04 全局背景图** | #167 | 需先按 `FEEDBACK.md` #30 完成方案 grill（选图/不透明度/深色压暗/固定不动），不猜 |
 | **UI10 README 头部收起** | #167 | 设计文档写明「用户构思中，实现时给两版效果对比」——需要你的两版对比，不在无人值守时替你拍板 |
-| **UI22 BottomSheet 玻璃** | #167 | M3 `ModalBottomSheet` 在独立 window 内，Haze 能否跨 window 采样必须真机确认 |
+| ~~UI22 BottomSheet 玻璃~~ | #167 | ✅ 已落地（本 worktree / `feature/t167-ui22-sheet-glass`）：跨 window 采样问题**已机械核实为不可能**（非真机才能确认），五处 `ModalBottomSheet` 改走 `GlassSheetSurface` 半透明路径 + 策略纯函数单测；结论回写 `docs/ui-design.md` §6.5 |
 | **UI17 AppMotion 消费面清理** | #167 | 纯清理性重构（局部仍有硬编码时长），优先级低于功能 |
 | **UI14 代码浏览悬浮搜索** | #166 | `FileViewerScreen` 顶栏已有 `startSearch()` 与跳行入口，与审计描述的「悬浮按钮」形态不同 —— 需先确认形态 |
 | **PR 时间线表情回应** | #166 | Issue 侧有、PR 侧无；`ReactionChip` 目前是 feature:issue 私有，需先抽到共享模块 |

@@ -75,6 +75,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
+import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
@@ -1001,45 +1002,49 @@ private fun CommentBottomSheet(
         // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）
         modifier = Modifier.appTransientEnterAlpha(),
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .imePadding() // 键盘弹出时抬升内容，避免输入框/按钮被遮挡
-                    .padding(16.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.pull_request_add_comment),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            OutlinedTextField(
-                value = commentText,
-                onValueChange = { commentText = it },
+        // 弹层玻璃点位（#167 / UI22，ui-design §6.1 #4）：容器底交 GlassSheetSurface，开关/主题降级由
+        // GlassScope.BOTTOM_SHEET 统一裁决（弹层是独立 window，几何结论见该组件 KDoc）
+        GlassSheetSurface {
+            Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 120.dp),
-                placeholder = { Text(text = stringResource(R.string.pull_request_comment_placeholder)) },
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                        .imePadding() // 键盘弹出时抬升内容，避免输入框/按钮被遮挡
+                        .padding(16.dp),
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text(text = stringResource(R.string.cancel))
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = { onSubmit(commentText) },
-                    enabled = commentText.isNotBlank(),
+                Text(
+                    text = stringResource(R.string.pull_request_add_comment),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = commentText,
+                    onValueChange = { commentText = it },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp),
+                    placeholder = { Text(text = stringResource(R.string.pull_request_comment_placeholder)) },
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
                 ) {
-                    Text(text = stringResource(R.string.submit))
+                    TextButton(onClick = onDismiss) {
+                        Text(text = stringResource(R.string.cancel))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { onSubmit(commentText) },
+                        enabled = commentText.isNotBlank(),
+                    ) {
+                        Text(text = stringResource(R.string.submit))
+                    }
                 }
             }
         }
