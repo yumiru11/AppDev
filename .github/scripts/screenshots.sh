@@ -159,7 +159,7 @@ fi
 #                            故降级为可选探针：命中是加分，不命中不算坏帧。
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/mermaid-js/mermaid" -p "$PKG" >/dev/null
 capture_frame readme-webview critical 5 \
-  act:"$PKG" exact:"README" log:"ReadmeRender.*repo=mermaid-js/mermaid" opt:text:"Mermaid"
+  act:"$PKG" exact:"README" log:"ReadmeRender.*renderMode=" opt:text:"Mermaid"
 # mermaid 代码块路径（同一屏滚到正文中部）：README tab 仍须选中
 retry_input swipe 540 1800 540 600 400
 capture_frame readme-mermaid critical 2 \
@@ -226,8 +226,17 @@ if require_token editor "编辑器链路需登录态（Edit 按钮仅在 LoggedI
   capture_frame file-viewer warn 4 \
     act:"$PKG" text:"AGENTS.md" desc:"Edit"
   if tap_desc "Edit"; then
-    capture_frame editor critical 3 \
-      act:"$PKG" text:"Commit" text:"AGENTS.md"
+    # 断言用「编辑态特征」而不是泛文本：FileEditScreen 顶栏有 Commit 动作。
+    # 2026-09-11 实测：首跑该帧停在 FileViewer（文本 Rendered/Source + desc Edit），
+    # 即**点了 Edit 但屏幕还没切过去**就被断言判死 —— settle 只有 3s 且断言窗口
+    # 起点在导航之前。故先用带轮询的 wait_for_text 等编辑态真的出现，再取帧；
+    # 轮询超时才判坏帧（此时是**真的**进不去编辑态，而不是抢跑）。
+    if wait_for_text "Commit" 15; then
+      capture_frame editor critical 3 \
+        act:"$PKG" text:"Commit" text:"AGENTS.md"
+    else
+      mark_bad_frame editor FAILED "点了 Edit 后 15s 内编辑态未出现（顶栏 Commit 动作缺失）"
+    fi
     # T22：同一编辑会话打开提交对话框；409 冲突态需并发篡改，无法确定性复现，不自动化
     if tap_text "Commit"; then
       capture_frame commit-dialog critical 2 \
