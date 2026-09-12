@@ -63,6 +63,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -107,6 +108,12 @@ import dev.chrisbanes.haze.rememberHazeState
  *
  * @param onOpenRepository 点击仓库 → 仓库详情
  * @param onLoginClick 游客态登录引导
+ * @param bottomContentPadding 底栏玻璃总高（[com.yumiru11.githubapp.core.ui.MainTabPager]
+ *   经宿主下发）。本屏是底栏分区页，自身 Scaffold 无 `bottomBar`、`contentWindowInsets`
+ *   又归零 → 自己的 `padding.calculateBottomPadding()` 恒为 0，**不能**作为底部预留来源；
+ *   该值天然含系统导航栏 inset（手势 ≈24dp / 三键 ≈48dp），直接落到列表 contentPadding，
+ *   让末项能滚出底栏上沿（走 contentPadding 路由而非给内容加 `navigationBarsPadding()`，
+ *   以保留内容穿过玻璃矩形的 backdrop blur 几何，见 [ReposScreen] KDoc「内容 full-bleed」）。
  */
 @Composable
 fun ReposScreen(
@@ -116,6 +123,7 @@ fun ReposScreen(
     onSearchClick: () -> Unit = {},
     onNotificationClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
+    bottomContentPadding: Dp = 0.dp,
     viewModel: ReposViewModel = hiltViewModel(),
 ) {
     val layout by viewModel.layout.collectAsStateWithLifecycle()
@@ -175,7 +183,9 @@ fun ReposScreen(
             },
         ) { paddingValues ->
             val topPadding = paddingValues.calculateTopPadding()
-            val bottomPadding = paddingValues.calculateBottomPadding()
+            // 底栏不在本 Scaffold 里（容器 MainTabPager 持有），故本 Scaffold 的
+            // calculateBottomPadding() 恒为 0——底部预留直接用宿主下发的 bottomContentPadding
+            // （= 底栏实测总高，含 navigationBars inset），见 reposListContentPadding KDoc
             Box(
                 modifier =
                     Modifier
@@ -195,7 +205,7 @@ fun ReposScreen(
                         message = stringResource(R.string.repos_login_message),
                         actionLabel = stringResource(R.string.repos_login_action),
                         onAction = onLoginClick,
-                        modifier = Modifier.padding(top = topPadding, bottom = bottomPadding),
+                        modifier = Modifier.padding(top = topPadding, bottom = bottomContentPadding),
                     )
                     return@Box
                 }
@@ -212,7 +222,7 @@ fun ReposScreen(
                             message = stringResource(R.string.repos_error_message),
                             actionLabel = stringResource(R.string.repos_error_retry),
                             onAction = { repositories.retry() },
-                            modifier = Modifier.padding(top = topPadding, bottom = bottomPadding),
+                            modifier = Modifier.padding(top = topPadding, bottom = bottomContentPadding),
                         )
                     }
 
@@ -221,11 +231,13 @@ fun ReposScreen(
                             icon = AppDevOcticons.Repo,
                             title = stringResource(R.string.repos_empty_title),
                             message = stringResource(R.string.repos_empty_message),
-                            modifier = Modifier.padding(top = topPadding, bottom = bottomPadding),
+                            modifier = Modifier.padding(top = topPadding, bottom = bottomContentPadding),
                         )
                     }
 
                     else -> {
+                        // 空/错/加载三态没有可滚内容，才用 Modifier.padding 一次性避让；
+                        // 列表态必须走滚动容器 contentPadding（内容要能穿过玻璃矩形）
                         // 布局切换 Crossfade（§3.2）：时长/曲线走 AppMotion 令牌
                         // （此前用 M3 默认规格，设置页「动画强度」滑杆对它无效）
                         Crossfade(
@@ -240,11 +252,7 @@ fun ReposScreen(
                             RepoCollection(
                                 mode = mode,
                                 repositories = repositories,
-                                contentPadding =
-                                    PaddingValues(
-                                        top = topPadding + AppDimens.cornerSmall,
-                                        bottom = bottomPadding + AppDimens.contentPadding,
-                                    ),
+                                contentPadding = reposListContentPadding(topPadding, bottomContentPadding),
                                 onOpenRepository = onOpenRepository,
                                 onCopyLink = { repository ->
                                     copyToClipboard(context, repository.htmlUrl())
@@ -268,6 +276,34 @@ fun ReposScreen(
         }
     }
 }
+
+/**
+ * 本屏（底栏分区页）列表的 contentPadding（纯函数，单测锁死）。
+ *
+ * **为什么底部预留必须由宿主下发、不能在本屏自算**：本屏 Scaffold 无 `bottomBar`，且
+ * `contentWindowInsets = WindowInsets(0.dp)`（内容 full-bleed 走 contentPadding 路由，保留
+ * 内容穿过顶栏玻璃矩形的 backdrop blur 几何），因此
+ * `paddingValues.calculateBottomPadding()` 恒为 `0.dp`。底栏（含其
+ * `WindowInsets.navigationBars` inset——手势 ≈24dp / 三键 ≈48dp）挂在外层
+ * [com.yumiru11.githubapp.core.ui.MainTabPager] 的 Scaffold 上，高度只有那里知道，
+ * 由 `MainActivity` 的 `reposPage` lambda 转成 [bottomContentPadding] 传进来。
+ *
+ * P0 回归护栏：宿主曾丢弃 page lambda 的 `PaddingValues` 形参，本屏退化成只预留
+ * [AppDimens.contentPadding]（16dp），仓库列表末行被底栏与系统导航栏压字。该缺陷编译通过、
+ * 首屏截图基线也看不出（CI 截图无「列表滚到底」帧），只能靠
+ * `ReposContentPaddingTest` 的数值断言 + `MainTabPagerInsetsTest` 的几何断言锁住。
+ *
+ * @param topPadding 顶栏玻璃总高（本屏 Scaffold 的 `calculateTopPadding()`）
+ * @param bottomContentPadding 宿主下发的底栏玻璃总高（含系统导航栏 inset）
+ */
+internal fun reposListContentPadding(
+    topPadding: Dp,
+    bottomContentPadding: Dp,
+): PaddingValues =
+    PaddingValues(
+        top = topPadding + AppDimens.cornerSmall,
+        bottom = bottomContentPadding + AppDimens.contentPadding,
+    )
 
 /** 顶栏第二行：标题 + 布局切换按钮（与首页小分区条共用同一块玻璃） */
 @Composable

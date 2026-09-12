@@ -38,6 +38,26 @@ import kotlinx.coroutines.launch
  * 分区页若自持顶栏（如 HomeScreen）应自建一份 state 覆盖本值，避免顶栏 effect
  * 嵌套进底栏 source 子树。
  *
+ * ## 底部避让契约（P0 系统栏 insets 修复）
+ *
+ * 本 Scaffold 的 `contentWindowInsets` 是 `WindowInsets(0.dp)`（**有意设计**：分区页各自
+ * 处理 insets，避免 2026-08-14 修过的「顶栏距状态栏空一段」），且 Scaffold **不会**给
+ * content 自动加 padding——所以「内容不被底栏 / 系统导航栏遮住」完全依赖宿主把底部预留
+ * 高度经 [PaddingValues] 下发给分区页：
+ *
+ * - 下发值 = `paddingValues.calculateBottomPadding()` = 底栏**实测总高**。底栏
+ *   [AppBottomBar] 的玻璃容器吃 `WindowInsets.navigationBars`（见其 KDoc），因此该值
+ *   天然含系统导航栏 inset：手势导航 ≈ 24dp、三键导航 ≈ 48dp
+ *   （实测见 `MainTabPagerInsetsTest`）。
+ * - 分区页必须把它落到**滚动容器的 `contentPadding`**（Home / Profile / Repos 三页同一契约），
+ *   既保证末项能完整滚出底栏上沿，又保留内容物理穿过玻璃矩形的 backdrop blur 几何。
+ *   **禁止**改成给内容层加 `navigationBarsPadding()` / `Modifier.padding(...)` 把内容整体
+ *   顶上去——玻璃背后会变空，FEEDBACK #17「毛玻璃看不出效果」复发。
+ * - ⚠️ 宿主 lambda **必须**接住这个形参并转成页面自己的 `bottomContentPadding`。
+ *   丢形参（`reposPage = { ReposScreen(...) }`）不会编译失败、也不会被截图基线抓到，
+ *   只会静默让整个分区少预留一个底栏高度（P0 根因，见 `MainActivity` 内注释）。
+ *   新增分区页时同样必须接；确实不需要避让的页面要写明理由，不留静默空实现。
+ *
  * @param selectedTab 当前选中分区键（MainTab.HOME / MainTab.REPOS / MainTab.PROFILE）
  * @param onTabSelected tab 点击回调（宿主无需处理，本组件内部已联动 pager；保留参数供外部感知）
  */
