@@ -32,6 +32,8 @@ dependencies {
     api(project(":core:data"))
     implementation(project(":core:github-rest"))
     implementation(project(":core:github-graphql"))
+    // PAT 降级门控（ADR-0003）：读 TokenStorage 的 isRestOnly 决定是否跳过 GraphQL 通道
+    implementation(project(":core:github-auth"))
 
     // IssueDto.pullRequest 为 JsonObject（github-rest api 暴露的公共类型，需传递可见）
     implementation(libs.kotlinx.serialization.json)

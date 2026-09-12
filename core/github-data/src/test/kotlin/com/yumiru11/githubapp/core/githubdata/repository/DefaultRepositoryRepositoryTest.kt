@@ -1,6 +1,8 @@
 package com.yumiru11.githubapp.core.githubdata.repository
 
 import com.apollographql.apollo.ApolloClient
+import com.yumiru11.githubapp.core.githubauth.token.InMemoryTokenStorage
+import com.yumiru11.githubapp.core.githubauth.token.SessionData
 import com.yumiru11.githubapp.core.githubdata.error.GitHubError
 import com.yumiru11.githubapp.core.githubdata.error.GitHubRequestException
 import com.yumiru11.githubapp.core.githubgraphql.GitHubApolloClientFactory
@@ -19,6 +21,7 @@ import mockwebserver3.RecordedRequest
 import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertFailsWith
@@ -30,23 +33,30 @@ class DefaultRepositoryRepositoryTest {
     private lateinit var server: MockWebServer
     private lateinit var repository: DefaultRepositoryRepository
     private lateinit var apolloClient: ApolloClient
+    private lateinit var tokenStorage: InMemoryTokenStorage
     private val responsesByPath = mutableMapOf<String, MockResponse>()
+    private val requestCountByPath = mutableMapOf<String, Int>()
 
     @Before
     fun setUp() {
         responsesByPath.clear()
+        requestCountByPath.clear()
         server = MockWebServer()
         server.dispatcher =
             object : Dispatcher() {
-                override fun dispatch(request: RecordedRequest): MockResponse =
-                    responsesByPath[request.url.encodedPath]
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    val path = request.url.encodedPath
+                    requestCountByPath[path] = (requestCountByPath[path] ?: 0) + 1
+                    return responsesByPath[path]
                         ?: MockResponse
                             .Builder()
                             .status("HTTP/1.1 404 Not Found")
                             .body("{}")
                             .build()
+                }
             }
         server.start()
+        tokenStorage = InMemoryTokenStorage()
 
         val okHttpClient =
             GitHubRestClient.createOkHttpClient(
@@ -61,7 +71,7 @@ class DefaultRepositoryRepositoryTest {
             )
         this.apolloClient = apolloClient
         val retrofit = GitHubRestClient.createRetrofit(server.url("/"), okHttpClient, GitHubRestClient.createJson())
-        repository = DefaultRepositoryRepository(apolloClient, retrofit.create(RepositoryApi::class.java))
+        repository = DefaultRepositoryRepository(apolloClient, retrofit.create(RepositoryApi::class.java), tokenStorage)
     }
 
     @After
@@ -194,6 +204,33 @@ class DefaultRepositoryRepositoryTest {
         }
 
     @Test
+    fun getRepository_restOnlyMode_skipsGraphQlAndUsesRestDirectly() =
+        runTest {
+            tokenStorage.saveSession(SessionData(pat = "github_pat_test", isRestOnly = true))
+            responsesByPath["/repos/octocat/Hello-World"] = restRepositoryResponse()
+
+            val repo = repository.getRepository("octocat", "Hello-World")
+
+            assertEquals("octocat", repo.ownerLogin)
+            assertEquals("JavaScript", repo.language)
+            assertEquals(1, requestCountByPath["/repos/octocat/Hello-World"])
+            assertNull("REST-only 模式不得发出注定 403 的 GraphQL 请求", requestCountByPath["/graphql"])
+        }
+
+    @Test
+    fun getRepository_restOnlyMode_restNotFound_throwsNotFoundWithoutGraphQlCall() =
+        runTest {
+            tokenStorage.saveSession(SessionData(pat = "github_pat_test", isRestOnly = true))
+            // /repos/... 未注册 → dispatcher 返回 404（REST 是唯一通道，无 GraphQL 兜底）
+
+            val exception =
+                assertFailsWith<GitHubRequestException> { repository.getRepository("ghost", "missing") }
+
+            assertEquals(GitHubError.NotFound, exception.error)
+            assertNull(requestCountByPath["/graphql"])
+        }
+
+    @Test
     fun getRepository_restFallbackCancelled_rethrowsCancellation() =
         runTest {
             responsesByPath["/graphql"] =
@@ -206,9 +243,22 @@ class DefaultRepositoryRepositoryTest {
                 mockk<RepositoryApi> {
                     coEvery { getRepository(any(), any()) } throws CancellationException("cancelled")
                 }
-            val repoUnderTest = DefaultRepositoryRepository(apolloClient, restApi)
+            val repoUnderTest = DefaultRepositoryRepository(apolloClient, restApi, tokenStorage)
 
             // 取消异常必须原样上抛（不得包装为 GitHubRequestException）
             assertFailsWith<CancellationException> { repoUnderTest.getRepository("octocat", "Hello-World") }
         }
+
+    /** REST GET /repos/{owner}/{repo} 最小合法响应（与既有用例同款载荷） */
+    private fun restRepositoryResponse(): MockResponse =
+        MockResponse
+            .Builder()
+            .body(
+                """
+                {"id":1,"name":"Hello-World","full_name":"octocat/Hello-World","private":false,
+                 "owner":{"login":"octocat","id":1},
+                 "description":"first repo","stargazers_count":3,"forks_count":2,
+                 "language":"JavaScript","default_branch":"master"}
+                """.trimIndent(),
+            ).build()
 }

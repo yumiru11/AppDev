@@ -1,6 +1,8 @@
 package com.yumiru11.githubapp.core.githubdata.user
 
 import com.apollographql.apollo.ApolloClient
+import com.yumiru11.githubapp.core.githubauth.token.InMemoryTokenStorage
+import com.yumiru11.githubapp.core.githubauth.token.SessionData
 import com.yumiru11.githubapp.core.githubdata.error.GitHubError
 import com.yumiru11.githubapp.core.githubdata.error.GitHubRequestException
 import com.yumiru11.githubapp.core.githubgraphql.GitHubApolloClientFactory
@@ -33,6 +35,7 @@ class DefaultUserRepositoryTest {
     private lateinit var server: MockWebServer
     private lateinit var repository: DefaultUserRepository
     private lateinit var apolloClient: ApolloClient
+    private lateinit var tokenStorage: InMemoryTokenStorage
     private val responsesByPath = mutableMapOf<String, MockResponse>()
     private val requestCountByPath = mutableMapOf<String, Int>()
 
@@ -40,6 +43,7 @@ class DefaultUserRepositoryTest {
     fun setUp() {
         responsesByPath.clear()
         requestCountByPath.clear()
+        tokenStorage = InMemoryTokenStorage()
         server = MockWebServer()
         server.dispatcher =
             object : Dispatcher() {
@@ -69,7 +73,7 @@ class DefaultUserRepositoryTest {
             )
         this.apolloClient = apolloClient
         val retrofit = GitHubRestClient.createRetrofit(server.url("/"), okHttpClient, GitHubRestClient.createJson())
-        repository = DefaultUserRepository(apolloClient, retrofit.create(UserApi::class.java))
+        repository = DefaultUserRepository(apolloClient, retrofit.create(UserApi::class.java), tokenStorage)
     }
 
     @After
@@ -223,7 +227,7 @@ class DefaultUserRepositoryTest {
                 mockk<UserApi> {
                     coEvery { currentUser() } throws CancellationException("cancelled")
                 }
-            val repoUnderTest = DefaultUserRepository(apolloClient, restApi)
+            val repoUnderTest = DefaultUserRepository(apolloClient, restApi, tokenStorage)
 
             // 取消异常必须原样上抛（不得包装为 GitHubRequestException）
             assertFailsWith<CancellationException> { repoUnderTest.getCurrentUser() }
@@ -242,7 +246,7 @@ class DefaultUserRepositoryTest {
                 mockk<UserApi> {
                     coEvery { currentUser() } throws IOException("network down")
                 }
-            val repoUnderTest = DefaultUserRepository(apolloClient, restApi)
+            val repoUnderTest = DefaultUserRepository(apolloClient, restApi, tokenStorage)
 
             val exception = assertFailsWith<GitHubRequestException> { repoUnderTest.getCurrentUser() }
 

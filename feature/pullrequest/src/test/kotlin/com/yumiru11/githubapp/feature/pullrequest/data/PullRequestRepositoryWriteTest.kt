@@ -1,6 +1,9 @@
 package com.yumiru11.githubapp.feature.pullrequest.data
 
 import com.apollographql.apollo.ApolloClient
+import com.yumiru11.githubapp.core.githubauth.token.InMemoryTokenStorage
+import com.yumiru11.githubapp.core.githubauth.token.SessionData
+import com.yumiru11.githubapp.core.githubgraphql.generated.PullRequestReviewThreadsQuery
 import com.yumiru11.githubapp.core.githubgraphql.generated.ViewerQuery
 import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
 import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
@@ -8,11 +11,13 @@ import com.yumiru11.githubapp.core.githubrest.api.IssueApi
 import com.yumiru11.githubapp.core.githubrest.api.PullRequestApi
 import com.yumiru11.githubapp.core.githubrest.api.RepoManagementApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
+import com.yumiru11.githubapp.core.githubrest.api.UserApi
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestState
 import io.mockk.coEvery
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -25,6 +30,7 @@ import org.junit.Before
 import org.junit.Test
 import retrofit2.HttpException
 import java.io.IOException
+import kotlin.test.assertFailsWith
 
 /**
  * [PullRequestRepository] 写操作单测（#163 L03，MockWebServer 真实 PullRequestApi）。
@@ -36,7 +42,9 @@ class PullRequestRepositoryWriteTest {
     private lateinit var server: MockWebServer
     private lateinit var pullRequestApi: PullRequestApi
     private lateinit var issueApi: IssueApi
+    private lateinit var userApi: UserApi
     private lateinit var apollo: ApolloClient
+    private lateinit var tokenStorage: InMemoryTokenStorage
 
     @Before
     fun setUp() {
@@ -55,7 +63,9 @@ class PullRequestRepositoryWriteTest {
             )
         pullRequestApi = retrofit.create(PullRequestApi::class.java)
         issueApi = retrofit.create(IssueApi::class.java)
+        userApi = retrofit.create(UserApi::class.java)
         apollo = mockk()
+        tokenStorage = InMemoryTokenStorage()
     }
 
     @After
@@ -71,6 +81,8 @@ class PullRequestRepositoryWriteTest {
             gitRefApi = mockk<GitRefApi>(),
             issueApi = issueApi,
             apolloClient = apollo,
+            userApi = userApi,
+            tokenStorage = tokenStorage,
         )
 
     private fun enqueuePullRequest(
@@ -226,5 +238,62 @@ class PullRequestRepositoryWriteTest {
             } catch (e: HttpException) {
                 assertEquals(403, e.code())
             }
+        }
+
+    // ── PAT 降级（isRestOnly）：REST 补位通道 ────────────────────────
+
+    @Test
+    fun viewerLoginOrNull_restOnlyMode_usesRestUserEndpointWithoutGraphQl() =
+        runTest {
+            tokenStorage.saveSession(SessionData(pat = "github_pat_test", isRestOnly = true))
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"login":"octocat","id":1}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            assertEquals("octocat", repository().viewerLoginOrNull())
+            verify(exactly = 0) { apollo.query(any<ViewerQuery>()) }
+            assertEquals("/user", server.takeRequest().url.encodedPath)
+        }
+
+    @Test
+    fun viewerLoginOrNull_restOnlyMode_restUnauthorized_returnsNull() =
+        runTest {
+            tokenStorage.saveSession(SessionData(pat = "github_pat_test", isRestOnly = true))
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 401 Unauthorized")
+                    .body("{}")
+                    .build(),
+            )
+
+            assertNull(repository().viewerLoginOrNull())
+            verify(exactly = 0) { apollo.query(any<ViewerQuery>()) }
+        }
+
+    @Test
+    fun reviewThreadContext_restOnlyMode_returnsEmptyContextWithoutGraphQl() =
+        runTest {
+            tokenStorage.saveSession(SessionData(pat = "github_pat_test", isRestOnly = true))
+
+            val context = repository().reviewThreadContext("PR_kwDOA")
+
+            // REST 无 reviewThreads 等价端点：保守空上下文 → UI 隐藏解析入口
+            assertNull(context.pullRequestNodeId)
+            assertTrue(context.threads.isEmpty())
+            verify(exactly = 0) { apollo.query(any<PullRequestReviewThreadsQuery>()) }
+        }
+
+    @Test
+    fun setThreadResolved_restOnlyMode_throwsRestOnlyUnsupportedException() =
+        runTest {
+            tokenStorage.saveSession(SessionData(pat = "github_pat_test", isRestOnly = true))
+
+            // 防御性兜底：即使 UI 入口越权可达，也必须以失败告终（调用方回滚乐观更新）
+            assertFailsWith<RestOnlyUnsupportedException> { repository().setThreadResolved("THREAD_1", true) }
         }
 }
