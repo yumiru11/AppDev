@@ -72,9 +72,13 @@ fun EnhancedHtmlBlock(
     }
 }
 
+/** 块级 `<script>…</script>` 元素：标签与正文一并丢弃（缺陷 #4；行内脚本见 NativeMarkdownPreprocessor）。 */
+private val SCRIPT_ELEMENT_REGEX = Regex("""(?is)<script\b[^>]*>.*?</script\s*>""")
+
 /** 去除 HTML 标签并解码常见实体（保留换行），HTML 块降级文本化用。 */
 internal fun stripHtmlTags(html: String): String =
     html
+        .replace(SCRIPT_ELEMENT_REGEX, "")
         .replace(Regex("""<[^>]+>"""), "")
         .replace("&amp;", "&")
         .replace("&lt;", "<")

@@ -6,6 +6,12 @@ plugins {
 android {
     namespace = "com.yumiru11.githubapp.core.markdown"
 
+    defaultConfig {
+        // coil-gif 由 Coil 3 的 ServiceLoader 机制按类名实例化（META-INF/services/
+        // coil3.util.DecoderServiceLoaderTarget），R8 会改名/裁剪 → 随模块分发 keep 规则
+        consumerProguardFiles("consumer-rules.pro")
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -33,6 +39,9 @@ dependencies {
 
     // 图片（Coil 3 + okhttp 网络）
     implementation(libs.coil.compose)
+    // GIF 动图（缺陷 #3）：Coil 3 核心不含 GIF 解码器；coil-gif 经 ServiceLoader 自动注册
+    // （API 28+ AnimatedImageDecoder / API 26-27 GifDecoder，见 coil3.gif.internal.GifDecoderServiceLoaderTarget）
+    implementation(libs.coil.gif)
     implementation(libs.coil.network.okhttp)
 
     // WebViewAssetLoader（assets 安全加载，禁 file://；T8 WebView 兜底通道用）
