@@ -5,6 +5,9 @@ package com.yumiru11.githubapp.feature.pullrequest
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
+import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
+import com.yumiru11.githubapp.core.datastore.draft.DraftText
 import com.yumiru11.githubapp.feature.pullrequest.data.PullRequestRepository
 import com.yumiru11.githubapp.feature.pullrequest.model.ViewerPermission
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,9 +36,14 @@ class PullRequestCreateViewModel
     constructor(
         savedStateHandle: SavedStateHandle,
         private val repository: PullRequestRepository,
+        private val drafts: DraftAutoSaver,
     ) : ViewModel() {
         private val owner: String = checkNotNull(savedStateHandle["owner"])
         private val repo: String = checkNotNull(savedStateHandle["repo"])
+
+        /** 正文草稿（长文本；标题短单行不进草稿，与 `DraftTargets.newPullRequest` 的取舍一致）。 */
+        val bodyDraft: DraftText =
+            DraftText(DraftTargets.newPullRequest(owner, repo), baseline = "", saver = drafts, scope = viewModelScope)
 
         private val _uiState = MutableStateFlow<PullRequestCreateUiState>(PullRequestCreateUiState.Loading)
         val uiState: StateFlow<PullRequestCreateUiState> = _uiState.asStateFlow()
@@ -57,7 +65,7 @@ class PullRequestCreateViewModel
         }
 
         fun updateBody(body: String) {
-            _uiState.update { state -> if (state is PullRequestCreateUiState.Form) state.copy(body = body) else state }
+            bodyDraft.onChanged(body)
         }
 
         fun selectBase(branch: String) {
@@ -75,18 +83,23 @@ class PullRequestCreateViewModel
             if (title.isBlank() || state.isSubmitting || !state.canCreate) return
             if (state.headBranch.isBlank() || state.headBranch == state.baseBranch) return
             _uiState.update { s -> if (s is PullRequestCreateUiState.Form) s.copy(isSubmitting = true) else s }
+            val body =
+                bodyDraft.text.value
+                    .trim()
+                    .takeIf { it.isNotEmpty() }
             viewModelScope.launch {
                 runCatching {
                     repository.createPullRequest(
                         owner = owner,
                         repo = repo,
                         title = title,
-                        body = state.body.trim().takeIf { it.isNotEmpty() },
+                        body = body,
                         head = state.headBranch,
                         base = state.baseBranch,
                     )
                 }.fold(
                     onSuccess = { pullRequest ->
+                        bodyDraft.discard()
                         // 复位提交态（宿主导航离开前按钮仍可用，防重复点击）
                         _uiState.update { s -> if (s is PullRequestCreateUiState.Form) s.copy(isSubmitting = false) else s }
                         _events.trySend(PullRequestCreateEvent.Created(pullRequest.number))

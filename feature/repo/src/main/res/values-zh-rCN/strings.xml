@@ -89,6 +89,8 @@
     <string name="repo_file_snackbar_committed_new_branch">已提交 %1$s 到新分支 %2$s</string>
     <string name="repo_file_snackbar_deleted">已删除 %1$s</string>
     <string name="repo_file_snackbar_keep_local">你的更改已复制到剪贴板</string>
+    <string name="repo_file_snackbar_draft_restored">已恢复未保存的草稿</string>
+    <string name="repo_file_snackbar_draft_discard">丢弃草稿</string>
 
     <!-- T23 分支管理（Git Refs API：列出/切换/创建/删除） -->
     <string name="repo_branches">分支</string>

@@ -6,13 +6,20 @@
 package com.yumiru11.githubapp.feature.repo
 
 import androidx.lifecycle.SavedStateHandle
+import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
+import com.yumiru11.githubapp.core.datastore.draft.DraftKey
+import com.yumiru11.githubapp.core.datastore.draft.DraftRepository
+import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
 import com.yumiru11.githubapp.core.editor.FileFindState
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -39,10 +46,14 @@ class RepoFilesViewModelTest {
     private val savedStateHandle =
         SavedStateHandle(mapOf("owner" to "octocat", "repo" to "Hello-World"))
 
-    private fun viewModel(repoRepository: RepoRepository): RepoFilesViewModel =
+    private fun viewModel(
+        repoRepository: RepoRepository,
+        drafts: DraftAutoSaver = draftSaver(RecordingDraftRepository()),
+    ): RepoFilesViewModel =
         RepoFilesViewModel(
             savedStateHandle = savedStateHandle,
             repoRepository = repoRepository,
+            drafts = drafts,
         )
 
     private fun treeNode(
@@ -372,12 +383,13 @@ class RepoFilesViewModelTest {
         text: String = "code",
         sha: String? = "blob-old",
         kind: FileKind = FileKind.CODE,
+        drafts: DraftAutoSaver = draftSaver(RecordingDraftRepository()),
     ): RepoFilesViewModel {
         coEvery { repoRepository.getTree(any(), any(), any()) } returns
             Result.success(listOf(treeNode("Main.kt", "Main.kt")))
         coEvery { repoRepository.getFileContent(any(), any(), any(), any()) } returns
             Result.success(FileContentData("Main.kt", "Main.kt", 4L, kind, text, sha))
-        val vm = viewModel(repoRepository)
+        val vm = viewModel(repoRepository, drafts)
         vm.loadRootTree("main")
         vm.openFile(treeNode("Main.kt", "Main.kt"), "main")
         vm.startEdit()
@@ -1066,4 +1078,176 @@ class RepoFilesViewModelTest {
             assertFalse("换文件不得残留上一文件的查找会话（高亮由 View 侧 clearFindText 清除）", state.isFindOpen)
             assertEquals(FileFindState(), state.findState)
         }
+
+    // ── 草稿持久化（需求审计 §10 P2：进程被杀不丢工作）────────────────────────
+
+    private fun draftKey(): DraftKey = DraftTargets.fileEdit("octocat", "Hello-World", "main", "Main.kt")
+
+    private fun draftSaver(
+        repository: DraftRepository,
+        debounceMillis: Long = 0,
+    ) = DraftAutoSaver(repository, CoroutineScope(UnconfinedTestDispatcher()), debounceMillis)
+
+    @Test
+    fun startEdit_storedDraftDiffersFromRemote_restoresTextAndEmitsDraftRestored() =
+        runTest {
+            val drafts = RecordingDraftRepository()
+            drafts.store(draftKey(), "draft text")
+
+            val vm = editingSetup(mockk<RepoRepository>(relaxed = true), text = "remote", drafts = draftSaver(drafts))
+            val events = mutableListOf<FileEditEvent>()
+            val job = launch(UnconfinedTestDispatcher()) { vm.editEvents.collect { events.add(it) } }
+
+            assertEquals("draft text", (vm.uiState.value.editState as FileEditState.Editing).text)
+            assertEquals(listOf<FileEditEvent>(FileEditEvent.DraftRestored), events)
+            job.cancel()
+        }
+
+    @Test
+    fun startEdit_storedDraftEqualsRemote_keepsRemoteAndEmitsNothing() =
+        runTest {
+            val drafts = RecordingDraftRepository()
+            drafts.store(draftKey(), "remote")
+
+            val vm = editingSetup(mockk<RepoRepository>(relaxed = true), text = "remote", drafts = draftSaver(drafts))
+            val events = mutableListOf<FileEditEvent>()
+            val job = launch(UnconfinedTestDispatcher()) { vm.editEvents.collect { events.add(it) } }
+
+            assertEquals("remote", (vm.uiState.value.editState as FileEditState.Editing).text)
+            assertTrue("草稿与远端一致不得假恢复", events.isEmpty())
+            job.cancel()
+        }
+
+    @Test
+    fun startEdit_draftLoadThrows_keepsRemoteSilently() =
+        runTest {
+            val drafts = RecordingDraftRepository(loadFailure = IOException("corrupt"))
+
+            val vm = editingSetup(mockk<RepoRepository>(relaxed = true), text = "remote", drafts = draftSaver(drafts))
+            val events = mutableListOf<FileEditEvent>()
+            val job = launch(UnconfinedTestDispatcher()) { vm.editEvents.collect { events.add(it) } }
+
+            assertEquals("remote", (vm.uiState.value.editState as FileEditState.Editing).text)
+            assertTrue("读失败按无草稿静默处理", events.isEmpty())
+            job.cancel()
+        }
+
+    @Test
+    fun startEdit_userTypedBeforeDraftLoad_doesNotClobberInput() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val drafts = RecordingDraftRepository(loadGate = gate)
+            drafts.store(draftKey(), "from-disk")
+            val repoRepository = mockk<RepoRepository>(relaxed = true)
+            coEvery { repoRepository.getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("Main.kt", "Main.kt")))
+            coEvery { repoRepository.getFileContent(any(), any(), any(), any()) } returns
+                Result.success(FileContentData("Main.kt", "Main.kt", 4L, FileKind.CODE, "remote", "blob-old"))
+            val vm = viewModel(repoRepository, draftSaver(drafts))
+            vm.loadRootTree("main")
+            vm.openFile(treeNode("Main.kt", "Main.kt"), "main")
+            vm.startEdit()
+
+            vm.onEditorTextChanged("typed by user")
+            gate.complete(Unit)
+            runCurrent()
+
+            assertEquals("typed by user", (vm.uiState.value.editState as FileEditState.Editing).text)
+        }
+
+    @Test
+    fun onEditorTextChanged_backToRemoteBaseline_discardsDraft() =
+        runTest {
+            val drafts = RecordingDraftRepository()
+            val vm = editingSetup(mockk<RepoRepository>(relaxed = true), text = "remote", drafts = draftSaver(drafts))
+
+            vm.onEditorTextChanged("changed")
+            assertEquals("changed", drafts.content(draftKey()))
+
+            vm.onEditorTextChanged("remote")
+
+            assertNull("回到基线 = 无未提交内容", drafts.content(draftKey()))
+        }
+
+    @Test
+    fun dismissEdit_pendingDebounce_savesCurrentTextImmediately() =
+        runTest {
+            val drafts = RecordingDraftRepository()
+            val vm = editingSetup(mockk<RepoRepository>(relaxed = true), drafts = draftSaver(drafts, debounceMillis = 60_000))
+
+            vm.onEditorTextChanged("work in progress")
+            assertNull("防抖窗口未到不落盘", drafts.content(draftKey()))
+
+            vm.dismissEdit()
+
+            assertEquals("work in progress", drafts.content(draftKey()))
+        }
+
+    @Test
+    fun commitEdit_success_discardsStoredDraft() =
+        runTest {
+            val drafts = RecordingDraftRepository()
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("Main.kt", "Main.kt")))
+                    coEvery { getFileContent(any(), any(), any(), any()) } returns
+                        Result.success(FileContentData("Main.kt", "Main.kt", 4L, FileKind.CODE, "code", "blob-old"))
+                    coEvery { updateFileContent(any(), any(), any(), any(), any(), any(), any()) } returns
+                        Result.success(FileCommitResult.Success("commit-1", "blob-new"))
+                }
+            val vm = editingSetup(repoRepository, drafts = draftSaver(drafts))
+            vm.onEditorTextChanged("committing")
+            assertEquals("committing", drafts.content(draftKey()))
+
+            vm.commitEdit(message = "fix", newBranchName = null, newFilePath = null)
+
+            assertNull("提交成功后草稿使命结束", drafts.content(draftKey()))
+        }
+
+    @Test
+    fun discardRestoredDraft_resetsTextToBaselineAndClearsStoredDraft() =
+        runTest {
+            val drafts = RecordingDraftRepository()
+            drafts.store(draftKey(), "draft")
+            val vm = editingSetup(mockk<RepoRepository>(relaxed = true), text = "remote", drafts = draftSaver(drafts))
+            assertEquals("draft", (vm.uiState.value.editState as FileEditState.Editing).text)
+
+            vm.discardRestoredDraft()
+
+            assertEquals("remote", (vm.uiState.value.editState as FileEditState.Editing).text)
+            assertNull(drafts.content(draftKey()))
+        }
+}
+
+/** 内存 [DraftRepository]（可控读门闩 / IO 失败注入，供草稿恢复时序测试）。 */
+private class RecordingDraftRepository(
+    private val loadFailure: IOException? = null,
+    private val loadGate: CompletableDeferred<Unit>? = null,
+) : DraftRepository {
+    private val drafts = mutableMapOf<DraftKey, String>()
+
+    fun store(
+        key: DraftKey,
+        content: String,
+    ) {
+        drafts[key] = content
+    }
+
+    fun content(key: DraftKey): String? = drafts[key]
+
+    override suspend fun load(key: DraftKey): String? {
+        loadGate?.await()
+        loadFailure?.let { throw it }
+        return drafts[key]
+    }
+
+    override suspend fun save(
+        key: DraftKey,
+        content: String,
+    ) {
+        if (content.isBlank()) drafts.remove(key) else drafts[key] = content
+    }
+
+    override suspend fun clear(key: DraftKey) {
+        drafts.remove(key)
+    }
 }

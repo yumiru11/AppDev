@@ -56,7 +56,12 @@ class DefaultDraftRepository(
      * 避免"用户长期编辑大量不同文件"把 DataStore 文件撑大。
      */
     private fun trimToMaxDrafts(prefs: MutablePreferences) {
-        val contentKeyNames = prefs.asMap().keys.map { it.name }.filter { it.startsWith(CONTENT_KEY_PREFIX) }
+        val contentKeyNames =
+            prefs
+                .asMap()
+                .keys
+                .map { it.name }
+                .filter { it.startsWith(CONTENT_KEY_PREFIX) }
         if (contentKeyNames.size <= MAX_DRAFT_COUNT) return
         val excessCount = contentKeyNames.size - MAX_DRAFT_COUNT
         contentKeyNames

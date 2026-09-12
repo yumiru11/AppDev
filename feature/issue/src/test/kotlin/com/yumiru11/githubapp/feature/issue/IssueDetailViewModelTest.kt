@@ -80,7 +80,7 @@ class IssueDetailViewModelTest {
                     coEvery { getIssueWriteContext(any(), any(), any()) } returns IssueWriteContext()
                 }
 
-            val viewModel = IssueDetailViewModel(savedStateHandle(), repository)
+            val viewModel = IssueDetailViewModel(savedStateHandle(), repository, draftSaver(RecordingDraftRepository()))
 
             val state = viewModel.uiState.value
             assertTrue(state is IssueDetailUiState.Success)
@@ -101,7 +101,7 @@ class IssueDetailViewModelTest {
                     coEvery { getIssue(any(), any(), any()) } throws httpException
                 }
 
-            val viewModel = IssueDetailViewModel(savedStateHandle(), repository)
+            val viewModel = IssueDetailViewModel(savedStateHandle(), repository, draftSaver(RecordingDraftRepository()))
 
             assertEquals(
                 IssueDetailUiState.Error(IssueErrorType.NOT_FOUND),
@@ -117,7 +117,7 @@ class IssueDetailViewModelTest {
                     coEvery { getIssue(any(), any(), any()) } throws IOException("network down")
                 }
 
-            val viewModel = IssueDetailViewModel(savedStateHandle(), repository)
+            val viewModel = IssueDetailViewModel(savedStateHandle(), repository, draftSaver(RecordingDraftRepository()))
 
             assertEquals(
                 IssueDetailUiState.Error(IssueErrorType.NETWORK),
@@ -133,7 +133,7 @@ class IssueDetailViewModelTest {
                     coEvery { getIssue(any(), any(), any()) } throws IllegalStateException("boom")
                 }
 
-            val viewModel = IssueDetailViewModel(savedStateHandle(), repository)
+            val viewModel = IssueDetailViewModel(savedStateHandle(), repository, draftSaver(RecordingDraftRepository()))
 
             assertEquals(
                 IssueDetailUiState.Error(IssueErrorType.UNKNOWN),
@@ -149,7 +149,7 @@ class IssueDetailViewModelTest {
                     coEvery { getIssue(owner, repo, number) } throws IOException("network down")
                     coEvery { getIssueWriteContext(any(), any(), any()) } returns IssueWriteContext()
                 }
-            val viewModel = IssueDetailViewModel(savedStateHandle(), repository)
+            val viewModel = IssueDetailViewModel(savedStateHandle(), repository, draftSaver(RecordingDraftRepository()))
             assertEquals(
                 IssueDetailUiState.Error(IssueErrorType.NETWORK),
                 viewModel.uiState.value,
@@ -172,7 +172,7 @@ class IssueDetailViewModelTest {
                     coEvery { getIssueWriteContext(any(), any(), any()) } returns IssueWriteContext()
                 }
 
-            val viewModel = IssueDetailViewModel(savedStateHandle(), repository)
+            val viewModel = IssueDetailViewModel(savedStateHandle(), repository, draftSaver(RecordingDraftRepository()))
 
             // 详情成功但时间线失败 → 整体 Error（不产“详情成功/时间线缺失”的部分 Success）
             assertEquals(
@@ -193,7 +193,7 @@ class IssueDetailViewModelTest {
                     coEvery { getIssueWriteContext(any(), any(), any()) } returns IssueWriteContext()
                 }
 
-            val viewModel = IssueDetailViewModel(savedStateHandle(), repository)
+            val viewModel = IssueDetailViewModel(savedStateHandle(), repository, draftSaver(RecordingDraftRepository()))
 
             // 详情请求未完成 → 时间线不提前渲染，保持 Loading
             assertEquals(IssueDetailUiState.Loading, viewModel.uiState.value)
@@ -219,7 +219,7 @@ class IssueDetailViewModelTest {
                     coEvery { getIssueWriteContext(any(), any(), any()) } returns IssueWriteContext()
                 }
 
-            val viewModel = IssueDetailViewModel(savedStateHandle(), repository)
+            val viewModel = IssueDetailViewModel(savedStateHandle(), repository, draftSaver(RecordingDraftRepository()))
 
             val state = viewModel.uiState.value
             assertTrue(state is IssueDetailUiState.Success)

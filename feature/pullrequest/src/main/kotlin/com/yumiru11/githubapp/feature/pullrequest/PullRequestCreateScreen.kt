@@ -68,6 +68,7 @@ fun PullRequestCreateScreen(
     viewModel: PullRequestCreateViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val bodyDraftText by viewModel.bodyDraft.text.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
@@ -149,6 +150,7 @@ fun PullRequestCreateScreen(
                 is PullRequestCreateUiState.Form -> {
                     CreatePullRequestForm(
                         state = state,
+                        body = bodyDraftText,
                         onTitleChange = viewModel::updateTitle,
                         onBodyChange = viewModel::updateBody,
                         onBaseChange = viewModel::selectBase,
@@ -164,6 +166,7 @@ fun PullRequestCreateScreen(
 @Composable
 private fun CreatePullRequestForm(
     state: PullRequestCreateUiState.Form,
+    body: String,
     onTitleChange: (String) -> Unit,
     onBodyChange: (String) -> Unit,
     onBaseChange: (String) -> Unit,
@@ -186,7 +189,7 @@ private fun CreatePullRequestForm(
         )
         Spacer(modifier = Modifier.height(12.dp))
         OutlinedTextField(
-            value = state.body,
+            value = body,
             onValueChange = onBodyChange,
             modifier = Modifier.fillMaxWidth(),
             label = { Text(text = stringResource(R.string.pull_request_create_body_label)) },

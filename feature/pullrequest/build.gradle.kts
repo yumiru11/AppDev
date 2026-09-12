@@ -61,6 +61,9 @@ dependencies {
     // 导航（GitHubLinkParser 解析评论链接）
     implementation(project(":core:navigation"))
 
+    // 草稿持久化（评论/Review/新建 PR 表单的本地草稿，进程被杀不丢工作）
+    implementation(project(":core:datastore"))
+
     // 外壳（TopAppBar 等）+ AppStateChip 状态徽标（#84）
     implementation(project(":core:ui"))
     implementation(project(":core:designsystem"))

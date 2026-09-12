@@ -7,6 +7,9 @@ package com.yumiru11.githubapp.feature.issue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
+import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
+import com.yumiru11.githubapp.core.datastore.draft.DraftText
 import com.yumiru11.githubapp.feature.issue.data.IssueRepository
 import com.yumiru11.githubapp.feature.issue.model.IssueErrorType
 import com.yumiru11.githubapp.feature.issue.model.IssueLabel
@@ -33,9 +36,16 @@ class CreateIssueViewModel
     constructor(
         savedStateHandle: SavedStateHandle,
         private val repository: IssueRepository,
+        private val drafts: DraftAutoSaver,
     ) : ViewModel() {
         private val owner: String = checkNotNull(savedStateHandle["owner"])
         private val repo: String = checkNotNull(savedStateHandle["repo"])
+
+        /**
+         * 正文草稿（长文本；标题短单行不进草稿，与 `DraftTargets.newIssue` 的取舍一致）。
+         * 进程被杀后重进表单时自动恢复。
+         */
+        val bodyDraft: DraftText = DraftText(DraftTargets.newIssue(owner, repo), baseline = "", saver = drafts, scope = viewModelScope)
 
         private val _uiState = MutableStateFlow<CreateIssueUiState>(CreateIssueUiState.Idle)
         val uiState: StateFlow<CreateIssueUiState> = _uiState.asStateFlow()
@@ -62,6 +72,7 @@ class CreateIssueViewModel
                 _uiState.value = CreateIssueUiState.Submitting
                 try {
                     repository.createIssue(owner, repo, title.trim(), body, labels.ifEmpty { null })
+                    bodyDraft.discard()
                     _events.emit(CreateIssueEvent.Created)
                 } catch (e: CancellationException) {
                     throw e

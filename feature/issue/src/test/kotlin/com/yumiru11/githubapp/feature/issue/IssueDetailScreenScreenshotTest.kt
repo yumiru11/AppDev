@@ -83,6 +83,7 @@ class IssueDetailScreenScreenshotTest : ScreenshotTest() {
         return IssueDetailViewModel(
             SavedStateHandle(mapOf("owner" to "octocat", "repo" to "Hello-World", "number" to 42)),
             repository,
+            draftSaver(RecordingDraftRepository()),
         )
     }
 

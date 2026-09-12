@@ -23,14 +23,13 @@ sealed interface PullRequestCreateUiState {
      *
      * @param canCreate 当前会话是否有推送权限（false 时提交禁用并提示）
      * @param isSubmitting 提交进行中（防重入）
-     * @param title/body/baseBranch/headBranch 表单字段
+     * @param title/baseBranch/headBranch 表单字段（正文由 VM 的 DraftText 持有，不在此状态内）
      */
     data class Form(
         val branches: List<RepositoryBranch>,
         val canCreate: Boolean = false,
         val isSubmitting: Boolean = false,
         val title: String = "",
-        val body: String = "",
         val baseBranch: String = "",
         val headBranch: String = "",
     ) : PullRequestCreateUiState

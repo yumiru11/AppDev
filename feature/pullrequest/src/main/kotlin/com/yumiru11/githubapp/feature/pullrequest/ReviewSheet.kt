@@ -68,12 +68,13 @@ internal fun ReviewEntryRow(
 @Composable
 internal fun ReviewSheet(
     canApprove: Boolean,
+    body: String,
+    onBodyChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onSubmit: (ReviewConclusion, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var conclusion by remember { mutableStateOf<ReviewConclusion?>(null) }
-    var body by remember { mutableStateOf("") }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -120,7 +121,7 @@ internal fun ReviewSheet(
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
                     value = body,
-                    onValueChange = { body = it },
+                    onValueChange = onBodyChange,
                     modifier =
                         Modifier
                             .fillMaxWidth()

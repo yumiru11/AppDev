@@ -8,6 +8,9 @@ package com.yumiru11.githubapp.feature.issue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
+import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
+import com.yumiru11.githubapp.core.datastore.draft.DraftText
 import com.yumiru11.githubapp.feature.issue.data.IssueRepository
 import com.yumiru11.githubapp.feature.issue.data.flipTaskListItem
 import com.yumiru11.githubapp.feature.issue.data.toTimelineItem
@@ -45,6 +48,7 @@ class IssueDetailViewModel
     constructor(
         savedStateHandle: SavedStateHandle,
         private val repository: IssueRepository,
+        private val drafts: DraftAutoSaver,
     ) : ViewModel() {
         private val owner: String = checkNotNull(savedStateHandle["owner"])
         private val repo: String = checkNotNull(savedStateHandle["repo"])
@@ -59,6 +63,43 @@ class IssueDetailViewModel
         /** #163 L02：元数据编辑 Sheet 状态（null = Sheet 关闭） */
         private val _editState = MutableStateFlow<IssueEditUiState?>(null)
         val editState: StateFlow<IssueEditUiState?> = _editState.asStateFlow()
+
+        /** 新评论正文草稿（进程被杀后重新打开评论 Sheet 自动恢复）。 */
+        val commentDraft: DraftText =
+            DraftText(DraftTargets.issueComment(owner, repo, number), baseline = "", saver = drafts, scope = viewModelScope)
+
+        /** 编辑 Issue 正文草稿（打开对话框时按当前正文建基线；null = 未打开）。 */
+        private val _editIssueDraft = MutableStateFlow<DraftText?>(null)
+        val editIssueDraft: StateFlow<DraftText?> = _editIssueDraft.asStateFlow()
+
+        /** 编辑既有评论正文草稿（null = 未打开）。 */
+        private val _editCommentDraft = MutableStateFlow<DraftText?>(null)
+        val editCommentDraft: StateFlow<DraftText?> = _editCommentDraft.asStateFlow()
+
+        /** 打开「编辑 Issue」对话框：以当前正文为基线恢复草稿。 */
+        fun openEditIssue(baseBody: String) {
+            _editIssueDraft.value = DraftText(DraftTargets.issueEdit(owner, repo, number), baseBody, drafts, viewModelScope)
+        }
+
+        /** 关闭「编辑 Issue」对话框（未提交）：当前文本立即落盘，不丢编辑。 */
+        fun closeEditIssue() {
+            _editIssueDraft.value?.saveNow()
+            _editIssueDraft.value = null
+        }
+
+        /** 打开「编辑评论」对话框：以当前评论正文为基线恢复草稿。 */
+        fun openEditComment(
+            commentId: Long,
+            baseBody: String,
+        ) {
+            _editCommentDraft.value = DraftText(DraftTargets.commentEdit(owner, repo, commentId), baseBody, drafts, viewModelScope)
+        }
+
+        /** 关闭「编辑评论」对话框（未提交）：当前文本立即落盘。 */
+        fun closeEditComment() {
+            _editCommentDraft.value?.saveNow()
+            _editCommentDraft.value = null
+        }
 
         init {
             loadIssueDetail()
@@ -115,6 +156,8 @@ class IssueDetailViewModel
                 _uiState.value = current.copy(issue = original.copy(title = title, body = body))
                 try {
                     val updated = repository.updateIssue(owner, repo, number, title = title, body = body)
+                    _editIssueDraft.value?.discard()
+                    _editIssueDraft.value = null
                     _uiState.value = current.copy(issue = updated.withWriteContext(original))
                     emitSnackbar(IssueSnackbarMessage.ISSUE_UPDATED)
                 } catch (e: CancellationException) {
@@ -140,6 +183,7 @@ class IssueDetailViewModel
                 _uiState.value = current.copy(timeline = current.timeline + tempComment)
                 try {
                     val created = repository.createComment(owner, repo, number, body)
+                    commentDraft.discard()
                     val real = created.toTimelineItem()
                     val state = currentSuccess() ?: return@launch
                     _uiState.value = state.copy(timeline = state.timeline.map { if (it.id == tempId) real else it })
@@ -170,6 +214,8 @@ class IssueDetailViewModel
                     )
                 try {
                     val updated = repository.updateComment(owner, repo, commentId, body)
+                    _editCommentDraft.value?.discard()
+                    _editCommentDraft.value = null
                     val real = updated.toTimelineItem()
                     val state = currentSuccess() ?: return@launch
                     _uiState.value = state.copy(timeline = state.timeline.map { if (it.id == commentId) real else it })

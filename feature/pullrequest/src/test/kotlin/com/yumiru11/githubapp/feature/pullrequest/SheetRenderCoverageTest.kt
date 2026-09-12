@@ -64,6 +64,8 @@ class SheetRenderCoverageTest {
             AppTheme(darkTheme = true) {
                 LineCommentSheet(
                     target = LineCommentTarget(anchor = anchor()),
+                    text = "",
+                    onTextChange = {},
                     canResolve = true,
                     onDismiss = {},
                     onSubmit = { _, _, _ -> },
@@ -87,6 +89,8 @@ class SheetRenderCoverageTest {
                             thread = thread(),
                             comments = listOf(comment()),
                         ),
+                    text = "",
+                    onTextChange = {},
                     canResolve = false,
                     onDismiss = {},
                     onSubmit = { _, _, _ -> },
@@ -104,6 +108,8 @@ class SheetRenderCoverageTest {
             AppTheme(darkTheme = true) {
                 ReviewSheet(
                     canApprove = false,
+                    body = "",
+                    onBodyChange = {},
                     onDismiss = {},
                     onSubmit = { _, _ -> },
                 )

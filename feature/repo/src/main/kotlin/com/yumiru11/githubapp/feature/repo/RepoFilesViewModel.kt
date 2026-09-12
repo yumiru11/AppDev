@@ -518,6 +518,8 @@ class RepoFilesViewModel
             val conflict = _uiState.value.editState as? FileEditState.Conflict ?: return
             val path = _uiState.value.selectedPath ?: return
             if (conflict.operation == ConflictOperation.DELETE) {
+                // 远端已删：本地文本无处可提交，草稿一并作废（否则下次进入恢复出一份永远提交不了的文本）
+                discardEditDraft()
                 _uiState.update { it.copy(editState = FileEditState.Idle) }
                 refreshViewerContent(path)
                 return
@@ -525,13 +527,18 @@ class RepoFilesViewModel
             viewModelScope.launch {
                 repoRepository.getFileContent(owner, repo, path, conflict.branch ?: loadedRef).fold(
                     onSuccess = { data ->
+                        val reloaded = data.text.orEmpty()
+                        // 409「重载」＝用户显式选择远端版本：旧草稿作废（不删的话下次进入会把被放弃的
+                        // 本地文本又恢复出来），并把重载文本设为新基线 —— 会话继续，后续输入仍有草稿保护
+                        editDraft?.let { drafts.discard(it.key) }
+                        editDraft = editDraft?.copy(baseText = reloaded)
                         _uiState.update {
                             it.copy(
                                 fileState = FileViewState.Loaded(data),
                                 editState =
                                     FileEditState.Editing(
                                         isNew = false,
-                                        text = data.text.orEmpty(),
+                                        text = reloaded,
                                         sha = data.sha,
                                         isMarkdown = data.kind == FileKind.MARKDOWN,
                                     ),
@@ -618,8 +625,10 @@ class RepoFilesViewModel
             _uiState.update { it.copy(editState = FileEditState.Idle) }
         }
 
-        /** 提交/删除成功后的收尾：清查看器与编辑态 + 失效树缓存并按目标分支重载（AC4 缓存失效）。 */
+        /** 提交/删除成功后的收尾：清草稿 + 清查看器与编辑态 + 失效树缓存并按目标分支重载（AC4 缓存失效）。 */
         private fun finishEditAndRefresh(targetRef: String?) {
+            // 内容已落到远端：草稿使命结束（保留会让下次进入恢复出与远端相同的文本）
+            discardEditDraft()
             val ref = targetRef ?: loadedRef
             _uiState.update {
                 it.copy(
@@ -706,6 +715,14 @@ sealed interface FileEditEvent {
     data class KeepLocal(
         val text: String,
     ) : FileEditEvent
+
+    /**
+     * 进入编辑态时恢复了一份本地草稿（编辑区已被回填）。
+     *
+     * UI 消费 = Snackbar 提示 + 「丢弃草稿」动作（[RepoFilesViewModel.discardRestoredDraft]）；
+     * 用户无动作时草稿保留（继续编辑会自动续存）。
+     */
+    data object DraftRestored : FileEditEvent
 
     /** 写操作失败（错误类型驱动本地化文案）。 */
     data class Failed(

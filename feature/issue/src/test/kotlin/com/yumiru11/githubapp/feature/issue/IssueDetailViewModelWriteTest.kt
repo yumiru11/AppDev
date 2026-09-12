@@ -4,6 +4,8 @@ package com.yumiru11.githubapp.feature.issue
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
+import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.feature.issue.data.IssueRepository
 import com.yumiru11.githubapp.feature.issue.model.Issue
@@ -73,10 +75,14 @@ class IssueDetailViewModelWriteTest {
             coEvery { getIssueWriteContext(owner, repo, number) } returns context
         }
 
-    private fun viewModel(repository: IssueRepository): IssueDetailViewModel =
+    private fun viewModel(
+        repository: IssueRepository,
+        drafts: DraftAutoSaver = draftSaver(RecordingDraftRepository()),
+    ): IssueDetailViewModel =
         IssueDetailViewModel(
             SavedStateHandle(mapOf("owner" to owner, "repo" to repo, "number" to number)),
             repository,
+            drafts,
         )
 
     private fun successState(viewModel: IssueDetailViewModel): IssueDetailUiState.Success =
@@ -818,5 +824,97 @@ class IssueDetailViewModelWriteTest {
             vm.dismissMetaEditor()
 
             assertNull(vm.editState.value)
+        }
+
+    // ---- 草稿持久化（需求审计 §10 P2：进程被杀不丢工作）----
+
+    @Test
+    fun addComment_success_discardsCommentDraftAndResetsText() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.createComment(owner, repo, number, "Nice work") } returns
+                IssueComment(id = 100L, body = "Nice work", author = IssueUser(login = "octocat"))
+            val draftRepository = RecordingDraftRepository()
+            val vm = viewModel(mockRepo, draftSaver(draftRepository))
+            advanceUntilIdle()
+            vm.commentDraft.onChanged("Nice work")
+            assertEquals("Nice work", draftRepository.drafts[vm.commentDraft.key])
+
+            vm.addComment("Nice work")
+            advanceUntilIdle()
+
+            assertTrue("评论发布成功必须清草稿", draftRepository.drafts.isEmpty())
+            assertEquals("", vm.commentDraft.text.value)
+        }
+
+    @Test
+    fun addComment_networkFailure_keepsCommentDraft() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.createComment(any(), any(), any(), any()) } throws IOException("network down")
+            val draftRepository = RecordingDraftRepository()
+            val vm = viewModel(mockRepo, draftSaver(draftRepository))
+            advanceUntilIdle()
+            vm.commentDraft.onChanged("in progress")
+
+            vm.addComment("in progress")
+            advanceUntilIdle()
+
+            assertEquals("发布失败不得丢草稿", "in progress", draftRepository.drafts[vm.commentDraft.key])
+        }
+
+    @Test
+    fun updateIssue_success_discardsEditIssueDraft() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.updateIssue(owner, repo, number, title = "t", body = "b") } returns issue()
+            val draftRepository = RecordingDraftRepository()
+            val vm = viewModel(mockRepo, draftSaver(draftRepository))
+            advanceUntilIdle()
+            vm.openEditIssue(issue().body.orEmpty())
+            vm.editIssueDraft.value?.onChanged("b")
+            assertEquals("b", draftRepository.drafts[DraftTargets.issueEdit(owner, repo, number)])
+
+            vm.updateIssue("t", "b")
+            advanceUntilIdle()
+
+            assertTrue("编辑 Issue 保存成功必须清草稿", draftRepository.drafts.isEmpty())
+            assertNull(vm.editIssueDraft.value)
+        }
+
+    @Test
+    fun openEditComment_storedDraftDiffers_restoresDraftOverCommentBody() =
+        runTest {
+            val commentId = 10L
+            val draftRepository = RecordingDraftRepository()
+            draftRepository.drafts[DraftTargets.commentEdit(owner, repo, commentId)] = "recovered edit"
+            val vm = viewModel(repository(), draftSaver(draftRepository))
+            advanceUntilIdle()
+
+            vm.openEditComment(commentId, "original")
+            advanceUntilIdle()
+
+            assertEquals(
+                "recovered edit",
+                vm.editCommentDraft.value
+                    ?.text
+                    ?.value,
+            )
+        }
+
+    @Test
+    fun closeEditIssue_withPendingDebounce_savesCurrentTextImmediately() =
+        runTest {
+            val draftRepository = RecordingDraftRepository()
+            val vm = viewModel(repository(), draftSaver(draftRepository, debounceMillis = 60_000))
+            advanceUntilIdle()
+            vm.openEditIssue(issue().body.orEmpty())
+            vm.editIssueDraft.value?.onChanged("in progress")
+            assertTrue("防抖窗口未到不落盘", draftRepository.drafts.isEmpty())
+
+            vm.closeEditIssue()
+
+            assertEquals("in progress", draftRepository.drafts[DraftTargets.issueEdit(owner, repo, number)])
+            assertNull(vm.editIssueDraft.value)
         }
 }
