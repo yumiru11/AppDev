@@ -7,12 +7,23 @@
 
 开发一个**功能全面的 Android GitHub 客户端**（轻量、流畅、全 Material You）。技术规划 = `plan.md`（41KB，必读），需求来源 = `request.txt`。应用名/包名仍为占位符：applicationId 与 namespace = `com.yumiru11.githubapp`（模块 namespace 用 `core.github_xxx` 下划线写法），产品定名后统一改。
 
-**当前状态（2026-09-11）**：`main@698c48f`。**T1–T26 全部合入 main 并关闭**（T23 有接线缺口，见下）；ui-audit 8 票（#83–#90）与 Task B 渲染架构切换（PR #70/#73）全部合入。本轮完成三份审计（需求符合性 / 提交级 / UI 真机截图）并立项新票，**当前活动票**：**#200 #201（P0）**、**#202 #203**、**#166 #167** 挂账项、**#26（T25 真机项）**；#1（Spec）与 #71（测试面板）按约定常开。剩余工作见 `docs/agents/project-status.md`。
+**当前状态（2026-09-12）**：`main@e2437b5`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、以及**四张新缺陷票 #200–#203 全部关闭**。#166 / #167 已关闭（条目逐条对账）。
+**当前活动票只剩三张**：**#26（T25 真机项，需用户配 Secrets）**、#1（Spec，常开）、#71（截图测试面板，勿关）。**缺陷队列已清空。**
 
-> ⚠️ **已知 P0 缺口（2026-09-11 提交级审计实证；修复合入前勿沿用旧结论）**
-> 1. **T23 两个页面从未接线** —— `MainActivity.kt` 漏传 `branchesScreen` / `createPullRequestScreen`，两者走 `AppNavHost` 的默认空实现 → 用户点进去是**白屏**（票面曾记为「已交付」）。修复分支 `fix/t23-nav-wiring`。
-> 2. **OAuth 开箱必失败** —— `OAuthConfig.kt` 的 `PLACEHOLDER_CLIENT_ID = "YOUR_OAUTH_APP_CLIENT_ID"`，全仓无 `buildConfigField` 注入点；真机 PKCE 登录前必须先配 client id。
-> 3. **仓库（Repos）分区底部 contentPadding 恒为 0** —— `MainActivity.kt` 的 `reposPage` lambda 丢弃了 `MainTabPager` 传入的 `PaddingValues`，列表末行被底栏压住（#200）。
+> 🔴 **四份审计报告已入库（2026-09-12，开工前必读其一）**
+> `docs/agents/` 下：`spec-audit-2026-09-11.md`（需求符合性 106 条判定 / 16 条缺口 / 20 条文档漂移）· `commit-audit-2026-09-11.md`（296 提交逐票核对）· `ui-audit-2026-09-11.md`（**含系统栏的 CI 真机帧**逐张读图，Roborazzi 基线看不到系统栏）· `markdown-consistency-2026-09-11.md`（GFM §2.3 逐条 + 三层回归说明）· `agp9-feasibility-2026-09-11.md`（工具链迁移实测）
+
+> ⚠️ **唯一需要用户操作的前置（其余已知 P0 均已修复）**
+> **OAuth 开箱必失败** —— `OAuthConfig.kt` 的 `PLACEHOLDER_CLIENT_ID = "YOUR_OAUTH_APP_CLIENT_ID"`，全仓无 `buildConfigField` 注入点；**真机 PKCE 登录前必须先配 client id**。不阻塞模拟器截图（CI 用 `SCREENSHOT_TOKEN` 注入 PAT）与全部测试。
+
+> 📌 **本轮已修复的三个 P0（勿再当成未修）**
+> 1. **T23 白屏** ✅ PR #220 —— `MainActivity` 补 `branchesScreen` / `createPullRequestScreen` 接线；并新增 **`NavHostWiringTest`** 结构化守卫（断言 19 个 screen lambda 无默认空实现残留）
+> 2. **Repos 分区 padding 恒 0** ✅ PR #215 —— 三键导航栏下末行被底栏压住；附 16 例**几何数值**回归测试（含反例灵敏度）
+> 3. **通知面板同像素叠印** ✅ PR #219 —— 根因是 API 30 模拟器走**降级路径**（无模糊）+ 0.75 底色 → 下层透印；改为降级路径不透明
+
+> 🧭 **两条此后必须遵守的方法学（本轮实测教训，代价很大）**
+> 1. **判断 Kotlin 库成员可用性，`javap` 不够** —— JVM `public` 可能是 Kotlin `internal`（`javap` 看不到 `@Metadata` 那一层）。**唯一可靠做法：用真实 Kotlin 编译探针引用目标符号、跑 `compileDebugKotlin`、读错误原文。** 本轮在 material3 1.4.0 与 1.5.0-alpha18 上各撞一次。
+> 2. **断言/门禁必须做「红→绿双向验证」** —— 本轮三次出现「看起来在检查、实际恒假或抢跑」：Compose TabRow 的 `selected` 与 `text` 不在同一 node（17/32 帧假红）、`minidom` 从 Document 节点遍历会跳过属性、日志正则与实现不符。**不经红证明的守卫会以「在跑但什么都没查」的形态上线。**
 
 ## 核心决策（来自 plan.md，勿偏离）
 
@@ -22,6 +33,12 @@
 - **评论列表绝不用 WebView**；**token 绝不注入 WebView**；代码浏览/编辑用 Rosemoe Sora Editor
 - i18n 从第一天落实：Compose 一律 `stringResource()`，禁止硬编码字符串（GitLight 教训）
 - 版本目录（`gradle/libs.versions.toml`）单一事实来源；设计令牌、Konsist 架构测试从第一行代码开始
+- **`material3` 显式 pin 在 `1.5.0-alpha18`**（不走 BOM）—— **M3 Expressive** 的唯一可用窗口；决策与撤除条件见 `docs/adr/0008-material3-alpha18-pin.md`：
+  - **为什么 pin**：`MotionScheme`（Expressive 弹簧物理）· `LoadingIndicator`（形变加载）· `WavyProgressIndicator` · `SplitButtonLayout` · `ButtonGroup` · `Medium/LargeFlexibleTopAppBar` 在 **1.4.0 上是 Kotlin `internal`**（拿不到），从 1.5.0-alpha 起才 public
+  - **为什么停在 alpha18**：**1.5.0-alpha19+ 要求 `minCompileSdk=37` + `minAGP=9.1.0`**（AAR 元数据实测）→ 本项目 compileSdk 36 / AGP 8.7.3 只能用 alpha01–alpha18
+  - **何时撤掉**：1.5.0 stable 回归某个 compose-bom 后删除本 pin（回到纯 BOM 托管）；或先做 AGP 9 迁移（已实测可行，见 `docs/agents/agp9-feasibility-2026-09-11.md`）再跟到 alpha28+/stable
+  - **代价**：alpha18 无 `FloatingToolbar` 家族；alpha 期改名已实测 2 例（`FlexibleTopAppBar` 这个名字在 1.5 线**根本不存在**；`SplitButtonDefaults.leadingButtonShape` 该版没有）
+  - **只 pin 单个 artifact、不动 BOM**（BOM 覆盖 Compose 全家，改它是把整条线拖进 alpha）
 
 ## 构建环境（本机事实）
 
@@ -37,22 +54,28 @@
 
 ## 验证命令（质量门禁 = CI 同款，提交前必跑）
 
+> ⚠️ **本机一律 `--no-daemon`**（2026-09-12 用户明确要求：daemon 会占内存、有 OOM 风险）。
+> 本机内存 15GB、多 worktree 并行时曾出现 load 30+ / 可用内存 1GB；daemon 各自 `-Xmx2048m` 且**不会随构建结束释放**。
+> `--no-daemon` 单次构建略慢（无热 JVM），但内存可控 —— **这是本机默认，不要省掉**。
+> **CI 不受影响**：workflow 里已有自己的 `--no-daemon`/runner 配置，不要改动 CI 侧。
+> 若见到残留 daemon：`./gradlew --stop`。
+
 ```bash
-./gradlew spotlessCheck              # ktlint 格式（修正用 spotlessApply）
-./gradlew detekt                     # 静态分析（config/detekt/detekt.yml 基线）
-./gradlew konsistCheck               # 架构测试（Konsist 分层依赖方向）
-./gradlew :app:lintDebug             # Android Lint（abortOnError）
-./gradlew :app:testDebugUnitTest     # 单测
-./gradlew coverageVerify             # JaCoCo 覆盖率硬门禁（聚合各模块 jacocoTestCoverageVerification；阈值表 build.gradle.kts coverageThresholds，改 UI/加文件会动分母）
-./gradlew :app:verifyRoborazziDebug  # 截图基准校验
-./gradlew :app:assembleDebug         # 打 debug APK
+./gradlew --no-daemon spotlessCheck      # ktlint 格式（修正用 spotlessApply）
+./gradlew --no-daemon detekt             # 静态分析（config/detekt/detekt.yml 基线）
+./gradlew --no-daemon konsistCheck       # 架构测试（Konsist 分层依赖方向）
+./gradlew --no-daemon :app:lintDebug     # Android Lint（abortOnError）
+./gradlew --no-daemon :app:testDebugUnitTest    # 单测
+./gradlew --no-daemon coverageVerify     # JaCoCo 覆盖率硬门禁（聚合各模块 jacocoTestCoverageVerification；阈值表 build.gradle.kts coverageThresholds）
+./gradlew --no-daemon :app:verifyRoborazziDebug # 截图基准校验
+./gradlew --no-daemon :app:assembleDebug # 打 debug APK
 ```
 
 快速验证（大量编辑后查 error，最快）：
 ```bash
-./gradlew :app:compileDebugKotlin    # 全量编译入口（增量 ~13s）
-./gradlew :core:markdown:compileDebugKotlin   # 单模块编译
-./gradlew :core:markdown:testDebugUnitTest --tests "*XxxRepositoryTest*"   # 单模块单类（注意：没有 :core 聚合项目）
+./gradlew --no-daemon :app:compileDebugKotlin    # 全量编译入口（增量 ~13s）
+./gradlew --no-daemon :core:markdown:compileDebugKotlin   # 单模块编译
+./gradlew --no-daemon :core:markdown:testDebugUnitTest --tests "*XxxRepositoryTest*"   # 单模块单类（注意：没有 :core 聚合项目）
 ```
 
 **⚠️ 铁律（血泪教训）**：
