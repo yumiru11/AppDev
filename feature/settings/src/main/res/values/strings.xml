@@ -53,6 +53,7 @@
     <string name="settings_code_font_mono">Monospace</string>
     <string name="settings_code_font_system">System default</string>
     <string name="settings_code_line_numbers">Line numbers</string>
+    <string name="settings_code_line_numbers_desc">Show line numbers in the code editor</string>
 
     <!-- Developer group -->
     <string name="settings_developer_group">Developer</string>

@@ -25,6 +25,8 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
     implementation(project(":core:designsystem"))
+    // 代码字体偏好（CodeFont：设置页 → DataStore → Sora typeface 接线，T24 死设置收口）
+    implementation(project(":core:datastore"))
 
     // MarkdownComposer 的工具栏图标（#166 / UI05：评论输入 Sheet 与编辑器页共用同一套工具栏）
     implementation(libs.icons.material.symbols.rounded)

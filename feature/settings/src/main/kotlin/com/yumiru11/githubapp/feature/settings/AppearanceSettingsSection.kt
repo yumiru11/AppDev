@@ -54,6 +54,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
@@ -68,12 +69,15 @@ import kotlin.math.roundToInt
 /**
  * 外观分组（ui-design §3.6，#87 分组卡化）：主题模式 / 动态取色 / seed 色盘 /
  * OLED / 高对比 / 毛玻璃 / 圆角强度滑杆（实时预览）/ 动画强度滑杆（实时预览）/
- * 图标风格预览卡，经 [CardGroup] 呈现为分段卡；非开关项副标题显示当前值（原生设置惯例）。
+ * 图标风格预览卡 / 代码字体 / 行号，经 [CardGroup] 呈现为分段卡；非开关项副标题显示当前值
+ * （原生设置惯例）。
  *
- * 「图标风格」入口随 AppIcon 消费基建落地而解禁（issue #168 / UI12）：底栏与顶栏
- * 图标已改为经 [AppIcon] 按 LocalIconStyle 取变体，切换即时生效，不再是「点了没反应」的
- * 空开关（FEEDBACK #6 的先例要求）。代码字体 / 行号仍隐藏（待 Sora 配置接线），
- * DataStore 字段与 [SettingsViewModel] 写入口保留。
+ * 隐藏项的解禁历史（FEEDBACK #6 先例：**消费点未落地前不暴露入口**）：
+ * - 「图标风格」随 AppIcon 消费基建落地解禁（issue #168 / UI12）：底栏与顶栏图标经 [AppIcon]
+ *   按 LocalIconStyle 取变体，切换即时生效
+ * - 「代码字体」「行号」随 Sora 配置接线解禁（T24 死设置收口）：`CodeFont` → typeface、
+ *   行号 → `isLineNumberEnabled`，消费点是 `core:editor` 的代码视图与 Markdown 编辑器
+ *   （经 `LocalCodeEditorPreferences` 由 AppThemeHost 下发），两者都不再是「点了没反应」的空开关
  */
 @Composable
 internal fun AppearanceSettingsSection(
@@ -170,6 +174,26 @@ internal fun AppearanceSettingsSection(
             IconStyleRow(
                 selected = uiState.iconStyle,
                 onSelect = viewModel::setIconStyle,
+            )
+        }
+        // 代码字体（T24 死设置收口）：二选一 chip —— 消费点是 core:editor 的 Sora 代码视图与
+        // Markdown 编辑器（经 LocalCodeEditorPreferences 下发），切换即时生效，不再是空开关
+        item {
+            CodeFontRow(
+                selected = uiState.codeFont,
+                onSelect = viewModel::setCodeFont,
+            )
+        }
+        // 行号开关（T24 死设置收口）：同上，直接驱动 Sora 的 isLineNumberEnabled
+        item {
+            val lineNumbersTitle = stringResource(R.string.settings_code_line_numbers)
+            SwitchSettingRow(
+                title = lineNumbersTitle,
+                description = stringResource(R.string.settings_code_line_numbers_desc),
+                checked = uiState.codeLineNumbers,
+                onCheckedChange = viewModel::setCodeLineNumbers,
+                // Switch 自身没有可见文本，TalkBack 停在它上面只会读「开关，关闭」→ 复用行标题补名
+                contentDescription = lineNumbersTitle,
             )
         }
         item { CornerScaleRow(scale = uiState.cornerScale, onScaleChange = viewModel::setCornerScale) }
@@ -409,6 +433,39 @@ private fun SeedSwatch(
 }
 
 /**
+ * 代码字体二选一（T24 死设置收口，ui-design §3.6「代码字体」）。
+ *
+ * 控件与 [ThemeModeRow] 同款（[FilterChip] 单选行 + 副标题回显当前值），不另造选择控件：
+ * 同为「少量固定选项」语义，一致的手感比新样式更值钱。
+ *
+ * 无 contentDescription：两个 chip 自带可见 label（"Monospace" / "System default"），
+ * TalkBack 直接读 label + 选中态；再叠一层 CD 只会把 label 顶掉、变成重复播报。
+ */
+@Composable
+internal fun CodeFontRow(
+    selected: CodeFont,
+    onSelect: (CodeFont) -> Unit,
+) {
+    val options =
+        listOf(
+            CodeFont.MONO to stringResource(R.string.settings_code_font_mono),
+            CodeFont.SYSTEM to stringResource(R.string.settings_code_font_system),
+        )
+    val currentName = options.first { (font, _) -> font == selected }.second
+    SettingRow(title = stringResource(R.string.settings_code_font), valueText = currentName) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (font, label) ->
+                FilterChip(
+                    selected = selected == font,
+                    onClick = { onSelect(font) },
+                    label = { Text(label) },
+                )
+            }
+        }
+    }
+}
+
+/**
  * 图标风格三选一（issue #168 / UI12，ui-design §3.6「Rounded/Outlined/Filled 预览」）。
  *
  * 每张预览卡用同一条 [AppIcons.Settings] 规格、只改 [IconStyle] 渲染 → 所见即所得；
@@ -597,6 +654,9 @@ private fun MotionPulsePreview(scale: Float) {
  *
  * @param enabled 交互可用性；false 时置灰（#167 / UI03：OLED/高对比下逐项开关被强制禁用）
  * @param indented 作为上级开关的子项缩进（同款控件层级化，避免另造组件）
+ * @param contentDescription 开关自身的无障碍名（默认 null = 沿用旧行为：Switch 节点无标签）。
+ *   标题与说明都是**兄弟节点**，TalkBack 单停在 Switch 上只会念「开关，关闭」；
+ *   需要时可传行标题让开关自带名字（T24 行号开关先例）。传值时**复用行标题 key**，不新增文案。
  */
 @Composable
 internal fun SwitchSettingRow(
@@ -606,6 +666,7 @@ internal fun SwitchSettingRow(
     description: String? = null,
     enabled: Boolean = true,
     indented: Boolean = false,
+    contentDescription: String? = null,
 ) {
     // 禁用态统一走 M3 的 38% onSurface（与 Switch 自身的禁用色一致）
     val titleColor =
@@ -642,10 +703,19 @@ internal fun SwitchSettingRow(
             }
         }
         Spacer(modifier = Modifier.width(16.dp))
+        // 先落到局部名并显式 `this.`：semantics 作用域里 contentDescription 是接收者上的
+        // 只写扩展属性，与形参同名时裸写会解析到形参（val）→ 编译报「val cannot be reassigned」
+        val switchContentDescription = contentDescription
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             enabled = enabled,
+            modifier =
+                if (switchContentDescription == null) {
+                    Modifier
+                } else {
+                    Modifier.semantics { this.contentDescription = switchContentDescription }
+                },
         )
     }
 }

@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.ui.appTransientEnterAlpha
 import com.yumiru11.githubapp.feature.home.R
@@ -51,11 +52,16 @@ internal fun RepoPickerSheet(
         // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）
         modifier = Modifier.appTransientEnterAlpha(),
     ) {
-        RepoPickerSheetContent(
-            uiState = uiState,
-            onPick = onPick,
-            onRetry = onRetry,
-        )
+        // 弹层玻璃点位（#167 / UI22，ui-design §6.1 #4）：容器底交 GlassSheetSurface，
+        // 开关与主题降级按 GlassScope.BOTTOM_SHEET 统一裁决（弹层是独立 window，
+        // 几何结论见该组件 KDoc / GlassRenderPolicy.resolveInDialogWindow）
+        GlassSheetSurface {
+            RepoPickerSheetContent(
+                uiState = uiState,
+                onPick = onPick,
+                onRetry = onRetry,
+            )
+        }
     }
 }
 

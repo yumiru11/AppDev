@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
 import com.yumiru11.githubapp.core.ui.appTransientEnterAlpha
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewConclusion
 
@@ -79,65 +80,69 @@ internal fun ReviewSheet(
         // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）
         modifier = modifier.appTransientEnterAlpha(),
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .imePadding()
-                    .padding(16.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.pull_request_review_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-            ) {
-                FilterChip(
-                    selected = conclusion == ReviewConclusion.APPROVE,
-                    onClick = { conclusion = ReviewConclusion.APPROVE },
-                    enabled = canApprove,
-                    label = { Text(text = stringResource(R.string.pull_request_review_approve)) },
-                )
-                FilterChip(
-                    selected = conclusion == ReviewConclusion.REQUEST_CHANGES,
-                    onClick = { conclusion = ReviewConclusion.REQUEST_CHANGES },
-                    enabled = canApprove,
-                    label = { Text(text = stringResource(R.string.pull_request_review_request_changes)) },
-                )
-                FilterChip(
-                    selected = conclusion == ReviewConclusion.COMMENT,
-                    onClick = { conclusion = ReviewConclusion.COMMENT },
-                    label = { Text(text = stringResource(R.string.pull_request_review_comment_option)) },
-                )
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedTextField(
-                value = body,
-                onValueChange = { body = it },
+        // 弹层玻璃点位（#167 / UI22，ui-design §6.1 #4）：容器底交 GlassSheetSurface，开关/主题降级由
+        // GlassScope.BOTTOM_SHEET 统一裁决（弹层是独立 window，几何结论见该组件 KDoc）
+        GlassSheetSurface {
+            Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 100.dp),
-                label = { Text(text = stringResource(R.string.pull_request_review_body_label)) },
-                placeholder = { Text(text = stringResource(R.string.pull_request_comment_placeholder)) },
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                        .imePadding()
+                        .padding(16.dp),
             ) {
-                TextButton(onClick = onDismiss) {
-                    Text(text = stringResource(R.string.cancel))
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = { conclusion?.let { onSubmit(it, body) } },
-                    enabled = conclusion != null && (conclusion != ReviewConclusion.COMMENT || body.isNotBlank()),
+                Text(
+                    text = stringResource(R.string.pull_request_review_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
                 ) {
-                    Text(text = stringResource(R.string.submit))
+                    FilterChip(
+                        selected = conclusion == ReviewConclusion.APPROVE,
+                        onClick = { conclusion = ReviewConclusion.APPROVE },
+                        enabled = canApprove,
+                        label = { Text(text = stringResource(R.string.pull_request_review_approve)) },
+                    )
+                    FilterChip(
+                        selected = conclusion == ReviewConclusion.REQUEST_CHANGES,
+                        onClick = { conclusion = ReviewConclusion.REQUEST_CHANGES },
+                        enabled = canApprove,
+                        label = { Text(text = stringResource(R.string.pull_request_review_request_changes)) },
+                    )
+                    FilterChip(
+                        selected = conclusion == ReviewConclusion.COMMENT,
+                        onClick = { conclusion = ReviewConclusion.COMMENT },
+                        label = { Text(text = stringResource(R.string.pull_request_review_comment_option)) },
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = body,
+                    onValueChange = { body = it },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 100.dp),
+                    label = { Text(text = stringResource(R.string.pull_request_review_body_label)) },
+                    placeholder = { Text(text = stringResource(R.string.pull_request_comment_placeholder)) },
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(text = stringResource(R.string.cancel))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { conclusion?.let { onSubmit(it, body) } },
+                        enabled = conclusion != null && (conclusion != ReviewConclusion.COMMENT || body.isNotBlank()),
+                    ) {
+                        Text(text = stringResource(R.string.submit))
+                    }
                 }
             }
         }

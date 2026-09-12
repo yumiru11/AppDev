@@ -15,3 +15,6 @@ captures/
 .kotlin/
 tmp-prompt.md
 .worktrees/
+
+# 临时/离线验证产物（假 adb 桩、干跑输出；一律不入库）
+tmp/
