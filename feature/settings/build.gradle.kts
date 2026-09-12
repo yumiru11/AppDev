@@ -46,6 +46,9 @@ dependencies {
     // 认证核心（PAT 开发者模式：TokenStorage/OAuthSessionManager/AuthState）
     implementation(project(":core:github-auth"))
 
+    // 限流快照（GATE-2：开发者分组「剩余配额」行直读 RateLimitStore，与 feature:search 同源）
+    implementation(project(":core:github-rest"))
+
     // Hilt（SettingsViewModel @HiltViewModel 装配）
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

@@ -65,7 +65,9 @@
     <string name="settings_pat_desc">fine-grained PAT 不支持 GraphQL，应用将自动降级为仅 REST 模式。</string>
     <string name="settings_rest_only_notice">当前为仅 REST 模式——GraphQL 功能不可用。</string>
     <string name="settings_rate_limit">剩余配额</string>
-    <string name="settings_rate_limit_unavailable">待接入</string>
+    <string name="settings_rate_limit_usage">%1$d / %2$d</string>
+    <string name="settings_rate_limit_reset">约 %1$d 分钟后重置</string>
+    <string name="settings_rate_limit_no_data">暂无数据</string>
 
     <!-- 通用分组 -->
     <string name="settings_general_group">通用</string>

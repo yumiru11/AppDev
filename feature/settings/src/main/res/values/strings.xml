@@ -65,7 +65,9 @@
     <string name="settings_pat_desc">Fine-grained PATs do not support GraphQL. The app falls back to REST-only mode.</string>
     <string name="settings_rest_only_notice">REST-only mode active — GraphQL features are unavailable.</string>
     <string name="settings_rate_limit">Rate limit</string>
-    <string name="settings_rate_limit_unavailable">Not available yet</string>
+    <string name="settings_rate_limit_usage">%1$d / %2$d</string>
+    <string name="settings_rate_limit_reset">Resets in about %1$d min</string>
+    <string name="settings_rate_limit_no_data">No data yet</string>
 
     <!-- General group -->
     <string name="settings_general_group">General</string>
