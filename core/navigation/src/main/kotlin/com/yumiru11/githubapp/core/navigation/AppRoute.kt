@@ -59,12 +59,28 @@ sealed interface AppRoute {
     ) : AppRoute
 
     // ref 为可选 query（T23 分支切换深链：切换后带新 ref 重进仓库详情，文件树按该分支加载）
+    //
+    // showFiles/treePath/showReleases/releaseTag 是**深链初始视图**提示（全部可选 query，
+    // 默认值 = 「无提示」）——补齐需求审计 §10 P2「Tree / Release 落到浏览器」：
+    //   · ParsedUrl.Tree    → showFiles=true（+ treePath：文件树自动展开到该目录）
+    //   · ParsedUrl.Release → showReleases=true（+ releaseTag：展开该 tag 的 Release 详情）
+    // 为什么不做成独立 destination：Tree/Release 落地的就是**同一个仓库详情屏**，只是初始
+    // 分区不同；新开 destination 会把 RepoDetailScreen 及其 RepoDetailActions 装配复制三份。
+    // 参数一律非空（Boolean + 空串），默认值即「无提示」→ 与既有 ref 同一种编码形态。
     @Serializable
     @SerialName("repo")
     data class Repo(
         val owner: String,
         val repo: String,
         val ref: String = "",
+        /** true = 直接落在「文件」分区（Tree 深链；无路径时也要看到文件浏览而非 README） */
+        val showFiles: Boolean = false,
+        /** 文件分区自动展开到的仓库内路径（空 = 只到根树，不展开） */
+        val treePath: String = "",
+        /** true = 直接落在「Releases」分区（Release 深链；无 tag 时看到列表） */
+        val showReleases: Boolean = false,
+        /** Releases 分区自动展开的 Release tag（空 = 只到列表，不展开） */
+        val releaseTag: String = "",
     ) : AppRoute
 
     @Serializable
