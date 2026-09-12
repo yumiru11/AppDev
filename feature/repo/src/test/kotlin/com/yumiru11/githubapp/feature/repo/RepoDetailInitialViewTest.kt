@@ -10,6 +10,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
 import com.yumiru11.githubapp.core.data.model.Release
 import com.yumiru11.githubapp.core.data.model.Repository
+import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
+import com.yumiru11.githubapp.core.datastore.draft.DraftRepository
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
 import io.mockk.coEvery
@@ -64,6 +66,7 @@ class RepoDetailInitialViewTest {
         RepoFilesViewModel(
             savedStateHandle = SavedStateHandle(mapOf("owner" to "octocat", "repo" to "Hello-World")),
             repoRepository = repoRepository,
+            drafts = DraftAutoSaver(mockk<DraftRepository>(relaxed = true)),
         )
 
     private fun setScreen(
