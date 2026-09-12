@@ -222,29 +222,42 @@ capture_frame file-tree warn 3 \
 # 进编辑态 → 点开提交对话框」链；并把 ①② 都变成硬断言。
 # 可达性：EditFileButton 需 `editable = state.isLoggedIn` → 无 token 时编辑器
 # **确实不可达**，如实标 MISSING，不伪造一个看起来对的帧。
+#
+# 2026-09-12 有界等待改造（为什么本帧仍可能合法地判 FAILED）：
+#   - editor：由「settle 3s + 12s 断言窗」改为「30s 有界轮询顶栏 Commit 动作
+#     （出现即早退）→ 再取帧」——把「探针抢跑」与「编辑态真的进不去」分开；
+#   - commit-dialog：同样先有界等待对话框占位文案（15s）再取帧；editor 未起来时
+#     **不再盲点 Commit**，直接标 MISSING（依赖帧缺失 ≠ 该帧自身失败）；
+#   - ⚠️ 静态接线追踪已确认（file:line 见 PR）：blob 深链 → MainActivity.BlobRoute
+#     （app/.../MainActivity.kt:597-633）直接渲染 FileViewerScreen，**不消费**
+#     RepoFilesUiState.editState；FileEditScreen 的渲染分支只存在于
+#     RepoDetailScreen.kt:224。即：深链路径点 Edit 后屏幕不切换、Commit 永不出现。
+#     该 FAILED 是**真实缺陷**（深链文件编辑入口死路），不是探针问题；
+#     修复应在 BlobRoute 补 editState → FileEditScreen 分支（需另开票）。
 if require_token editor "编辑器链路需登录态（Edit 按钮仅在 LoggedIn 时渲染）"; then
   adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/blob/main/AGENTS.md" -p "$PKG" >/dev/null
   # FileViewer 顶栏标题 = 选中路径：它出现即「blob 深链真的加载了文件」
   capture_frame file-viewer warn 4 \
     act:"$PKG" text:"AGENTS.md" desc:"Edit"
   if tap_desc "Edit"; then
-    # 断言用「编辑态特征」而不是泛文本：FileEditScreen 顶栏有 Commit 动作。
-    # 2026-09-11 实测：首跑该帧停在 FileViewer（文本 Rendered/Source + desc Edit），
-    # 即**点了 Edit 但屏幕还没切过去**就被断言判死 —— settle 只有 3s 且断言窗口
-    # 起点在导航之前。故先用带轮询的 wait_for_text 等编辑态真的出现，再取帧；
-    # 轮询超时才判坏帧（此时是**真的**进不去编辑态，而不是抢跑）。
-    if wait_for_text "Commit" 15; then
-      capture_frame editor warn 3 \
+    # 编辑态就绪判据 = FileEditScreen 顶栏的 Commit 动作（TextButton，文本恰为
+    # repo_file_commit="Commit"）。有界等待 30s + 1s 轮询，出现即早退：
+    # - 命中：编辑态确实到了（此后 capture_frame 自己的断言仍然兜底）；
+    # - 超时：30s 足够排除「导航/首帧/草稿回填慢」，此时的 FAILED 是真失败。
+    if wait_for_text "Commit" 30; then
+      capture_frame editor warn 1 \
         act:"$PKG" text:"Commit" text:"AGENTS.md"
+      # T22：同一编辑会话打开提交对话框；先用子串轮询等占位文案出现再取帧
+      # （与帧断言同口径）。409 冲突态需并发篡改，无法确定性复现，不自动化。
+      if tap_text "Commit" && wait_for_attr_sub "text" "Describe your changes…" 15; then
+        capture_frame commit-dialog warn 1 \
+          act:"$PKG" text:"Describe your changes…" text:"Commit to current branch"
+      else
+        mark_bad_frame commit-dialog FAILED "点了 Commit 后 15s 内提交对话框未出现（占位文案缺失）"
+      fi
     else
-      mark_bad_frame editor FAILED "点了 Edit 后 15s 内编辑态未出现（顶栏 Commit 动作缺失）"
-    fi
-    # T22：同一编辑会话打开提交对话框；409 冲突态需并发篡改，无法确定性复现，不自动化
-    if tap_text "Commit"; then
-      capture_frame commit-dialog warn 2 \
-        act:"$PKG" text:"Describe your changes…" text:"Commit to current branch"
-    else
-      mark_missing_frame commit-dialog "编辑态未出现 Commit 动作，无法打开提交对话框"
+      mark_bad_frame editor FAILED "点了 Edit 后 30s 内编辑态未出现（顶栏 Commit 动作缺失）"
+      mark_missing_frame commit-dialog "依赖编辑器帧：编辑态未出现，提交对话框无法打开"
     fi
     adb shell input keyevent 4             # 关对话框回编辑器
   else
