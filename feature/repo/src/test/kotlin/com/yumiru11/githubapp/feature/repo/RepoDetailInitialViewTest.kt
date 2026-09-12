@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
@@ -95,6 +96,40 @@ class RepoDetailInitialViewTest {
             }
         }
         composeRule.waitForIdle()
+    }
+
+    @Test
+    fun repoDetailScreen_success_rendersRepositoryHeaderBlock() {
+        setScreen(
+            viewModel =
+                detailViewModel(
+                    RepoDetailUiState.Success(
+                        repo =
+                            Repository(
+                                ownerLogin = "octocat",
+                                name = "Hello-World",
+                                description = "My first repository on GitHub!",
+                                stargazerCount = 3,
+                                forkCount = 5,
+                                language = "Kotlin",
+                            ),
+                        readmeState = ReadmeState.Empty,
+                        isLoggedIn = true,
+                    ),
+                ),
+            filesViewModel = filesViewModel(mockk<RepoRepository>(relaxed = true)),
+        )
+
+        // UI-C01 回归：仓库头整块必须在初始（未滚动）首帧渲染 —— 头像 / 名称 / 描述 /
+        // 统计 / Star 操作按钮。此前 headerHeightPx 首帧恒 0，外层 height(0) 约束使内层
+        // 测不出自然高度（自锁），头部被裁成 0 高，uiautomator dump 里 Avatar/Star 全缺。
+        composeRule.onNodeWithContentDescription("Avatar").assertIsDisplayed()
+        composeRule.onNodeWithText("Hello-World").assertIsDisplayed()
+        composeRule.onNodeWithText("My first repository on GitHub!").assertIsDisplayed()
+        composeRule.onNodeWithText("3 stars").assertIsDisplayed()
+        composeRule.onNodeWithText("5 forks").assertIsDisplayed()
+        composeRule.onNodeWithText("Kotlin").assertIsDisplayed()
+        composeRule.onNodeWithText("Star").assertIsDisplayed()
     }
 
     @Test
