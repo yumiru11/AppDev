@@ -128,9 +128,15 @@ val coverageThresholds =
         ":app" to 0.02, // 实测 2.61%（13/498 行；纯 UI 装配曾豁免，现按实测棘轮，防 13 行覆盖无声归零）
         ":core:common" to 0.99, // 实测 100.0%（23/23 行）
         ":core:editor" to 0.51, // 实测 52.35%（M3EditorThemeKt/MarkdownComposerKt 等 Compose 类不入单测，拉低分母；逻辑类高覆盖）
-        ":core:database" to 0.04, // 实测 5.17%（⚠️ Room 生成 *_Impl 计入分母 + 本模块 Robolectric 单测不入 exec，见 PR「已知盲区」；地板 50 为 Phase C 目标）
         ":feature:search" to 0.53, // 实测 53.93%（VM/分页/缓存已覆盖；SearchResultRowsKt/SearchTopBarKt 纯 UI 不入单测）
         ":feature:editor" to 0.58, // 实测 59.38%（19/32 行，分母极小，1 行 ≈ 3.1pp，后续调阈需谨慎）
+        // ── 2026-09-13 Robolectric 覆盖率修复（chore/jacoco-robolectric-coverage）────────
+        // 根因：JaCoCo agent 默认 inclnolocationclasses=false，只插桩带 CodeSource 的类；Robolectric
+        // 的 SandboxClassLoader 用 4 参 defineClass 定义应用类（无 CodeSource）→ 整类被静默跳过。
+        // 修复：includeNoLocationClasses=true + includes=com/yumiru11/*（见 configureRobolectricCoverage）。
+        // 修复后本模块 Robolectric 单测覆盖真正进 exec，按【新实测值】棘轮（口径同 #255）。
+        ":core:database" to 0.85, // 实测 86.43%（618/715 行；修复前 5.17%——Room *_Impl 现由 DAO Robolectric 测试真实覆盖）
+        ":feature:auth" to 0.99, // 实测 100.00%（25/25 行；修复前 0.00%——AuthViewModel 由 Robolectric 单测覆盖，LoginScreen 已入 coverageExcludes）
     )
 
 // JaCoCo 分析排除：生成代码/样板（R/BuildConfig/Manifest/Hilt 产物）+ UI 层，不计入分母
@@ -238,6 +244,7 @@ subprojects {
             buildTypes.getByName("debug") { enableUnitTestCoverage = true }
         }
         configureJacocoVersion()
+        configureRobolectricCoverage()
         this@subprojects.registerCoverageTasks()
     }
     plugins.withId("com.android.library") {
@@ -245,6 +252,7 @@ subprojects {
             buildTypes.getByName("debug") { enableUnitTestCoverage = true }
         }
         configureJacocoVersion()
+        configureRobolectricCoverage()
         this@subprojects.registerCoverageTasks()
     }
 }
@@ -256,6 +264,24 @@ subprojects {
 fun Project.configureJacocoVersion() {
     val androidExt = extensions.getByName("android") as com.android.build.api.dsl.CommonExtension<*, *, *, *, *, *>
     androidExt.testCoverage.jacocoVersion = libs.versions.jacoco.get()
+}
+
+// Robolectric 沙箱类 + JaCoCo agent 的兼容修复（根因与实测证据见 coverageThresholds 上方长注释）。
+// 必须在 android 扩展可用后调用；testOptions.unitTests.all 由 AGP 在配置每个 Test 任务时回放，
+// 此时 JacocoTaskExtension 已存在（AGP 用 findByType 取它），因此这是唯一不依赖插件应用时序的注入点。
+fun Project.configureRobolectricCoverage() {
+    val androidExt = extensions.getByName("android") as com.android.build.api.dsl.CommonExtension<*, *, *, *, *, *>
+    androidExt.testOptions.unitTests.all { test ->
+        test.extensions
+            .findByType(org.gradle.testing.jacoco.plugins.JacocoTaskExtension::class.java)
+            ?.apply {
+                setIncludeNoLocationClasses(true)
+                // includes 用 VM 类名（`/` 分隔，已实测 `com.yumiru11.*` 不匹配、`com/yumiru11/*` 匹配）：
+                // 只插桩本项目类。Robolectric 沙箱类因此可见，同时 JDK 运行时生成的无 CodeSource 类
+                // （jdk/internal/reflect/Generated*Accessor 等）不被插桩，避免测试 worker 启动即崩。
+                setIncludes(listOf("com/yumiru11/*"))
+            }
+    }
 }
 
 // 为模块注册 jacocoTestReport（T2 全量分母）+ jacocoTestCoverageVerification（T3，有阈值时），并接入根聚合。
