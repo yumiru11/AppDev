@@ -5,6 +5,21 @@ kotlin = "2.3.21"
 # 与锁定基线 AGP 8.7.3 不兼容（NoSuchMethodError），取 AGP8 兼容最高版 2.3.7
 ksp = "2.3.7"
 compose-bom = "2026.06.01"
+# ⚠️ M3 Expressive 临时 pin（技术债，决策与撤除条件见 docs/adr/0008-material3-alpha18-pin.md）
+# 为什么 pin alpha：Expressive 的组件（LoadingIndicator / Circular·LinearWavyProgressIndicator /
+#   SplitButtonLayout / ButtonGroup / Medium·LargeFlexibleTopAppBar）与公开的
+#   MotionScheme.standard()/expressive() 工厂全部只存在于 material3 1.5.0 线；
+#   1.4.0（BOM 当前 pin）里 MotionScheme 工厂在 Kotlin 层是 internal，拿不到。
+# 为什么是 alpha18 而不是更高：1.5.0-alpha19 起 AAR 元数据升到 minCompileSdk=37 + minAGP=9.1.0，
+#   与本项目锁定的 compileSdk 36 / AGP 8.7.3 硬冲突；alpha18 是「不改工具链还能装的最高版本」
+#   （minCompileSdk=35 / minAGP=8.6.0，实测通过）。
+# 为什么不改 compose-bom：BOM 覆盖 Compose 全家（ui/foundation/runtime/…），
+#   改 BOM 会把整条 Compose 线一起拖到 alpha，改动面与风险远大于只 pin 单个 artifact。
+#   显式版本的直接依赖在冲突解析里胜过 BOM 的 constraint（alpha18 > 1.4.0），故只动这一个 key。
+# 何时撤掉：material3 1.5.0 stable 发布且回归某个 compose-bom 后，删除本 version 与
+#   compose-material3 的 version.ref（回到纯 BOM 托管）；若届时已升 AGP 9 + compileSdk 37，
+#   也可直接跟到当时的 stable/BOM。撤除前必须重跑全门禁 + 重录截图基线。
+compose-material3 = "1.5.0-alpha18"
 hilt = "2.57.2"
 apollo = "5.0.1"
 retrofit = "3.0.0"
@@ -64,7 +79,7 @@ mockwebserver = "5.4.0"
 [libraries]
 # Compose BOM
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "compose-material3" }
 compose-ui = { group = "androidx.compose.ui", name = "ui" }
 compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }

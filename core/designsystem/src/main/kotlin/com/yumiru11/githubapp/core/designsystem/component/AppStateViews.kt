@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -81,7 +81,21 @@ fun AppErrorState(
 }
 
 /**
- * 加载态占位：居中圆形进度 + 可选标签。
+ * 加载态占位：居中形变加载指示 + 可选标签。
+ *
+ * 指示器用 M3 Expressive 的 [LoadingIndicator]（形变 `RoundedPolygon` 序列）而非旧
+ * [CircularProgressIndicator]：官方把前者定位为「should replace most uses of the
+ * indeterminate circular progress indicator」，整页首载正是该语义。颜色走
+ * `LoadingIndicatorDefaults.indicatorColor`（= `colorScheme.primary`，与旧指示器一致）
+ * —— 零硬编码颜色。
+ *
+ * ⚠️ alpha 期门控不稳定：material3 **1.5.0-alpha18 的 `LoadingIndicator` 恰好无
+ * `@ExperimentalMaterial3ExpressiveApi` 门控**（字节码实测该文件对该 marker 的引用数
+ * = 0），故此处不需要 `@OptIn`；但官方 release notes 有 "Revert MaterialShapes and
+ * LoadingIndicator promotions to stable"，**alpha19 起又变回门控**。升级 pin 时若编译
+ * 报 opt-in 相关错误，在此处加**局部** `@OptIn(ExperimentalMaterial3ExpressiveApi::class)`
+ * 并写理由，**不要**开全局 `-opt-in`（会让全仓失去门控保护）。详见
+ * `docs/adr/0008-material3-alpha18-pin.md`。
  */
 @Composable
 fun AppLoadingState(
@@ -93,7 +107,7 @@ fun AppLoadingState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        CircularProgressIndicator()
+        LoadingIndicator()
         if (label != null) {
             Text(
                 text = label,
@@ -154,11 +168,22 @@ private fun AppMessageState(
 /*
  * 整页/整分区加载态：把 AppLoadingState 垂直+水平居中后铺满给定区域。
  *
+<<<<<<< HEAD
+ * 为什么单独有这一个（2026-09-11）：feature:issue 与 feature:pullrequest 各自有一份
+ * IssueLoadingContent / PullRequestLoadingContent，实现逐字相同（居中 Box + 裸 Material
+ * 圆形指示器）—— 两处重复，且于是那 4 屏成了全应用仅存的「加载态与其余 20 多屏不一致」
+ * 的地方（其余屏都走 AppLoadingState）。
+ *
+ * 收敛到本文件而不是在各 feature 内改：本文件位于 core/designsystem/ 下，
+ * 是设计系统层里加载态的唯一事实来源；各 feature 只保留调用点。
+ *
+=======
  * 为什么单独有这一个（2026-09-11）：feature:issue / feature:pullrequest 各自有一份
  * IssueLoadingContent / PullRequestLoadingContent，实现逐字相同（居中 Box + 裸 Material
  * 圆形指示器）—— 两处重复，且于是那 4 屏成了全应用仅存的「加载态与其他屏不一致」的地方。
  *
  * 收敛到本文件（core/designsystem/）的理由：这里是加载态的唯一事实来源；各 feature 只留调用点。
+>>>>>>> origin/main
  * 用法：AppCenteredLoadingState(modifier = Modifier.fillMaxSize())
  */
 @Composable

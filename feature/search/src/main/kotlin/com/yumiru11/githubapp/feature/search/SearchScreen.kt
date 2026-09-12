@@ -28,8 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
@@ -84,7 +83,7 @@ internal const val SEARCH_PROGRESS_TAG = "search-progress"
  * - 限流（429）与网络错误：分页错误按 GitHubError 分类展示友好文案（验收第 5 条）
  * - 点击结果 → GitHubLinkParser 解析 html_url → 应用内路由（回调由宿主接线）
  * - **结果区动效（#167 / UI16）**：换关键词 / 切 Tab 走 M3 fade-through（[appFadeThroughTransform]，
- *   动画键 = 查询词 + 选中 Tab）；搜索中只在**顶部**显示细 [LinearProgressIndicator]，
+ *   动画键 = 查询词 + 选中 Tab）；搜索中只在**顶部**显示细 [LinearWavyProgressIndicator]，
  *   结果区保留上一份成功结果——不再整区闪 loading
  */
 @Composable
@@ -190,6 +189,14 @@ fun SearchScreen(
 /**
  * 顶部细进度条（#167 / UI16）：搜索中在结果区**顶部**显示不确定进度条，
  * 出现/消失的淡入淡出走 fade-through 出场时长令牌（折算为 0 即直接显隐）。
+ *
+ * **M3 Expressive wavy**：用 [LinearWavyProgressIndicator] 替代旧的
+ * `LinearProgressIndicator`。官方对 wavy 的取舍是「让较长过程不显得静止」，同时
+ * 明令「In very small buttons, use the flat shape since the wavy shape is not as
+ * visible at that size」。本处是**通栏**的搜索等待指示（宽度足够、wavy 波形清晰可见），
+ * 属于适配区间；按钮内 18dp 级别的 pending 指示则一律保持 flat
+ * （见 `MergeBox` / `RepoDetailScreen` 的按钮内 pending）。
+ * 颜色走默认主题色角色（primary / surfaceVariant 系），零硬编码颜色。
  */
 @Composable
 private fun SearchProgressBar(
@@ -204,7 +211,7 @@ private fun SearchProgressBar(
         enter = fadeIn(animationSpec = tween(fadeMillis, easing = AppMotion.EmphasizedDecelerate)),
         exit = fadeOut(animationSpec = tween(fadeMillis, easing = AppMotion.EmphasizedAccelerate)),
     ) {
-        LinearProgressIndicator(
+        LinearWavyProgressIndicator(
             modifier =
                 Modifier
                     .fillMaxWidth()
@@ -636,8 +643,9 @@ private fun CodeLoginGateContent(
 /**
  * 加载态：项目共享的 [AppLoadingState]（#84/#185 建立）+ 本地化文案。
  *
- * C3 修复：原先只有一个裸 `CircularProgressIndicator`，无文案、无说明，
- * 且与全 app 其他屏的加载态不一致（那些屏都走 AppLoadingState）。
+ * 该组件内部即 alpha18 的 M3 Expressive `LoadingIndicator`（形变加载），
+ * 故本屏不再直调 `LoadingIndicator` —— 复用共享组件同时拿到形变加载与统一文案，
+ * 也是「Issue/PR/Search 加载态一致」的收敛点（见 AppCenteredLoadingState）。
  */
 @Composable
 private fun LoadingContent(modifier: Modifier = Modifier) {

@@ -7,6 +7,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
+import com.yumiru11.githubapp.core.designsystem.token.AppMotionScheme
 import com.yumiru11.githubapp.core.designsystem.token.LocalMotionScale
 
 /**
@@ -36,6 +37,12 @@ import com.yumiru11.githubapp.core.designsystem.token.LocalMotionScale
  * pass `min(DataStore motionScale, system animator scale)` so every
  * [AppMotion.scaledDuration] consumer honours the system "remove animations"
  * setting. Default 1f = no scaling.
+ *
+ * The same scale also selects the M3 Expressive spring scheme
+ * ([AppMotionScheme.forMotionScale], ui-design §4.5): at scale 0 the theme
+ * degrades from expressive springs to zero-bounce standard springs, so
+ * "reduce motion" users never see the spatial overshoot even in components
+ * that animate through [MaterialTheme.motionScheme].
  *
  * Usage:
  * ```
@@ -100,6 +107,10 @@ fun AppTheme(
             // 视觉上等价于整屏 Crossfade 但不会重建导航/滚动状态。
             colorScheme = rememberAnimatedColorScheme(themeColors.colorScheme),
             shapes = AppShapes.from(cornerScale),
+            // M3 Expressive 弹簧物理（ui-design §4.5）：组件动效的 spec 来源。
+            // 缩放 ≤ 0 时退化为标准方案（零回弹）；注意 spring 无时长概念，
+            // 逐帧「落终态」仍需调用方自行判定缩放（见 AppMotionScheme KDoc）。
+            motionScheme = AppMotionScheme.forMotionScale(motionScale),
             typography = AppTypography.from(),
             content = content,
         )

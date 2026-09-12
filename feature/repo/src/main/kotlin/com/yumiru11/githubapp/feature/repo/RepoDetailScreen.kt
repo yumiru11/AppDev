@@ -57,6 +57,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -196,7 +197,8 @@ fun RepoDetailScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,
                     ) {
-                        CircularProgressIndicator()
+                        // 整页首载 → M3 Expressive 形变加载指示（ADR-0008：alpha18 无 opt-in 门控）
+                        LoadingIndicator()
                     }
                 }
 
@@ -1189,7 +1191,8 @@ private fun ReleasesList(
                 modifier = Modifier.fillMaxWidth().height(200.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator()
+                // 分区首载 → M3 Expressive 形变加载指示（ADR-0008）
+                LoadingIndicator()
             }
         }
 
@@ -1305,7 +1308,8 @@ private fun TagsList(
                 modifier = Modifier.fillMaxWidth().height(200.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator()
+                // 分区首载 → M3 Expressive 形变加载指示（ADR-0008）
+                LoadingIndicator()
             }
         }
 
@@ -1392,7 +1396,8 @@ private fun ReleaseDetailView(
                     modifier = Modifier.fillMaxWidth().height(200.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator()
+                    // 分区首载 → M3 Expressive 形变加载指示（ADR-0008）
+                    LoadingIndicator()
                 }
             }
 
@@ -1667,7 +1672,8 @@ private fun ReadmeSection(
                 modifier = Modifier.fillMaxWidth().height(200.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                CircularProgressIndicator()
+                // 分区首载 → M3 Expressive 形变加载指示（ADR-0008）
+                LoadingIndicator()
             }
         }
 

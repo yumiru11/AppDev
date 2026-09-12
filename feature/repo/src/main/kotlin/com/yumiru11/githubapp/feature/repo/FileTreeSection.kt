@@ -11,8 +11,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,7 +50,8 @@ fun FileTreeSection(
     when (treeState) {
         is TreeState.Loading -> {
             Box(modifier = modifier.fillMaxWidth().padding(vertical = 64.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+                // 分区首载 → M3 Expressive 形变加载指示（ADR-0008：alpha18 无 opt-in 门控）
+                LoadingIndicator()
             }
         }
 
