@@ -42,6 +42,7 @@ import com.mikepenz.markdown.model.markdownExtendedSpans
 import com.mikepenz.markdown.model.markdownPadding
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.yumiru11.githubapp.core.markdown.native.NativeMarkdownPreprocessor
+import com.yumiru11.githubapp.core.markdown.native.rememberMarkdownInlineSemantics
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import org.intellij.markdown.MarkdownElementTypes
 
@@ -68,6 +69,8 @@ fun EnhancedMarkdownViewer(
     val preparedMarkdown = remember(markdown) { NativeMarkdownPreprocessor.prepare(markdown) }
     val state = rememberMarkdownState(preparedMarkdown, immediate = true)
     val scheme = MaterialTheme.colorScheme
+    // 内联语义（@user 提及 / kbd / sub / sup）：经 Markdown(annotator) 下发给全部 MarkdownText
+    val inlineSemantics = rememberMarkdownInlineSemantics()
     val currentOnInternalLink by rememberUpdatedState(onInternalLink)
     val currentBaseRepoUrl by rememberUpdatedState(baseRepoUrl)
     val linkUriHandler =
@@ -117,6 +120,7 @@ fun EnhancedMarkdownViewer(
         CompositionLocalProvider(LocalUriHandler provides linkUriHandler) {
             Markdown(
                 state,
+                annotator = inlineSemantics,
                 padding =
                     markdownPadding(
                         block = 16.dp,

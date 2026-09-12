@@ -106,9 +106,9 @@ class MarkdownConsistencyReportTest {
         val text = reportFile.readText()
 
         assertEquals("服务端 HTML 覆盖数（报告写到 32/35）", 32, serverHtml)
-        assertEquals("离线 GFM 覆盖数（报告写到 29/35，2026-09-12 修复后）", 29, offline)
+        assertEquals("离线 GFM 覆盖数（报告写到 30/35，2026-09-12 @user 提及补齐后）", 30, offline)
         assertTrue("报告必须写出 32 / 35", text.contains("32 / 35"))
-        assertTrue("报告必须写出 29 / 35", text.contains("29 / 35"))
+        assertTrue("报告必须写出 30 / 35", text.contains("30 / 35"))
     }
 
     private fun parseFixtureTable(): List<ReportRow> {

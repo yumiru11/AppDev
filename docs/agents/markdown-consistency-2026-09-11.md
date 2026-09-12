@@ -71,7 +71,7 @@ App 侧要保证的是「不要把它弄坏」（清洗、相对 URL 改写、CS
 | `19-external-link` | 外部链接 | ✅ | ✅ | ✅ | 🟡 |
 | `20-autolink` | 自动链接（裸 URL） | ✅ | ✅ | ✅ | 🟡 |
 | `21-relative-link` | 相对链接（`./`、`../`、`/owner/repo`） | ✅ | ✅ | ✅ | 🟡 |
-| `22-mention-user` | 提及：`@user` | — | ✅ | — | ✅ |
+| `22-mention-user` | 提及：`@user` | — | ✅ | ✅ | ✅ |
 | `23-mention-org-team` | 提及：`@org/team` | — | ✅ | — | ✅ |
 | `24-issue-ref` | 引用：`#123`、`owner/repo#123`、`gh-123` | — | ✅ | — | ✅ |
 | `25-commit-sha-ref` | 提交引用（裸 sha） | — | ✅ | — | ✅ |
@@ -105,7 +105,7 @@ App 侧要保证的是「不要把它弄坏」（清洗、相对 URL 改写、CS
 | 🟡 有渲染 + 原生像素基线待录制（WebView 产物回归已就位） | **24** |
 | ❌ 无渲染路径 | **2** |
 | 服务端 HTML 通道覆盖 | 32 / 35 |
-| 离线 GFM 通道覆盖 | 29 / 35 |
+| 离线 GFM 通道覆盖 | 30 / 35 |
 | 原生通道覆盖 | 24 / 35 |
 
 严格口径（只认「基线已生效的像素回归」）：**0**——因为 24 条原生基线尚未录制，
@@ -113,17 +113,17 @@ App 侧要保证的是「不要把它弄坏」（清洗、相对 URL 改写、CS
 
 ## 3. 最严重的 3 个缺口
 
-### 缺口 1：离线 GFM 通道仍缺 6 条 §2.3 写法（2026-09-11 时点为 12 条）
+### 缺口 1：离线 GFM 通道仍缺 5 条 §2.3 写法（2026-09-11 时点为 12 条）
 
 离线 GFM（markdown-it 14.1.0 + renderer.js）是 **Issue/PR 正文的唯一通道**，也是 README
 服务端异常时的降级通道。产物级证据（`WebViewOfflineGfmCapabilityTest`）。
-2026-09-12 的修复波补上 5 条（相对链接、相对图片、emoji 短码、锚点跳转、脚注）；
+2026-09-12 的修复波补上 6 条（相对链接、相对图片、emoji 短码、锚点跳转、脚注、`@user` 提及）；
 相对链接/图片的改写移到 markdown-it 渲染产物层（`renderer.js` 的 `rewriteRelativeUrls`，
 Node 真实执行回归 `OfflineRendererExecutionTest`）。当前剩余缺口：
 
 | 缺失写法 | 产物证据 |
 |---|---|
-| `@user` / `@org/team` 提及 | markdown-it 无 mention 插件 |
+| `@org/team` 提及 | 用户提及已由 `mentionPlugin` 补齐；团队提及无应用内路由（GitHubLinkParser 归 External），整段保持纯文本 |
 | `#123` / `owner/repo#123` / `gh-123` 引用 | 正文裸引用不被 linkify（`GfmNativeParserCapabilityTest.issueReferenceFixture_hashSyntax_isNotAutolinked` 同样在原生侧证否） |
 | 裸 sha 提交引用 | 同上 |
 | KaTeX / Mermaid | `assets/webview/` 无对应运行时 |
