@@ -30,7 +30,6 @@ import com.yumiru11.githubapp.core.designsystem.token.LocalMotionScale
 import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.EditorContentHolder
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
-import com.yumiru11.githubapp.core.ui.screens.ProfileScreen
 
 /**
  * 应用导航宿主：入口 Composable，内部 Navigation Compose NavHost（#90 类型安全路由）。

@@ -11,6 +11,10 @@ interface UserRepository {
      *
      * GraphQL viewer 读优先，失败降级 REST GET /user；双通道均失败抛
      * [com.yumiru11.githubapp.core.githubdata.error.GitHubRequestException]。
+     *
+     * **保留声明（DEAD-1 核验）**：当前生产代码无调用方（Hilt 已装配 [DefaultUserRepository]，
+     * Viewer 资料消费面待接入）；`DefaultUserRepositoryTest` 对双通道有完整覆盖。
+     * 删除须连同接口/实现/DI 与测试整体评估，本次仅标注保留。
      */
     suspend fun getCurrentUser(): User
 }
