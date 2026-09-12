@@ -62,7 +62,7 @@ import com.yumiru11.githubapp.core.ui.RepoDetailActions
  *   保留本地（复制剪贴板）；删除冲突：重载（回查看器刷新）/ 重试删除 / 取消
  * - 删除确认对话框：commit message 必填
  *
- * @param editState 编辑状态（Idle 时本屏幕不应显示；由上层 [RepoDetailScreen] 控制可见性）
+ * @param editState 编辑状态（Idle 时本屏幕不应显示；由上层 [FileEditHost] 控制可见性，仓库详情与 BLOB 深链两处入口共用）
  * @param filePath 当前文件路径（新建文件为 null，标题显示「新建文件」）
  * @param baseRepoUrl 仓库主页 URL（Markdown 预览相对链接基址）
  * @param defaultRef 当前查看分支（提交对话框「当前分支」文案）
@@ -375,5 +375,43 @@ fun FileEditScreen(
                 }
             },
         )
+    }
+}
+
+/**
+ * 文件覆盖宿主（T22）：[editState] 非 [FileEditState.Idle] → 全屏 [FileEditScreen]；否则渲染 [content]。
+ *
+ * 为什么要共用：[RepoDetailScreen]（仓库详情文件 Tab）与 BLOB 深链路由（app 模块 `BlobRoute`）
+ * 是文件查看的两个入口，都必须消费 [RepoFilesUiState.editState]。此前 BlobRoute 只渲染查看器、
+ * 漏了编辑分支 —— ViewModel 已进入编辑态而界面仍停在查看器，「编辑」按钮点了没反应（深链编辑死路）。
+ * 把「editState → FileEditScreen」固化在唯一组件里，两处入口不再可能各自漂移。
+ *
+ * @param actions 编辑区内 Markdown 预览的链接动作（缺省跟随 [LocalRepoDetailActions]）
+ */
+@Composable
+fun FileEditHost(
+    editState: FileEditState,
+    filePath: String?,
+    baseRepoUrl: String,
+    defaultRef: String,
+    viewModel: RepoFilesViewModel,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    actions: RepoDetailActions = LocalRepoDetailActions.current,
+    content: @Composable () -> Unit,
+) {
+    if (editState !is FileEditState.Idle) {
+        FileEditScreen(
+            editState = editState,
+            filePath = filePath,
+            baseRepoUrl = baseRepoUrl,
+            defaultRef = defaultRef,
+            viewModel = viewModel,
+            actions = actions,
+            onClose = onClose,
+            modifier = modifier,
+        )
+    } else {
+        content()
     }
 }

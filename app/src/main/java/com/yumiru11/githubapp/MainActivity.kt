@@ -17,15 +17,20 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -73,6 +78,8 @@ import com.yumiru11.githubapp.feature.pullrequest.PullRequestListScreen
 import com.yumiru11.githubapp.feature.repo.BranchesScreen
 import com.yumiru11.githubapp.feature.repo.CommitDetailScreen
 import com.yumiru11.githubapp.feature.repo.CreateRepoScreen
+import com.yumiru11.githubapp.feature.repo.FileEditEventSnackbar
+import com.yumiru11.githubapp.feature.repo.FileEditHost
 import com.yumiru11.githubapp.feature.repo.FileViewerScreen
 import com.yumiru11.githubapp.feature.repo.ReleaseCreateScreen
 import com.yumiru11.githubapp.feature.repo.RepoDetailScreen
@@ -274,6 +281,8 @@ class MainActivity : ComponentActivity() {
                                         repo = repo,
                                         ref = ref,
                                         path = path,
+                                        // 登录态：游客只读（不渲染「编辑」），与 RepoDetailScreen 同口径
+                                        isLoggedIn = authState !is AuthState.Anonymous,
                                         navController = navController,
                                     )
                                 },
@@ -593,13 +602,19 @@ private fun SearchRoute(
 /**
  * BLOB 深链路由承载（T11 补接线）：把 owner/repo/ref/path 注入 [RepoFilesViewModel]
  * 并以全屏 FileViewer 呈现——此前该路由误挂占位组件致深链/树外链接显示「Coming soon」。
+ *
+ * T22 修复：本路由必须与 [RepoDetailScreen] 一样消费 `RepoFilesUiState.editState` ——
+ * 此前只渲染查看器，点「编辑」后 ViewModel 已进入编辑态而界面不切换（深链文件编辑死路，
+ * CI editor.png 探针 FAILED 的根因）。编辑态分支经 [FileEditHost] 与仓库详情共用；
+ * [FileEditEventSnackbar] 消费草稿恢复/提交事件（PR #234 草稿流程在此路径同样可用）。
  */
 @Composable
-private fun BlobRoute(
+internal fun BlobRoute(
     owner: String,
     repo: String,
     ref: String,
     path: String,
+    isLoggedIn: Boolean,
     navController: androidx.navigation.NavHostController,
     viewModel: RepoFilesViewModel =
         androidx.hilt.navigation.compose
@@ -607,27 +622,48 @@ private fun BlobRoute(
 ) {
     val fileState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(path) { viewModel.openDeepLinkFile(path) }
+    // 编辑事件必须在此消费：否则草稿恢复提示（含「丢弃草稿」动作）与提交结果事件永远无人接收
+    FileEditEventSnackbar(viewModel = viewModel, snackbarHostState = snackbarHostState)
 
-    FileViewerScreen(
-        fileState = fileState.fileState,
-        selectedPath = fileState.selectedPath ?: path,
-        ref = ref,
-        viewModel = viewModel,
-        actions =
-            RepoDetailActions(
-                onNavigateToParsedUrl = { parsed -> navigateToParsedUrl(navController, parsed) },
-                onOpenExternal = { url ->
-                    openExternalBrowser(context, url)
-                },
-                onEditMarkdown = null,
-            ),
-        baseRepoUrl = "https://github.com/$owner/$repo",
-        findState = fileState.findState,
-        isFindOpen = fileState.isFindOpen,
-        editable = true,
-        onClose = { navController.popBackStack() },
-        modifier = Modifier.fillMaxSize(),
-    )
+    val baseRepoUrl = "https://github.com/$owner/$repo"
+    val actions =
+        RepoDetailActions(
+            onNavigateToParsedUrl = { parsed -> navigateToParsedUrl(navController, parsed) },
+            onOpenExternal = { url -> openExternalBrowser(context, url) },
+            onEditMarkdown = null,
+        )
+    Box(modifier = Modifier.fillMaxSize()) {
+        FileEditHost(
+            editState = fileState.editState,
+            filePath = fileState.selectedPath,
+            baseRepoUrl = baseRepoUrl,
+            defaultRef = ref,
+            viewModel = viewModel,
+            onClose = { viewModel.dismissEdit() },
+            modifier = Modifier.fillMaxSize(),
+            actions = actions,
+        ) {
+            FileViewerScreen(
+                fileState = fileState.fileState,
+                selectedPath = fileState.selectedPath ?: path,
+                ref = ref,
+                viewModel = viewModel,
+                actions = actions,
+                baseRepoUrl = baseRepoUrl,
+                findState = fileState.findState,
+                isFindOpen = fileState.isFindOpen,
+                // 游客只读：与 RepoDetailScreen 一致，未登录不渲染「编辑」入口
+                editable = isLoggedIn,
+                onClose = { navController.popBackStack() },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding(),
+        )
+    }
 }
