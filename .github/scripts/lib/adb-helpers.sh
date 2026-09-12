@@ -262,11 +262,23 @@ assert_log_holds() {
   return 2
 }
 
-# Tab 选中态断言：Compose TabRow 的选中 Tab 带 selected="true"（Tab 文字自身
-# 一直可见，只看文字无法区分「README tab」与「README tab 被选中」）。
-# **必须与 selected 属性放在同一个 <node 里匹配**：分开 grep 会被「A 节点有文字、
-# B 节点有 selected」这种风马牛不相及的组合假通过（本 bug 的修复若只判文字，
-# readme-webview 依旧会在 Files tab 上拍）。
+# Tab 选中态断言：Compose TabRow 的选中 Tab 带 selected="true"，但**文本节点未必
+# 与 selected 属性同节点**。
+#
+# ⚠️ 首版实现要求「同一 <node> 里既有 text="X" 又有 selected="true"」——2026-09-11
+# 首次真跑 CI 实测：**17/32 帧全部判坏**，包括 repos/profile/pr-conversation 这些
+# 显然拍对了的帧。原因是 Compose 的语义树把 selected 挂在 Tab 容器节点、文本挂在子
+# 节点（或旁挂），同节点要求在该树上几乎永不成立 —— 判据过严会把「工具链假设」
+# 当成「UI 坏了」，比不检查更糟（假红会让人把门禁关掉）。
+#
+# 正确判据（三级，从强到弱，全部落在**同一棵子树**内）：
+#   1. 同一 node 既有 text="X" 又有 selected="true"            → 通过（最严格）
+#   2. 存在 selected="true" 的 node，其**子树内**有 text="X"    → 通过（Compose 实际形态）
+#   3. 存在 text="X" 的 node，其 bounds 落在某个 selected="true" node 的 bounds 内
+#                                                              → 通过（个别版本下标在祖先）
+# 用 minidom 走真树结构而不是正则 —— 正则做不到「子树内」这种判断，而
+# 「分开 grep text 与 selected」又会被风马牛不相及的组合假通过（本 bug 的修复若只判
+# 文字，Files tab 上也有「README」字样，等于没检查）。
 wait_for_selected() {
   local value="$1" timeout="${2:-12}"
   local deadline=$(( $(date +%s) + timeout ))
@@ -274,14 +286,85 @@ wait_for_selected() {
     if dump_ui 2>/dev/null; then
       if python3 -c "
 import re, sys
-xml = open('/tmp/ui.xml').read()
-pat = re.compile(r'<node[^>]*>')
-for m in pat.finditer(xml):
-    tag = m.group(0)
-    if 'text=\"$value\"' in tag and 'selected=\"true\"' in tag:
+import xml.dom.minidom as minidom
+value = '$value'
+
+# ⚠️ 必须从 documentElement 走：minidom 的 Document 节点在遍历时会**跳过属性**
+# （实测 getAttribute 恒返回空串），从 Document 出发会得到 0 个 selected 节点 →
+# 断言恒假红。这是 2026-09-11 首版实现的第二个 bug，由离线夹具实测抓出。
+
+def selected_nodes(n, acc):
+    if n.nodeType == n.ELEMENT_NODE:
+        if n.getAttribute('selected') == 'true':
+            acc.append(n)
+        for c in n.childNodes:
+            selected_nodes(c, acc)
+    return acc
+
+def texts(n, acc):
+    if n.nodeType == n.ELEMENT_NODE:
+        t = n.getAttribute('text')
+        if t:
+            acc.append(t)
+        for c in n.childNodes:
+            texts(c, acc)
+    return acc
+
+def bounds(n):
+    b = n.getAttribute('bounds')
+    if not b:
+        return None
+    try:
+        l, t = b.split('][')[0].lstrip('[').split(',')
+        r, bb = b.split('][')[1].rstrip(']').split(',')
+        return int(l), int(t), int(r), int(bb)
+    except Exception:
+        return None
+
+try:
+    doc = minidom.parse('/tmp/ui.xml')
+except Exception:
+    sys.exit(1)
+root = doc.documentElement
+sels = selected_nodes(root, [])
+
+# 判据 1：同一 node 既有该 text 又 selected=true（最严格，某些版本成立）
+for n in sels:
+    if value == n.getAttribute('text') or value in n.getAttribute('text'):
         sys.exit(0)
+
+# ⚠️ 判据 2（子树内出现该文本）**故意不用**：2026-09-11 用真实 CI dump
+# （readme-webview.ui.xml）实测发现 Compose TabRow 的**选中容器 View** 覆盖
+# 整个 Tab 行，子树里同时含 README/Files/Releases 三个标签 —— 子树判据会让
+# 「Files tab 选中时查 README」也通过，等于**把本 bug 又放回来**。
+
+# 判据 3：文本节点 bounds 落在某个 selected 节点 bounds 之内（个别版本下标在祖先）
+def text_nodes(n, acc):
+    if n.nodeType == n.ELEMENT_NODE:
+        t = n.getAttribute('text')
+        if t and (value == t or value in t):
+            acc.append(n)
+        for c in n.childNodes:
+            text_nodes(c, acc)
+    return acc
+
+for sn in sels:
+    sb = bounds(sn)
+    if not sb:
+        continue
+    sl, st, sr, sbb = sb
+    for tn in text_nodes(root, []):
+        tb = bounds(tn)
+        if not tb:
+            continue
+        tl, tt, tr, tbb = tb
+        if sl <= tl and tt >= st and tr <= sr and tbb <= sbb:
+            sys.exit(0)
+
 sys.exit(1)
-" 2>/dev/null; then
+" 2>/dev/null
+
+      then
         return 0
       fi
     fi
