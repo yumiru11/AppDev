@@ -3,6 +3,7 @@ package com.yumiru11.githubapp.core.githubauth.auth
 import android.app.PendingIntent
 import android.content.Context
 import android.net.Uri
+import com.yumiru11.githubapp.core.githubauth.session.SessionCacheCleaner
 import com.yumiru11.githubapp.core.githubauth.token.SessionData
 import com.yumiru11.githubapp.core.githubauth.token.TokenStorage
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,8 @@ class OAuthSessionManager
         private val tokenStorage: TokenStorage,
         private val tokenEndpointClient: TokenEndpointClient,
         private val config: OAuthConfig,
+        /** 登出时清空的会话级缓存（默认空，由各缓存模块 @IntoSet 注册）。 */
+        private val cacheCleaners: Set<@JvmSuppressWildcards SessionCacheCleaner> = emptySet(),
     ) {
         private val _authState: MutableStateFlow<AuthState> =
             MutableStateFlow(deriveAuthState(tokenStorage.loadSession()))
@@ -115,9 +118,14 @@ class OAuthSessionManager
             _authState.value = deriveAuthState(tokenStorage.loadSession())
         }
 
-        /** 登出：清空全部凭据并置 [AuthState.Anonymous]。对匿名态调用是幂等 no-op。 */
+        /**
+         * 登出：清空全部凭据 + 所有会话级缓存，并置 [AuthState.Anonymous]。对匿名态调用是幂等 no-op。
+         *
+         * 缓存清空失败不阻断登出（登录态必须可退出）：单个 cleaner 抛异常仅被吞掉，状态照常翻转。
+         */
         suspend fun signOut() {
             tokenStorage.clear()
+            cacheCleaners.forEach { cleaner -> runCatching { cleaner.clearSessionCache() } }
             _authState.value = AuthState.Anonymous
         }
     }

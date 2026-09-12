@@ -6,20 +6,23 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.yumiru11.githubapp.core.database.dao.CachedReadmeDao
 import com.yumiru11.githubapp.core.database.dao.CachedRepositoryDao
+import com.yumiru11.githubapp.core.database.dao.EtagCacheDao
 import com.yumiru11.githubapp.core.database.dao.IssueDao
 import com.yumiru11.githubapp.core.database.dao.SearchHistoryDao
 import com.yumiru11.githubapp.core.database.entity.CachedReadmeEntity
 import com.yumiru11.githubapp.core.database.entity.CachedRepositoryEntity
+import com.yumiru11.githubapp.core.database.entity.EtagCacheEntity
 import com.yumiru11.githubapp.core.database.entity.IssueEntity
 import com.yumiru11.githubapp.core.database.entity.SearchHistoryEntity
 
 /**
- * 应用本地数据库 v4。
+ * 应用本地数据库 v5。
  *
  * v1：仓库响应缓存（ETag 304）
  * v2：+ cached_readme 表（README 双 key 缓存：contentHash + themeVersion）
  * v3：+ search_history 表（T18 搜索历史：query 主键 + 时间戳）
  * v4：+ cached_issues 表（issue #165 / L07 Issue 列表 RemoteMediator 分页缓存）
+ * v5：+ etag_cache 表（DATA-1：按账号作用域持久化 ETag + 响应体，跨进程复用 304 缓存）
  */
 @Database(
     entities = [
@@ -27,8 +30,9 @@ import com.yumiru11.githubapp.core.database.entity.SearchHistoryEntity
         CachedReadmeEntity::class,
         SearchHistoryEntity::class,
         IssueEntity::class,
+        EtagCacheEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -39,6 +43,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun searchHistoryDao(): SearchHistoryDao
 
     abstract fun issueDao(): IssueDao
+
+    abstract fun etagCacheDao(): EtagCacheDao
 
     companion object {
         /**
@@ -120,6 +126,43 @@ abstract class AppDatabase : RoomDatabase() {
                     db.execSQL(
                         "CREATE INDEX IF NOT EXISTS `index_cached_issues_owner_repo_filter_page_position` " +
                             "ON `cached_issues` (`owner`, `repo`, `filter`, `page`, `position`)",
+                    )
+                }
+            }
+
+        /**
+         * v4 → v5：新增 etag_cache 表（DATA-1 持久化 ETag 缓存，按账号作用域）。
+         *
+         * 纯新增表：既有四张表数据原样保留。列/主键/索引必须与 EtagCacheEntity 的 Room 导出
+         * schema（schemas/5.json）逐字段一致，否则 MigrationTestHelper.runMigrationsAndValidate
+         * 直接失败。
+         */
+        val MIGRATION_4_5: Migration =
+            object : Migration(4, 5) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE IF NOT EXISTS `etag_cache` (
+                            `scope` TEXT NOT NULL,
+                            `method` TEXT NOT NULL,
+                            `url` TEXT NOT NULL,
+                            `etag` TEXT NOT NULL,
+                            `contentType` TEXT,
+                            `body` TEXT NOT NULL,
+                            `bodyBytes` INTEGER NOT NULL,
+                            `storedAt` INTEGER NOT NULL,
+                            `lastAccessedAt` INTEGER NOT NULL,
+                            PRIMARY KEY(`scope`, `method`, `url`)
+                        )
+                        """.trimIndent(),
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_etag_cache_lastAccessedAt` " +
+                            "ON `etag_cache` (`lastAccessedAt`)",
+                    )
+                    db.execSQL(
+                        "CREATE INDEX IF NOT EXISTS `index_etag_cache_storedAt` " +
+                            "ON `etag_cache` (`storedAt`)",
                     )
                 }
             }

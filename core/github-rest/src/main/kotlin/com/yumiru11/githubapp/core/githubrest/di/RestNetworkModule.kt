@@ -15,8 +15,8 @@ import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.api.SearchApi
 import com.yumiru11.githubapp.core.githubrest.api.UserApi
 import com.yumiru11.githubapp.core.githubrest.auth.TokenProvider
+import com.yumiru11.githubapp.core.githubrest.http.EtagScopeProvider
 import com.yumiru11.githubapp.core.githubrest.http.EtagStore
-import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -33,14 +33,14 @@ import javax.inject.Singleton
  * [TokenProvider] 由 app 装配层提供（SessionTokenProvider，读 TokenStorage；
  * core:github-rest 不依赖 core:github-auth，P0-7 修复：原实现绑死 GuestTokenProvider
  * 导致 PAT/登录令牌永不注入请求，2026-08-14 真机走查）。
+ *
+ * [EtagStore] 与 [EtagScopeProvider] 均**不在本模块绑定**：跨进程持久化实现位于
+ * `core:github-data`（`RoomEtagStore`，残余审计 DATA-1），作用域按凭据派生；网络层只持有
+ * 抽象（plan.md §10.2「core:github-* 只依赖网络与模型」）。
  */
 @Module
 @InstallIn(SingletonComponent::class)
 object RestNetworkModule {
-    @Provides
-    @Singleton
-    fun provideEtagStore(): EtagStore = InMemoryEtagStore()
-
     @Provides
     @Singleton
     fun provideJson(): Json = GitHubRestClient.createJson()
@@ -51,11 +51,13 @@ object RestNetworkModule {
     fun provideGitHubOkHttpClient(
         tokenProvider: TokenProvider,
         etagStore: EtagStore,
+        scopeProvider: EtagScopeProvider,
     ): OkHttpClient =
         GitHubRestClient.createOkHttpClient(
             tokenProvider = tokenProvider,
             etagStore = etagStore,
             debugLogging = BuildConfig.DEBUG,
+            scopeProvider = scopeProvider,
         )
 
     @Provides

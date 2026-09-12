@@ -25,6 +25,7 @@ class EtagCacheInterceptorTest {
     private lateinit var store: InMemoryEtagStore
     private lateinit var rateLimitStore: InMemoryRateLimitStore
     private lateinit var client: OkHttpClient
+    private val scopeProvider = EtagScopeProvider { TEST_SCOPE }
 
     @Before
     fun setUp() {
@@ -35,7 +36,7 @@ class EtagCacheInterceptorTest {
         client =
             OkHttpClient
                 .Builder()
-                .addInterceptor(EtagCacheInterceptor(store, rateLimitStore))
+                .addInterceptor(EtagCacheInterceptor(store, rateLimitStore, scopeProvider))
                 .build()
     }
 
@@ -59,7 +60,7 @@ class EtagCacheInterceptorTest {
 
         get("/repos/octocat/Hello-World").close()
 
-        val entry = store.get(server.url("/repos/octocat/Hello-World").toString())
+        val entry = store.get(TEST_SCOPE, "GET", server.url("/repos/octocat/Hello-World").toString())
         assertEquals(""""abc123"""", entry?.etag)
         assertEquals("""{"name":"Hello-World"}""", entry?.body)
     }
@@ -109,7 +110,7 @@ class EtagCacheInterceptorTest {
 
         get("/user").close()
 
-        assertNull(store.get(server.url("/user").toString()))
+        assertNull(store.get(TEST_SCOPE, "GET", server.url("/user").toString()))
     }
 
     @Test
@@ -127,7 +128,7 @@ class EtagCacheInterceptorTest {
             .close()
 
         assertNull(server.takeRequest().headers["If-None-Match"])
-        assertNull(store.get(server.url("/markdown").toString()))
+        assertNull(store.get(TEST_SCOPE, "GET", server.url("/markdown").toString()))
     }
 
     @Test
@@ -215,5 +216,61 @@ class EtagCacheInterceptorTest {
         val response = get("/repos/octocat/Hello-World")
 
         assertEquals(304, response.code)
+    }
+
+    @Test
+    fun intercept_responseWithNoStore_isNotCached() {
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .body("""{"private":true}""")
+                .addHeader("ETag", """"priv1"""")
+                .addHeader("Cache-Control", "private, no-store")
+                .build(),
+        )
+
+        get("/user").close()
+
+        assertNull(store.get(TEST_SCOPE, "GET", server.url("/user").toString()))
+    }
+
+    @Test
+    fun intercept_differentScope_doesNotSendIfNoneMatchNorShareEntry() {
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .body("""{"secret":"account-a"}""")
+                .addHeader("ETag", """"a1"""")
+                .build(),
+        )
+        server.enqueue(
+            MockResponse
+                .Builder()
+                .body("""{"secret":"account-b"}""")
+                .addHeader("ETag", """"b1"""")
+                .build(),
+        )
+
+        get("/user").close()
+
+        val accountBClient =
+            OkHttpClient
+                .Builder()
+                .addInterceptor(EtagCacheInterceptor(store, rateLimitStore, EtagScopeProvider { "account-b" }))
+                .build()
+        accountBClient
+            .newCall(Request.Builder().url(server.url("/user")).build())
+            .execute()
+            .close()
+
+        server.takeRequest()
+        val bRequest = server.takeRequest()
+        assertNull("B 不得复用 A 的 ETag", bRequest.headers["If-None-Match"])
+        assertEquals(""""a1"""", store.get(TEST_SCOPE, "GET", server.url("/user").toString())?.etag)
+        assertEquals(""""b1"""", store.get("account-b", "GET", server.url("/user").toString())?.etag)
+    }
+
+    private companion object {
+        const val TEST_SCOPE = "account-a"
     }
 }

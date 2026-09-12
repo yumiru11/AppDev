@@ -1,5 +1,6 @@
 package com.yumiru11.githubapp.core.githubauth.auth
 
+import com.yumiru11.githubapp.core.githubauth.session.SessionCacheCleaner
 import com.yumiru11.githubapp.core.githubauth.token.EncryptedTokenStorage
 import com.yumiru11.githubapp.core.githubauth.token.TokenStorage
 import dagger.Binds
@@ -7,6 +8,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.Multibinds
 import okhttp3.OkHttpClient
 import javax.inject.Qualifier
 import javax.inject.Singleton
@@ -30,6 +32,13 @@ abstract class AuthModule {
     @Binds
     @Singleton
     abstract fun bindTokenEndpointClient(impl: OkHttpTokenEndpointClient): TokenEndpointClient
+
+    /**
+     * 空集兜底：无任何缓存实现注册时，[OAuthSessionManager] 仍可注入 `Set<SessionCacheCleaner>`。
+     * 具体实现由各自模块以 `@IntoSet` 追加（如 core:github-data 的 RoomEtagStore）。
+     */
+    @Multibinds
+    abstract fun sessionCacheCleaners(): Set<SessionCacheCleaner>
 }
 
 /**
