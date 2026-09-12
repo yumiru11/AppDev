@@ -23,10 +23,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,13 +43,14 @@ import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThread
 @Composable
 internal fun LineCommentSheet(
     target: LineCommentTarget,
+    text: String,
+    onTextChange: (String) -> Unit,
     canResolve: Boolean,
     onDismiss: () -> Unit,
     onSubmit: (LineCommentAnchor, String, Long?) -> Unit,
     onToggleResolve: (ReviewThread) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var commentText by remember { mutableStateOf("") }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -102,8 +99,8 @@ internal fun LineCommentSheet(
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedTextField(
-                    value = commentText,
-                    onValueChange = { commentText = it },
+                    value = text,
+                    onValueChange = onTextChange,
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -132,8 +129,8 @@ internal fun LineCommentSheet(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
-                        onClick = { onSubmit(target.anchor, commentText, target.comments.firstOrNull()?.id) },
-                        enabled = commentText.isNotBlank(),
+                        onClick = { onSubmit(target.anchor, text, target.comments.firstOrNull()?.id) },
+                        enabled = text.isNotBlank(),
                     ) {
                         Text(text = stringResource(R.string.submit))
                     }

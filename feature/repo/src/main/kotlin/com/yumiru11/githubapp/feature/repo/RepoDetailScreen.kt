@@ -64,6 +64,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -436,6 +437,17 @@ private fun FileEditEventSnackbar(
                 is FileEditEvent.KeepLocal -> {
                     copyToClipboard(context, event.text, CLIP_LABEL_FILE_EDIT)
                     snackbarHostState.showSnackbar(context.getString(R.string.repo_file_snackbar_keep_local))
+                }
+
+                is FileEditEvent.DraftRestored -> {
+                    val result =
+                        snackbarHostState.showSnackbar(
+                            message = context.getString(R.string.repo_file_snackbar_draft_restored),
+                            actionLabel = context.getString(R.string.repo_file_snackbar_draft_discard),
+                        )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        viewModel.discardRestoredDraft()
+                    }
                 }
 
                 is FileEditEvent.Failed -> {

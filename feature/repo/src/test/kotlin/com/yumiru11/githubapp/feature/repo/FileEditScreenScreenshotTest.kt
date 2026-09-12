@@ -25,6 +25,7 @@ class FileEditScreenScreenshotTest : ScreenshotTest() {
         RepoFilesViewModel(
             SavedStateHandle(mapOf("owner" to "octocat", "repo" to "Hello-World")),
             mockk<RepoRepository>(relaxed = true),
+            drafts = mockk(relaxed = true),
         )
 
     @Test

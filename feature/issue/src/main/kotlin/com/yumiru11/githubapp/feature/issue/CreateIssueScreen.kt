@@ -61,8 +61,8 @@ fun CreateIssueScreen(
     viewModel: CreateIssueViewModel = hiltViewModel(),
 ) {
     var title by remember { mutableStateOf("") }
-    var body by remember { mutableStateOf("") }
     var selectedLabels by remember { mutableStateOf(emptySet<String>()) }
+    val body by viewModel.bodyDraft.text.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val availableLabels by viewModel.availableLabels.collectAsStateWithLifecycle()
 
@@ -114,7 +114,7 @@ fun CreateIssueScreen(
             )
             OutlinedTextField(
                 value = body,
-                onValueChange = { body = it },
+                onValueChange = viewModel.bodyDraft::onChanged,
                 label = { Text(text = stringResource(R.string.issue_create_body_label)) },
                 minLines = 6,
                 modifier = Modifier.fillMaxWidth(),

@@ -10,6 +10,9 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
+import com.yumiru11.githubapp.core.datastore.draft.DraftKey
+import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
 import com.yumiru11.githubapp.core.editor.FileFindState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -36,6 +39,10 @@ import javax.inject.Inject
  *   [FileEditEvent.Failed]）→ 409 冲突转 [FileEditState.Conflict]，
  *   三选项（[reloadAfterConflict]/[overwriteAfterConflict]/[keepLocalAfterConflict]）绝不静默覆盖；
  *   [deleteFile] 删除（确认由 UI 弹窗）；提交/删除成功后清缓存并重载目标分支树（AC4 缓存失效）。
+ * - **编辑草稿持久化**（需求审计 2026-09-11 §10 P2；plan.md:955「文件编辑冲突 → 本地草稿保留」）：
+ *   编辑中的文本经 [DraftAutoSaver] 防抖落盘（键 = owner/repo/ref/path），重新进入同一文件时恢复
+ *   并上抛 [FileEditEvent.DraftRestored]（UI 提示 + 「丢弃草稿」）；提交/删除成功、409「重载」、
+ *   文本回到基线、用户主动丢弃都会清草稿；[dismissEdit] 退出时**立即落盘**（进程被杀不再丢工作）。
  *
  * 错误一律映射为 [RepoErrorType]（UI 层 stringResource 本地化，ViewModel 不产英文文案）。
  * 编辑流程事件（Snackbar/剪贴板）经 [editEvents] 上抛，UI 层消费。
@@ -46,6 +53,7 @@ class RepoFilesViewModel
     constructor(
         savedStateHandle: SavedStateHandle,
         private val repoRepository: RepoRepository,
+        private val drafts: DraftAutoSaver,
     ) : ViewModel() {
         private val owner: String = checkNotNull(savedStateHandle["owner"])
         private val repo: String = checkNotNull(savedStateHandle["repo"])
@@ -62,6 +70,20 @@ class RepoFilesViewModel
 
         /** 已加载的根树分支（同 ref 免重复拉取；Tab 切换重建组合不触发网络） */
         private var loadedRef: String? = null
+
+        /**
+         * 当前编辑会话的草稿上下文（进入编辑态时确定，离开编辑/提交成功后清空）。
+         *
+         * @param key 草稿键（文件 = owner/repo/ref/path；新建文件 = owner/repo/ref）
+         * @param baseText 进入编辑时的远端基线文本 —— 「丢弃草稿」把编辑区恢复成它，
+         *   也是"无未提交内容"的判据（编辑区回到基线 → 清草稿而不是存一份和远端一样的草稿）
+         */
+        private data class EditDraft(
+            val key: DraftKey,
+            val baseText: String,
+        )
+
+        private var editDraft: EditDraft? = null
 
         fun loadRootTree(ref: String) {
             if (loadedRef == ref && _uiState.value.treeState is TreeState.Loaded) return
@@ -299,21 +321,29 @@ class RepoFilesViewModel
         fun startEdit() {
             val data = (_uiState.value.fileState as? FileViewState.Loaded)?.data ?: return
             if (data.kind != FileKind.CODE && data.kind != FileKind.MARKDOWN) return
+            val base = data.text.orEmpty()
+            val draftKey = draftTargetKey(path = _uiState.value.selectedPath)
+            editDraft = EditDraft(draftKey, baseText = base)
+            // 同步先进入编辑态（远端内容立即可编辑），草稿恢复在后台读盘完成后回填 ——
+            // 不让一次磁盘读阻塞「点编辑」的响应
             _uiState.update {
                 it.copy(
                     editState =
                         FileEditState.Editing(
                             isNew = false,
-                            text = data.text.orEmpty(),
+                            text = base,
                             sha = data.sha,
                             isMarkdown = data.kind == FileKind.MARKDOWN,
                         ),
                 )
             }
+            restoreDraft(draftKey = draftKey, baseText = base)
         }
 
         /** 新建文件模式（文件 Tab「新建文件」按钮；路径由提交对话框输入）。 */
         fun startNewFile() {
+            val draftKey = draftTargetKey(path = null)
+            editDraft = EditDraft(draftKey, baseText = "")
             _uiState.update {
                 it.copy(
                     selectedPath = null,
@@ -321,17 +351,86 @@ class RepoFilesViewModel
                     editState = FileEditState.Editing(isNew = true, text = "", sha = null, isMarkdown = false),
                 )
             }
+            restoreDraft(draftKey = draftKey, baseText = "")
         }
 
         /** 编辑器文本变更同步（编辑器是文本唯一事实源；提交/预览用 [FileEditState.Editing.text]）。 */
         fun onEditorTextChanged(text: String) {
             val current = _uiState.value.editState as? FileEditState.Editing ?: return
             _uiState.update { it.copy(editState = current.copy(text = text)) }
+            val draft = editDraft ?: return
+            if (text == draft.baseText) {
+                // 回到基线（撤销到底/清空）＝ 没有未提交内容：清草稿，既避免"空草稿"，
+                // 也避免下次进来弹一个内容与远端一模一样的恢复提示
+                drafts.discard(draft.key)
+                return
+            }
+            drafts.scheduleSave(draft.key, text)
         }
 
-        /** 关闭编辑（返回查看器/树）。编辑内容不保留（保留走 409「保留本地」剪贴板路径）。 */
+        /**
+         * 关闭编辑（返回查看器/树）。
+         *
+         * 编辑内容**立即落盘为草稿**（需求审计 §10 P2：进程被杀不再丢工作）——
+         * 再次进入同一文件会恢复并提示，用户要"真丢弃"走 [discardRestoredDraft] 或 409 三选项。
+         */
         fun dismissEdit() {
+            editDraft?.let { draft ->
+                (_uiState.value.editState as? FileEditState.Editing)?.let { drafts.saveNow(draft.key, it.text) }
+            }
+            editDraft = null
             _uiState.update { it.copy(editState = FileEditState.Idle) }
+        }
+
+        /**
+         * 「丢弃草稿」（恢复提示的 Snackbar 动作）：删除已存草稿并把编辑区恢复为进入编辑时的远端基线文本。
+         *
+         * 恢复到基线而不是"保留当前文本"：否则紧接着的防抖保存会把刚丢弃的内容又写回去
+         * （且文本等于基线时 [onEditorTextChanged] 的判定也会再清一次，语义自洽）。
+         */
+        fun discardRestoredDraft() {
+            val draft = editDraft ?: return
+            drafts.discard(draft.key)
+            val current = _uiState.value.editState as? FileEditState.Editing ?: return
+            _uiState.update { it.copy(editState = current.copy(text = draft.baseText)) }
+        }
+
+        /** 当前编辑目标的草稿键（路径未知 = 新建文件模式 → 按仓库 + 分支一个草稿槽）。 */
+        private fun draftTargetKey(path: String?): DraftKey {
+            val ref = loadedRef ?: refArg
+            return if (path.isNullOrBlank()) {
+                DraftTargets.newFile(owner, repo, ref)
+            } else {
+                DraftTargets.fileEdit(owner, repo, ref, path)
+            }
+        }
+
+        /**
+         * 草稿恢复（读盘在后台，完成后回填编辑区）。
+         *
+         * 三重守卫，缺一不可：
+         * 1. 读不到草稿 / 读失败 → 什么都不做（[DraftAutoSaver.load] 已把 IO 失败降级为 null）；
+         * 2. 草稿与远端基线**相同** → 不做"假恢复"（也不弹提示）；
+         * 3. 用户已经开始输入（编辑区文本 != 基线）→ **绝不覆盖**用户正在写的内容（读盘是异步的）。
+         */
+        private fun restoreDraft(
+            draftKey: DraftKey,
+            baseText: String,
+        ) {
+            viewModelScope.launch {
+                val draft = drafts.load(draftKey) ?: return@launch
+                if (draft == baseText) return@launch
+                val current = _uiState.value.editState as? FileEditState.Editing ?: return@launch
+                if (current.text != baseText) return@launch
+                _uiState.update { it.copy(editState = current.copy(text = draft)) }
+                _editEvents.trySend(FileEditEvent.DraftRestored)
+            }
+        }
+
+        /** 清草稿并结束草稿会话（提交/删除成功、409「重载」、离开编辑态）。 */
+        private fun discardEditDraft() {
+            editDraft?.let { drafts.discard(it.key) }
+            editDraft = null
         }
 
         /**
@@ -461,6 +560,8 @@ class RepoFilesViewModel
             val conflict = _uiState.value.editState as? FileEditState.Conflict ?: return
             val path = _uiState.value.selectedPath ?: return
             if (conflict.operation == ConflictOperation.DELETE) {
+                // 远端已删：本地文本无处可提交，草稿一并作废（否则下次进入恢复出一份永远提交不了的文本）
+                discardEditDraft()
                 _uiState.update { it.copy(editState = FileEditState.Idle) }
                 refreshViewerContent(path)
                 return
@@ -468,13 +569,18 @@ class RepoFilesViewModel
             viewModelScope.launch {
                 repoRepository.getFileContent(owner, repo, path, conflict.branch ?: loadedRef).fold(
                     onSuccess = { data ->
+                        val reloaded = data.text.orEmpty()
+                        // 409「重载」＝用户显式选择远端版本：旧草稿作废（不删的话下次进入会把被放弃的
+                        // 本地文本又恢复出来），并把重载文本设为新基线 —— 会话继续，后续输入仍有草稿保护
+                        editDraft?.let { drafts.discard(it.key) }
+                        editDraft = editDraft?.copy(baseText = reloaded)
                         _uiState.update {
                             it.copy(
                                 fileState = FileViewState.Loaded(data),
                                 editState =
                                     FileEditState.Editing(
                                         isNew = false,
-                                        text = data.text.orEmpty(),
+                                        text = reloaded,
                                         sha = data.sha,
                                         isMarkdown = data.kind == FileKind.MARKDOWN,
                                     ),
@@ -561,8 +667,10 @@ class RepoFilesViewModel
             _uiState.update { it.copy(editState = FileEditState.Idle) }
         }
 
-        /** 提交/删除成功后的收尾：清查看器与编辑态 + 失效树缓存并按目标分支重载（AC4 缓存失效）。 */
+        /** 提交/删除成功后的收尾：清草稿 + 清查看器与编辑态 + 失效树缓存并按目标分支重载（AC4 缓存失效）。 */
         private fun finishEditAndRefresh(targetRef: String?) {
+            // 内容已落到远端：草稿使命结束（保留会让下次进入恢复出与远端相同的文本）
+            discardEditDraft()
             val ref = targetRef ?: loadedRef
             _uiState.update {
                 it.copy(
@@ -649,6 +757,14 @@ sealed interface FileEditEvent {
     data class KeepLocal(
         val text: String,
     ) : FileEditEvent
+
+    /**
+     * 进入编辑态时恢复了一份本地草稿（编辑区已被回填）。
+     *
+     * UI 消费 = Snackbar 提示 + 「丢弃草稿」动作（[RepoFilesViewModel.discardRestoredDraft]）；
+     * 用户无动作时草稿保留（继续编辑会自动续存）。
+     */
+    data object DraftRestored : FileEditEvent
 
     /** 写操作失败（错误类型驱动本地化文案）。 */
     data class Failed(

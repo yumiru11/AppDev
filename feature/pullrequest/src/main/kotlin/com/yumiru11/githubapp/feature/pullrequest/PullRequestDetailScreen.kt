@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.datastore.draft.DraftText
 import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
@@ -120,6 +121,8 @@ fun PullRequestDetailScreen(
     viewModel: PullRequestDetailViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val commentDraftText by viewModel.commentDraft.text.collectAsStateWithLifecycle()
+    val reviewDraftText by viewModel.reviewDraft.text.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -241,7 +244,10 @@ fun PullRequestDetailScreen(
                                     canCloseReopenPr = successState?.canCloseReopenPr == true,
                                     isClosed = successState?.pullRequest?.state == PullRequestState.CLOSED,
                                     pending = successState?.pendingAction != null,
-                                    onEditPr = { showEditPrDialog = true },
+                                    onEditPr = {
+                                        viewModel.openEditPr(successState?.pullRequest?.body.orEmpty())
+                                        showEditPrDialog = true
+                                    },
                                     onClosePr = { showCloseConfirm = true },
                                     onReopenPr = viewModel::reopenPullRequest,
                                 ),
@@ -292,7 +298,10 @@ fun PullRequestDetailScreen(
                         pullRequest = state.pullRequest,
                         timeline = state.timeline,
                         canEditComment = state::canEditComment,
-                        onEditComment = { editingComment = it },
+                        onEditComment = {
+                            viewModel.openEditComment(it.id, it.body.orEmpty())
+                            editingComment = it
+                        },
                         onDeleteComment = { deletingComment = it },
                         commits = state.commits,
                         files = state.files,
@@ -334,15 +343,21 @@ fun PullRequestDetailScreen(
 
             // 评论输入 BottomSheet
             // 编辑会话评论（#166）：标题 + 正文，保存走乐观更新
+            val editCommentDraft = viewModel.editCommentDraft.collectAsStateWithLifecycle().value
             editingComment?.let { comment ->
-                EditCommentDialog(
-                    initialBody = comment.body.orEmpty(),
-                    onDismiss = { editingComment = null },
-                    onSave = { body ->
-                        editingComment = null
-                        viewModel.updateComment(comment.id, body)
-                    },
-                )
+                if (editCommentDraft != null) {
+                    EditCommentDialog(
+                        draft = editCommentDraft,
+                        onDismiss = {
+                            viewModel.closeEditComment()
+                            editingComment = null
+                        },
+                        onSave = { body ->
+                            editingComment = null
+                            viewModel.updateComment(comment.id, body)
+                        },
+                    )
+                }
             }
 
             // 删除会话评论确认（#166）
@@ -371,7 +386,12 @@ fun PullRequestDetailScreen(
 
             if (showCommentSheet) {
                 CommentBottomSheet(
-                    onDismiss = { showCommentSheet = false },
+                    text = commentDraftText,
+                    onTextChange = viewModel.commentDraft::onChanged,
+                    onDismiss = {
+                        viewModel.commentDraft.saveNow()
+                        showCommentSheet = false
+                    },
                     // 发布失败时**不关闭** Sheet：已输入的内容不能丢（失败提示由事件通道给出）
                     onSubmit = viewModel::submitComment,
                     sheetState = sheetState,
@@ -380,21 +400,31 @@ fun PullRequestDetailScreen(
 
             // 行评论 BottomSheet（T16：新增/回复 + 会话解析）
             val lineCommentTarget by viewModel.lineCommentTarget.collectAsStateWithLifecycle()
+            val lineCommentDraft = viewModel.lineCommentDraft.collectAsStateWithLifecycle().value
             lineCommentTarget?.let { target ->
-                LineCommentSheet(
-                    target = target,
-                    canResolve = (uiState as? PullRequestDetailUiState.Success)?.canResolveThreads ?: false,
-                    onDismiss = { viewModel.dismissLineComment() },
-                    onSubmit = { anchor, body, inReplyToId -> viewModel.submitLineComment(anchor, body, inReplyToId) },
-                    onToggleResolve = { thread -> viewModel.toggleThreadResolved(thread) },
-                )
+                if (lineCommentDraft != null) {
+                    LineCommentSheet(
+                        target = target,
+                        text = lineCommentDraft.text.collectAsStateWithLifecycle().value,
+                        onTextChange = lineCommentDraft::onChanged,
+                        canResolve = (uiState as? PullRequestDetailUiState.Success)?.canResolveThreads ?: false,
+                        onDismiss = { viewModel.dismissLineComment() },
+                        onSubmit = { anchor, body, inReplyToId -> viewModel.submitLineComment(anchor, body, inReplyToId) },
+                        onToggleResolve = { thread -> viewModel.toggleThreadResolved(thread) },
+                    )
+                }
             }
 
             // #163 L03：编辑 PR（标题 + 正文）
-            if (showEditPrDialog && successState?.canEditPr == true) {
+            val editPrDraft = viewModel.editPrDraft.collectAsStateWithLifecycle().value
+            if (showEditPrDialog && successState?.canEditPr == true && editPrDraft != null) {
                 EditPullRequestDialog(
                     pullRequest = successState.pullRequest,
-                    onDismiss = { showEditPrDialog = false },
+                    draft = editPrDraft,
+                    onDismiss = {
+                        viewModel.closeEditPr()
+                        showEditPrDialog = false
+                    },
                     onSubmit = { title, body ->
                         showEditPrDialog = false
                         viewModel.editPullRequest(title, body)
@@ -431,7 +461,12 @@ fun PullRequestDetailScreen(
                 val canApprove = (uiState as? PullRequestDetailUiState.Success)?.canApprove ?: false
                 ReviewSheet(
                     canApprove = canApprove,
-                    onDismiss = { showReviewSheet = false },
+                    body = reviewDraftText,
+                    onBodyChange = viewModel.reviewDraft::onChanged,
+                    onDismiss = {
+                        viewModel.reviewDraft.saveNow()
+                        showReviewSheet = false
+                    },
                     onSubmit = { conclusion, body ->
                         viewModel.submitReview(conclusion, body)
                         showReviewSheet = false
@@ -541,11 +576,12 @@ private fun PullRequestMoreMenu(
 @Composable
 private fun EditPullRequestDialog(
     pullRequest: PullRequest,
+    draft: DraftText,
     onDismiss: () -> Unit,
     onSubmit: (String, String) -> Unit,
 ) {
     var title by remember { mutableStateOf(pullRequest.title) }
-    var body by remember { mutableStateOf(pullRequest.body.orEmpty()) }
+    val body by draft.text.collectAsStateWithLifecycle()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.pull_request_edit_title)) },
@@ -561,7 +597,7 @@ private fun EditPullRequestDialog(
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = body,
-                    onValueChange = { body = it },
+                    onValueChange = draft::onChanged,
                     label = { Text(text = stringResource(R.string.pull_request_edit_body_label)) },
                     minLines = 4,
                     modifier = Modifier.fillMaxWidth(),
@@ -1086,12 +1122,12 @@ private val TAB_ROW_MIN_TAB_WIDTH = 64.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CommentBottomSheet(
+    text: String,
+    onTextChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onSubmit: (String) -> Unit,
     sheetState: SheetState,
 ) {
-    var commentText by remember { mutableStateOf("") }
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -1116,8 +1152,8 @@ private fun CommentBottomSheet(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedTextField(
-                    value = commentText,
-                    onValueChange = { commentText = it },
+                    value = text,
+                    onValueChange = onTextChange,
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -1136,8 +1172,8 @@ private fun CommentBottomSheet(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
-                        onClick = { onSubmit(commentText) },
-                        enabled = commentText.isNotBlank(),
+                        onClick = { onSubmit(text) },
+                        enabled = text.isNotBlank(),
                     ) {
                         Text(text = stringResource(R.string.submit))
                     }
@@ -1150,18 +1186,18 @@ private fun CommentBottomSheet(
 /** 编辑会话评论对话框（#166）：只改正文，保存前不允许空白。 */
 @Composable
 private fun EditCommentDialog(
-    initialBody: String,
+    draft: DraftText,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
 ) {
-    var body by remember { mutableStateOf(initialBody) }
+    val body by draft.text.collectAsStateWithLifecycle()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.pull_request_comment_edit_title)) },
         text = {
             OutlinedTextField(
                 value = body,
-                onValueChange = { body = it },
+                onValueChange = draft::onChanged,
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
             )

@@ -7,6 +7,9 @@ package com.yumiru11.githubapp.feature.pullrequest
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
+import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
+import com.yumiru11.githubapp.core.datastore.draft.DraftText
 import com.yumiru11.githubapp.feature.pullrequest.data.PullRequestRepository
 import com.yumiru11.githubapp.feature.pullrequest.data.RepositoryControl
 import com.yumiru11.githubapp.feature.pullrequest.data.toTimelineItem
@@ -59,6 +62,7 @@ class PullRequestDetailViewModel
     constructor(
         savedStateHandle: SavedStateHandle,
         private val repository: PullRequestRepository,
+        private val drafts: DraftAutoSaver,
     ) : ViewModel() {
         private val owner: String = checkNotNull(savedStateHandle["owner"])
         private val repo: String = checkNotNull(savedStateHandle["repo"])
@@ -82,6 +86,51 @@ class PullRequestDetailViewModel
         /** T16：已打开的行评论目标（null = 未打开） */
         private val _lineCommentTarget = MutableStateFlow<LineCommentTarget?>(null)
         val lineCommentTarget: StateFlow<LineCommentTarget?> = _lineCommentTarget.asStateFlow()
+
+        /** 会话评论正文草稿（进程被杀后重新打开评论 Sheet 自动恢复）。 */
+        val commentDraft: DraftText =
+            DraftText(DraftTargets.issueComment(owner, repo, number), baseline = "", saver = drafts, scope = viewModelScope)
+
+        /** Review 提交正文草稿。 */
+        val reviewDraft: DraftText =
+            DraftText(DraftTargets.pullReview(owner, repo, number), baseline = "", saver = drafts, scope = viewModelScope)
+
+        /** 行内评论正文草稿（打开行评论 Sheet 时按锚点建键；null = 未打开）。 */
+        private val _lineCommentDraft = MutableStateFlow<DraftText?>(null)
+        val lineCommentDraft: StateFlow<DraftText?> = _lineCommentDraft.asStateFlow()
+
+        /** 编辑 PR 正文草稿（打开对话框时按当前正文建基线；null = 未打开）。 */
+        private val _editPrDraft = MutableStateFlow<DraftText?>(null)
+        val editPrDraft: StateFlow<DraftText?> = _editPrDraft.asStateFlow()
+
+        /** 编辑既有评论正文草稿（null = 未打开）。 */
+        private val _editCommentDraft = MutableStateFlow<DraftText?>(null)
+        val editCommentDraft: StateFlow<DraftText?> = _editCommentDraft.asStateFlow()
+
+        /** 打开「编辑 PR」对话框：以当前正文为基线恢复草稿。 */
+        fun openEditPr(baseBody: String) {
+            _editPrDraft.value = DraftText(DraftTargets.pullEdit(owner, repo, number), baseBody, drafts, viewModelScope)
+        }
+
+        /** 关闭「编辑 PR」对话框（未提交）：当前文本立即落盘。 */
+        fun closeEditPr() {
+            _editPrDraft.value?.saveNow()
+            _editPrDraft.value = null
+        }
+
+        /** 打开「编辑评论」对话框：以当前评论正文为基线恢复草稿。 */
+        fun openEditComment(
+            commentId: Long,
+            baseBody: String,
+        ) {
+            _editCommentDraft.value = DraftText(DraftTargets.commentEdit(owner, repo, commentId), baseBody, drafts, viewModelScope)
+        }
+
+        /** 关闭「编辑评论」对话框（未提交）：当前文本立即落盘。 */
+        fun closeEditComment() {
+            _editCommentDraft.value?.saveNow()
+            _editCommentDraft.value = null
+        }
 
         /** T16 写操作失败事件通道（UI 层 stringResource 本地化，ViewModel 不产文案） */
         private val _events = MutableSharedFlow<PullRequestDetailEvent>(extraBufferCapacity = EVENT_BUFFER)
@@ -131,10 +180,19 @@ class PullRequestDetailViewModel
             val thread = state.reviewThreads.firstOrNull { it.path == path && it.side == side && it.anchorLine == line }
             val comments = state.reviewComments.filter { it.path == path && it.side == side && it.anchorLine == line }
             _lineCommentTarget.value = LineCommentTarget(anchor = anchor, thread = thread, comments = comments)
+            _lineCommentDraft.value =
+                DraftText(
+                    DraftTargets.lineComment(owner, repo, number, path, side.name, line),
+                    baseline = "",
+                    saver = drafts,
+                    scope = viewModelScope,
+                )
         }
 
         /** 关闭行评论输入 */
         fun dismissLineComment() {
+            _lineCommentDraft.value?.saveNow()
+            _lineCommentDraft.value = null
             _lineCommentTarget.value = null
         }
 
@@ -150,6 +208,7 @@ class PullRequestDetailViewModel
             viewModelScope.launch {
                 try {
                     repository.addComment(owner, repo, number, body)
+                    commentDraft.discard()
                     refreshPullRequestAndTimeline()
                     _events.tryEmit(PullRequestDetailEvent.CommentPosted)
                 } catch (e: CancellationException) {
@@ -186,6 +245,8 @@ class PullRequestDetailViewModel
                     )
                 try {
                     repository.updateComment(owner, repo, commentId, body)
+                    _editCommentDraft.value?.discard()
+                    _editCommentDraft.value = null
                     _events.tryEmit(PullRequestDetailEvent.CommentUpdated)
                 } catch (e: CancellationException) {
                     throw e
@@ -257,6 +318,8 @@ class PullRequestDetailViewModel
                             reviewComments = current.reviewComments.map { if (it.id == optimistic.id) created else it },
                         )
                     refreshThreads(current.pullRequest.nodeId)
+                    _lineCommentDraft.value?.discard()
+                    _lineCommentDraft.value = null
                     _lineCommentTarget.value = null
                 } catch (e: CancellationException) {
                     throw e
@@ -325,6 +388,7 @@ class PullRequestDetailViewModel
             viewModelScope.launch {
                 try {
                     val review = repository.submitReview(owner, repo, number, conclusion, body)
+                    reviewDraft.discard()
                     val current = _uiState.value as? PullRequestDetailUiState.Success ?: return@launch
                     _uiState.value =
                         current.copy(
@@ -438,6 +502,8 @@ class PullRequestDetailViewModel
             viewModelScope.launch {
                 try {
                     val updated = repository.updatePr(owner, repo, number, title = targetTitle, body = body)
+                    _editPrDraft.value?.discard()
+                    _editPrDraft.value = null
                     val current = _uiState.value as? PullRequestDetailUiState.Success ?: return@launch
                     _uiState.value =
                         current.copy(

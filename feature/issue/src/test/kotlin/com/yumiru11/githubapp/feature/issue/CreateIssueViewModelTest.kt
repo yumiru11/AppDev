@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.feature.issue
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.feature.issue.data.IssueRepository
 import com.yumiru11.githubapp.feature.issue.model.Issue
@@ -34,11 +35,36 @@ class CreateIssueViewModelTest {
     private val owner = "octocat"
     private val repo = "Hello-World"
 
-    private fun viewModel(repository: IssueRepository): CreateIssueViewModel =
+    private fun viewModel(
+        repository: IssueRepository,
+        drafts: DraftAutoSaver = draftSaver(RecordingDraftRepository()),
+    ): CreateIssueViewModel =
         CreateIssueViewModel(
             SavedStateHandle(mapOf("owner" to owner, "repo" to repo)),
             repository,
+            drafts,
         )
+
+    @Test
+    fun createIssue_success_discardsBodyDraftAndResetsText() =
+        runTest {
+            val repository =
+                mockk<IssueRepository> {
+                    coEvery { getLabels(owner, repo) } returns emptyList()
+                    coEvery { createIssue(owner, repo, "New bug", "Drafted", null) } returns
+                        Issue(id = 1L, number = 42, title = "New bug", state = IssueState.OPEN)
+                }
+            val draftRepository = RecordingDraftRepository()
+            val vm = viewModel(repository, draftSaver(draftRepository))
+            vm.bodyDraft.onChanged("Drafted")
+            assertEquals("Drafted", draftRepository.drafts[vm.bodyDraft.key])
+
+            vm.createIssue("New bug", "Drafted", emptyList())
+            advanceUntilIdle()
+
+            assertTrue("创建成功必须清草稿", draftRepository.drafts.isEmpty())
+            assertEquals("", vm.bodyDraft.text.value)
+        }
 
     @Test
     fun createIssue_success_emitsCreatedAndSendsSelectedLabels() =

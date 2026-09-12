@@ -4,6 +4,8 @@ package com.yumiru11.githubapp.feature.pullrequest
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
+import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.feature.pullrequest.data.PullRequestRepository
 import com.yumiru11.githubapp.feature.pullrequest.data.RepositoryControl
@@ -36,6 +38,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -118,10 +121,15 @@ class PullRequestDetailViewModelTest {
             coEvery { viewerLoginOrNull() } returns null
         }
 
+    private fun viewModel(
+        repository: PullRequestRepository,
+        drafts: DraftAutoSaver = draftSaver(RecordingDraftRepository()),
+    ): PullRequestDetailViewModel = PullRequestDetailViewModel(savedStateHandle(), repository, drafts)
+
     @Test
     fun load_success_emitsSuccessWithAllTabData() =
         runTest {
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repository())
+            val viewModel = viewModel(repository())
 
             val state = viewModel.uiState.value
             assertTrue(state is PullRequestDetailUiState.Success)
@@ -136,7 +144,7 @@ class PullRequestDetailViewModelTest {
     @Test
     fun load_mergeableState_passesThroughToSuccess() =
         runTest {
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repository())
+            val viewModel = viewModel(repository())
 
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertEquals(MergeableState.MERGEABLE, state.pullRequest.mergeableState)
@@ -155,7 +163,7 @@ class PullRequestDetailViewModelTest {
                     coEvery { getPullRequest(any(), any(), any()) } throws httpException
                 }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             val state = viewModel.uiState.value
             assertTrue(state is PullRequestDetailUiState.Error)
@@ -170,7 +178,7 @@ class PullRequestDetailViewModelTest {
                     coEvery { getPullRequest(any(), any(), any()) } throws IOException("boom")
                 }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             val state = viewModel.uiState.value
             assertTrue(state is PullRequestDetailUiState.Error)
@@ -185,7 +193,7 @@ class PullRequestDetailViewModelTest {
                     coEvery { getPullRequest(any(), any(), any()) } throws IllegalStateException("boom")
                 }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             val state = viewModel.uiState.value
             assertTrue(state is PullRequestDetailUiState.Error)
@@ -201,7 +209,7 @@ class PullRequestDetailViewModelTest {
                     coEvery { timeline(owner, repo, number) } throws IOException("timeline boom")
                 }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             val state = viewModel.uiState.value
             assertTrue("时间线失败 → 整体 Error（不产部分 Success）", state is PullRequestDetailUiState.Error)
@@ -214,7 +222,7 @@ class PullRequestDetailViewModelTest {
                 mockk<PullRequestRepository> {
                     coEvery { getPullRequest(any(), any(), any()) } throws IOException("boom")
                 }
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), failingRepository)
+            val viewModel = viewModel(failingRepository)
             assertTrue(viewModel.uiState.value is PullRequestDetailUiState.Error)
 
             // 恢复桩：重试后成功
@@ -237,7 +245,7 @@ class PullRequestDetailViewModelTest {
     @Test
     fun selectTab_switchesBetweenFourTabs() =
         runTest {
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repository())
+            val viewModel = viewModel(repository())
 
             viewModel.selectTab(PullRequestTab.COMMITS)
             assertEquals(PullRequestTab.COMMITS, viewModel.selectedTab.value)
@@ -255,7 +263,7 @@ class PullRequestDetailViewModelTest {
     @Test
     fun selectTab_sameTab_isIdempotent() =
         runTest {
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repository())
+            val viewModel = viewModel(repository())
 
             viewModel.selectTab(PullRequestTab.CONVERSATION)
 
@@ -265,7 +273,7 @@ class PullRequestDetailViewModelTest {
     @Test
     fun toggleCheckExpanded_addsAndRemovesId() =
         runTest {
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repository())
+            val viewModel = viewModel(repository())
 
             viewModel.toggleCheckExpanded(100L)
             assertTrue(100L in viewModel.expandedCheckIds.value)
@@ -277,7 +285,7 @@ class PullRequestDetailViewModelTest {
     @Test
     fun toggleCheckExpanded_multipleIds_keepsIndependent() =
         runTest {
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repository())
+            val viewModel = viewModel(repository())
 
             viewModel.toggleCheckExpanded(100L)
             viewModel.toggleCheckExpanded(101L)
@@ -294,7 +302,7 @@ class PullRequestDetailViewModelTest {
     @Test
     fun toggleCommitExpanded_addsAndRemovesSha() =
         runTest {
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repository())
+            val viewModel = viewModel(repository())
 
             viewModel.toggleCommitExpanded("abc123")
             assertTrue("abc123" in viewModel.expandedCommitShas.value)
@@ -306,7 +314,7 @@ class PullRequestDetailViewModelTest {
     @Test
     fun toggleFileExpanded_addsAndRemovesFilename() =
         runTest {
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repository())
+            val viewModel = viewModel(repository())
 
             viewModel.toggleFileExpanded("src/Main.kt")
             assertTrue("src/Main.kt" in viewModel.expandedFileNames.value)
@@ -363,7 +371,7 @@ class PullRequestDetailViewModelTest {
         runTest {
             val comments = listOf(reviewComment(id = 1L))
             val threads = listOf(reviewThread())
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repositoryWithComments(comments = comments, threads = threads))
+            val viewModel = viewModel(repositoryWithComments(comments = comments, threads = threads))
 
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertEquals(comments, state.reviewComments)
@@ -375,8 +383,7 @@ class PullRequestDetailViewModelTest {
     fun openLineComment_aggregatesThreadAndComments() =
         runTest {
             val viewModel =
-                PullRequestDetailViewModel(
-                    savedStateHandle(),
+                viewModel(
                     repositoryWithComments(comments = listOf(reviewComment(id = 1L)), threads = listOf(reviewThread())),
                 )
 
@@ -393,7 +400,7 @@ class PullRequestDetailViewModelTest {
     @Test
     fun dismissLineComment_clearsTarget() =
         runTest {
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), repository())
+            val viewModel = viewModel(repository())
 
             viewModel.openLineComment("README.md", DiffSide.RIGHT, 3)
             assertNotNull(viewModel.lineCommentTarget.value)
@@ -410,7 +417,7 @@ class PullRequestDetailViewModelTest {
             val mockRepo = repositoryWithComments()
             coEvery { mockRepo.createReviewComment(owner, repo, number, any(), "hi", "abc123") } returns created
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             val anchor = LineCommentAnchor(path = "README.md", side = DiffSide.RIGHT, line = 3)
             viewModel.submitLineComment(anchor, "hi")
             advanceUntilIdle()
@@ -429,7 +436,7 @@ class PullRequestDetailViewModelTest {
             val mockRepo = repositoryWithComments(comments = listOf(reviewComment(id = 1L)))
             coEvery { mockRepo.replyReviewComment(owner, repo, number, "README.md", 1L, "reply") } returns reply
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             val anchor = LineCommentAnchor(path = "README.md", side = DiffSide.RIGHT, line = 3)
             viewModel.submitLineComment(anchor, "reply", inReplyToId = 1L)
             advanceUntilIdle()
@@ -445,7 +452,7 @@ class PullRequestDetailViewModelTest {
             val mockRepo = repositoryWithComments()
             coEvery { mockRepo.createReviewComment(owner, repo, number, any(), any(), any()) } throws IOException("boom")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.openLineComment("README.md", DiffSide.RIGHT, 3)
             viewModel.submitLineComment(LineCommentAnchor(path = "README.md", side = DiffSide.RIGHT, line = 3), "hi")
             advanceUntilIdle()
@@ -460,7 +467,7 @@ class PullRequestDetailViewModelTest {
         runTest {
             val mockRepo = repositoryWithComments(threads = listOf(reviewThread()))
             coEvery { mockRepo.setThreadResolved("THREAD_1", true) } returns Unit
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             val thread = (viewModel.uiState.value as PullRequestDetailUiState.Success).reviewThreads.single()
             assertFalse(thread.isResolved)
 
@@ -477,7 +484,7 @@ class PullRequestDetailViewModelTest {
             val mockRepo = repositoryWithComments(threads = listOf(reviewThread()))
             coEvery { mockRepo.setThreadResolved("THREAD_1", true) } throws IOException("boom")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             val thread = (viewModel.uiState.value as PullRequestDetailUiState.Success).reviewThreads.single()
             viewModel.toggleThreadResolved(thread)
             advanceUntilIdle()
@@ -489,7 +496,7 @@ class PullRequestDetailViewModelTest {
     fun toggleThreadResolved_restOnlySession_isNoop() =
         runTest {
             val mockRepo = repositoryWithComments(threads = listOf(reviewThread()), nodeId = null)
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertFalse("REST-only 会话 → 无解析入口", state.canResolveThreads)
 
@@ -513,7 +520,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.repositoryControl(owner, repo) } returns
                 RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertTrue(state.canReview)
@@ -529,7 +536,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.repositoryControl(owner, repo) } returns
                 RepositoryControl(viewerPermission = ViewerPermission.READ, defaultBranch = "main")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertTrue("READ 可发起 comment 审查", state.canReview)
@@ -543,7 +550,7 @@ class PullRequestDetailViewModelTest {
             val mockRepo = repository()
             coEvery { mockRepo.repositoryControl(owner, repo) } returns RepositoryControl()
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertFalse(state.canReview)
@@ -559,7 +566,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.repositoryControl(owner, repo) } returns
                 RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertTrue(state.headSameRepo)
@@ -584,7 +591,7 @@ class PullRequestDetailViewModelTest {
                 review
             }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.submitReview(ReviewConclusion.APPROVE, "LGTM")
 
             val optimistic = viewModel.uiState.value as PullRequestDetailUiState.Success
@@ -614,7 +621,7 @@ class PullRequestDetailViewModelTest {
                 throw IOException("boom")
             }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.submitReview(ReviewConclusion.COMMENT, "hi")
 
             val optimistic = viewModel.uiState.value as PullRequestDetailUiState.Success
@@ -635,7 +642,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.repositoryControl(owner, repo) } returns
                 RepositoryControl(viewerPermission = ViewerPermission.READ, defaultBranch = "main")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertFalse(state.canApprove)
 
@@ -654,7 +661,7 @@ class PullRequestDetailViewModelTest {
                 gate.await()
                 true
             }
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             // 加载态为 OPEN；合并成功后的刷新返回 MERGED（合并前建桩会令 canMerge=false）
             coEvery { mockRepo.getPullRequest(owner, repo, number) } returns
                 pullRequest().copy(state = PullRequestState.MERGED, mergedAt = "2026-08-23T00:00:00Z")
@@ -681,7 +688,7 @@ class PullRequestDetailViewModelTest {
             val mockRepo = repository()
             coEvery { mockRepo.mergePullRequest(owner, repo, number, any(), any(), any(), any()) } throws IOException("boom")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.mergePullRequest(PullRequestMergeMethod.MERGE, "", "", deleteBranch = false)
             advanceUntilIdle()
 
@@ -701,7 +708,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.mergePullRequest(owner, repo, number, any(), any(), any(), "abc123") } returns true
             coEvery { mockRepo.deleteBranch(owner, repo, "feature") } returns Unit
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             val loaded = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertTrue(loaded.canDeleteHeadBranch)
 
@@ -724,7 +731,7 @@ class PullRequestDetailViewModelTest {
                 gate.await()
                 true
             }
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             // 加载态为 OPEN；合并成功后的刷新返回 MERGED（合并前建桩会令 canMerge=false）
             coEvery { mockRepo.getPullRequest(owner, repo, number) } returns pullRequest().copy(state = PullRequestState.MERGED)
             viewModel.mergePullRequest(PullRequestMergeMethod.MERGE, "", "", deleteBranch = false)
@@ -748,7 +755,7 @@ class PullRequestDetailViewModelTest {
                 Unit
             }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.updateBranch()
 
             val optimistic = viewModel.uiState.value as PullRequestDetailUiState.Success
@@ -775,7 +782,7 @@ class PullRequestDetailViewModelTest {
                 throw IOException("boom")
             }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.updateBranch()
             gate.complete(Unit)
             advanceUntilIdle()
@@ -798,7 +805,7 @@ class PullRequestDetailViewModelTest {
                 Unit
             }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             val loaded = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertTrue(loaded.canDeleteHeadBranch)
 
@@ -824,7 +831,7 @@ class PullRequestDetailViewModelTest {
                 throw IOException("boom")
             }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.deleteBranch()
             gate.complete(Unit)
             advanceUntilIdle()
@@ -842,7 +849,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.repositoryControl(owner, repo) } returns
                 RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertTrue("WRITE 可编辑 PR", state.canEditPr)
@@ -857,7 +864,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.repositoryControl(owner, repo) } returns
                 RepositoryControl(viewerPermission = ViewerPermission.READ, defaultBranch = "main")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertFalse(state.canEditPr)
@@ -874,7 +881,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.repositoryControl(owner, repo) } returns
                 RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
             assertFalse("已合并不可关闭/重开", state.canCloseReopenPr)
@@ -893,7 +900,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.getPullRequest(owner, repo, number) } returnsMany
                 listOf(pullRequest(), pullRequest().copy(title = "New title", body = "New body"))
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.editPullRequest("New title", "New body")
 
             val optimistic = viewModel.uiState.value as PullRequestDetailUiState.Success
@@ -916,7 +923,7 @@ class PullRequestDetailViewModelTest {
             val mockRepo = repository()
             coEvery { mockRepo.updatePr(any(), any(), any(), any(), any(), any()) } throws IOException("network down")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.events.test {
                 viewModel.editPullRequest("New title", "New body")
                 advanceUntilIdle()
@@ -948,7 +955,7 @@ class PullRequestDetailViewModelTest {
             val comment = twoComments.filterIsInstance<PullRequestTimelineItem.Comment>().first()
             val originalIndex = twoComments.indexOfFirst { it.id == comment.id }
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.events.test {
                 viewModel.updateComment(comment.id, "edited body")
                 advanceUntilIdle()
@@ -980,7 +987,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.updateComment(any(), any(), any(), any()) } throws IOException("network down")
             val comment = timeline().filterIsInstance<PullRequestTimelineItem.Comment>().first()
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.events.test {
                 viewModel.updateComment(comment.id, "edited body")
                 advanceUntilIdle()
@@ -1003,7 +1010,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.deleteComment(any(), any(), any()) } returns Unit
             val comment = timeline().filterIsInstance<PullRequestTimelineItem.Comment>().first()
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.events.test {
                 viewModel.deleteComment(comment.id)
                 advanceUntilIdle()
@@ -1022,7 +1029,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.deleteComment(any(), any(), any()) } throws IOException("network down")
             val comment = timeline().filterIsInstance<PullRequestTimelineItem.Comment>().first()
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.events.test {
                 viewModel.deleteComment(comment.id)
                 advanceUntilIdle()
@@ -1041,7 +1048,7 @@ class PullRequestDetailViewModelTest {
             val mockRepo = repository()
             coEvery { mockRepo.viewerLoginOrNull() } returns "me"
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             advanceUntilIdle()
 
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
@@ -1057,7 +1064,7 @@ class PullRequestDetailViewModelTest {
             val mockRepo = repository()
             coEvery { mockRepo.viewerLoginOrNull() } returns null
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             advanceUntilIdle()
 
             val state = viewModel.uiState.value as PullRequestDetailUiState.Success
@@ -1079,7 +1086,7 @@ class PullRequestDetailViewModelTest {
             val mockRepo = repository()
             coEvery { mockRepo.addComment(any(), any(), any(), any()) } returns Unit
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.events.test {
                 viewModel.submitComment("LGTM")
                 advanceUntilIdle()
@@ -1098,7 +1105,7 @@ class PullRequestDetailViewModelTest {
             val mockRepo = repository()
             coEvery { mockRepo.addComment(any(), any(), any(), any()) } throws IOException("network down")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.events.test {
                 viewModel.submitComment("LGTM")
                 advanceUntilIdle()
@@ -1112,7 +1119,7 @@ class PullRequestDetailViewModelTest {
     fun submitComment_blankBody_doesNotCallRepository() =
         runTest {
             val mockRepo = repository()
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             viewModel.submitComment("   ")
             advanceUntilIdle()
@@ -1124,7 +1131,7 @@ class PullRequestDetailViewModelTest {
     fun editPullRequest_blankTitle_doesNotSubmit() =
         runTest {
             val mockRepo = repository()
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             viewModel.editPullRequest("   ", "body")
             advanceUntilIdle()
@@ -1141,7 +1148,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.getPullRequest(owner, repo, number) } returnsMany
                 listOf(pullRequest(), pullRequest().copy(state = PullRequestState.CLOSED))
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.events.test {
                 viewModel.closePullRequest()
 
@@ -1170,7 +1177,7 @@ class PullRequestDetailViewModelTest {
             val mockRepo = repository()
             coEvery { mockRepo.closePr(owner, repo, number) } throws IOException("network down")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.events.test {
                 viewModel.closePullRequest()
                 advanceUntilIdle()
@@ -1193,7 +1200,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.getPullRequest(owner, repo, number) } returnsMany listOf(closed, pullRequest())
             coEvery { mockRepo.reopenPr(owner, repo, number) } returns pullRequest()
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             // 关闭态（未合并）仍可重开
             assertTrue((viewModel.uiState.value as PullRequestDetailUiState.Success).canCloseReopenPr)
 
@@ -1216,7 +1223,7 @@ class PullRequestDetailViewModelTest {
             coEvery { mockRepo.getPullRequest(owner, repo, number) } returns closed
             coEvery { mockRepo.reopenPr(owner, repo, number) } throws IOException("network down")
 
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
             viewModel.events.test {
                 viewModel.reopenPullRequest()
                 advanceUntilIdle()
@@ -1234,7 +1241,7 @@ class PullRequestDetailViewModelTest {
             val mockRepo = repository()
             coEvery { mockRepo.repositoryControl(owner, repo) } returns
                 RepositoryControl(viewerPermission = ViewerPermission.READ, defaultBranch = "main")
-            val viewModel = PullRequestDetailViewModel(savedStateHandle(), mockRepo)
+            val viewModel = viewModel(mockRepo)
 
             viewModel.closePullRequest()
             viewModel.reopenPullRequest()
@@ -1244,5 +1251,125 @@ class PullRequestDetailViewModelTest {
             coVerify(exactly = 0) { mockRepo.closePr(any(), any(), any()) }
             coVerify(exactly = 0) { mockRepo.reopenPr(any(), any(), any()) }
             coVerify(exactly = 0) { mockRepo.updatePr(any(), any(), any(), any(), any(), any()) }
+        }
+
+    // ── 草稿持久化（需求审计 §10 P2：进程被杀不丢工作）────────────────────────
+
+    @Test
+    fun submitComment_success_discardsCommentDraft() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.addComment(any(), any(), any(), any()) } returns Unit
+            val draftRepository = RecordingDraftRepository()
+            val viewModel = viewModel(mockRepo, draftSaver(draftRepository))
+            advanceUntilIdle()
+            viewModel.commentDraft.onChanged("LGTM")
+            assertEquals("LGTM", draftRepository.drafts[DraftTargets.issueComment(owner, repo, number)])
+
+            viewModel.submitComment("LGTM")
+            advanceUntilIdle()
+
+            assertTrue("评论发布成功必须清草稿", draftRepository.drafts.isEmpty())
+            assertEquals("", viewModel.commentDraft.text.value)
+        }
+
+    @Test
+    fun submitReview_success_discardsReviewDraft() =
+        runTest {
+            val mockRepo = repository()
+            coEvery { mockRepo.submitReview(owner, repo, number, ReviewConclusion.COMMENT, "note") } returns
+                PullRequestReview(id = 900L, author = null, body = "note", state = PullRequestReviewState.COMMENTED)
+            val draftRepository = RecordingDraftRepository()
+            val viewModel = viewModel(mockRepo, draftSaver(draftRepository))
+            advanceUntilIdle()
+            viewModel.reviewDraft.onChanged("note")
+            assertEquals("note", draftRepository.drafts[DraftTargets.pullReview(owner, repo, number)])
+
+            viewModel.submitReview(ReviewConclusion.COMMENT, "note")
+            advanceUntilIdle()
+
+            assertTrue("Review 提交成功必须清草稿", draftRepository.drafts.isEmpty())
+            assertEquals("", viewModel.reviewDraft.text.value)
+        }
+
+    @Test
+    fun submitLineComment_success_discardsAnchorScopedDraft() =
+        runTest {
+            val mockRepo = repositoryWithComments()
+            coEvery { mockRepo.createReviewComment(owner, repo, number, any(), "hi", "abc123") } returns
+                reviewComment(id = 500L, body = "hi")
+            val draftRepository = RecordingDraftRepository()
+            val viewModel = viewModel(mockRepo, draftSaver(draftRepository))
+            advanceUntilIdle()
+            viewModel.openLineComment("README.md", DiffSide.RIGHT, 3)
+            val draft = checkNotNull(viewModel.lineCommentDraft.value)
+            draft.onChanged("hi")
+            assertEquals("hi", draftRepository.drafts[draft.key])
+
+            viewModel.submitLineComment(LineCommentAnchor(path = "README.md", side = DiffSide.RIGHT, line = 3), "hi")
+            advanceUntilIdle()
+
+            assertTrue("行评论提交成功必须清草稿", draftRepository.drafts.isEmpty())
+            assertNull(viewModel.lineCommentDraft.value)
+        }
+
+    @Test
+    fun editPullRequest_success_discardsEditPrDraft() =
+        runTest {
+            val mockRepo = repository()
+            val edited = pullRequest().copy(title = "New title", body = "New body")
+            coEvery { mockRepo.updatePr(owner, repo, number, title = "New title", body = "New body") } returns edited
+            val draftRepository = RecordingDraftRepository()
+            val viewModel = viewModel(mockRepo, draftSaver(draftRepository))
+            advanceUntilIdle()
+            viewModel.openEditPr(pullRequest().body.orEmpty())
+            viewModel.editPrDraft.value?.onChanged("New body")
+            assertEquals("New body", draftRepository.drafts[DraftTargets.pullEdit(owner, repo, number)])
+
+            viewModel.editPullRequest("New title", "New body")
+            advanceUntilIdle()
+
+            assertTrue("编辑 PR 保存成功必须清草稿", draftRepository.drafts.isEmpty())
+            assertNull(viewModel.editPrDraft.value)
+        }
+
+    @Test
+    fun openEditComment_storedDraftDiffers_restoresDraftOverCommentBody() =
+        runTest {
+            val commentId = 1L
+            val draftRepository = RecordingDraftRepository()
+            draftRepository.drafts[DraftTargets.commentEdit(owner, repo, commentId)] = "recovered edit"
+            val viewModel =
+                viewModel(
+                    repositoryWithComments(comments = listOf(reviewComment(id = commentId))),
+                    draftSaver(draftRepository),
+                )
+            advanceUntilIdle()
+
+            viewModel.openEditComment(commentId, "original")
+            advanceUntilIdle()
+
+            assertEquals(
+                "recovered edit",
+                viewModel.editCommentDraft.value
+                    ?.text
+                    ?.value,
+            )
+        }
+
+    @Test
+    fun closeEditPr_withPendingDebounce_savesCurrentTextImmediately() =
+        runTest {
+            val draftRepository = RecordingDraftRepository()
+            val viewModel = viewModel(repository(), draftSaver(draftRepository, debounceMillis = 60_000))
+            advanceUntilIdle()
+            viewModel.openEditPr(pullRequest().body.orEmpty())
+            viewModel.editPrDraft.value?.onChanged("in progress")
+            assertTrue("防抖窗口未到不落盘", draftRepository.drafts.isEmpty())
+
+            viewModel.closeEditPr()
+
+            assertEquals("in progress", draftRepository.drafts[DraftTargets.pullEdit(owner, repo, number)])
+            assertNull(viewModel.editPrDraft.value)
         }
 }

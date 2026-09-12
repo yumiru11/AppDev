@@ -2,6 +2,8 @@ package com.yumiru11.githubapp.feature.pullrequest
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
+import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.feature.pullrequest.data.PullRequestRepository
 import com.yumiru11.githubapp.feature.pullrequest.data.RepositoryControl
@@ -12,6 +14,7 @@ import com.yumiru11.githubapp.feature.pullrequest.model.ViewerPermission
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -45,7 +48,10 @@ class PullRequestCreateViewModelTest {
                 PullRequest(id = 1, number = 42, title = "t", state = PullRequestState.OPEN)
         }
 
-    private fun viewModel(repo: PullRequestRepository): PullRequestCreateViewModel = PullRequestCreateViewModel(savedStateHandle, repo)
+    private fun viewModel(
+        repo: PullRequestRepository,
+        drafts: DraftAutoSaver = draftSaver(RecordingDraftRepository()),
+    ): PullRequestCreateViewModel = PullRequestCreateViewModel(savedStateHandle, repo, drafts)
 
     @Test
     fun load_success_setsDefaultBaseAndOtherHead() =
@@ -160,5 +166,40 @@ class PullRequestCreateViewModelTest {
             }
 
             assertFalse((vm.uiState.value as PullRequestCreateUiState.Form).isSubmitting)
+        }
+
+    @Test
+    fun submit_success_discardsBodyDraft() =
+        runTest {
+            val repo = repository()
+            val draftRepository = RecordingDraftRepository()
+            val vm = viewModel(repo, draftSaver(draftRepository))
+            vm.updateTitle("Add feature")
+            vm.updateBody("Desc")
+            assertEquals("Desc", draftRepository.drafts[DraftTargets.newPullRequest("octocat", "Hello-World")])
+
+            vm.submit()
+
+            assertTrue("创建成功必须清草稿", draftRepository.drafts.isEmpty())
+            assertEquals("", vm.bodyDraft.text.value)
+        }
+
+    @Test
+    fun bodyDraft_restoredFromDisk_feedsSubmission() =
+        runTest {
+            val draftRepository = RecordingDraftRepository()
+            draftRepository.drafts[DraftTargets.newPullRequest("octocat", "Hello-World")] = "Recovered draft"
+            val repo = repository()
+            val vm = viewModel(repo, draftSaver(draftRepository))
+            runCurrent()
+
+            assertEquals("Recovered draft", vm.bodyDraft.text.value)
+
+            vm.updateTitle("Add feature")
+            vm.submit()
+
+            coVerify(exactly = 1) {
+                repo.createPullRequest("octocat", "Hello-World", "Add feature", "Recovered draft", "dev", "main")
+            }
         }
 }

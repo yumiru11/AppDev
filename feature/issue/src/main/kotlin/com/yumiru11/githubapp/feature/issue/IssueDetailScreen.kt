@@ -94,6 +94,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.datastore.draft.DraftText
 import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
@@ -158,6 +159,7 @@ fun IssueDetailScreen(
     val currentUrl = (uiState as? IssueDetailUiState.Success)?.issue?.htmlUrl
 
     val editState by viewModel.editState.collectAsStateWithLifecycle()
+    val commentDraftText by viewModel.commentDraft.text.collectAsStateWithLifecycle()
 
     var showCommentSheet by remember { mutableStateOf(false) }
     var editingIssue by remember { mutableStateOf(false) }
@@ -241,12 +243,18 @@ fun IssueDetailScreen(
                         onInternalLink = onInternalLink,
                         baseRepoUrl = "https://github.com/$owner/$repo",
                         onCloseReopen = { if (state.issue.state == IssueState.OPEN) viewModel.closeIssue() else viewModel.reopenIssue() },
-                        onEditIssue = { editingIssue = true },
+                        onEditIssue = {
+                            viewModel.openEditIssue(state.issue.body.orEmpty())
+                            editingIssue = true
+                        },
                         onEditMeta = viewModel::openMetaEditor,
                         onToggleSubscription = viewModel::toggleSubscription,
                         onToggleIssueReaction = viewModel::toggleIssueReaction,
                         onToggleCommentReaction = viewModel::toggleCommentReaction,
-                        onEditComment = { editingComment = it },
+                        onEditComment = {
+                            viewModel.openEditComment(it.id, it.body.orEmpty())
+                            editingComment = it
+                        },
                         onDeleteComment = { deletingComment = it },
                         onCheckboxClick = viewModel::toggleTaskListItem,
                         modifier = Modifier.fillMaxSize(),
@@ -260,7 +268,12 @@ fun IssueDetailScreen(
     val state = uiState as? IssueDetailUiState.Success
     if (showCommentSheet && state?.canComment == true) {
         CommentInputSheet(
-            onDismiss = { showCommentSheet = false },
+            text = commentDraftText,
+            onTextChange = viewModel.commentDraft::onChanged,
+            onDismiss = {
+                viewModel.commentDraft.saveNow()
+                showCommentSheet = false
+            },
             onSubmit = { body ->
                 showCommentSheet = false
                 viewModel.addComment(body)
@@ -269,10 +282,15 @@ fun IssueDetailScreen(
     }
 
     // 编辑 Issue 对话框
-    if (editingIssue && state?.canEditIssue == true) {
+    val editIssueDraft = viewModel.editIssueDraft.collectAsStateWithLifecycle().value
+    if (editingIssue && state?.canEditIssue == true && editIssueDraft != null) {
         EditIssueDialog(
             issue = state.issue,
-            onDismiss = { editingIssue = false },
+            draft = editIssueDraft,
+            onDismiss = {
+                viewModel.closeEditIssue()
+                editingIssue = false
+            },
             onSubmit = { title, body ->
                 editingIssue = false
                 viewModel.updateIssue(title, body)
@@ -294,11 +312,15 @@ fun IssueDetailScreen(
     }
 
     // 编辑评论对话框
+    val editCommentDraft = viewModel.editCommentDraft.collectAsStateWithLifecycle().value
     editingComment?.let { comment ->
-        if (state?.canEditComment(comment) == true) {
+        if (state?.canEditComment(comment) == true && editCommentDraft != null) {
             EditCommentDialog(
-                comment = comment,
-                onDismiss = { editingComment = null },
+                draft = editCommentDraft,
+                onDismiss = {
+                    viewModel.closeEditComment()
+                    editingComment = null
+                },
                 onSubmit = { body ->
                     editingComment = null
                     viewModel.updateComment(comment.id, body)
@@ -1153,10 +1175,11 @@ private fun MilestoneOptionCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CommentInputSheet(
+    text: String,
+    onTextChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onSubmit: (String) -> Unit,
 ) {
-    var body by remember { mutableStateOf("") }
     var isPreview by remember { mutableStateOf(false) }
     var editorController by remember { mutableStateOf<MarkdownEditorController?>(null) }
     val sheetState = rememberModalBottomSheetState()
@@ -1187,16 +1210,16 @@ private fun CommentInputSheet(
                         .imePadding(),
             ) {
                 MarkdownComposer(
-                    text = body,
+                    text = text,
                     isPreview = isPreview,
                     onTogglePreview = { isPreview = it },
-                    onTextChanged = { body = it },
+                    onTextChanged = onTextChange,
                     onEditorReady = { editorController = it },
                     onToolbarAction = { editorController?.applySyntax(it) },
                     themeTokens = editorTokens,
                     preview = {
                         MarkdownViewer(
-                            markdown = body.ifBlank { previewPlaceholder },
+                            markdown = text.ifBlank { previewPlaceholder },
                             // Sheet 自身可滚动：预览不再开内层滚动（避免嵌套滚动手势打架）
                             scrollable = false,
                             modifier = Modifier.fillMaxWidth().padding(vertical = AppDimens.cornerSmall),
@@ -1215,8 +1238,8 @@ private fun CommentInputSheet(
                     }
                     Spacer(modifier = Modifier.width(AppDimens.cornerSmall))
                     Button(
-                        onClick = { onSubmit(body) },
-                        enabled = body.isNotBlank(),
+                        onClick = { onSubmit(text) },
+                        enabled = text.isNotBlank(),
                     ) {
                         Text(text = stringResource(R.string.issue_comment_submit))
                     }
@@ -1230,11 +1253,12 @@ private fun CommentInputSheet(
 @Composable
 private fun EditIssueDialog(
     issue: Issue,
+    draft: DraftText,
     onDismiss: () -> Unit,
     onSubmit: (String, String) -> Unit,
 ) {
     var title by remember { mutableStateOf(issue.title) }
-    var body by remember { mutableStateOf(issue.body.orEmpty()) }
+    val body by draft.text.collectAsStateWithLifecycle()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.issue_edit_title)) },
@@ -1249,7 +1273,7 @@ private fun EditIssueDialog(
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = body,
-                    onValueChange = { body = it },
+                    onValueChange = draft::onChanged,
                     label = { Text(text = stringResource(R.string.issue_edit_body_label)) },
                     minLines = 4,
                     modifier = Modifier.fillMaxWidth(),
@@ -1275,18 +1299,18 @@ private fun EditIssueDialog(
 /** 编辑评论对话框 */
 @Composable
 private fun EditCommentDialog(
-    comment: IssueTimelineItem.Comment,
+    draft: DraftText,
     onDismiss: () -> Unit,
     onSubmit: (String) -> Unit,
 ) {
-    var body by remember { mutableStateOf(comment.body.orEmpty()) }
+    val body by draft.text.collectAsStateWithLifecycle()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.issue_edit_comment_title)) },
         text = {
             OutlinedTextField(
                 value = body,
-                onValueChange = { body = it },
+                onValueChange = draft::onChanged,
                 minLines = 3,
                 modifier = Modifier.fillMaxWidth(),
             )
