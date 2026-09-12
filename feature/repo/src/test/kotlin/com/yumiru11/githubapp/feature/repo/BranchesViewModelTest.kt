@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
@@ -26,6 +27,15 @@ class BranchesViewModelTest {
 
     private val savedStateHandle =
         SavedStateHandle(mapOf("owner" to "octocat", "repo" to "Hello-World"))
+
+    @Before
+    fun warmUpMockK() {
+        // MockK/ByteBuddy 首次为每个被 mock 类型生成字节码是真实墙钟开销；若该生成发生在
+        // runTest 体内，会计入整测超时预算，高负载/CI 覆盖率插桩下超过 60s 即抛
+        // UncompletedCoroutinesError（kotlinx.coroutines#3800）。在 @Before 中复用桩工厂预热，
+        // 把一次性生成移出受测超时窗口。
+        viewModel(repository(), managementRepository())
+    }
 
     private fun repository(
         control: BranchControl = BranchControl(canPush = true, defaultBranch = "main"),

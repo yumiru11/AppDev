@@ -22,6 +22,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
@@ -36,6 +37,19 @@ import kotlin.test.assertIs
 class HomeViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
+
+    @Before
+    fun warmUpMockK() {
+        // MockK/ByteBuddy 首次生成字节码 + ViewModel/Paging 首次类加载与 JIT 都是真实墙钟开销；
+        // 若发生在 runTest 体内，会计入整测超时预算，高负载/CI 覆盖率插桩下超过 60s 即抛
+        // UncompletedCoroutinesError（kotlinx.coroutines#3800）。在 @Before 中复用桩工厂与一次
+        // 轻量冒烟预热，把一次性初始化移出受测超时窗口。
+        homeViewModel(
+            repository(),
+            sessionManager(AuthState.SignedIn(SessionData(accessToken = "warmup"))),
+            trendRepository(),
+        )
+    }
 
     private fun sessionManager(auth: AuthState): OAuthSessionManager =
         mockk<OAuthSessionManager> {

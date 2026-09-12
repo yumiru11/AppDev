@@ -30,6 +30,7 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import retrofit2.HttpException
@@ -47,6 +48,16 @@ class SearchViewModelTest {
     // debounce 依赖虚拟时间：StandardTestDispatcher + runTest 共享调度器
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule(StandardTestDispatcher())
+
+    @Before
+    fun warmUpMockK() {
+        // MockK/ByteBuddy 首次生成字节码 + ViewModel/Paging 首次类加载与 JIT 都是真实墙钟开销；
+        // 若发生在 runTest 体内，会计入整测超时预算，高负载/CI 覆盖率插桩下超过 60s 即抛
+        // UncompletedCoroutinesError（kotlinx.coroutines#3800）。在 @Before 中复用桩工厂与一次
+        // 轻量冒烟预热，把一次性初始化移出受测超时窗口。
+        val warmUp = viewModel(pagingRepository(), historyRepository(), sessionManager(AuthState.Anonymous))
+        warmUp.submitQuery("warmup")
+    }
 
     private fun sessionManager(auth: AuthState): OAuthSessionManager =
         mockk<OAuthSessionManager> {
