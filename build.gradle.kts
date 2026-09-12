@@ -118,6 +118,19 @@ val coverageThresholds =
         // 纳入后至少让 dto/mapper/ViewModel 这些**单测可达**的逻辑层进报告与门禁。
         // 阈值取实测值向下取整（项目惯例）：73.9% → 0.73。
         ":feature:pullrequest" to 0.73, // 实测 73.9%（2026-09-11 首次纳入：此前该模块不在阈值表 → 无 jacocoTestReport → diff 门禁看不见它的新增行）
+        // ── 2026-09-12 阈值补齐（chore/coverage-thresholds）────────────────────────
+        // 背景：审计发现 26 个模块仅 15 个有阈值 → 其余模块 coverageVerify 不注册验证任务，
+        // 覆盖率可无声腐烂。本批对「有自身单测 exec、可测」的 6 个模块按【实测值棘轮】补阈
+        // （阈值 = 实测值小幅下浮，2 位小数取整所致落在 −0.6~1.4pp，逐条注明）。
+        // 实测口径 = 各模块 jacocoTestReport XML 的 LINE COVEREDRATIO（合并全部模块 exec，
+        // 与 coverageVerify 的 executionData/classDirectories 完全同源）。
+        // 未纳入本批的 5 个模块（无 exec 验证恒 skip / 类全排除 / 实测 0%）逐条说明见 PR body。
+        ":app" to 0.02, // 实测 2.61%（13/498 行；纯 UI 装配曾豁免，现按实测棘轮，防 13 行覆盖无声归零）
+        ":core:common" to 0.99, // 实测 100.0%（23/23 行）
+        ":core:editor" to 0.51, // 实测 52.35%（M3EditorThemeKt/MarkdownComposerKt 等 Compose 类不入单测，拉低分母；逻辑类高覆盖）
+        ":core:database" to 0.04, // 实测 5.17%（⚠️ Room 生成 *_Impl 计入分母 + 本模块 Robolectric 单测不入 exec，见 PR「已知盲区」；地板 50 为 Phase C 目标）
+        ":feature:search" to 0.53, // 实测 53.93%（VM/分页/缓存已覆盖；SearchResultRowsKt/SearchTopBarKt 纯 UI 不入单测）
+        ":feature:editor" to 0.58, // 实测 59.38%（19/32 行，分母极小，1 行 ≈ 3.1pp，后续调阈需谨慎）
     )
 
 // JaCoCo 分析排除：生成代码/样板（R/BuildConfig/Manifest/Hilt 产物）+ UI 层，不计入分母
