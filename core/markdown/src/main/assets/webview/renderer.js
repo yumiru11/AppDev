@@ -10,9 +10,11 @@
  *    - 任务列表 checkbox change → onCheckboxClick(index, checked)
  *    - ResizeObserver → onHeightChanged(height)
  * 3. 离线模式（OFFLINE_MARKDOWN_IT）：调用 markdown-it 渲染原始 markdown，
- *    补 GitHub Alert / 任务列表两个最小 GFM 插件，并用 highlight.js 高亮代码块
+ *    补 GitHub Alert / 任务列表两个最小 GFM 插件，并用 highlight.js 高亮代码块；
+ *    渲染产物再按仓库上下文改写相对链接/图片（见 renderOfflineHtml 的说明）
  *
  * 安全：本脚本不接收任何 token；token 仅由 PrivateImageInterceptor 加到网络请求。
+ * 仓库上下文（`owner/repo`）不是凭据，由 `data-base-repo` 属性传入（公开信息）。
  */
 (function () {
   'use strict';
@@ -296,18 +298,156 @@
     });
   }
 
-  function renderOfflineMarkdown() {
-    var rawEl = document.getElementById('markdown-raw');
-    if (!rawEl) return;
-    var raw = rawEl.getAttribute('data-markdown-raw') || '';
-    if (typeof window.markdownit === 'undefined') {
-      rawEl.textContent = raw;
-      return;
+  // ── 离线通道：仓库上下文与相对 URL 改写 ───────────────────────────────
+  //
+  // 为什么改写发生在这一层（而不是 Kotlin 的 WebViewHtmlBuilder）：
+  // 离线模式的输入是**未解析的 markdown 文本**。在那一层，`./docs/x.png` 与代码围栏里的
+  // 示例文本、行内代码里的 `](../x)` 无法区分——任何正则都会误伤（既有 assets/ 改写即如此）。
+  // markdown-it 渲染成 HTML 之后，代码围栏与行内代码里的尖括号/引号已经是转义文本
+  // （`&lt;img src=&quot;…&quot;&gt;`），`<img … src="…"` 形式的属性正则不可能命中；而所有
+  // 真实的链接目标（引用式 `[ref]: path`、相对路径、内联 HTML `<img src>`）都已是属性值。
+  // 因此改写作用在**渲染产物**上：与 Kotlin 侧 SERVER_HTML 通道同一阶段、同一规则，
+  // 且必须发生在 DOMPurify 清洗**之前**（URI 白名单会剔除未解析的相对 src）。
+  //
+  // 目标域（与 Kotlin rewriteRelativeUrls / 原生 resolveMarkdownUrl 保持同一约定）：
+  // - img src → https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{path}
+  // - a href  → https://github.com/{owner}/{repo}/blob/HEAD/{path}（点击后由 GitHubLinkParser 分流到应用内路由）
+  // - a href 的**路由形态**（`issues/123`、`/owner/repo/issues/123`）→ 对应的 github.com 路由
+  //   （plan.md §2.11 的输入形态；否则会把 issue 链接渲染成仓库里名为 `issues/123` 的文件）
+  // - assets/ → appassets 域（app 内置资产，不是仓库文件）
+
+  var ASSET_BASE = 'https://appassets.androidplatform.net/assets/webview/';
+  var RAW_BASE = 'https://raw.githubusercontent.com/';
+  var GITHUB_BASE = 'https://github.com/';
+  var IMG_SRC_REGEX = /(<img[^>]*?\ssrc=")([^"]*)(")/g;
+  var ANCHOR_HREF_REGEX = /(<a[^>]*?\shref=")([^"]*)(")/g;
+
+  /** GitHub 站点路由关键字（与 `GitHubLinkParser.parsePath` 的 vocabulary 对齐）。 */
+  var SITE_ROUTE_SEGMENTS = ['issues', 'pull', 'blob', 'tree', 'commit', 'releases', 'discussions', 'raw'];
+
+  /** `owner/repo`（或完整 repo URL）→ {owner, repo}；非法/缺省返回 null。 */
+  function parseRepoContext(repoContext) {
+    if (!repoContext) return null;
+    var parts = String(repoContext).replace(/^https?:\/\/github\.com\//i, '').split('/');
+    if (parts.length < 2 || !parts[0] || !parts[1]) return null;
+    return { owner: parts[0], repo: parts[1] };
+  }
+
+  /**
+   * 相对路径归一化：绝对 URL（http/https/data）与纯锚点原样返回；其余去掉 `./` 与前导 `/`，
+   * 折叠 `.` / `..`（`..` 越出仓库根时钳制到根，而不是产出含 `..` 的死链）。
+   *
+   * 与 Kotlin `WebViewHtmlBuilder.normalizeRepoRelativePath` 是同一约定（两条通道同一套规则）。
+   */
+  function normalizeRelative(path) {
+    if (/^https?:/i.test(path) || /^data:/i.test(path) || path.charAt(0) === '#') return path;
+    var segments = path.replace(/^\//, '').split('/');
+    var normalized = [];
+    for (var i = 0; i < segments.length; i++) {
+      if (segments[i] === '' || segments[i] === '.') continue;
+      if (segments[i] === '..') {
+        normalized.pop();
+        continue;
+      }
+      normalized.push(segments[i]);
     }
+    return normalized.length ? normalized.join('/') : path;
+  }
+
+  /**
+   * 站点路径形态：前导 `/`，且第 3 段是 GitHub 路由关键字（`/owner/repo/issues/123`）。
+   * 这种写法在网页端指 github.com 的站点路径，不是仓库内文件（plan.md §2.11）。
+   */
+  function isSiteRoutePath(path) {
+    if (path.charAt(0) !== '/') return false;
+    var parts = path.replace(/^\/+/, '').split('/');
+    return parts.length >= 4 && SITE_ROUTE_SEGMENTS.indexOf(parts[2].toLowerCase()) >= 0;
+  }
+
+  /** 仓库内路由形态：`issues/123`、`pull/7`、`commit/<sha>`、`blob/<ref>/<path>`（形状明确，避免误伤同名目录）。 */
+  function isRepoRoutePath(path) {
+    var parts = path.split('/');
+    if (parts.length < 2) return false;
+    var head = parts[0].toLowerCase();
+    if (head === 'issues' || head === 'pull' || head === 'discussions') return /^\d+$/.test(parts[1]);
+    if (head === 'commit') return /^[0-9a-f]{7,40}$/i.test(parts[1]);
+    if (head === 'blob' || head === 'tree' || head === 'raw') return parts.length >= 3 && parts[1] !== '';
+    if (head === 'releases') return parts.length >= 3 && parts[1] === 'tag' && parts[2] !== '';
+    return false;
+  }
+
+  /** 链接目标绝对化；null = 原样保留（绝对 URL / 锚点 / mailto）。 */
+  function resolveLinkTarget(href, owner, repo) {
+    if (/^https?:/i.test(href) || /^mailto:/i.test(href) || href.charAt(0) === '#') return null;
+    if (isSiteRoutePath(href)) return GITHUB_BASE + href.replace(/^\/+/, '');
+    var normalized = normalizeRelative(href);
+    if (isRepoRoutePath(normalized)) return GITHUB_BASE + owner + '/' + repo + '/' + normalized;
+    return GITHUB_BASE + owner + '/' + repo + '/blob/HEAD/' + normalized;
+  }
+
+  /** 图片目标绝对化；null = 原样保留（绝对 URL / data: / 锚点）。 */
+  function resolveImageTarget(src, owner, repo) {
+    if (/^https?:/i.test(src) || /^data:/i.test(src) || src.charAt(0) === '#') return null;
+    var normalized = normalizeRelative(src);
+    if (normalized.indexOf('assets/') === 0) {
+      return ASSET_BASE + normalized.slice('assets/'.length);
+    }
+    return RAW_BASE + owner + '/' + repo + '/HEAD/' + normalized;
+  }
+
+  /** 把渲染产物里的相对 img src / a href 改写成绝对 URL（无仓库上下文时原样返回）。 */
+  function rewriteRelativeUrls(html, repoContext) {
+    var ctx = parseRepoContext(repoContext);
+    if (!ctx) return html;
+
+    var out = html.replace(IMG_SRC_REGEX, function (match, prefix, src, suffix) {
+      var target = resolveImageTarget(src, ctx.owner, ctx.repo);
+      if (target === null) return match;
+      return prefix + target + suffix;
+    });
+
+    return out.replace(ANCHOR_HREF_REGEX, function (match, prefix, href, suffix) {
+      var target = resolveLinkTarget(href, ctx.owner, ctx.repo);
+      if (target === null) return match;
+      return prefix + target + suffix;
+    });
+  }
+
+  /** 离线 markdown-it 实例（配置与插件清单即离线通道的能力面）。 */
+  function createMarkdownIt() {
     var md = window.markdownit({ html: true, linkify: true, breaks: false });
     md.use(githubAlertPlugin);
     md.use(taskListPlugin);
-    var html = md.render(raw);
+    return md;
+  }
+
+  /**
+   * 原始 markdown → 注入 HTML（**纯字符串路径**，无 DOM 依赖）。
+   *
+   * 拆出这个函数是为了让离线通道的渲染产物可以被 Node 单测**真实执行**并逐串断言
+   * （见 `core/markdown/src/test/js/offline-render-harness.js`）——JVM 无 JS 引擎，
+   * 只靠源码文本断言无法证明「相对链接真的被改写了」。
+   *
+   * @param {string} raw 原始 markdown
+   * @param {{repoContext: (string|null)}} options 仓库上下文（`owner/repo`）
+   * @returns {string|null} HTML；markdown-it 未加载时返回 null（调用方降级为纯文本）
+   */
+  function renderOfflineHtml(raw, options) {
+    var opts = options || {};
+    if (typeof window.markdownit === 'undefined') return null;
+    return rewriteRelativeUrls(createMarkdownIt().render(raw), opts.repoContext);
+  }
+
+  function renderOfflineMarkdown() {
+    var rawEl = document.getElementById('markdown-raw');
+    if (!rawEl) return null;
+    var raw = rawEl.getAttribute('data-markdown-raw') || '';
+    var html = renderOfflineHtml(raw, { repoContext: rawEl.getAttribute('data-base-repo') });
+    if (html === null) {
+      // markdown-it 未加载（assets 缺失）：原样显示原始 markdown，不阻断页面
+      rawEl.textContent = raw;
+      return null;
+    }
     var container = document.createElement('div');
     container.innerHTML = html;
     rawEl.parentNode.replaceChild(container, rawEl);
@@ -316,10 +456,14 @@
     return container;
   }
 
-  // Exposed for offline JVM/Node tests of the GFM plugins (not used by the bridge).
+  // Exposed for offline JVM/Node tests of the GFM plugins + offline render pipeline
+  // (not used by the bridge).
   window.__appdevMarkdownPlugins = {
     githubAlertPlugin: githubAlertPlugin,
     taskListPlugin: taskListPlugin,
+    renderOfflineHtml: renderOfflineHtml,
+    rewriteRelativeUrls: rewriteRelativeUrls,
+    parseRepoContext: parseRepoContext,
   };
 
   function init() {

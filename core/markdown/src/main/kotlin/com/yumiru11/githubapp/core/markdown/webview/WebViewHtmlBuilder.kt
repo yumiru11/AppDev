@@ -55,6 +55,14 @@ object WebViewHtmlBuilder {
     private val REWRITE_ASSETS_IMAGE_REGEX =
         Regex("""!\[([^\]]*)\]\(assets/([^)]*)\)""")
 
+    /** GitHub 站点路由关键字（与 `GitHubLinkParser.parsePath` 的 vocabulary 对齐）。 */
+    private val SITE_ROUTE_SEGMENTS =
+        setOf("issues", "pull", "blob", "tree", "commit", "releases", "discussions", "raw")
+
+    private val REPO_ROUTE_NUMBER_REGEX = Regex("""\d+""")
+
+    private val REPO_ROUTE_SHA_REGEX = Regex("""[0-9a-fA-F]{7,40}""")
+
     /**
      * 兼容旧签名：仅注入 [MarkdownThemeTokens] 的 md-sys 变量（T8/T9 既有调用）。
      */
@@ -83,7 +91,7 @@ object WebViewHtmlBuilder {
         inlineCss: Map<String, String> = emptyMap(),
     ): String {
         val themeMarker = if (isDark) "dark" else "light"
-        val contentBlock = rewriteRelativeUrls(buildContentBlock(sanitizedHtml, renderMode), baseRepoUrl)
+        val contentBlock = buildContentBlock(sanitizedHtml, renderMode, baseRepoUrl)
         val offlineScripts =
             if (renderMode == RenderMode.OFFLINE_MARKDOWN_IT) {
                 "\n    <script src=\"${ASSET_BASE}markdown-it.min.js\"></script>" +
@@ -131,19 +139,22 @@ object WebViewHtmlBuilder {
     /**
      * 构建内容块（取决于渲染模式）。
      *
-     * - SERVER_HTML：强制经 [HtmlSanitizer] 清洗后嵌入（组件内建安全责任，任何进入
-     *   WebView 的 HTML 必经清洗，即使调用方未清洗）
-     * - OFFLINE_MARKDOWN_IT：将原始 markdown 转义后注入 `<div data-markdown-raw="...">`，
+     * - SERVER_HTML：强制经 [HtmlSanitizer] 清洗 + [rewriteRelativeUrls] 改写相对资源路径后嵌入
+     *   （组件内建安全责任，任何进入 WebView 的 HTML 必经清洗，即使调用方未清洗）
+     * - OFFLINE_MARKDOWN_IT：将原始 markdown 转义后注入 `<div data-markdown-raw="…">`，
      *   由 renderer.js 调用 markdown-it 渲染（原始 markdown 不做正则清洗，避免破坏代码围栏；
-     *   渲染产物由 DOMPurify 在 WebView 内权威清洗）
+     *   渲染产物由 DOMPurify 在 WebView 内权威清洗）。
+     *   **相对链接/图片的改写在 renderer.js 的渲染产物层完成**（见 [repoContext] 的说明）：
+     *   这里只把仓库上下文以 `data-base-repo` 传给脚本。
      */
     private fun buildContentBlock(
         content: String,
         renderMode: RenderMode,
+        baseRepoUrl: String?,
     ): String =
         when (renderMode) {
             RenderMode.SERVER_HTML -> {
-                HtmlSanitizer.sanitize(content)
+                rewriteRelativeUrls(HtmlSanitizer.sanitize(content), baseRepoUrl)
             }
 
             RenderMode.OFFLINE_MARKDOWN_IT -> {
@@ -157,16 +168,43 @@ object WebViewHtmlBuilder {
                         "![$alt](https://appassets.androidplatform.net/assets/$path)"
                     }
                 val escaped = escapeForHtmlAttribute(absolutized)
-                "    <div id=\"markdown-raw\" data-markdown-raw=\"$escaped\"></div>"
+                val repoAttribute =
+                    repoContext(baseRepoUrl)?.let { " data-base-repo=\"${escapeForHtmlAttribute(it)}\"" }.orEmpty()
+                "    <div id=\"markdown-raw\" data-markdown-raw=\"$escaped\"$repoAttribute></div>"
             }
         }
 
     /**
-     * 改写服务端 HTML 中的相对资源路径（2026-08-14 真机走查修复：README 相对图/链接空白）。
+     * 仓库上下文（`owner/repo`）：离线通道交给 renderer.js 改写相对链接/图片的入参。
+     *
+     * ## 为什么改写必须在 renderer.js（渲染产物层）而不是这里（转义前/后）
+     *
+     * 离线模式的输入是**未解析的 markdown 文本**。在这一层改写只有两条路，都不稳：
+     * 1. 作用在转义后的属性值上（2026-09-11 之前的实现）——正则 `<img[^>]*?\ssrc="…"`
+     *    根本匹配不到 markdown 文本，功能等于没做（D3 的根因）；
+     * 2. 作用在转义前的 raw markdown 上——`./docs/x.png` 与代码围栏/行内代码里的示例文本
+     *    无法区分，正则必然误伤（既有 [REWRITE_ASSETS_IMAGE_REGEX] 就有这个毛病）。
+     *
+     * markdown-it 解析后，代码块里的内容已是转义文本、链接目标已是真实属性，改写既准确又
+     * 覆盖引用式链接（`[ref]: path`）与内联 HTML `<img src>`。规则与 [rewriteRelativeUrls]
+     * 完全一致（同一目标域），因此离线通道与服务端 HTML 通道对同一个仓库解析出同样的链接。
+     */
+    internal fun repoContext(baseRepoUrl: String?): String? {
+        if (baseRepoUrl == null) return null
+        val (owner, repo) = parseBaseRepo(baseRepoUrl) ?: return null
+        return "$owner/$repo"
+    }
+
+    /**
+     * 改写**服务端 HTML**（已渲染产物）中的相对资源路径（2026-08-14 真机走查修复：README 相对图/链接空白）。
      *
      * - img src 相对路径 → `https://raw.githubusercontent.com/{owner}/{repo}/HEAD/{path}`
      * - a href 相对路径 → `https://github.com/{owner}/{repo}/blob/HEAD/{path}`
      * - 绝对 URL（http/https/data）与无 baseRepoUrl 时原样保留
+     *
+     * 只用于 [RenderMode.SERVER_HTML]：该模式的输入已经是 HTML，属性正则安全。
+     * 离线通道的输入是 markdown 文本，同一套规则由 `renderer.js` 在渲染产物上执行
+     * （见 [repoContext]）。
      */
     private fun rewriteRelativeUrls(
         html: String,
@@ -175,41 +213,106 @@ object WebViewHtmlBuilder {
         if (baseRepoUrl == null) return html
         val (owner, repo) = parseBaseRepo(baseRepoUrl) ?: return html
 
-        fun resolve(path: String): String =
-            if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:") || path.startsWith("#")) {
-                path
-            } else {
-                val trimmed = path.removePrefix("./").removePrefix("/")
-                if (trimmed.isEmpty()) path else trimmed
+        // img src：相对路径 → raw 域（assets/ → appassets 域）
+        var out =
+            UrlRegexes.IMG_SRC_REGEX.replace(html) { match ->
+                val src = match.groupValues[1]
+                val target = resolveImageTarget(src, owner, repo)
+                if (target == null) match.value else match.value.replaceFirst(src, target)
             }
-
-        var out = html
-        // img src：相对路径 → raw 域
-        out =
-            UrlRegexes.IMG_SRC_REGEX.replace(out) { match ->
-                val src = resolve(match.groupValues[1])
-                if (src.startsWith("http") || src.startsWith("data:")) {
-                    match.value
-                } else if (src.startsWith("assets/")) {
-                    // 本地 fixture 资产（原型/测试）：走 appassets 域，避免 raw 域被墙
-                    match.value.replaceFirst(match.groupValues[1], "$ASSET_BASE${src.removePrefix("assets/")}")
-                } else {
-                    val rawUrl = "https://raw.githubusercontent.com/$owner/$repo/HEAD/$src"
-                    match.value.replaceFirst(match.groupValues[1], rawUrl)
-                }
-            }
-        // a href：相对路径 → github blob 域（点击后由链接分发走应用内导航）
+        // a href：相对路径 → github 路由（点击后由链接分发走应用内导航）
         out =
             UrlRegexes.ANCHOR_HREF_REGEX.replace(out) { match ->
-                val href = resolve(match.groupValues[1])
-                if (href.startsWith("http") || href.startsWith("mailto:") || href.startsWith("#")) {
-                    match.value
-                } else {
-                    val blobUrl = "https://github.com/$owner/$repo/blob/HEAD/$href"
-                    match.value.replaceFirst(match.groupValues[1], blobUrl)
-                }
+                val href = match.groupValues[1]
+                val target = resolveLinkTarget(href, owner, repo)
+                if (target == null) match.value else match.value.replaceFirst(href, target)
             }
         return out
+    }
+
+    /**
+     * 图片目标绝对化（离线侧对应 `renderer.js` 的 `resolveImageTarget`）。
+     *
+     * `assets/` 是 app 内置资产（原型/测试夹具）→ appassets 域，避免 raw 域被墙；
+     * 其余相对路径 → `raw.githubusercontent.com`。返回 null = 原样保留。
+     */
+    private fun resolveImageTarget(
+        src: String,
+        owner: String,
+        repo: String,
+    ): String? {
+        if (src.startsWith("http") || src.startsWith("data:") || src.startsWith("#")) return null
+        val normalized = normalizeRepoRelativePath(src)
+        return if (normalized.startsWith("assets/")) {
+            "$ASSET_BASE${normalized.removePrefix("assets/")}"
+        } else {
+            "https://raw.githubusercontent.com/$owner/$repo/HEAD/$normalized"
+        }
+    }
+
+    /**
+     * 链接目标绝对化（离线侧对应 `renderer.js` 的 `resolveLinkTarget`）。返回 null = 原样保留。
+     *
+     * 分支顺序（两条通道同一约定）：
+     * 1. 绝对 URL / 锚点 → 原样；
+     * 2. 站点路径形态（前导 `/` + 第 3 段是 GitHub 路由关键字，如 `/owner/repo/issues/123`）
+     *    → `https://github.com{path}`（plan.md §2.11 的输入形态，最终落到应用内路由）；
+     * 3. 仓库内路由形态（`issues/123`、`commit/<sha>`）→ `https://github.com/{owner}/{repo}/{path}`
+     *    —— 否则会被当成仓库里名为 `issues/123` 的文件；
+     * 4. 其余 → `https://github.com/{owner}/{repo}/blob/HEAD/{path}`。
+     */
+    private fun resolveLinkTarget(
+        href: String,
+        owner: String,
+        repo: String,
+    ): String? {
+        if (href.startsWith("http") || href.startsWith("mailto:") || href.startsWith("#")) return null
+        if (isSiteRoutePath(href)) return "https://github.com/${href.trimStart('/')}"
+        val normalized = normalizeRepoRelativePath(href)
+        return if (isRepoRoutePath(normalized)) {
+            "https://github.com/$owner/$repo/$normalized"
+        } else {
+            "https://github.com/$owner/$repo/blob/HEAD/$normalized"
+        }
+    }
+
+    /** 站点路径形态：前导 `/` 且第 3 段是路由关键字（`/owner/repo/issues/123`）。 */
+    private fun isSiteRoutePath(path: String): Boolean {
+        if (!path.startsWith("/")) return false
+        val segments = path.trimStart('/').split('/')
+        return segments.size >= 4 && segments[2].lowercase() in SITE_ROUTE_SEGMENTS
+    }
+
+    /** 仓库内路由形态：`issues/123`、`pull/7`、`commit/<sha>`、`blob/<ref>/<path>`。 */
+    private fun isRepoRoutePath(path: String): Boolean {
+        val segments = path.split('/')
+        if (segments.size < 2) return false
+        return when (segments[0].lowercase()) {
+            "issues", "pull", "discussions" -> REPO_ROUTE_NUMBER_REGEX.matches(segments[1])
+            "commit" -> REPO_ROUTE_SHA_REGEX.matches(segments[1])
+            "blob", "tree", "raw" -> segments.size >= 3 && segments[1].isNotEmpty()
+            "releases" -> segments.size >= 3 && segments[1] == "tag" && segments[2].isNotEmpty()
+            else -> false
+        }
+    }
+
+    /**
+     * 相对路径归一化（两条通道共用的约定，离线侧对应 `renderer.js` 的 `normalizeRelative`）。
+     *
+     * 去掉 `./` 与前导 `/`，折叠 `.` 与 `..`；`..` 越出仓库根时**钳制到根**——
+     * 否则会产出 `blob/HEAD/../CONTRIBUTING.md` 这类含 `..` 的死链（app 内的
+     * [com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser] 会把它当成字面文件名）。
+     */
+    private fun normalizeRepoRelativePath(path: String): String {
+        val normalized = mutableListOf<String>()
+        path.removePrefix("/").split('/').forEach { segment ->
+            when (segment) {
+                "", "." -> Unit
+                ".." -> if (normalized.isNotEmpty()) normalized.removeAt(normalized.lastIndex)
+                else -> normalized.add(segment)
+            }
+        }
+        return if (normalized.isEmpty()) path else normalized.joinToString("/")
     }
 
     /** 解析 `https://github.com/{owner}/{repo}` → (owner, repo)；非法格式返回 null */
