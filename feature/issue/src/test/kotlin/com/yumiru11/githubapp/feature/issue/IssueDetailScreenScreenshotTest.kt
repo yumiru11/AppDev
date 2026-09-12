@@ -52,7 +52,7 @@ class IssueDetailScreenScreenshotTest : ScreenshotTest() {
                         author = IssueUser(login = "octocat"),
                         labels = listOf(IssueLabel(name = "bug", color = "d73a4a")),
                         assignees = listOf(IssueUser(login = "octocat"), IssueUser(login = "hubot")),
-                        createdAt = "2026-01-01T10:00:00Z",
+                        createdAt = isoDaysAgo(days = 240),
                         htmlUrl = "https://github.com/octocat/Hello-World/issues/42",
                     )
                 coEvery { timeline("octocat", "Hello-World", 42) } returns
@@ -61,7 +61,7 @@ class IssueDetailScreenScreenshotTest : ScreenshotTest() {
                             id = 10L,
                             author = IssueUser(login = "hubot"),
                             body = "Looks good to me, thanks!",
-                            createdAt = "2026-01-01T10:00:00Z",
+                            createdAt = isoDaysAgo(days = 240),
                         ),
                         IssueTimelineItem.Event(
                             id = 11L,

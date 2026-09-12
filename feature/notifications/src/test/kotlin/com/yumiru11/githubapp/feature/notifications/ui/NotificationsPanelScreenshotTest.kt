@@ -30,6 +30,29 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35])
 class NotificationsPanelScreenshotTest : ScreenshotTest() {
+    /**
+     * 相对时间夹具（**必须相对，不能写死绝对时间**）。
+     *
+     * 踩过的坑：原夹具写死 `2026-08-21T09:00:00Z`，而通知行渲染的是相对时间
+     * （"2 weeks ago" / "3 weeks ago"）。08-21 到 09-10 是 20 天（floor(20/7)=2 → "2 weeks"），
+     * 到 09-11 是 21 天（floor(21/7)=3 → "3 weeks"）—— 跨过取整边界的那一刻，
+     * **同一份代码 + 同一份基线**的截图校验就从绿变红，且重录基线只能把时钟重置、
+     * 下周还会再炸（典型的 time-bomb flaky test）。
+     *
+     * 改成"相对现在 N 天"后就永远落在同一个桶里。取 21 天是为了与当前基线
+     * （"3 weeks ago"）保持一致；21/7 恰好是整数，且渲染时刻必然晚于夹具构造时刻，
+     * 差值只会 ≥ 21 天，不会掉回 2 weeks。
+     */
+    private fun isoDaysAgo(
+        days: Long,
+        hoursEarlier: Long = 0,
+    ): String =
+        java.time.Instant
+            .now()
+            .minus(days, java.time.temporal.ChronoUnit.DAYS)
+            .minus(hoursEarlier, java.time.temporal.ChronoUnit.HOURS)
+            .toString()
+
     private fun item(
         id: String,
         repo: String,
@@ -66,7 +89,7 @@ class NotificationsPanelScreenshotTest : ScreenshotTest() {
                                     "PullRequest",
                                     "mention",
                                     true,
-                                    "2026-08-21T09:00:00Z",
+                                    isoDaysAgo(days = 21),
                                 ),
                                 item(
                                     "2",
@@ -75,7 +98,7 @@ class NotificationsPanelScreenshotTest : ScreenshotTest() {
                                     "Issue",
                                     "subscribed",
                                     false,
-                                    "2026-08-21T08:00:00Z",
+                                    isoDaysAgo(days = 21, hoursEarlier = 1),
                                 ),
                             ),
                     ),
@@ -90,7 +113,7 @@ class NotificationsPanelScreenshotTest : ScreenshotTest() {
                                     "Release",
                                     "ci_activity",
                                     true,
-                                    "2026-08-20T18:03:00Z",
+                                    isoDaysAgo(days = 21, hoursEarlier = 6),
                                 ),
                             ),
                     ),
