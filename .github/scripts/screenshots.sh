@@ -74,6 +74,30 @@ if [ -n "${SCREENSHOT_TOKEN:-}" ]; then
   AUTHED=true
 fi
 
+# ── 0.6 冷启动耗时实测（#26 验收「冷启动 < 1.5s」的 CI 侧证据）─────────
+# 用 am start -W 拿系统口径的 TotalTime（Activity 首帧），比"截图拍脑袋"可靠。
+# **诚实标注**：这是模拟器（KVM + 宿主 CPU）的数字，不等于中端机；它只用于
+# ① 发现回归（同一环境前后对比）② 给真机基线一个量级参考。
+# 真机 <1.5s 的最终判定仍需人工走查——这是本项无法在 CI 闭环的部分。
+adb shell am force-stop "$PKG"
+STARTUP=$(adb shell am start -W -n "$PKG/com.yumiru11.githubapp.MainActivity" 2>/dev/null | tr -d '\r' || true)
+printf '%s\n' "$STARTUP" > "$OUT/startup.txt"
+COLD_TOTAL=$(printf '%s\n' "$STARTUP" | awk -F': ' '/TotalTime/ {print $2; exit}')
+if [ -n "${COLD_TOTAL:-}" ]; then
+  echo "::notice::cold start TotalTime=${COLD_TOTAL}ms（模拟器 API 30，非真机；用于回归对比）"
+  {
+    echo ""
+    echo "### Cold start (emulator)"
+    echo ""
+    echo '```'
+    printf '%s\n' "$STARTUP"
+    echo '```'
+  } >> "${GITHUB_STEP_SUMMARY:-/dev/null}" 2>/dev/null || true
+else
+  echo "::warning::am start -W 未返回 TotalTime（冷启动实测缺失）"
+fi
+sleep 3
+
 # 登录态帧的前置条件判定：没 token 就**明确标 MISSING**（而不是拍一张游客态冒充
 # 登录态——「拍到了登录失败的应用」比「没拍」更糟，见 assert_signed_in 注释）。
 # readme-webview 正文渲染不受登录影响，无需 token。
@@ -87,6 +111,7 @@ require_token() {
 # ══════════════════════════════════════════════════════════════════════
 # 1. 首页（浅色）
 # ══════════════════════════════════════════════════════════════════════
+# ── 1. 首页（浅色）──────────────────────────────────────────
 adb shell cmd uimode night no
 adb shell am force-stop "$PKG"
 launch_app

@@ -1,4 +1,4 @@
-package com.yumiru11.githubapp.feature.home.ui
+package com.yumiru11.githubapp.core.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -17,23 +17,29 @@ import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.designsystem.token.LocalStaggerEnabled
 
 /** 参与首屏 stagger 的最大行数（#89）：其余行直出，避免深页滚动时反复入场。 */
-internal const val STAGGER_MAX_ITEMS = 12
+const val STAGGER_MAX_ITEMS = 12
 
 /**
  * 第 [index] 行的 stagger 延迟（#89，ui-design.md §4.2 H2-5：24ms/项）。
  * 超出首屏窗口或非法索引一律 0（立即开始）。纯函数，单测覆盖。
  */
-internal fun staggerDelayMillis(index: Int): Int =
-    if (index in 0 until STAGGER_MAX_ITEMS) index * AppMotion.LIST_STAGGER_INTERVAL_MILLIS else 0
+fun staggerDelayMillis(index: Int): Int = if (index in 0 until STAGGER_MAX_ITEMS) index * AppMotion.LIST_STAGGER_INTERVAL_MILLIS else 0
 
 /**
- * 列表项进入动效（slide-up + fade，ui-design.md §3.1「列表首项进入 slide+fade」）：
- * - 间隔 [staggerDelayMillis]，时长 [AppMotion.DURATION_LIST_ITEM] 经
+ * 列表项首帧进入动效（slide-up + fade，ui-design.md §3.1「列表首项进入 slide+fade」）：
+ * - 间隔 [staggerDelayMillis]（24ms/项，§4.2 H2-5），时长 [AppMotion.DURATION_LIST_ITEM] 经
  *   [AppMotion.scaledDuration] 缩放（设置动画强度 × 系统动画缩放取 min；0 = 立即完成）
- * - rememberSaveable 记账：已播过的行滚动回收后再组合不重播
+ * - rememberSaveable 记账：已播过的行滚动回收后再组合不重播——
+ *   滚动中不会二次入场，故不打断滚动（§4.4「列表滚动中禁用进入动画（首帧后）」）
+ *
+ * ## 归属（#167 / UI17）
+ *
+ * 本文件原在 `feature/home/ui/Stagger.kt`，`feature/repo/ReposScreen.kt` 另有一份等价私有实现
+ * （feature 之间禁互引，只能各写一份）。UI17 的「列表项首帧进入」消费点统一上移到 `core:ui`：
+ * 两个 feature 现在共用同一份令牌消费路径，改一处即全站生效。
  */
 @Composable
-internal fun rememberStaggerEnterModifier(index: Int): Modifier {
+fun rememberStaggerEnterModifier(index: Int): Modifier {
     // 全局开关（#167 / UI06，§4.2 H2-2）：关掉即"列表一次性直出"，不位移不淡入。
     // 注意与动效缩放的差别：缩放到 0 是"动画瞬时完成"（首帧即在终态，视觉相同），
     // 而关开关是"根本不进入动画路径"——对长列表省下的组合/绘制开销是实打实的。

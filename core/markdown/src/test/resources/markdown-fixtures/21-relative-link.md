@@ -1,0 +1,5 @@
+- [同目录](./docs/architecture.md)
+- [上级目录](../CONTRIBUTING.md)
+- [仓库内绝对路径](/owner/repo/blob/main/README.md)
+- [锚点](#section)
+- [仓库内相对 issue](issues/123)

@@ -617,7 +617,10 @@ launch_app() {
 
   adb shell am start -n "$PKG/com.yumiru11.githubapp.MainActivity" >/dev/null
   wait_for_activity "$PKG" || true
-  sleep 2   # 首帧稳定（动画归零后无需更长）
+  # 首帧稳定。3s（原 2s）：加了品牌化启动屏（D3）后冷启动会先显示 splash 再交接给
+  # 首帧，2s 有拍到 splash 的风险。#196 的修复随 helper 抽取一并保留（#195 把本函数
+  # 搬进 lib/adb-helpers.sh 时丢了这 1s）。
+  sleep 3
 }
 
 # 长截图（纯 adb 滚动 + 多帧截图，无 Python/PIL 依赖）：

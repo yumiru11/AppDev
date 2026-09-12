@@ -40,10 +40,11 @@
 ### 1.4 本地全门禁（提交前必跑，与 CI 命令级对齐）
 
 ```bash
-./gradlew spotlessCheck detekt konsistCheck :app:lintDebug :app:testDebugUnitTest :app:verifyRoborazziDebug :app:assembleDebug
+./gradlew spotlessCheck detekt konsistCheck :app:lintDebug :app:testDebugUnitTest coverageVerify :app:verifyRoborazziDebug :app:assembleDebug
 ```
 
-- **覆盖率门禁**（Phase A 起）：`./gradlew jacocoTestReport`（或模块级）——覆盖率策略见 `docs/agents/testing-strategy.md`；CI PR 阶段加 diff coverage（新增代码 ≥80%）
+- **覆盖率门禁**（Phase A 起）：`./gradlew coverageReport coverageVerify` 是 **CI 硬门禁**（各模块 LINE ≥ `build.gradle.kts` 的 `coverageThresholds`）——**必须跑**，漏跑会「本地全绿 CI 必挂」。完整策略见 `docs/agents/testing-strategy.md`；CI PR 阶段另有 diff coverage 软门禁（新增代码 ≥80%）
+- **模块级截图基线也已入 CI**（PR #188 起）：除 `:app:verifyRoborazziDebug` 外，`core:ui` / `core:designsystem` 等模块的 verify 同样在闸内——改这些模块的 UI 后要跑对应模块的 verify
 - **新功能票必补测试**：实现时对照 `docs/agents/testing-checklist.md` 为对应业务点补测试（每点至少 正常+边界+异常 三类；ViewModel 补 4 态）——Phase C 起强制
 
 - 违规修复：`./gradlew spotlessApply`；detekt 业务合理违规用 `@file:Suppress("RuleName")` + 理由注释

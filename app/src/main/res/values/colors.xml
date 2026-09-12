@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 启动屏配色（D3）。
+     为什么这里是"硬编码颜色"却不违反项目的零硬编码颜色铁律：
+     windowSplashScreenBackground 属于 **window 级主题属性**，在 Compose 之前生效，
+     取不到 MaterialTheme.colorScheme。这里取的是应用主色（紫）与深色下的近黑，
+     与 Theme.AppDev 的窗口背景一致，保证 splash → 首帧之间没有跳色。
+     改动时请同步 values-night 的同名资源。 -->
+<resources>
+    <color name="splash_background">#FFFBFE</color>
+</resources>
