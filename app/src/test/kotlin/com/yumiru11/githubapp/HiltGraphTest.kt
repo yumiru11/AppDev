@@ -3,6 +3,7 @@ package com.yumiru11.githubapp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import com.yumiru11.githubapp.core.database.AppDatabase
+import com.yumiru11.githubapp.core.githubauth.auth.OAuthConfig
 import com.yumiru11.githubapp.core.githubdata.repository.RepositoryRepository
 import com.yumiru11.githubapp.core.githubdata.user.UserRepository
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -39,6 +40,9 @@ class HiltGraphTest {
 
     @Inject lateinit var database: AppDatabase
 
+    /** app 装配层的 OAuthConfig 绑定（BuildConfig.OAUTH_CLIENT_ID 注入）——防绑定丢失回退占位符。 */
+    @Inject lateinit var oauthConfig: OAuthConfig
+
     @Before
     fun setUp() {
         hiltRule.inject()
@@ -51,5 +55,6 @@ class HiltGraphTest {
         assertNotNull("DataStore 应可注入", dataStore)
         assertNotNull("AppDatabase 应可注入", database)
         assertNotNull("AppDatabase DAO 应可获取", database.cachedRepositoryDao())
+        assertNotNull("OAuthConfig 应可注入（app 装配层）", oauthConfig)
     }
 }

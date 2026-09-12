@@ -35,4 +35,26 @@ class OAuthConfigTest {
         // 其余字段保持默认（测试注入时只改需要改的）
         assertEquals(OAuthConfig.REDIRECT_URI, config.redirectUri)
     }
+
+    @Test
+    fun isConfigured_defaultPlaceholder_false() {
+        assertEquals(false, OAuthConfig().isConfigured)
+        assertEquals(false, OAuthConfig.isClientIdConfigured(OAuthConfig.PLACEHOLDER_CLIENT_ID))
+    }
+
+    @Test
+    fun isConfigured_blankOrPaddedValues_false() {
+        assertEquals(false, OAuthConfig.isClientIdConfigured(""))
+        assertEquals(false, OAuthConfig.isClientIdConfigured("   "))
+        // 前后带空白的占位符同样视为未配置（防从 local.properties/复制粘贴带空格）
+        assertEquals(false, OAuthConfig.isClientIdConfigured("  ${OAuthConfig.PLACEHOLDER_CLIENT_ID}  "))
+    }
+
+    @Test
+    fun isConfigured_realClientId_true() {
+        assertEquals(true, OAuthConfig(clientId = "Iv1.0123456789abcdef").isConfigured)
+        assertEquals(true, OAuthConfig.isClientIdConfigured("Ov23liAbCdEf123456"))
+        // 中间含空格的非法值不做过度校验：只负责区分「占位/空白」与「看起来配置了」
+        assertEquals(true, OAuthConfig.isClientIdConfigured("client id"))
+    }
 }
