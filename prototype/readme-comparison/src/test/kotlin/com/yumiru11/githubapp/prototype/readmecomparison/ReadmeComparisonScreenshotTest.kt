@@ -34,7 +34,6 @@ class ReadmeComparisonScreenshotTest : ScreenshotTest() {
             markdown = markdown,
             imageTransformer = remember(context) { AssetMarkdownImageTransformer(context) },
             darkTheme = isDarkTheme(),
-            horizontalScrollEnabled = false,
             modifier = Modifier.fillMaxWidth().width(720.dp),
         )
     }
