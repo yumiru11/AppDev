@@ -6,6 +6,8 @@
 # 调研证明 adb screencap + input + uimode 足够截图自动化
 # （docs/research/actions-emulator-feasibility.md Q5——kzahel/kiwix/
 # inaturalist 等真实 workflow 同款模式）。
+# 本脚本是**唯一**截图驱动：`.maestro/screenshots/*.yaml`（5 个 flow）从未被任何
+# workflow 执行，已随本轮清理删除（其画面 100% 由本脚本覆盖，见 ci.yml 截图 job）。
 #
 # 依赖：模拟器已由 android-emulator-runner 启动（adb 可用），
 # debug APK 已装（assembleDebug 产物被 action 自动安装）。
@@ -155,7 +157,7 @@ fi
 #   log:ReadmeRender.*repo=mermaid-js/mermaid —— RepoRepository 在本帧窗口内打出
 #                            「readme 元数据取到了」的日志（正文渲染链路的机器证据）
 #   opt:text:Mermaid     —— WebView 正文文本是否进 uiautomator dump 依 WebView 版本而定
-#                            （.maestro/screenshots/readme-webview.yaml 已注明不可依赖），
+#                            （WebView 内容不属于原生 view hierarchy，文本不可依赖），
 #                            故降级为可选探针：命中是加分，不命中不算坏帧。
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/mermaid-js/mermaid" -p "$PKG" >/dev/null
 capture_frame readme-webview critical 5 \
