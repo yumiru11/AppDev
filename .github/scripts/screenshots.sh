@@ -153,6 +153,17 @@ capture_frame repos warn 3 \
 if [ "$AUTHED" = "false" ]; then
   capture_frame repos-guest warn 1 \
     act:"$PKG" text:"Sign in to see your repositories"
+else
+  # 登录态下该帧**按设计不适用**（它验证的正是「游客看到登录引导」）。显式写 SKIPPED
+  # 标记而不是什么都不留：ci.yml 的 Verify screenshots collected 要求「每一帧都有产出
+  # 或显式处置」，留空会被判成漏拍（GATE-5b 的收集校验）。不进 bad-frames.txt
+  # （不是坏帧也不是 MISSING）。
+  {
+    echo "frame: repos-guest"
+    echo "kind: SKIPPED"
+    echo "severity: info"
+    echo "reason: 仅游客态拍摄（SCREENSHOT_TOKEN 已配置，登录态下该屏为仓库列表）"
+  } > "$OUT/repos-guest.skipped.txt"
 fi
 
 # ══════════════════════════════════════════════════════════════════════
