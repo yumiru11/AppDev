@@ -241,6 +241,16 @@ assert_selected_holds() {
   return 2
 }
 
+# checked 语义（radio / M3 SegmentedButton 的选中态）的能力缺失包装，同 selected。
+assert_checked_holds() {
+  local value="$1" timeout="${2:-12}"
+  if command -v python3 >/dev/null 2>&1; then
+    if wait_for_checked "$value" "$timeout" >/dev/null 2>&1; then return 0; fi
+    return 1
+  fi
+  return 2
+}
+
 # 标记「断言能力缺失」告警只打一次，避免刷屏掩盖真正的坏帧
 HOST_CAPABILITY_WARNED=0
 warn_capability_once() {
@@ -262,31 +272,39 @@ assert_log_holds() {
   return 2
 }
 
-# Tab 选中态断言：Compose TabRow 的选中 Tab 带 selected="true"，但**文本节点未必
-# 与 selected 属性同节点**。
+# 语义选中态断言：Tab 的 selected 与 radio/分段按钮的 checked 共用同一套判据。
 #
-# ⚠️ 首版实现要求「同一 <node> 里既有 text="X" 又有 selected="true"」——2026-09-11
-# 首次真跑 CI 实测：**17/32 帧全部判坏**，包括 repos/profile/pr-conversation 这些
-# 显然拍对了的帧。原因是 Compose 的语义树把 selected 挂在 Tab 容器节点、文本挂在子
-# 节点（或旁挂），同节点要求在该树上几乎永不成立 —— 判据过严会把「工具链假设」
-# 当成「UI 坏了」，比不检查更糟（假红会让人把门禁关掉）。
+# ⚠️ 为什么两种属性都必须支持：Compose 不同组件把「选中」暴露到不同语义位——
+#   - TabRow 的 Tab（Modifier.selectable）→ selected="true"（CI 实证：README/
+#     Repos/Profile/Commits/Conversation 这些帧一直稳定命中）
+#   - M3 SegmentedButton（radio 语义）→ checkable/checked="true"，selected 恒 false
+#     （CI run 34698275775 的 pr-diff-unified.ui.xml / pr-diff-side-by-side.ui.xml 实证：
+#      checked=true 随点击在两段之间移动，selected 全为 false）
+#   用 selected 判分段按钮会稳定假红（pr-diff 两帧的实际失败原因），反之亦然。
 #
-# 正确判据（三级，从强到弱，全部落在**同一棵子树**内）：
-#   1. 同一 node 既有 text="X" 又有 selected="true"            → 通过（最严格）
-#   2. 存在 selected="true" 的 node，其**子树内**有 text="X"    → 通过（Compose 实际形态）
-#   3. 存在 text="X" 的 node，其 bounds 落在某个 selected="true" node 的 bounds 内
-#                                                              → 通过（个别版本下标在祖先）
-# 用 minidom 走真树结构而不是正则 —— 正则做不到「子树内」这种判断，而
-# 「分开 grep text 与 selected」又会被风马牛不相及的组合假通过（本 bug 的修复若只判
-# 文字，Files tab 上也有「README」字样，等于没检查）。
-wait_for_selected() {
-  local value="$1" timeout="${2:-12}"
+# ⚠️ 首版实现的三个实测教训（2026-09-11/12，别重蹈）：
+#   ① 要求「同一 <node> 里既有 text 又有 selected」→ 17/32 帧全判坏：Compose 语义树
+#      把 selected 挂在 Tab 容器节点、文本挂在子节点，同节点要求几乎永不成立；
+#   ② minidom 从 Document 节点遍历会**跳过属性**（实测 getAttribute 恒返回空串）→
+#      断言恒假红。必须从 documentElement 走；
+#   ③ 「子树内有该文本」判据**故意不用**：TabRow 的选中容器 View 覆盖整个 Tab 行，
+#      子树里同时含 README/Files/Releases 三个标签 —— 会让「Files 选中时查 README」
+#      也通过（把假红换成假绿）。
+#
+# 正确判据（两级，从强到弱，全部落在**同一棵子树**内）：
+#   1. 同一 node 既有 text="X" 又有 <语义>="true"             → 通过（最严格）
+#   2. 存在 <语义>="true" 的 node，其 bounds **包含** text="X" 的 node
+#                                                             → 通过（Compose 实际形态）
+# 用 minidom 走真树结构 + bounds 包含判定，而不是分开 grep text 与语义位。
+wait_for_state() {
+  local attr="$1" value="$2" timeout="${3:-12}"
   local deadline=$(( $(date +%s) + timeout ))
   while :; do
     if dump_ui 2>/dev/null; then
       if python3 -c "
 import re, sys
 import xml.dom.minidom as minidom
+state_attr = '$attr'
 value = '$value'
 
 # ⚠️ 必须从 documentElement 走：minidom 的 Document 节点在遍历时会**跳过属性**
@@ -295,7 +313,7 @@ value = '$value'
 
 def selected_nodes(n, acc):
     if n.nodeType == n.ELEMENT_NODE:
-        if n.getAttribute('selected') == 'true':
+        if n.getAttribute(state_attr) == 'true':
             acc.append(n)
         for c in n.childNodes:
             selected_nodes(c, acc)
@@ -369,12 +387,15 @@ sys.exit(1)
       fi
     fi
     [ "$(date +%s)" -ge "$deadline" ] && {
-      echo "::warning::timeout waiting for '$value' node to be selected"
+      echo "::warning::timeout waiting for '$value' node with $attr=true"
       return 1
     }
     sleep 1
   done
 }
+
+wait_for_selected() { wait_for_state selected "$@"; }
+wait_for_checked() { wait_for_state checked "$@"; }
 
 # 帧断言编排：FRAME_CHECKS/FRAME_REASONS/FRAME_OPTIONAL/FRAME_SEVERITY 由
 # capture_frame 设好。
@@ -492,6 +513,7 @@ frame_unlock() {
 #   act:<substr>         前台 activity 含该子串
 #   text:<文本>          UI 层级出现该文本（含 WebView 渲染出的文本）
 #   exact:<文本>         该文本节点处于 selected=true（Tab 选中态）
+#   checked:<文本>       该文本节点处于 checked=true（radio/分段按钮选中态）
 #   desc:<content-desc>  出现该 content-desc
 #   log:<正则>           **本帧开始之后**的 logcat 里出现该正则
 # severity：critical | warn（见各帧注释；决定 mark_bad_frame 用 ::error:: 还是 ::warning::）
@@ -523,6 +545,12 @@ capture_frame() {
       exact)
         FRAME_CHECKS+=("assert_selected_holds '$val'")
         FRAME_REASONS+=("「$val」节点不在 selected=true 状态（Tab 未选中）")
+        ;;
+      checked)
+        # radio/分段按钮的选中态（M3 SegmentedButton → checkable/checked=true，
+        # selected 恒 false；与 exact: 分开，避免把两种语义混为一谈）
+        FRAME_CHECKS+=("assert_checked_holds '$val'")
+        FRAME_REASONS+=("「$val」节点不在 checked=true 状态（分段按钮未选中）")
         ;;
       desc)
         FRAME_CHECKS+=("assert_attr_holds content-desc '$val'")
@@ -799,6 +827,63 @@ try_tap_desc() {
     adb shell input tap $bounds >/dev/null
     return 0
   fi
+  return 1
+}
+
+# ── 右下角 FAB 定位点击（ExtendedFAB 的文案不进 uiautomator dump）─────────────
+# 实证（CI run 34698275775 的 issue-authed.ui.xml / pr-actions.ui.xml）：
+# ExtendedFloatingActionButton（Comment / New issue）在 dump 里是 clickable 的 NAF
+# 节点，文本与图标子节点都没有 text/content-desc —— `wait_for_text "Comment"` /
+# `wait_for_text "New issue"` 永远等不到，这是 create-issue 被误标 MISSING、
+# issue-authed/pr-actions 稳定 FAILED 的共同根因之一。
+#
+# 判据：屏幕**右下角**（节点中心 x ≥ 0.7*屏宽 且 y ≥ 0.85*屏高）内 clickable=true
+# 且无文案的节点，取面积最大者。右下角限制是必要的——只在「底部区域」取最大节点时，
+# pr-diff 的整行可点击 diff 行（面积是 FAB 的两倍多）会被误点（实测 117432 vs 51597px²）。
+# 屏幕尺寸用 wm size 实测而不是写死 1080x2400；取不到时退回 pixel_6 档（本 job 档位）。
+# 找到即点，返回 0；未找到返回 1（调用方按「入口不可达」处理，不得当通过）。
+try_tap_fab() {
+  dump_ui || return 1
+  local size w h bounds
+  size=$(adb shell wm size 2>/dev/null | grep -oE '[0-9]+x[0-9]+' | head -1 || true)
+  w="${size%%x*}"
+  h="${size##*x}"
+  case "$w:$h" in
+    [0-9]*:[0-9]*) ;;
+    *) w=1080; h=2400 ;;
+  esac
+  bounds=$(python3 - "$w" "$h" <<'PY' 2>/dev/null || true
+import re
+import sys
+w, h = int(sys.argv[1]), int(sys.argv[2])
+xml = open('/tmp/ui.xml').read()
+best = None
+best_area = 0
+for m in re.finditer(r'<node[^>]*?/?>', xml):
+    tag = m.group(0)
+    if 'clickable="true"' not in tag:
+        continue
+    if 'text=""' not in tag or 'content-desc=""' not in tag:
+        continue
+    b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', tag)
+    if not b:
+        continue
+    l, t, r, bb = map(int, b.groups())
+    cx, cy = (l + r) // 2, (t + bb) // 2
+    if cx >= w * 0.7 and cy >= h * 0.85:
+        area = (r - l) * (bb - t)
+        if area > best_area:
+            best_area = area
+            best = (cx, cy)
+print('%d %d' % best if best else '')
+PY
+)
+  if [ -n "$bounds" ]; then
+    # shellcheck disable=SC2086  # "x y" 两个数字需按词拆分传给 input tap
+    adb shell input tap $bounds >/dev/null
+    return 0
+  fi
+  echo "::warning::右下角未找到无文案的 clickable 节点（FAB）—— 该屏可能没有 FAB"
   return 1
 }
 

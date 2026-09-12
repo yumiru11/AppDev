@@ -27,13 +27,24 @@
 #
 # 新规则（三条不可绕过）：
 #   R1 **断言前置**：每一帧都经 capture_frame 拍摄，截图前必须确认已在目标屏
-#      （act/text/exact/desc/log 五种断言，见 lib/adb-helpers.sh）。
+#      （act/text/exact/checked/desc/log 六种断言，见 lib/adb-helpers.sh）。
 #   R2 **坏帧显式化**：断言不过 → 不产出正常帧，改走坏帧路径（原图改名
 #      <name>.FAILED.png + 现场 UI 层级 <name>.ui.xml + bad-frames.txt + 拼板水印）。
 #   R3 **md5 去重**：帧集合两两比对，像素完全相同即判后一帧为 DUPLICATE 坏帧
 #      （豁免必须显式写进 lib/adb-helpers.sh 的 FRAME_MD5_EXEMPT_PAIRS 并附理由）。
 # 帧的 severity 决定坏帧报 ::error:: 还是 ::warning::（见各帧 capture_frame 第 2 参）；
 # 是否染红 job 只看 critical 帧，决策与理由写在脚本结尾的决策段。
+#
+# ── 断言选择器三条铁律（2026-09-12 第二轮修复，均有 ui.xml 实证）────────────
+#   1. **placeholder 不是就绪信号**：M3 OutlinedTextField 的 placeholder 仅在
+#      「聚焦且为空」时渲染（有 label 时更严格）—— 点了按钮但没点输入框，dump 里
+#      只有 label（任 #250：commit-dialog）。断言用 label / 对话框标题这类恒存文本。
+#   2. **selected≠checked**：Tab 用 selected=true，M3 SegmentedButton 用
+#      checkable/checked=true（pr-diff 两帧假红的根因）；capture_frame 的
+#      exact: 与 checked: 分开表达。
+#   3. **ExtendedFAB 的文案不进 dump**（NAF 节点，text/desc 均空）——
+#      wait_for_text "Comment"/"New issue" 永远等不到；改用 try_tap_fab 结构性
+#      定位后断言点击后弹出的 Sheet/表单内容（issue-authed/pr-actions/create-issue）。
 # ============================================================
 set -euo pipefail
 
@@ -136,10 +147,12 @@ capture_frame home-dark warn 0 \
 tap_text "Repos"
 capture_frame repos warn 3 \
   act:"$PKG" exact:"Repos"
-# 游客态仓库 tab 是登录引导占位（无 token 时不该出现仓库列表）
+# 游客态仓库 tab 是登录引导占位（无 token 时不该出现仓库列表）。
+# 断言从 opt 升为必需：本帧的目的就是「游客看到登录引导」，引导缺失时帧本身
+# 无价值（opt 会让帧静默通过）。文案在 ReposScreen.kt:204 无条件渲染，可当硬门槛。
 if [ "$AUTHED" = "false" ]; then
   capture_frame repos-guest warn 1 \
-    act:"$PKG" opt:text:"Sign in to see your repositories"
+    act:"$PKG" text:"Sign in to see your repositories"
 fi
 
 # ══════════════════════════════════════════════════════════════════════
@@ -198,8 +211,11 @@ adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11
 # 仓库详情默认 tab = README，故 repo-actions 帧同时是「AppDev README 空态」的留档：
 # 这里**要求** "No README" —— 仓库确实没有 README，拍到的就是真实状态；
 # 哪天仓库补了 README，这条断言会失败并把人叫来看（比静默拍个空态强）。
+# 2026-09-12 补 desc:"Avatar" 头部存在性闸门：此前本帧只断言 tab/文案，仓库头
+# （UI-C01）整块缺失时照样「通过」—— 探针空洞。Avatar 是仓库头卡片的恒定语义
+# （AsyncImage contentDescription），与登录态无关，适合当锚点。
 capture_frame repo-actions warn 4 \
-  act:"$PKG" text:"yumiru11/AppDev" exact:"README" opt:text:"No README"
+  act:"$PKG" text:"yumiru11/AppDev" exact:"README" desc:"Avatar" opt:text:"No README"
 tap_text "Releases"
 capture_frame repo-releases warn 3 \
   act:"$PKG" exact:"Releases" text:"yumiru11/AppDev"
@@ -247,13 +263,19 @@ if require_token editor "编辑器链路需登录态（Edit 按钮仅在 LoggedI
     if wait_for_text "Commit" 30; then
       capture_frame editor warn 1 \
         act:"$PKG" text:"Commit" text:"AGENTS.md"
-      # T22：同一编辑会话打开提交对话框；先用子串轮询等占位文案出现再取帧
-      # （与帧断言同口径）。409 冲突态需并发篡改，无法确定性复现，不自动化。
-      if tap_text "Commit" && wait_for_attr_sub "text" "Describe your changes…" 15; then
+      # T22：同一编辑会话打开提交对话框。
+      # #250 修正：旧探针等的是 placeholder「Describe your changes…」，但 M3
+      # OutlinedTextField 的 placeholder **只在聚焦且为空时**渲染（本字段还有 label
+      # 「Commit message」顶着）——只点顶栏 Commit 不点输入框时层级里根本没有该文案，
+      # 15s 必然超时（CI run 34698275775 的 commit-dialog.ui.xml 实证：对话框已打开，
+      # EditText focused="false"，全部文本 = Commit message / Commit to current branch
+      # (main) / Create a new branch / Commit / Cancel）。
+      # 改用对话框打开后**必然存在**的 label 文案做就绪判据 + 帧断言。
+      if tap_text "Commit" && wait_for_attr_sub "text" "Commit message" 15; then
         capture_frame commit-dialog warn 1 \
-          act:"$PKG" text:"Describe your changes…" text:"Commit to current branch"
+          act:"$PKG" text:"Commit message" text:"Commit to current branch"
       else
-        mark_bad_frame commit-dialog FAILED "点了 Commit 后 15s 内提交对话框未出现（占位文案缺失）"
+        mark_bad_frame commit-dialog FAILED "点了 Commit 后 15s 内提交对话框未出现（label「Commit message」缺失）"
       fi
     else
       mark_bad_frame editor FAILED "点了 Edit 后 30s 内编辑态未出现（顶栏 Commit 动作缺失）"
@@ -338,16 +360,20 @@ if wait_for_text "Files changed"; then
   if wait_for_desc "Show patch"; then
     tap_desc "Show patch"
   fi
+  # M3 SingleChoiceSegmentedButtonRow 的选中态是 checkable/checked=true（radio 语义），
+  # 不是 selected —— 旧断言用 exact:（=selected）必然假红。CI run 34698275775 的
+  # pr-diff-unified.ui.xml 实证：选中段 checkable=true checked=true、selected=false，
+  # 且 checked 随点击在两段间移动（side-by-side 帧里移到右段）。
   capture_frame pr-diff-unified warn 4 \
-    act:"$PKG" exact:"Unified" text:"Side-by-side"
+    act:"$PKG" checked:"Unified" text:"Side-by-side"
   tap_text "Side-by-side"
   # 换段两件套证据：① 帧必须与 unified 不同（capture_until_changed，其内部重按重截）；
-  # ② Side-by-side 段必须真的进入 selected=true —— 否则这帧只是 unified 的复制品，
+  # ② Side-by-side 段必须真的进入 checked=true —— 否则这帧只是 unified 的复制品，
   #    宁可标坏帧也不产出一张看起来对的图。
   capture_until_changed "$OUT/pr-diff-unified.png" "$OUT/pr-diff-side-by-side.png" "Side-by-side" || true
   sel_rc=0
   if [ -f "$OUT/pr-diff-side-by-side.png" ]; then
-    assert_selected_holds "Side-by-side" 12 || sel_rc=$?
+    assert_checked_holds "Side-by-side" 12 || sel_rc=$?
   else
     sel_rc=1
   fi
@@ -358,7 +384,7 @@ if wait_for_text "Files changed"; then
     echo "::warning::无法判定 Side-by-side 选中态（缺少 python3）—— 该帧未纳入 md5 去重"
   else
     rm -f "$OUT/pr-diff-side-by-side.png"
-    mark_bad_frame pr-diff-side-by-side FAILED "Side-by-side 段未进入 selected=true（分段切换未生效，帧与 unified 无区别）"
+    mark_bad_frame pr-diff-side-by-side FAILED "Side-by-side 段未进入 checked=true（分段切换未生效，帧与 unified 无区别）"
   fi
 else
   mark_missing_frame pr-diff-unified "PR 详情页未出现 Files changed Tab"
@@ -383,25 +409,86 @@ capture_frame profile warn 3 \
 if [ "$AUTHED" = "true" ] && assert_signed_in; then
   # 仓库详情（Star 按钮；登录态下 Star 是文本按钮）
   adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev" -p "$PKG" >/dev/null
-  capture_frame repo-star warn 5 \
-    act:"$PKG" text:"yumiru11/AppDev" text:"Star"
-  # Issue 详情（评论框可见）
-  adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues/71" -p "$PKG" >/dev/null
-  capture_frame issue-authed warn 6 \
-    act:"$PKG" text:"Write a comment…"
-  # PR 详情（PR 操作可见）
-  adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/pull/73" -p "$PKG" >/dev/null
-  capture_frame pr-actions warn 6 \
-    act:"$PKG" text:"Leave a comment…"
-  # 创建 Issue 表单（T14）
-  adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues" -p "$PKG" >/dev/null
-  if wait_for_text "New issue"; then
-    tap_text "New issue"
-    # 旧写法 `wait_for_text "Title" || true` 被吞掉 → 表单没打开也照截
-    capture_frame create-issue warn 4 \
-      act:"$PKG" text:"Title"
+  # 真实缺陷闸门（UI-C01，2026-09-11 审计 §1.4）：仓库头（Avatar/描述/统计/
+  # Star·Watch·Fork）在初始进入（未滚动）时**必须可见**；实证全屏缺失（截图
+  # repo-actions/readme-webview/repo-releases 顶栏下方直接是 Tab 行；dump 里无
+  # Avatar/Star 等任何头部节点），疑为 #167「README 下滑收起头部」的零高度测量
+  # 反馈回路（headerHeightPx 初值 0 → 外层 height(0) 约束下内层测不出自然高度）。
+  # 该缺陷属 app 侧（feature/repo），不在本探针 PR 修；这里只把失败原因说清楚，
+  # **仍然判坏帧**（不弱化、不销声）。
+  if ! wait_for_desc "Avatar" 5; then
+    FRAME_SEVERITY="warn"
+    mark_bad_frame repo-star FAILED "仓库头整体未渲染（Avatar/描述/统计/Star·Watch·Fork 全缺）—— 真实缺陷 UI-C01：初始未滚动态头部不应收起；同屏 repo-actions/readme-webview 亦有同证"
   else
-    mark_missing_frame create-issue "Issue 列表页未出现 New issue 入口（无写权限/未登录）"
+    capture_frame repo-star warn 5 \
+      act:"$PKG" text:"yumiru11/AppDev" text:"Star"
+  fi
+  # Issue 详情 → 评论输入 Sheet。
+  # 旧探针等「Write a comment…」(issue_comment_hint)：该字符串在代码里**零引用**
+  # （全仓 grep 只有 strings.xml 定义）—— 评论入口是右下 ExtendedFAB（文案
+  # 「Comment」），而 ExtendedFAB 的文案不进 uiautomator dump（NAF 节点，ci run
+  # 34698275775 的 issue-authed.ui.xml 实证：clickable 节点 text='' desc=''），
+  # 旧断言必然 FAILED。改为：结构性定位 FAB → 点开输入 Sheet → 断言 Sheet 特有文案。
+  adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues/71" -p "$PKG" >/dev/null
+  if wait_for_text "Open"; then
+    if try_tap_fab; then
+      # Sheet 内必现文本：Edit/Preview 双 Tab（MarkdownComposer）+ Cancel（issue_comment_cancel）
+      if wait_for_attr_sub "text" "Preview" 10 && wait_for_attr_sub "text" "Cancel" 5; then
+        capture_frame issue-authed warn 2 \
+          act:"$PKG" text:"Preview" text:"Cancel" opt:text:"Comment"
+      else
+        FRAME_SEVERITY="warn"
+        mark_bad_frame issue-authed FAILED "评论 FAB 已点击但输入 Sheet 未出现（Preview/Cancel 均缺失——MarkdownComposer 未渲染）"
+      fi
+    else
+      # FAB 受 canComment 门控（IssueDetailScreen.kt:207）：无权评论时入口按设计隐藏 → MISSING
+      mark_missing_frame issue-authed "Issue 详情已加载但评论入口（右下 FAB）不存在——canComment=false（无评论权限）"
+    fi
+  else
+    mark_missing_frame issue-authed "Issue 详情未加载（依赖帧不可达）"
+  fi
+  adb shell input keyevent 4   # 收起评论 Sheet，避免影响后续帧
+  # PR 详情 → 评论输入 Sheet。
+  # 旧探针等 placeholder「Leave a comment…」在**详情页本体**出现：该 placeholder
+  # 只在 CommentInputSheet 的 OutlinedTextField 里（PullRequestDetailScreen.kt:1161），
+  # 详情页本体只有 FAB（pull_request_comment="Comment"，同样不进 dump）。
+  adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/pull/73" -p "$PKG" >/dev/null
+  if wait_for_text "Conversation"; then
+    if try_tap_fab; then
+      # Sheet 标题「Add comment」(pull_request_add_comment) 是打开后必现文本；
+      # placeholder 是否渲染依 M3 聚焦规则，降级为可选探针。
+      if wait_for_attr_sub "text" "Add comment" 10; then
+        capture_frame pr-actions warn 2 \
+          act:"$PKG" text:"Add comment" opt:text:"Leave a comment…"
+      else
+        FRAME_SEVERITY="warn"
+        mark_bad_frame pr-actions FAILED "评论 FAB 已点击但输入 Sheet 未出现（Add comment 标题缺失）"
+      fi
+    else
+      # PR 评论 FAB 在 Success 态无条件渲染（PullRequestDetailScreen.kt:264）——缺失即缺陷
+      FRAME_SEVERITY="warn"
+      mark_bad_frame pr-actions FAILED "PR 详情已加载但评论 FAB 不存在（无条件渲染的入口缺失）"
+    fi
+  else
+    mark_missing_frame pr-actions "PR 详情未加载（依赖帧不可达）"
+  fi
+  adb shell input keyevent 4   # 收起评论 Sheet
+  # 创建 Issue 表单（T14）。
+  # 同 FAB 问题：列表页 FAB 文案「New issue」不进 dump（ExtendedFAB 语义），旧
+  # wait_for_text "New issue" 永远超时 → 帧被误标 MISSING。改为点 FAB 后断言表单。
+  adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/issues" -p "$PKG" >/dev/null
+  if wait_for_text "Open"; then
+    if try_tap_fab; then
+      # 表单标签 Title/Body（issue_create_title_label / body_label）是打开后必现文本
+      capture_frame create-issue warn 4 \
+        act:"$PKG" text:"Title" text:"Body"
+    else
+      # 列表页 FAB 无条件渲染（IssueListScreen.kt:110）——缺失即缺陷
+      FRAME_SEVERITY="warn"
+      mark_bad_frame create-issue FAILED "Issue 列表页已加载但 New issue FAB 不存在（无条件渲染的入口缺失）"
+    fi
+  else
+    mark_missing_frame create-issue "Issue 列表页未加载（依赖帧不可达）"
   fi
 else
   echo "::warning::登录态未确认（无 SCREENSHOT_TOKEN，或 SCREENSHOT_TOKEN 已失效）——跳过登录后帧并标记 MISSING"
