@@ -5,8 +5,10 @@ import com.yumiru11.githubapp.core.common.logging.LogRedaction
 import com.yumiru11.githubapp.core.githubrest.auth.AuthTokenInterceptor
 import com.yumiru11.githubapp.core.githubrest.auth.TokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.EtagCacheInterceptor
+import com.yumiru11.githubapp.core.githubrest.http.EtagScopeProvider
 import com.yumiru11.githubapp.core.githubrest.http.EtagStore
 import com.yumiru11.githubapp.core.githubrest.http.GitHubHeaderInterceptor
+import com.yumiru11.githubapp.core.githubrest.http.GuestEtagScopeProvider
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNamingStrategy
 import okhttp3.HttpUrl
@@ -37,15 +39,19 @@ object GitHubRestClient {
     /**
      * 共享 OkHttpClient，拦截器顺序（外→内）：
      * ETag（条件请求/304 回放）→ 统一头 → 认证头 → 日志（仅 debug）。
+     *
+     * [scopeProvider] 追加在末尾并带默认值：既有调用点（大量测试的 `(tokenProvider, etagStore, debugLogging)`
+     * 位置参数）保持不变；生产由装配层注入 [com.yumiru11.githubapp.core.githubrest.http.TokenEtagScopeProvider]。
      */
     fun createOkHttpClient(
         tokenProvider: TokenProvider,
         etagStore: EtagStore,
         debugLogging: Boolean,
+        scopeProvider: EtagScopeProvider = GuestEtagScopeProvider,
     ): OkHttpClient =
         OkHttpClient
             .Builder()
-            .addInterceptor(EtagCacheInterceptor(etagStore))
+            .addInterceptor(EtagCacheInterceptor(etagStore, scopeProvider = scopeProvider))
             .addInterceptor(GitHubHeaderInterceptor())
             .addInterceptor(AuthTokenInterceptor(tokenProvider))
             .addInterceptor(

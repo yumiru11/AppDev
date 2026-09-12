@@ -13,9 +13,22 @@ composeCompiler {
 android {
     namespace = "com.yumiru11.githubapp.core.githubdata"
 
+    defaultConfig {
+        // core:github-auth 库 manifest 的 ${appAuthRedirectScheme} 占位符（ADR-0001 自定义 scheme；
+        // 本模块新增对 github-auth 的依赖 + Robolectric 测试 manifest 合并后需要）。
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.yumiru11.githubapp"
+    }
+
     // 显式关闭 compose（约定插件默认开启）
     buildFeatures {
         compose = false
+    }
+
+    // Room（RoomEtagStore + in-memory DB）在 Robolectric 下需要 Android 资源
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
     }
 }
 
@@ -35,8 +48,14 @@ dependencies {
     // PAT 降级门控（ADR-0003）：读 TokenStorage 的 isRestOnly 决定是否跳过 GraphQL 通道
     implementation(project(":core:github-auth"))
 
+    // DATA-1：持久化 ETag 缓存的 EtagCacheDao（RoomEtagStore 数据出入口）
+    implementation(project(":core:database"))
+
     // IssueDto.pullRequest 为 JsonObject（github-rest api 暴露的公共类型，需传递可见）
     implementation(libs.kotlinx.serialization.json)
+
+    // RoomEtagStore 用 runBlocking 桥接同步 EtagStore 与 Room suspend DAO
+    implementation(libs.kotlinx.coroutines.core)
 
     // Paging 3（GraphQL cursor PagingSource）
     implementation(libs.paging.runtime)

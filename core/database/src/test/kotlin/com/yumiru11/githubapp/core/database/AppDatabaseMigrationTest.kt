@@ -246,6 +246,87 @@ class AppDatabaseMigrationTest {
             }
     }
 
+    @Test
+    fun createDatabase_v5_buildsExpectedSchema() {
+        helper.createDatabase(TEST_DB_NAME_V5_SCHEMA, 5).use { db ->
+            val tables = queryTableNames(db)
+            assertTrue("应包含 etag_cache 表", tables.contains("etag_cache"))
+            assertEquals(5, tables.size)
+        }
+    }
+
+    @Test
+    fun migrate_4to5_addsEtagCacheTableAndKeepsExistingCaches() {
+        helper.createDatabase(TEST_DB_NAME_V5, 4).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO cached_repositories (owner, name, etag, payload, updatedAt)
+                VALUES ('octocat', 'Hello-World', 'W/"abc"', '{"id":1}', 1700000000000)
+                """.trimIndent(),
+            )
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB_NAME_V5, 5, true, AppDatabase.MIGRATION_4_5).use { db ->
+            val tables = queryTableNames(db)
+            assertTrue("应包含 etag_cache 表", tables.contains("etag_cache"))
+            assertEquals(5, tables.size)
+
+            val cursor = db.query("SELECT owner, name, etag FROM cached_repositories", emptyArray())
+            cursor.use {
+                assertTrue(it.moveToFirst())
+                assertEquals("octocat", it.getString(0))
+                assertEquals("W/\"abc\"", it.getString(2))
+            }
+
+            db.execSQL(
+                """
+                INSERT INTO etag_cache
+                    (scope, method, url, etag, contentType, body, bodyBytes, storedAt, lastAccessedAt)
+                VALUES ('a', 'GET', 'https://api.github.com/user', 'W/"v1"', 'application/json', '{}', 2, 1, 1)
+                """.trimIndent(),
+            )
+            val etagCursor = db.query("SELECT scope, method, url, etag FROM etag_cache", emptyArray())
+            etagCursor.use {
+                assertTrue(it.moveToFirst())
+                assertEquals("a", it.getString(0))
+                assertEquals("GET", it.getString(1))
+                assertEquals("https://api.github.com/user", it.getString(2))
+                assertEquals("W/\"v1\"", it.getString(3))
+            }
+        }
+    }
+
+    @Test
+    fun migrate_1to5_fullChain_keepsRepositoryCacheAndAddsAllTables() {
+        helper.createDatabase(TEST_DB_NAME_V5_FULL, 1).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO cached_repositories (owner, name, etag, payload, updatedAt)
+                VALUES ('octocat', 'Hello-World', 'W/"v1"', '{"id":1}', 1700000000000)
+                """.trimIndent(),
+            )
+        }
+
+        helper
+            .runMigrationsAndValidate(
+                TEST_DB_NAME_V5_FULL,
+                5,
+                true,
+                AppDatabase.MIGRATION_1_2,
+                AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4,
+                AppDatabase.MIGRATION_4_5,
+            ).use { db ->
+                val tables = queryTableNames(db)
+                assertEquals(5, tables.size)
+                val cursor = db.query("SELECT owner, name, etag FROM cached_repositories", emptyArray())
+                cursor.use {
+                    assertTrue(it.moveToFirst())
+                    assertEquals("W/\"v1\"", it.getString(2))
+                }
+            }
+    }
+
     private fun queryTableNames(db: SupportSQLiteDatabase): Set<String> {
         val names = mutableSetOf<String>()
         val sql =
@@ -270,6 +351,9 @@ class AppDatabaseMigrationTest {
         const val TEST_DB_NAME_V4 = "migration-test-v4"
         const val TEST_DB_NAME_V4_SCHEMA = "migration-test-v4-schema"
         const val TEST_DB_NAME_V4_FULL = "migration-test-v4-full"
+        const val TEST_DB_NAME_V5 = "migration-test-v5"
+        const val TEST_DB_NAME_V5_SCHEMA = "migration-test-v5-schema"
+        const val TEST_DB_NAME_V5_FULL = "migration-test-v5-full"
         const val SCHEMA_DIRECTORY = "schemas"
     }
 }
