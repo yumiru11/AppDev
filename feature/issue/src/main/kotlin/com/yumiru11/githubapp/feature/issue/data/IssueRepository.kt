@@ -15,9 +15,13 @@ import com.apollographql.apollo.api.Optional
 import com.apollographql.cache.normalized.FetchPolicy
 import com.apollographql.cache.normalized.fetchPolicy
 import com.yumiru11.githubapp.core.database.dao.IssueDao
+import com.yumiru11.githubapp.core.githubauth.session.isRestOnly
+import com.yumiru11.githubapp.core.githubauth.token.TokenStorage
 import com.yumiru11.githubapp.core.githubgraphql.generated.IssueWriteContextQuery
 import com.yumiru11.githubapp.core.githubgraphql.generated.UpdateIssueMutation
 import com.yumiru11.githubapp.core.githubrest.api.IssueApi
+import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
+import com.yumiru11.githubapp.core.githubrest.api.UserApi
 import com.yumiru11.githubapp.core.githubrest.model.CreateCommentRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreateIssueRequest
 import com.yumiru11.githubapp.core.githubrest.model.CreateReactionRequest
@@ -26,6 +30,7 @@ import com.yumiru11.githubapp.core.githubrest.model.IssueDto
 import com.yumiru11.githubapp.core.githubrest.model.IssueEventDto
 import com.yumiru11.githubapp.core.githubrest.model.ReactionDto
 import com.yumiru11.githubapp.core.githubrest.model.ReactionsDto
+import com.yumiru11.githubapp.core.githubrest.model.RepositoryPermissionsDto
 import com.yumiru11.githubapp.core.githubrest.model.SubscriptionRequest
 import com.yumiru11.githubapp.core.githubrest.model.UpdateIssueRequest
 import com.yumiru11.githubapp.feature.issue.model.Issue
@@ -56,6 +61,11 @@ import javax.inject.Singleton
  * 任务列表 checkbox 反向同步走 GraphQL UpdateIssue mutation（node id 来自
  * [getIssueWriteContext]），GraphQL 失败（PAT 模式/网络）降级 REST PATCH body。
  * 全部写操作由 ViewModel 层做乐观更新 + 失败回滚。
+ *
+ * **PAT 降级门控**（ADR-0003）：`isRestOnly`（fine-grained PAT 无 GraphQL 权限）时
+ * [getIssueWriteContext] 走 REST 补位通道（GET /repos/{o}/{r} 权限 + GET /user 登录名）、
+ * [toggleTaskListItem] 直接走 REST PATCH，均不再发出注定 403 的 GraphQL 请求。
+ * 门控按请求实时读取 [TokenStorage]。
  */
 @Singleton
 @Suppress("TooManyFunctions") // #163 新增订阅/元数据读写后 21 个职责相关方法（读/写/订阅/GraphQL 通道），拆类反损内聚（PullRequestRepository 同款先例）
@@ -65,6 +75,9 @@ class IssueRepository
         private val issueApi: IssueApi,
         private val apolloClient: ApolloClient,
         private val issueDao: IssueDao,
+        private val repositoryApi: RepositoryApi,
+        private val userApi: UserApi,
+        private val tokenStorage: TokenStorage,
     ) {
         /**
          * Issue 分页流（按 [filter] 过滤 open/closed）。
@@ -272,10 +285,25 @@ class IssueRepository
         /**
          * 获取 Issue 写操作上下文（viewer login + 仓库权限 + Issue node id）。
          *
-         * GraphQL 优先；失败（PAT 模式不支持 GraphQL / 网络）返回保守空上下文
-         * （权限 NONE → UI 隐藏写操作），不抛异常。
+         * Gateway 分流（ADR-0003）：
+         * - `isRestOnly=false`（OAuth）：GraphQL 优先；失败（网络/协议）返回保守空上下文
+         *   （权限 NONE → UI 隐藏写操作），不抛异常。
+         * - `isRestOnly=true`（fine-grained PAT）：**不发 GraphQL**，直接走 REST 补位
+         *   （GET /repos/{o}/{r} 的 permissions + GET /user 的 login）。
          */
         suspend fun getIssueWriteContext(
+            owner: String,
+            repo: String,
+            number: Int,
+        ): IssueWriteContext =
+            if (isRestOnly(tokenStorage.loadSession())) {
+                restWriteContext(owner, repo)
+            } else {
+                graphQlWriteContext(owner, repo, number)
+            }
+
+        /** GraphQL 通道（OAuth 读优先）：失败返回保守空上下文，不抛。 */
+        private suspend fun graphQlWriteContext(
             owner: String,
             repo: String,
             number: Int,
@@ -303,9 +331,33 @@ class IssueRepository
             }
 
         /**
+         * REST 补位通道（PAT 降级，plan.md §4.5）：仓库权限 + viewer 登录名。
+         *
+         * `issueNodeId` 恒为 null —— REST 不提供 GraphQL node id，且 PAT 本就不能用
+         * GraphQL mutation；[toggleTaskListItem] 因此直接走 REST PATCH body。
+         * 失败与 GraphQL 通道同款保守降级（空上下文 → UI 隐藏写操作），不抛异常。
+         */
+        private suspend fun restWriteContext(
+            owner: String,
+            repo: String,
+        ): IssueWriteContext =
+            try {
+                val repository = repositoryApi.getRepository(owner, repo)
+                IssueWriteContext(
+                    viewerLogin = userApi.currentUser().login,
+                    viewerPermission = repository.permissions.toIssueViewerPermission(),
+                    issueNodeId = null,
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                IssueWriteContext()
+            }
+
+        /**
          * 任务列表 checkbox 反向同步：翻转正文第 [index] 个任务项为 [checked] 并持久化。
          *
-         * GraphQL UpdateIssue mutation 优先（需 [nodeId]）；失败降级 REST PATCH body。
+         * GraphQL UpdateIssue mutation 优先（需 [nodeId] 且非 PAT 降级）；否则 REST PATCH body。
          * 成功后重新拉取详情返回规范 [Issue]（mutation 返回字段子集不全）。
          */
         suspend fun toggleTaskListItem(
@@ -318,7 +370,8 @@ class IssueRepository
             checked: Boolean,
         ): Issue {
             val newBody = flipTaskListItem(body, index, checked)
-            if (nodeId != null) {
+            val graphQlAvailable = nodeId != null && !isRestOnly(tokenStorage.loadSession())
+            if (graphQlAvailable) {
                 try {
                     val response =
                         apolloClient
@@ -330,7 +383,7 @@ class IssueRepository
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    // GraphQL 失败（PAT 模式/网络/协议错误）→ REST 兜底
+                    // GraphQL 失败（网络/协议错误）→ REST 兜底
                 }
             }
             return updateIssue(owner, repo, number, body = newBody)
@@ -342,6 +395,23 @@ class IssueRepository
             /** GitHub 未订阅语义（GET .../subscription 返回 404） */
             const val HTTP_NOT_FOUND = 404
         }
+    }
+
+/**
+ * REST 权限位 → [IssueViewerPermission]（PAT 降级补位通道）。
+ *
+ * GitHub REST 的 `permissions` 对象用布尔位表达（admin/maintain/push/triage/pull），
+ * 与 GraphQL `RepositoryPermission` 枚举一一对应；对象缺省（游客/无 token）→ NONE（保守隐藏写入口）。
+ */
+internal fun RepositoryPermissionsDto?.toIssueViewerPermission(): IssueViewerPermission =
+    when {
+        this == null -> IssueViewerPermission.NONE
+        admin -> IssueViewerPermission.ADMIN
+        maintain -> IssueViewerPermission.MAINTAIN
+        push -> IssueViewerPermission.WRITE
+        triage -> IssueViewerPermission.TRIAGE
+        pull -> IssueViewerPermission.READ
+        else -> IssueViewerPermission.NONE
     }
 
 /** IssueDto → [Issue] */

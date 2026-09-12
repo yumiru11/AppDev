@@ -2,16 +2,22 @@ package com.yumiru11.githubapp.feature.issue.data
 
 import com.apollographql.apollo.ApolloClient
 import com.yumiru11.githubapp.core.database.dao.IssueDao
+import com.yumiru11.githubapp.core.githubauth.token.InMemoryTokenStorage
+import com.yumiru11.githubapp.core.githubauth.token.SessionData
 import com.yumiru11.githubapp.core.githubgraphql.generated.IssueWriteContextQuery
 import com.yumiru11.githubapp.core.githubgraphql.generated.UpdateIssueMutation
 import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
 import com.yumiru11.githubapp.core.githubrest.api.IssueApi
+import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
+import com.yumiru11.githubapp.core.githubrest.api.UserApi
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
+import com.yumiru11.githubapp.core.githubrest.model.RepositoryPermissionsDto
 import com.yumiru11.githubapp.feature.issue.model.IssueState
 import com.yumiru11.githubapp.feature.issue.model.IssueViewerPermission
 import com.yumiru11.githubapp.feature.issue.model.IssueWriteContext
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
@@ -35,7 +41,10 @@ import java.io.IOException
 class IssueRepositoryWriteTest {
     private lateinit var server: MockWebServer
     private lateinit var issueApi: IssueApi
+    private lateinit var repositoryApi: RepositoryApi
+    private lateinit var userApi: UserApi
     private lateinit var apolloClient: ApolloClient
+    private lateinit var tokenStorage: InMemoryTokenStorage
 
     @Before
     fun setUp() {
@@ -53,7 +62,10 @@ class IssueRepositoryWriteTest {
                 json = GitHubRestClient.createJson(),
             )
         issueApi = retrofit.create(IssueApi::class.java)
+        repositoryApi = retrofit.create(RepositoryApi::class.java)
+        userApi = retrofit.create(UserApi::class.java)
         apolloClient = mockk()
+        tokenStorage = InMemoryTokenStorage()
     }
 
     @After
@@ -62,7 +74,15 @@ class IssueRepositoryWriteTest {
     }
 
     // 写操作测试不触达分页缓存：IssueDao 用 relaxed mock（本票 L07 只改读路径）
-    private fun repository(): IssueRepository = IssueRepository(issueApi, apolloClient, mockk<IssueDao>(relaxed = true))
+    private fun repository(): IssueRepository =
+        IssueRepository(
+            issueApi = issueApi,
+            apolloClient = apolloClient,
+            issueDao = mockk<IssueDao>(relaxed = true),
+            repositoryApi = repositoryApi,
+            userApi = userApi,
+            tokenStorage = tokenStorage,
+        )
 
     @Test
     fun createIssue_validRequest_returnsDomainIssue() =
@@ -478,4 +498,106 @@ class IssueRepositoryWriteTest {
 
             assertEquals("""{"milestone":null}""", server.takeRequest().body?.utf8())
         }
+
+    // ── PAT 降级（isRestOnly）：REST 补位通道 ────────────────────────────
+
+    @Test
+    fun getIssueWriteContext_restOnlyMode_usesRestPermissionsAndViewerWithoutGraphQl() =
+        runTest {
+            tokenStorage.saveSession(SessionData(pat = "github_pat_test", isRestOnly = true))
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        {"id":1,"name":"Hello-World","full_name":"octocat/Hello-World","private":false,
+                         "owner":{"login":"octocat","id":1},
+                         "permissions":{"admin":false,"maintain":false,"push":true,"triage":false,"pull":true}}
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"login":"octocat","id":1}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val context = repository().getIssueWriteContext("octocat", "Hello-World", 42)
+
+            assertEquals("octocat", context.viewerLogin)
+            assertEquals(IssueViewerPermission.WRITE, context.viewerPermission)
+            assertNull("REST 无 GraphQL node id，降级路径必须为 null", context.issueNodeId)
+            coVerify(exactly = 0) { apolloClient.query(any<IssueWriteContextQuery>()) }
+            assertEquals("/repos/octocat/Hello-World", server.takeRequest().url.encodedPath)
+            assertEquals("/user", server.takeRequest().url.encodedPath)
+        }
+
+    @Test
+    fun getIssueWriteContext_restOnlyMode_restForbidden_returnsConservativeEmptyContext() =
+        runTest {
+            tokenStorage.saveSession(SessionData(pat = "github_pat_test", isRestOnly = true))
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 403 Forbidden")
+                    .body("""{"message":"Resource not accessible by personal access token"}""")
+                    .build(),
+            )
+
+            val context = repository().getIssueWriteContext("octocat", "Hello-World", 42)
+
+            assertNull("失败应保守无 viewer login（UI 隐藏写入口）", context.viewerLogin)
+            assertEquals(IssueViewerPermission.NONE, context.viewerPermission)
+            assertNull(context.issueNodeId)
+        }
+
+    @Test
+    fun toggleTaskListItem_restOnlyMode_withNodeId_skipsGraphQlAndUsesRestPatch() =
+        runTest {
+            tokenStorage.saveSession(SessionData(pat = "github_pat_test", isRestOnly = true))
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("""{"id": 1, "number": 42, "title": "t", "state": "open", "body": "- [x] done"}""")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val issue =
+                repository().toggleTaskListItem(
+                    owner = "octocat",
+                    repo = "Hello-World",
+                    number = 42,
+                    nodeId = "I_kwDOA",
+                    body = "- [ ] done",
+                    index = 0,
+                    checked = true,
+                )
+
+            assertEquals("- [x] done", issue.body)
+            // nodeId 非空也不得发 GraphQL（fine-grained PAT 注定 403）
+            coVerify(exactly = 0) { apolloClient.mutation(any<UpdateIssueMutation>()) }
+            val request = server.takeRequest()
+            assertEquals("PATCH", request.method)
+            assertEquals("/repos/octocat/Hello-World/issues/42", request.url.encodedPath)
+        }
+
+    @Test
+    fun toIssueViewerPermission_permissionBits_mapToMatchingEnum() {
+        assertEquals(IssueViewerPermission.ADMIN, RepositoryPermissionsDto(admin = true).toIssueViewerPermission())
+        assertEquals(IssueViewerPermission.MAINTAIN, RepositoryPermissionsDto(maintain = true).toIssueViewerPermission())
+        assertEquals(IssueViewerPermission.WRITE, RepositoryPermissionsDto(push = true).toIssueViewerPermission())
+        assertEquals(IssueViewerPermission.TRIAGE, RepositoryPermissionsDto(triage = true).toIssueViewerPermission())
+        assertEquals(IssueViewerPermission.READ, RepositoryPermissionsDto(pull = true).toIssueViewerPermission())
+    }
+
+    @Test
+    fun toIssueViewerPermission_missingPermissionObject_conservativelyMapsToNone() {
+        // 游客/无 token：permissions 对象缺省 → NONE（保守隐藏写入口，与 GraphQL 通道同款）
+        assertEquals(IssueViewerPermission.NONE, (null as RepositoryPermissionsDto?).toIssueViewerPermission())
+        assertEquals(IssueViewerPermission.NONE, RepositoryPermissionsDto().toIssueViewerPermission())
+    }
 }

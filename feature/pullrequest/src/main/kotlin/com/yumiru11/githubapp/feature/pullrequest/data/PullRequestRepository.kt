@@ -10,6 +10,8 @@ import androidx.paging.PagingData
 import com.apollographql.apollo.ApolloClient
 import com.apollographql.cache.normalized.FetchPolicy
 import com.apollographql.cache.normalized.fetchPolicy
+import com.yumiru11.githubapp.core.githubauth.session.isRestOnly
+import com.yumiru11.githubapp.core.githubauth.token.TokenStorage
 import com.yumiru11.githubapp.core.githubgraphql.generated.PullRequestReviewThreadsQuery
 import com.yumiru11.githubapp.core.githubgraphql.generated.ResolveReviewThreadMutation
 import com.yumiru11.githubapp.core.githubgraphql.generated.UnresolveReviewThreadMutation
@@ -21,6 +23,7 @@ import com.yumiru11.githubapp.core.githubrest.api.IssueApi
 import com.yumiru11.githubapp.core.githubrest.api.PullRequestApi
 import com.yumiru11.githubapp.core.githubrest.api.RepoManagementApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
+import com.yumiru11.githubapp.core.githubrest.api.UserApi
 import com.yumiru11.githubapp.core.githubrest.model.CheckRunDto
 import com.yumiru11.githubapp.core.githubrest.model.CombinedStatusDto
 import com.yumiru11.githubapp.core.githubrest.model.CreateCommentRequest
@@ -82,6 +85,11 @@ import javax.inject.Singleton
  * - 提交：[commits]（GET .../pulls/{number}/commits）
  * - 文件：[files]（GET .../pulls/{number}/files）
  * - Checks：[checkRuns]（GET .../commits/{ref}/check-runs）+ [combinedStatus]（GET .../commits/{ref}/status）
+ *
+ * **PAT 降级门控**（ADR-0003）：`isRestOnly`（fine-grained PAT 无 GraphQL 权限）时
+ * [viewerLoginOrNull] 走 REST GET /user；[reviewThreadContext] 直接返回空上下文
+ * （REST 无 reviewThreads 等价端点）；[setThreadResolved] 抛
+ * [RestOnlyUnsupportedException]（GraphQL 是唯一通道）。三者都不再发出注定 403 的 GraphQL 请求。
  */
 @Singleton
 @Suppress("TooManyFunctions") // T23 新增 createPullRequest/branches 后 21 个职责相关方法（列表/详情/写/审查/合并），拆类反损内聚
@@ -94,6 +102,8 @@ class PullRequestRepository
         private val gitRefApi: GitRefApi,
         private val issueApi: IssueApi,
         private val apolloClient: ApolloClient,
+        private val userApi: UserApi,
+        private val tokenStorage: TokenStorage,
     ) {
         /** PR 分页流（按 [filter] 过滤 open/closed/all） */
         fun pulls(
@@ -144,18 +154,24 @@ class PullRequestRepository
         /**
          * 当前登录用户登录名（#166：判断评论是否为「我发的」，据此决定是否显示编辑/删除菜单）。
          *
-         * 走既有的 Viewer 查询（core:github-graphql 已生成 ViewerQuery），不新增 .graphql 文件。
-         * 取不到（未登录/GraphQL 降级）返回 null —— 菜单整体不显示，而不是显示成别人的评论。
+         * - OAuth：走既有的 Viewer 查询（core:github-graphql 已生成 ViewerQuery），不新增 .graphql 文件
+         * - PAT 降级（isRestOnly）：走 REST GET /user 的 login（plan.md §4.5 补位通道）
+         *
+         * 取不到（未登录/网络失败）返回 null —— 菜单整体不显示，而不是显示成别人的评论。
          */
         suspend fun viewerLoginOrNull(): String? =
-            runCatching {
-                apolloClient
-                    .query(ViewerQuery())
-                    .execute()
-                    .data
-                    ?.viewer
-                    ?.login
-            }.getOrNull()
+            if (isRestOnly(tokenStorage.loadSession())) {
+                runCatching { userApi.currentUser().login }.getOrNull()
+            } else {
+                runCatching {
+                    apolloClient
+                        .query(ViewerQuery())
+                        .execute()
+                        .data
+                        ?.viewer
+                        ?.login
+                }.getOrNull()
+            }
 
         /** 单个 PR 详情 */
         suspend fun getPullRequest(
@@ -408,11 +424,15 @@ class PullRequestRepository
         /**
          * 会话上下文（GraphQL reviewThreads 查询，T16）。
          *
-         * GraphQL 不可用（fine-grained PAT 不支持 / 网络异常）→ 保守空上下文
-         * （pullRequestNodeId=null，UI 隐藏解析入口），不抛异常（T14 getIssueWriteContext 同款降级）。
+         * - GraphQL 不可用（网络异常）→ 保守空上下文（pullRequestNodeId=null，UI 隐藏解析入口），
+         *   不抛异常（T14 getIssueWriteContext 同款降级）。
+         * - **PAT 降级（isRestOnly）→ 不发 GraphQL，直接返回空上下文**：REST 无 reviewThreads
+         *   等价端点（`GET /pulls/{n}/comments` 只有行内评论、无 thread/已解决语义），
+         *   降级后果见 [setThreadResolved]。
          */
         suspend fun reviewThreadContext(pullRequestNodeId: String?): ReviewThreadContext {
             if (pullRequestNodeId == null) return ReviewThreadContext()
+            if (isRestOnly(tokenStorage.loadSession())) return ReviewThreadContext()
             return try {
                 val response =
                     apolloClient
@@ -452,11 +472,24 @@ class PullRequestRepository
             }
         }
 
-        /** 解决/解除会话（T16；GraphQL 是唯一通道——REST 无解析端点） */
+        /**
+         * 解决/解除会话（T16；GraphQL 是唯一通道——REST 无解析端点）。
+         *
+         * **PAT 降级下无法执行**（REST 无等价端点）：抛 [RestOnlyUnsupportedException] 让
+         * 调用方的乐观更新回滚并提示失败 —— 而不是像修复前那样发出注定 403 的 GraphQL
+         * 请求、拿到空响应后**静默当作成功**（Apollo execute() 不抛 HTTP 错误，错误收敛在
+         * response.exception，故原来的 403 表现为「点了解析但服务端没变」）。
+         *
+         * UI 侧 `canResolveThreads` 在降级时为 false（见 [reviewThreadContext]），入口本就不显示，
+         * 此抛错是防御性兜底。
+         */
         suspend fun setThreadResolved(
             threadId: String,
             resolved: Boolean,
         ) {
+            if (isRestOnly(tokenStorage.loadSession())) {
+                throw RestOnlyUnsupportedException(RESOLVE_THREAD_OPERATION)
+            }
             if (resolved) {
                 apolloClient.mutation(ResolveReviewThreadMutation(input = ResolveReviewThreadInput(threadId = threadId))).execute()
             } else {
@@ -484,6 +517,9 @@ class PullRequestRepository
             /** REST state 字段值（#163 L03 关闭/重开） */
             const val PR_STATE_OPEN = "open"
             const val PR_STATE_CLOSED = "closed"
+
+            /** 降级不支持的操作名（异常消息用，非 UI 文案） */
+            const val RESOLVE_THREAD_OPERATION = "resolveReviewThread/unresolveReviewThread"
         }
     }
 
@@ -627,6 +663,16 @@ data class RepositoryControl(
     val viewerPermission: ViewerPermission = ViewerPermission.UNKNOWN,
     val defaultBranch: String? = null,
 )
+
+/**
+ * REST-only 降级（fine-grained PAT，ADR-0003）下无 REST 等价端点的操作。
+ *
+ * 消息为开发者诊断用英文（与 [com.yumiru11.githubapp.core.githubauth.auth.OAuthCallbackException] 同款），
+ * 非用户可见文案 —— 用户侧由调用方经既有失败通道（Snackbar/回滚）呈现本地化文案。
+ */
+class RestOnlyUnsupportedException(
+    operation: String,
+) : Exception("operation not available in REST-only mode (fine-grained PAT): $operation")
 
 /** GraphQL reviewThreads 响应的最小映射源（解包自 Apollo 响应，交给纯函数映射便于单测） */
 data class RawReviewThread(

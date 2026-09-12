@@ -1,9 +1,18 @@
 package com.yumiru11.githubapp.core.githubdata.paging
 
 import androidx.paging.PagingSource
+import com.yumiru11.githubapp.core.githubauth.token.InMemoryTokenStorage
+import com.yumiru11.githubapp.core.githubauth.token.SessionData
 import com.yumiru11.githubapp.core.githubdata.error.GitHubError
 import com.yumiru11.githubapp.core.githubdata.error.GitHubRequestException
 import com.yumiru11.githubapp.core.githubgraphql.GitHubApolloClientFactory
+import com.yumiru11.githubapp.core.githubrest.api.GitHubRestClient
+import com.yumiru11.githubapp.core.githubrest.api.UserApi
+import com.yumiru11.githubapp.core.githubrest.auth.TokenProvider
+import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
+import io.mockk.coEvery
+import io.mockk.mockk
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -15,6 +24,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 
 /**
@@ -25,17 +35,29 @@ import kotlin.test.assertIs
 class ViewerRepositoriesPagingSourceTest {
     private lateinit var server: MockWebServer
     private lateinit var pagingSource: ViewerRepositoriesPagingSource
+    private lateinit var tokenStorage: InMemoryTokenStorage
 
     @Before
     fun setUp() {
         server = MockWebServer()
         server.start()
+        tokenStorage = InMemoryTokenStorage()
         val apolloClient =
             GitHubApolloClientFactory.create(
                 serverUrl = server.url("/graphql").toString(),
                 okHttpClient = OkHttpClient(),
             )
-        pagingSource = ViewerRepositoriesPagingSource(apolloClient)
+        val restClient =
+            GitHubRestClient.createOkHttpClient(
+                tokenProvider = TokenProvider { "test-token" },
+                etagStore = InMemoryEtagStore(),
+                debugLogging = false,
+            )
+        val userApi =
+            GitHubRestClient
+                .createRetrofit(server.url("/"), restClient, GitHubRestClient.createJson())
+                .create(UserApi::class.java)
+        pagingSource = ViewerRepositoriesPagingSource(apolloClient, userApi, tokenStorage)
     }
 
     @After
@@ -240,6 +262,103 @@ class ViewerRepositoriesPagingSourceTest {
             val exception = assertIs<GitHubRequestException>(error.throwable)
             assertEquals(GitHubError.Server(500), exception.error)
         }
+
+    // ── PAT 降级（isRestOnly）：REST /user/repos 通道 ─────────────────────
+
+    @Test
+    fun load_restOnlyMode_usesRestUserReposWithGraphQlEquivalentSort() =
+        runTest {
+            tokenStorage.saveSession(restOnlySession())
+            server.enqueue(repositoriesResponse(count = 2))
+
+            val page =
+                assertIs<PagingSource.LoadResult.Page<String, *>>(
+                    pagingSource.load(PagingSource.LoadParams.Refresh(key = null, loadSize = 2, placeholdersEnabled = false)),
+                )
+
+            assertEquals(2, (page.data as List<*>).size)
+            assertEquals("2", page.nextKey)
+            assertNull(page.prevKey)
+            // 唯一请求必须打到 REST（"/graphql" 从未被访问）；排序与 GraphQL UPDATED_AT DESC 对齐
+            val request = server.takeRequest()
+            assertEquals("/user/repos", request.url.encodedPath)
+            assertEquals("2", request.url.queryParameter("per_page"))
+            assertEquals("1", request.url.queryParameter("page"))
+            assertEquals("updated", request.url.queryParameter("sort"))
+            assertEquals("desc", request.url.queryParameter("direction"))
+        }
+
+    @Test
+    fun load_restOnlyMode_append_usesNumericPageKeyAndStopsAtTailPage() =
+        runTest {
+            tokenStorage.saveSession(restOnlySession())
+            server.enqueue(repositoriesResponse(count = 2))
+            server.enqueue(repositoriesResponse(count = 1))
+
+            pagingSource.load(PagingSource.LoadParams.Refresh(key = null, loadSize = 2, placeholdersEnabled = false))
+            val second =
+                assertIs<PagingSource.LoadResult.Page<String, *>>(
+                    pagingSource.load(PagingSource.LoadParams.Append(key = "2", loadSize = 2, placeholdersEnabled = false)),
+                )
+
+            server.takeRequest() // 首屏请求
+            assertEquals("2", server.takeRequest().url.queryParameter("page"))
+            assertEquals("1", second.prevKey)
+            assertNull("返回条数不足 loadSize 即尾页，nextKey 必须为空", second.nextKey)
+        }
+
+    @Test
+    fun load_restOnlyMode_restForbidden_returnsLoadResultErrorWithForbidden() =
+        runTest {
+            tokenStorage.saveSession(restOnlySession())
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 403 Forbidden")
+                    .body("""{"message":"Resource not accessible by personal access token"}""")
+                    .build(),
+            )
+
+            val result =
+                pagingSource.load(PagingSource.LoadParams.Refresh(key = null, loadSize = 2, placeholdersEnabled = false))
+
+            val error = assertIs<PagingSource.LoadResult.Error<String, *>>(result)
+            val exception = assertIs<GitHubRequestException>(error.throwable)
+            assertEquals(GitHubError.Forbidden, exception.error)
+        }
+
+    @Test
+    fun load_restOnlyMode_cancelled_rethrowsCancellation() =
+        runTest {
+            tokenStorage.saveSession(restOnlySession())
+            val cancelledApi =
+                mockk<UserApi> {
+                    coEvery { currentUserRepositories(any(), any(), any(), any()) } throws CancellationException("cancelled")
+                }
+            val source = ViewerRepositoriesPagingSource(mockk(relaxed = true), cancelledApi, tokenStorage)
+
+            // 取消异常必须原样上抛（不得包装为 LoadResult.Error，否则分页协程取消语义被吞）
+            assertFailsWith<CancellationException> {
+                source.load(PagingSource.LoadParams.Refresh(key = null, loadSize = 2, placeholdersEnabled = false))
+            }
+        }
+
+    /** PAT 降级会话（fine-grained PAT，ADR-0003） */
+    private fun restOnlySession(): SessionData = SessionData(pat = "github_pat_test", isRestOnly = true)
+
+    /** REST /user/repos 响应（count 条最小合法 RepositoryDto） */
+    private fun repositoriesResponse(count: Int): MockResponse =
+        MockResponse
+            .Builder()
+            .body(
+                (1..count).joinToString(separator = ",", prefix = "[", postfix = "]") { index ->
+                    """
+                    {"id":$index,"name":"repo-$index","full_name":"octocat/repo-$index","private":false,
+                     "owner":{"login":"octocat","id":1},"stargazers_count":$index,"language":"Kotlin",
+                     "default_branch":"main"}
+                    """.trimIndent()
+                },
+            ).build()
 
     private fun connectionResponse(
         endCursor: String,

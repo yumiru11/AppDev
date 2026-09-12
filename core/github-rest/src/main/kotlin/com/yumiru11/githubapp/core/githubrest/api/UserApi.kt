@@ -28,11 +28,18 @@ interface UserApi {
         @Path("login") login: String,
     ): UserDto
 
-    /** GET /user/repos：当前认证用户仓库（page/per_page 分页） */
+    /**
+     * GET /user/repos：当前认证用户仓库（page/per_page 分页）。
+     *
+     * [sort]/[direction] 可选（缺省 = 不传参 = GitHub 默认按 full_name 升序）；
+     * REST 补位通道按 GraphQL 同款排序传 `updated` + `desc`（见 ViewerRepositoriesPagingSource）。
+     */
     @GET("user/repos")
     suspend fun currentUserRepositories(
         @Query("per_page") perPage: Int,
         @Query("page") page: Int,
+        @Query("sort") sort: String? = null,
+        @Query("direction") direction: String? = null,
     ): List<RepositoryDto>
 
     /** GET /users/{login}/repos：任意用户公开仓库（page/per_page 分页） */
