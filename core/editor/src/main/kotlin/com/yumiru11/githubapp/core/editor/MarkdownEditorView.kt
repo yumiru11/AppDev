@@ -13,6 +13,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import com.yumiru11.githubapp.core.datastore.model.CodeFont
+import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferences
 import io.github.rosemoe.sora.langs.textmate.TextMateColorScheme
 import io.github.rosemoe.sora.langs.textmate.TextMateLanguage
 import io.github.rosemoe.sora.langs.textmate.registry.ThemeRegistry
@@ -28,6 +30,9 @@ import org.eclipse.tm4e.core.registry.IThemeSource
  * - 高亮：Markdown TextMate 语法（assets/grammars/markdown.tmLanguage.json）
  * - 主题：M3 派生（[m3EditorThemeTokens]，plan.md §8.2 映射表）
  * - 自动补全：@mention / emoji（[MarkdownEditorLanguage] 包装 TextMate 语言）
+ * - 外观偏好（T24 死设置接线）：[codeFont] / [lineNumbers] 默认取
+ *   [LocalCodeEditorPreferences]（app 层 AppThemeHost 从 DataStore 注入），组内变化即时下发
+ *   —— Markdown 源码同为代码文本，缩进对齐/行号引用与代码视图同等需要，故两处偏好一致生效。
  *
  * 文本同步：编辑器是文本唯一事实源；内容变化经 [onTextChanged] 上报宿主，
  * [content] 仅用于初始化/外部重置（与编辑器当前文本不同才 setText，防循环）。
@@ -36,6 +41,8 @@ import org.eclipse.tm4e.core.registry.IThemeSource
  * @param themeTokens M3 编辑器令牌（[rememberM3EditorThemeTokens]）
  * @param mentions @mention 补全候选（真实数据由上层注入）
  * @param emojis emoji 补全候选（默认 [DEFAULT_MARKDOWN_EMOJIS]）
+ * @param codeFont 代码字体（默认跟随设置页偏好 [LocalCodeEditorPreferences]）
+ * @param lineNumbers 是否显示行号（默认跟随设置页偏好 [LocalCodeEditorPreferences]）
  * @param onEditorReady 控制句柄就绪回调（工具栏/撤销重做等外部控制用）
  * @param onTextChanged 文本变更回调（预览/状态同步用）
  */
@@ -45,6 +52,8 @@ fun MarkdownEditorView(
     themeTokens: EditorThemeTokens,
     mentions: List<String>,
     emojis: List<MarkdownEmoji>,
+    codeFont: CodeFont = LocalCodeEditorPreferences.current.codeFont,
+    lineNumbers: Boolean = LocalCodeEditorPreferences.current.lineNumbers,
     onEditorReady: (MarkdownEditorController) -> Unit = {},
     onTextChanged: (String) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -78,14 +87,17 @@ fun MarkdownEditorView(
         factory = { ctx ->
             CodeEditor(ctx).apply {
                 setEditable(true)
-                isLineNumberEnabled = true
                 isWordwrap = true
                 setTabWidth(4)
                 setTextSize(EDITOR_TEXT_SIZE_SP)
                 setUndoEnabled(true)
+                // 首帧就按偏好建视图（同 CodeEditorView：避免先画默认态再纠正的闪动）
+                applyCodeEditorPreferences(codeFont = codeFont, lineNumbers = lineNumbers)
             }
         },
         update = { editor ->
+            // 偏好同步（T24）：每次重组即时下发到已存在的实例（幂等，见 helper KDoc）
+            editor.applyCodeEditorPreferences(codeFont = codeFont, lineNumbers = lineNumbers)
             if (editor.text.toString() != content) {
                 editor.setText(content)
             }
