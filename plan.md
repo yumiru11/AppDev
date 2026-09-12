@@ -1,8 +1,43 @@
 # Android GitHub 客户端 —— 技术规划
 
 > **核心结论先说：**
-> **Kotlin + Jetpack Compose + Material 3 构建全原生 UI；GitHub 数据层 GraphQL 优先、REST 补位；Markdown 采用「Compose 原生渲染为主 + WebView 高保真兜底」的分层架构**——短内容、评论、常规 Issue/PR 正文用原生渲染保证列表流畅与 Material You 深度融入；README、长文档、复杂 GFM（mermaid、KaTeX、重型 HTML）落到 WebView 高保真通道，结合 GitHub 服务端渲染 HTML，注入同一套 Material You CSS 令牌，并统一拦截 GitHub 链接跳转应用内页面。
+> **Kotlin + Jetpack Compose + Material 3 构建全原生 UI；GitHub 数据层 GraphQL 读优先、REST 写优先；Markdown 采用「WebView 主渲染 + Compose 原生短文本」的分层架构**——README、Issue/PR 正文走 WebView 高保真通道（GitHub 服务端渲染 HTML 优先 → 离线 markdown-it GFM 降级），注入同一套 Material You CSS 令牌，并统一拦截 GitHub 链接跳转应用内页面；评论列表、通知、行内评论等短文本保持 Compose 原生渲染，保证列表流畅与 Material You 深度融入。
+> **（2026-09-11 回写：原计划为「Compose 原生渲染为主 + WebView 高保真兜底」，2026-08-19 Task B 经 ADR-0007 拍板反转为 WebView 主渲染；反转原因见该 ADR「背景」——原生增强链在 4 轮真机问题中持续暴露引擎级短板。§2.2 / §2.5 已同步改写，详见文末「偏离回写总表」。）**
+> **（2026-09-12 回写：数据层的「GraphQL 读优先」**实际未成立**——Issue/PR 详情、timeline、通知、搜索等读路径全走 REST，GraphQL 仅覆盖 Viewer / RepositoryOverview / ViewerRepositories / ReviewThreads 等少数读位（§4.4）。决策与回归触发条件见 `docs/adr/0009-graphql-read-path-deviation.md`。）**
 > 代码文件浏览与编辑交给专业代码编辑器（Rosemoe Sora Editor）满足"准确语法高亮"；写功能（评论、编辑、审查、合并、文件提交、分支管理）通过 GraphQL mutation + REST 完成闭环。项目采用多模块架构、Hilt、Room、Paging 3，测试与截图回归全部跑在 Linux 纯 JVM（Robolectric + Roborazzi），不依赖虚拟机、不依赖 Waydroid、不引入 Kotlin Multiplatform。
+
+---
+
+## 0. 偏离回写总表（2026-09-11）
+
+> **为什么有这一节**：本文档是项目「技术规划权威」，被 `AGENTS.md` 列为必读。但规划写于动工之前，落地过程中有若干处方案被 ADR 拍板改掉、或在调研后换了更优解，而**正文长期停留在"计划用 X"的时态**——后续 agent 据此开工才发现 X 不成立（2026-09-11 调研 agent 即因此走弯路）。
+> **读法**：下文正文中凡带 `（2026-09-11 回写：…）` / `（2026-09-12 回写：…）` 的段落，均以回写后的**现决策**为准；被划为历史记录的原计划**保留不删**，以保留「原计划 → 现决策 → 原因」的演进痕迹。
+> **证据来源**：`docs/agents/spec-audit-2026-09-11.md` §10 P3 + §11 文档漂移清单，逐条以 grep/read 对当前 HEAD 复核。
+> **状态图例**：✅ 已按现决策落地 ｜ 🔁 方案已被替代（正文已改写）｜ ⏳ 仍未实现（保留计划，标注待做）
+
+| # | plan 原计划 | 代码现实（证据） | 状态 | 处理 | 详见 |
+|---|---|---|---|---|---|
+| 1 | `MarkdownRenderer` 抽象接口 + `MarkdownContent`/`RenderContext`/`SourceType` + `FeatureDetector` 路由（§2.4） | 三者全仓 **0 命中**；实际是两个独立 Composable 入口 `WebViewMarkdownRenderer`（`core/markdown/.../webview/WebViewMarkdownRenderer.kt:62`）与 `MarkdownViewer`（`MarkdownViewer.kt:55`），调用点直接选用，无接口层；`FeatureDetector` 仅剩自身定义 + 单测（生产 0 引用） | 🔁 | 改写为「按调用点直选渲染器」的现架构，抽象接口降级为未采用的提案 | §2.4 |
+| 2 | 兜底 WebView 用 **Shiki**（TextMate 语法、按语言懒加载）（§2.2/§2.6/§2.12/§17） | `core/markdown/src/main/assets/webview/highlight.min.js` = **highlight.js v11.11.1 整包**；`renderer.js:141` 调 `hljs.highlightElement`；Shiki 在 `.kt/.js/.json/.toml` 中 **0 命中**（仅一处测试注释提及名号） | 🔁 | 改写为 highlight.js（整包加载，非懒加载）；starry-night 曾评估、未采用（见 §2.12） | §2.2 / §2.6 / §2.12 |
+| 3 | 原生代码块 **Highlights 18 语言** → v2 接 **prism4j 150+**（§2.5/§2.12/§16/§17） | **prism4j 全仓 0 命中**；实际用 **KotlinTextMate 0.2.0 TextMate 语法，打包 7 个 grammar**（`core/markdown/src/main/assets/grammars/`：go/java/json/kotlin/python/shell/yaml；`TextMateCodeBlock.kt:28,63`） | 🔁 | 改写为 TextMate 7 语言；扩展路径按调研结论改为「加 JSON 资产」而非接 prism4j | §2.12 / §16 |
+| 4 | 主题生成用 **Material Color Utilities**（seed → 全 tonal palette）（§5.2） | MCU 直接依赖 **0 命中**；动态色走 compose-material3 的 `dynamicLight/DarkColorScheme`（`ThemeColors.kt:297,314`），seed 色**只设 `primary`**（`ThemeColors.kt:499`：`lightColorScheme(primary = seed)`）；`styleVariant`/`contrastLevel` 不存在 | ⏳ + 🔁 | 标注未实现（保留计划）；同时说明 seed 半成品现状与 ADR-0004 六套主题的关系 | §5.2 |
+| 5 | 主题模型 `AppThemePreferences`（11 字段）（§5.2） | `AppThemePreferences` **0 命中**；实际是扁平 `UserPreferencesRepository` 接口（`core/datastore/.../preferences/UserPreferencesRepository.kt`）+ ADR-0004 的六套 `ThemeMode` | 🔁 | 改写为实际模型，原 data class 保留作设计意图记录 | §5.2 |
+| 6 | **androidx.benchmark** 生成 Baseline Profile（§14.3） | `androidx.benchmark`/`macrobenchmark`/`baselineprofile` 全仓 **0 命中**；`app/src/main/baseline-prof.txt` 为**手写**（该文件头 7-11 行自述原因：macrobenchmark 需真机/模拟器，与本仓「全 JVM」红线冲突）；`ProfileInstaller` 已接线 | ⏳ | 标注未实现 + 保留计划；写明手写产物是当前交付物、接入后应替换 | §14.3 |
+| 7 | 风险对策「**原生优先** + 服务端 HTML 兜底 + 快照回归集」（§16） | ADR-0007 后已反转为 WebView 主渲染；「快照回归集」**部分落地**：#232 起 `MarkdownFixtureScreenshotTest` **31 张 fixture 基线** + `:core:markdown:verifyRoborazziDebug` 已进门禁（`ci.yml:149`）；但 WebView 通道仍无产物级回归（Robolectric 无法真渲染 WebView） | 🔁 + ✅/⏳ | 「原生优先」改写为 WebView 主渲染；快照回归集标注「原生 ✅ 31 张 / WebView 路径 ⏳」 | §16 / §12.5 |
+| 8 | `MarkdownRenderer`/`MarkdownFeatureDetector`（§2.6/§2.12 单元测试项） | 同上第 1 项，抽象层不存在 | 🔁 | 改写为 `FeatureDetector`（现存、纯函数） | §12.2 |
+| 9 | §12.4「测试全 Linux JVM 免模拟器」 | 单测/截图 ✅ 成立；但 **WebView 内容在 Linux JVM 无法真实渲染**，README/正文渲染的验证实际依赖 CI KVM 模拟器（`ci.yml:285-346`，`android-emulator-runner` api 30） | 🔁 | 补注例外边界（ADR-0007「代价」已承认此测试盲区） | §12.4 |
+| 10 | §12.5 截图矩阵（Light/Dark/OLED/Dynamic/高对比 × en/zh/ar-RTL × 大字 × 预设主题） | 实测 66 张基线，覆盖 Light/Dark × en（+少量 RTL）；其余维度未覆盖。§12.5「产物 `build/outputs/roborazzi/*.png` 本机预览」亦无落地配方，CI 仅在 failure 上传 | ⏳ | 保留矩阵作目标，标注现状覆盖率与未落地项 | §12.5 |
+| 11 | §14.1 README 首次渲染 < 800ms / 缓存命中 < 300ms、冷启动 < 1.5s | 三个性能目标**均无实测数据**（macrobenchmark 未接入，见第 6 项） | ⏳ | 保留目标，标注「尚无实测数据」 | §14.1 |
+| 12 | §3.2 REST 补位端点表「Reviews：`GET/POST /pulls/{n}/reviews`」 | **读走 GraphQL** `PullRequestReviewThreads.graphql`（`PullRequestRepository.kt:439`）、**写走 REST** `POST /pulls/{n}/reviews`（`PullRequestApi.kt:190`）——能力等价，通道一分为二 | 🔁 | 补注双通道现实（`PullRequestDto.kt:131` 的 `GET /reviews` DTO 注释为遗留说明） | §3.2 / §4.5 |
+| 13 | §7.3 Merge 示例给的是 GraphQL `mergePullRequest` mutation | 实现为 **REST `PUT /pulls/{n}/merge`**（`PullRequestApi.kt:204`），符合 §1.2「REST 写优先」但示例未回写 | 🔁 | 保留 GraphQL 示例作规划意图，补注实际走 REST | §7.3 |
+| 14 | §3.1/§17 写 `multiplatform-markdown-renderer 0.43.0` | 版本目录实为 **0.38.1**（`gradle/libs.versions.toml:48`），且另引入 **KotlinTextMate 0.2.0** 承担代码块高亮（`textmate = "0.2.0"`） | 🔁 | 版本号统一改为 0.38.1，补记 KotlinTextMate | §3.1 / §17 |
+| 15 | §17 最终清单「Markdown：mikepenz …（-m3、-code）」 | 实际四个制品：`markdown-renderer` + `-m3` + `-code` + **`-coil3`**（`libs.versions.toml:167-170`） | 🔁 | 补记 `-coil3` | §17 |
+| 16 | §1.2/§3.2/§4.4「**GraphQL 读优先**」+ 典型 Query `IssueDetail`（`body`/`bodyHTML`/`timelineItems` 游标）（§1.2/§4.4） | **`IssueDetail.graphql` 不存在**；全仓 8 个 `.graphql`（Viewer / RepositoryOverview / ViewerRepositories / PullRequestReviewThreads / UpdateIssue / ResolveReviewThread / UnresolveReviewThread / IssueWriteContext）；Issue/PR 详情、timeline、通知、搜索读路径全 REST（`IssueRepository.kt:59`「读：列表分页流 + 详情 + 时间线（REST）」）；`bodyHTML` 仅出现在 schema 定义与文档 | 🔁 | 修订为「REST 读为主 + GraphQL 少数读位」；**新增 ADR-0009 记录原意/现实/原因/回归触发条件** | ADR-0009 / §4.4 |
+
+**已核实为「无需回写」的审计项**（避免后人重复劳动）：
+
+- **`AppTypography`**（审计 §11 D7 记为「全仓 0 命中」）——**已过时**：`165ad76` 已落地 `core/designsystem/.../theme/AppTypography.kt`（10.9KB，M3 baseline 15 档 + markdown 标题档）并接线 `MaterialTheme(typography = AppTypography.from())`（`AppTheme.kt:114`）。§5.4 现已属实。
+- **`ExtendedColors`**（审计 §11 D6 记为「缺 8 个字段」）——字段名与语义**有意不同**：实现为 Alert 卡片语义（note/tip/important/warning/caution 各 2 字段）+ brand/danger/success 族，共 19 字段（`core/designsystem/.../ExtendedColors.kt`），而非计划里的 `info`/`merged`/`draft`。§5.3 已在其上方标注实际语义。
 
 ---
 
@@ -39,34 +74,70 @@
 | 方案 | 优点 | 缺点 | 适合场景 |
 |---|---|---|---|
 | 纯 Compose 自建 Markdown 渲染 | Material You 最统一，交互最原生 | GFM 兼容性工作量巨大；HTML、表格、任务列表、嵌套等很难完整支持 | 不推荐为主方案 |
-| **Compose 第三方库（multiplatform-markdown-renderer）** | Compose 原生、M3 配色模块、GFM 表格/删除线/任务列表、可点击链接、语法高亮、懒加载、异步解析；社区活跃（v0.43.0） | 对极少数高级内容（math/mermaid/重型 HTML）支持不足 | ✅ **主渲染器** |
+| **Compose 第三方库（multiplatform-markdown-renderer）** | Compose 原生、M3 配色模块、GFM 表格/删除线/任务列表、可点击链接、语法高亮、懒加载、异步解析；社区活跃（规划时标注 v0.43.0，**实际锁定 0.38.1**，见 §3.1） | 对极少数高级内容（math/mermaid/重型 HTML）支持不足 | ✅ **主渲染器** |
 | Markwon + TextView | 成熟稳定，GFM 扩展全面，prism4j 高亮 150+ 语言 | 需 AndroidView 桥接，与 Compose 动效/主题割裂 | 不选（能力已被主渲染器覆盖） |
 | WebView + 本地 JS 渲染（markdown-it 等） | 可高度还原 GFM，支持 KaTeX/Mermaid | 性能/内存开销，与 Compose 滚动嵌套复杂 | 仅作**兜底通道** |
 | GitHub 服务端渲染 HTML + WebView | 最接近网页端；mention、issue 引用、相对链接完整 | 依赖 API/网络，需 sanitize、缓存、样式注入 | **兜底通道首选数据源** |
 
-### 2.2 推荐架构：原生优先 + WebView 兜底（混合渲染）
+### 2.2 实际架构：WebView 主渲染 + Compose 原生短文本（分层渲染）
+
+> **（2026-09-11 回写：本节原题为「推荐架构：原生优先 + WebView 兜底（混合渲染）」。2026-08-19 Task B 经 ADR-0007 拍板**反转为 WebView 主渲染**——README 与 Issue/PR 正文一律 WebView，评论列表/通知等短文本保持原生。下方管线图已按现决策改写；原「原生优先」方案作为历史记录保留在本节末尾。）**
 
 ```text
 原始 Markdown
   │
-  ├─① 预处理层 GhMarkdownProcessor
-  │    · emoji 短码 → Unicode（gemoji 子集映射表，数据放 assets 不硬编码）
-  │    · 相对链接 → 按仓库上下文重写（./docs → 默认分支路径）
-  │    · 特性探测：mermaid 围栏 / $math$ / 重型 HTML / 超大文档 → 标记 fallback
+  ├─① 预处理层（按需）：相对链接重写 / 特性探测降级
+  │    · README：服务端 HTML 优先（getReadmeHtml 三级降级 + 双 key 缓存）
+  │    · Issue/PR 正文：无服务端 HTML API → 离线 GFM（WebViewHtmlBuilder.build(raw)）
   │
-  ├─② 主路径：ComposeMarkdownRenderer（mikepenz renderer）
-  │    · 注解器（annotator）扩展：@user 彩色 span、#n 引用、[!NOTE] 提醒块、锚点、代码语言徽标
-  │    · 任务列表可交互 checkbox
+  ├─② 主路径（正文类内容）：WebViewMarkdownRenderer
+  │    · 服务端 HTML 或离线 markdown-it 产物 → DOMPurify 权威清洗
+  │    · Material You 融合：Kotlin 预计算混色变量（真机 WebView 不支持 CSS color-mix）
+  │    · 交互经白名单 JS bridge：链接 / 复制 / 图片 / checkbox / 高度 / 滚动
   │    · 链接统一交给 GitHubLinkParser
   │
-  └─③ 兜底路径：WebViewMarkdownRenderer（按需启用，绝不默认）
-       ├─ 数据源优先级：
-       │    GitHub 服务端 HTML（/readme HTML / POST /markdown gfm+context）
-       │    → 本地 markdown-it + Shiki/KaTeX/Mermaid（assets 打包，离线可用）
-       ├─ CSS：注入 Material You 令牌（见 2.9）
-       ├─ 私有图片代理（shouldInterceptRequest 白名单 + Authorization）
-       └─ 链接统一交给 GitHubLinkParser
+  └─③ 短文本路径：MarkdownViewer（mikepenz renderer 0.38.1 + KotlinTextMate）
+       · 评论列表、通知、行内评论 —— 一律原生，绝不用 WebView
+       · 注解器扩展：@user span、#n 引用、[!NOTE] 提醒块、锚点、代码语言徽标
+       · 任务列表可交互 checkbox
+       · 链接统一交给 GitHubLinkParser
 ```
+
+**两套实现的真实边界**（与下方 §2.4 的关系）：
+
+| 通道 | 入口（无抽象接口，调用点直选） | 服务的内容 | 调用点 |
+|---|---|---|---|
+| WebView（主） | `WebViewMarkdownRenderer`（`@Composable`） | README、Issue 正文、PR 正文、编辑器预览 | `RepoDetailScreen.kt:1748`、`IssueDetailScreen.kt:505`、`PullRequestTabContent.kt:167`、`MarkdownEditorScreen.kt:132` |
+| 原生（短文本） | `MarkdownViewer` / `EnhancedMarkdownViewer` | 评论、timeline 条目、行内评论、仓库内 md 文件预览 | `PullRequestTimelineItems.kt:67/96/138`、`LineCommentSheet.kt:182`、`IssueDetailScreen.kt:871/1221` |
+
+> **历史记录（原计划，已被 ADR-0007 取代）**：原 §2.2 规划「主路径 = `ComposeMarkdownRenderer`（mikepenz renderer）+ 兜底路径 = `WebViewMarkdownRenderer`（按需启用，绝不默认）」，并规定 README 走「Compose 原生为主；复杂内容 → WebView 服务端 HTML 通道」。**反转原因**：原生增强链在 4 轮真机问题中持续暴露引擎级短板（排版细节、复杂度、跨版本维护），而 WebView 通道基于 github-markdown-css 官方方案渲染稳定、兼容面广——完整理由与代价见 `docs/adr/0007-markdown-native-primary-webview-fallback.md`。
+> **未随反转改变的红线**：评论列表绝不用 WebView；token 绝不注入 WebView；私有图片仅经 `shouldInterceptRequest` 白名单加 Authorization。
+
+> **原计划管线图（2026-09-11 保留作历史记录，勿据此实现）**：以下为 Task B 反转前的规划原文，其「主路径 = ComposeMarkdownRenderer / 兜底 = WebView（绝不默认）」的极性已与当前实现相反，仅保留以说明演进：
+>
+> ```text
+> 原始 Markdown
+>   │
+>   ├─① 预处理层 GhMarkdownProcessor
+>   │    · emoji 短码 → Unicode（gemoji 子集映射表，数据放 assets 不硬编码）
+>   │    · 相对链接 → 按仓库上下文重写（./docs → 默认分支路径）
+>   │    · 特性探测：mermaid 围栏 / $math$ / 重型 HTML / 超大文档 → 标记 fallback
+>   │
+>   ├─② 主路径：ComposeMarkdownRenderer（mikepenz renderer）
+>   │    · 注解器（annotator）扩展：@user 彩色 span、#n 引用、[!NOTE] 提醒块、锚点、代码语言徽标
+>   │    · 任务列表可交互 checkbox
+>   │    · 链接统一交给 GitHubLinkParser
+>   │
+>   └─③ 兜底路径：WebViewMarkdownRenderer（按需启用，绝不默认）
+>        ├─ 数据源优先级：
+>        │    GitHub 服务端 HTML（/readme HTML / POST /markdown gfm+context）
+>        │    → 本地 markdown-it + Shiki/KaTeX/Mermaid（assets 打包，离线可用）
+>        ├─ CSS：注入 Material You 令牌（见 2.9）
+>        ├─ 私有图片代理（shouldInterceptRequest 白名单 + Authorization）
+>        └─ 链接统一交给 GitHubLinkParser
+> ```
+>
+> 注：`GhMarkdownProcessor` 预处理层与 `ComposeMarkdownRenderer` 均**未落地**（全仓 0 命中）；相对链接重写随 Task B 一并移除（WebView 侧由服务端 HTML / markdown-it 自带处理）。「本地 markdown-it + Shiki」中的 Shiki 实际为 highlight.js，见 §2.12。
 
 ### 2.3 渲染目标清单（GFM 全覆盖）
 
@@ -93,7 +164,14 @@
 - Mermaid（兜底通道，可选）
 - 脚注（尽力而为，不保证与网页完全一致）
 
-### 2.4 渲染器抽象接口
+### 2.4 渲染器抽象接口（原计划，未采用）
+
+> **（2026-09-11 回写：本节描述的统一抽象层 **从未落地**，全仓 0 命中——`MarkdownRenderer` / `MarkdownContent` / `RenderContext` / `SourceType` 四个符号在 `*.kt` 中均无定义（仅存在同名 **Composable 函数** `WebViewMarkdownRenderer`，是入口而非接口实现）。
+> **实际架构**：不做统一接口，由调用点按内容类型直接选用两个 Composable 入口（见 §2.2 边界表）：
+> - 正文类 → `WebViewMarkdownRenderer(sanitizedHtml, tokenProvider, bridgeCallback, modifier, httpClient, renderMode, baseRepoUrl, fillAvailableHeight, onScrollChanged)`，其中 `renderMode: RenderMode`（`SERVER_HTML` / `OFFLINE_MARKDOWN_IT`）取代了原 `SourceType` 的枚举职责；
+> - 短文本 → `MarkdownViewer(markdown, onInternalLink, baseRepoUrl, modifier, scrollable)`。
+> **为什么没做**：ADR-0007 反转为 WebView 主渲染后，两通道的内容边界变成「正文 vs 短文本」这样一条调用点一眼可判的线，抽象接口只剩转发价值；而接口要求的 `Flow<RenderResult>` 进度模型（进度→完成→失败降级）与两个通道的实际控制流（WebView 加载回调 / Compose 同步渲染）都不吻合。**若将来第三条渲染通道出现，再引入抽象层仍是合理选项。**
+> **`MarkdownFeatureDetector` 路由已废弃**：`FeatureDetector`（`core/markdown/.../webview/FeatureDetector.kt:50`，纯函数 `shouldFallback`）保留并有单测，但 **README 分流判定不再使用它**，生产代码 0 引用——正文一律走 WebView，无需探测。下方代码块保留作原设计意图记录。**
 
 ```kotlin
 interface MarkdownRenderer {
@@ -119,19 +197,23 @@ data class RenderContext(
 )
 ```
 
-两套实现：`ComposeMarkdownRenderer`（主）与 `WebViewMarkdownRenderer`（兜底），由 `MarkdownFeatureDetector` 判定路由（含"本地离线编辑预览"分支）。
+> 注：`MarkdownThemeTokens` 是本节唯一**真实存在**的符号（`core/markdown/.../webview/MarkdownThemeTokens.kt:25`），WebView 通道的 Material You 令牌导出即由它承担（含 `toCssVariables()` / `versionHash()`）。
+
+原计划：「两套实现：`ComposeMarkdownRenderer`（主）与 `WebViewMarkdownRenderer`（兜底），由 `MarkdownFeatureDetector` 判定路由（含"本地离线编辑预览"分支）」——**该路由与两个实现的极性均已由 ADR-0007 反转，见 §2.2**。
 
 ### 2.5 分内容类型渲染决策表
 
-| 内容类型 | 渲染方式 | 理由 |
+> **（2026-09-11 回写：下表已按 ADR-0007 的 WebView 主渲染现状改写。原表把 README/正文列为「Compose 原生」，与实现相反。）**
+
+| 内容类型 | 渲染方式（现状） | 理由 |
 |---|---|---|
-| Issue/PR 评论、短正文 | Compose 原生 | 列表滚动流畅、主题一致、无需 WebView |
-| 常规 Issue/PR 正文 | Compose 原生；探测到复杂内容再切兜底 | 与网页一致且轻量 |
-| README | Compose 原生为主；复杂内容 → WebView 服务端 HTML 通道 | 达到「网页端一致」最稳途径又不牺牲性能 |
-| Markdown 编辑预览 | 与展示共用管线；服务端渲染时走 POST /markdown | 避免编辑态与展示态不一致 |
+| Issue/PR 评论、通知、行内评论等短文本 | **Compose 原生**（`MarkdownViewer`） | 列表滚动流畅、主题一致、无需 WebView（铁律：评论列表绝不用 WebView） |
+| Issue/PR 正文 | **WebView**（离线 GFM：`WebViewHtmlBuilder.build(raw)`） | 无服务端 HTML API，由 markdown-it + 融合样式承担 |
+| README | **WebView**：服务端 HTML（`getReadmeHtml` 三级降级 + 双 key 缓存）优先，异常降级离线 markdown-it（renderMode 仍 WEBVIEW） | 达到「网页端一致」最稳途径（ADR-0007 决策 1） |
+| Markdown 编辑预览 | **WebView**，与展示共用主渲染管线（离线 GFM） | 避免编辑态与展示态不一致 |
 | 代码文件浏览/编辑 | Sora Editor（TextMate） | 需要行号/搜索/准确高亮/编辑 |
 | PR Diff | 自建 Compose 统一 diff 视图（v1 轻量版）+ 行评论 | 初期不强行完整自研，WebView diff 仅兜底 |
-| 代码块语法高亮 | 原生：Highlights（18 语言）→ v2 prism4j（150+ 语言）；文件级：TextMate | 分层覆盖查询覆盖 |
+| 代码块语法高亮 | **原生短文本：KotlinTextMate（7 个 grammar 资产）**；**WebView 通道：highlight.js 11.11.1 整包**；文件级：Sora TextMate | 见 §2.12（原「Highlights 18 语言 → v2 prism4j 150+」已废弃） |
 
 ### 2.6 README 渲染策略（第一优先级）
 
@@ -156,15 +238,19 @@ data class RenderContext(
 3. **最后本地兜底**（离线草稿预览、API 不可用时）：
 
    - markdown-it + markdown-it-task-lists/tables/anchor/emoji/footnote
-   - Shiki（TextMate 语法，准确性高）或 highlight.js
-   - KaTeX、Mermaid 按需懒加载
+   - **highlight.js 11.11.1（整包，非按语言懒加载）** ← 2026-09-11 回写：原计划为 Shiki（TextMate 语法、按语言懒加载，Web Worker 里跑）
+   - KaTeX、Mermaid **未接入**（⏳ 保留计划；当前 assets 内无对应脚本，见 §2.3 目标清单中二者的「可选」定位）
    - 全部 JS/CSS 打包进 assets，`WebViewAssetLoader` 提供，不从网络加载
 
 ### 2.7 Issue/PR 正文渲染策略
 
-- GraphQL 取 `body` 与 `bodyHTML`：**有 bodyHTML 优先原生 span 渲染；无则 `body` + POST /markdown**；编辑时用原始 `body`。
-- 详情页：标题、状态、标签、作者、Assignees、Milestone、Reactions → Compose 原生；正文 → 本地渲染，探测到复杂内容切换高保真通道。
-- Timeline 评论：一律原生渲染（数量多，禁止逐条 WebView）。
+> **（2026-09-11 回写：原计划「GraphQL 取 `body` 与 `bodyHTML`，有 bodyHTML 优先原生 span 渲染」**未落地且方向已变**——`bodyHTML` 在 `.kt` / `.graphql` 中 **0 命中**，Issue/PR 详情读路径实为 REST；正文一律 **WebView 离线 GFM**（`IssueDetailScreen.kt:505`、`PullRequestTabContent.kt:167`），不做「探测到复杂内容再切换」的分流。）**
+
+- **正文（现状）**：取原始 `body`（REST）→ `WebViewHtmlBuilder.build(raw)` 离线 GFM → `WebViewMarkdownRenderer`；编辑态用原始 `body`。
+- 详情页：标题、状态、标签、作者、Assignees、Milestone、Reactions → Compose 原生；正文 → WebView（见上行）。
+- Timeline 评论：**一律原生渲染**（数量多，禁止逐条 WebView）——此条不变，是铁律。
+
+> 原计划（保留作历史记录）：「GraphQL 取 `body` 与 `bodyHTML`：有 bodyHTML 优先原生 span 渲染；无则 `body` + POST /markdown；编辑时用原始 `body`。详情页：…正文 → 本地渲染，探测到复杂内容切换高保真通道。」
 
 ### 2.8 评论渲染策略
 
@@ -214,10 +300,10 @@ Compose 侧生成主题令牌，注入 `:root` 变量：
   --md-sys-color-surface-container-high: …;
   --md-sys-color-outline-variant: …;
   --md-sys-shape-corner-medium: 12px;
-  --md-sys-font-sans: …;
-  --md-sys-font-mono: …;
+  --fontStack-sansSerif: …;
+  --fontStack-monospace: …;
 }
-.markdown-body { background: transparent; color: var(--md-sys-color-on-surface); font-family: var(--md-sys-font-sans); }
+.markdown-body { background: transparent; color: var(--md-sys-color-on-surface); font-family: var(--fontStack-sansSerif); }
 a { color: var(--md-sys-color-primary); }
 pre { background: var(--md-sys-color-surface-container-low); border-radius: var(--md-sys-shape-corner-medium); padding: 12px; }
 blockquote { background: var(--md-sys-color-surface-container-low); border-left: 3px solid var(--md-sys-color-primary); }
@@ -226,6 +312,8 @@ table td, table th { border: 1px solid var(--md-sys-color-outline-variant); }
 
 - 深色/浅色/OLED/动态色切换时重新注入令牌（缓存按 token 版本双 key）。
 - 不直接照搬 GitHub 蓝灰 CSS，基于 `github-markdown-css` 思路自维护 `markdown-you.css`。
+
+> **（2026-09-11 回写：字体令牌**命名漂移**——原计划 `--md-sys-font-sans` / `--md-sys-font-mono`，实现注入的是 GitHub 命名 `--fontStack-sansSerif` / `--fontStack-monospace`（`MaterialYouFusionMapper.buildCss`；由 `WebViewMaterialYouTokenContractTest` 双向锁定）。上方 CSS 已按实现改写，其余 `--md-sys-*` 令牌名与实现一致。真机 WebView 不支持 CSS `color-mix`，混色必须 Kotlin 预计算。）**
 
 ### 2.11 链接跳转设计（GitHubLinkParser）
 
@@ -257,10 +345,19 @@ sealed interface GitHubLink {
 
 ### 2.12 语法高亮方案
 
-- **README 代码块**：原生通道用 Highlights（18 种常用语言，6 组暗/亮主题可随 App「色随主题」）；覆盖不足（JSON/YAML/HTML/CSS/SQL/Markdown 等）→ v2 接入 prism4j（150+ 语法）自绘 `codeFence` 组件（renderer 组件点已验证可替换）。
-- **兜底 WebView**：Shiki（TextMate 语法、准确性高、按语言懒加载，Web Worker 里跑，首屏不加载全语言）。
-- **代码文件浏览**：Sora Editor TextMate 语法（VS Code 同款语法），支持行号、搜索、跳转行、wrap。
-- **PR Diff**：自研轻量 unified diff 渲染；复杂场景可 WebView + diff 库过渡。
+> **（2026-09-11 回写：本节原计划的三层方案中，Highlights（18 语言）、prism4j（150+）、Shiki 三者**均未落地**。实际实现如下表——决策依据见 `docs/research/highlight-engine-analysis.md`（该调研显式比较了 KotlinTextMate / hljs 移植 / WebView starry-night 三方案，**结论：starry-night 与 hljs 移植均未采用**，保持 KotlinTextMate 并扩 grammar 资产，因为「瓶颈不在引擎而在资产」）。）**
+
+| 场景 | 实际实现 | 语言覆盖 | 证据 |
+|---|---|---|---|
+| 原生通道代码块（评论等短文本） | **KotlinTextMate 0.2.0** TextMate 语法 + M3 派生主题 | **7 个 grammar 资产**：kotlin / python / go / java / json / yaml / shell；未覆盖语言走带样式兜底块（`FallbackCodeBlock`），不崩不错版 | `core/markdown/src/main/assets/grammars/`、`TextMateCodeBlock.kt:29`、`M3TextMateTheme.kt` |
+| WebView 通道代码块（README/正文） | **highlight.js v11.11.1 整包** | 整包含的常见语言（非按语言懒加载） | `assets/webview/highlight.min.js`（127KB）、`renderer.js:141`（`hljs.highlightElement`）、`WebViewHtmlBuilder.kt:98` |
+| 代码文件浏览/编辑 | Sora Editor TextMate 语法（VS Code 同款），支持行号、搜索、跳转行、wrap | 同 Sora 资产 | `core/editor` |
+| PR Diff | 自研轻量 unified diff 渲染；复杂场景可 WebView + diff 库过渡 | — | `feature/pullrequest/.../DiffView*` |
+
+**语言覆盖不足时的扩展路径（已调研拍板）**：从 VS Code 官方/社区 grammar 仓库（许可宽松）复制 JSON 语法资产进 `core/markdown/src/main/assets/grammars/`——每个语言约 0.5 天、**零 Kotlin 代码改动**（`rememberTextMateGrammar` 查 `GRAMMAR_FILES` 映射即可）。这比「接 prism4j」或「移植 highlight.js 引擎」（调研估 30–45 人天）便宜一个数量级。
+
+> **原计划（保留作历史记录）**：「README 代码块：原生通道用 Highlights（18 种常用语言，6 组暗/亮主题可随 App「色随主题」）；覆盖不足 → v2 接入 prism4j（150+ 语法）自绘 `codeFence` 组件。兜底 WebView：Shiki（TextMate 语法、准确性高、按语言懒加载，Web Worker 里跑，首屏不加载全语言）。」
+> **为何换掉**：Highlights 与 prism4j 均未引入（prism4j 全仓 0 命中；Highlights 依赖未出现在版本目录）；Shiki 需 Node 构建链产出 TextMate→JS 产物，与「assets 全静态打包、不从网络加载」的约束不划算，而 highlight.js 是 GitHub 网页端同源方案、单文件零构建。
 
 ### 2.13 渲染性能优化
 
@@ -316,7 +413,8 @@ webView.settings.apply {
 | 日志 | Timber | debug 网络可视化 |
 | Debug 网络 | Chucker | Debug 包使用 |
 | 内存检测 | LeakCanary | Debug 包使用 |
-| Markdown | multiplatform-markdown-renderer 0.43.0（+m3、+code） | 见 §2 |
+| Markdown（短文本通道） | multiplatform-markdown-renderer **0.38.1**（+m3、+code、+coil3）+ KotlinTextMate 0.2.0 | 见 §2（2026-09-11 回写：原写 0.43.0，实现为 0.38.1；高亮由 KotlinTextMate 承担） |
+| Markdown（正文通道） | WebView + github-markdown-css + markdown-it + highlight.js + DOMPurify | README/正文主渲染（ADR-0007） |
 | 代码/编辑 | Rosemoe Sora Editor（editor-compose + language-textmate） | 见 §8 |
 | 图标 | Material Symbols（com.composables compose-icons）+ Octicons 补充 | 见 §5.8 |
 
@@ -324,12 +422,12 @@ webView.settings.apply {
 
 | 能力 | 通道 | 端点 |
 |---|---|---|
-| 主要读取（feed/repo/issue/PR/timeline/viewer） | GraphQL | `/graphql` |
+| 主要读取（feed/repo/issue/PR/timeline/viewer） | **原计划 GraphQL；实际 REST 为主** | `/graphql` 仅覆盖 Viewer / RepositoryOverview / ViewerRepositories / ReviewThreads——Issue/PR 详情与 timeline 全走 REST（ADR-0009、§4.4） |
 | README 原文/HTML | REST | `GET /repos/{o}/{r}/readme` |
-| Markdown 渲染（预览/兜底） | REST | `POST /markdown`（`mode=gfm`, `context`） |
+| Markdown 渲染（预览/兜底） | REST | `POST /markdown`（`mode=gfm`, `context`）—— README 三级降级的 **Tier 2**（`RepoRepository.kt:239,257`）；正文预览不走此端点，走 WebView 离线 GFM（见 §2.5） |
 | 文件内容/新建/更新/删除 | REST | Contents API |
 | 仓库树、分支、提交 | REST | Git Data API |
-| PR 文件/Diff/Reviews/Checks | REST | pulls/files、reviews、check-runs |
+| PR 文件/Diff/Reviews/Checks | REST + GraphQL | pulls/files、reviews（**写** REST）、check-runs；Review 会话线程**读**走 GraphQL `PullRequestReviewThreads` |
 | 搜索（仓库/用户/issue/代码） | REST | `/search/*`（搜索 REST-only） |
 | 通知 | REST | Notifications API |
 | 写操作 | REST + GraphQL mutation | comments/reviews/merge 等 |
@@ -368,10 +466,12 @@ Authorization: Bearer {token}
 
 ### 4.4 GraphQL 设计（Apollo Kotlin）
 
+> **（2026-09-12 回写：本节是**最大偏离区**。「GraphQL 读优先」实际未成立——下文的典型 Query 中 `IssueDetail` **从未实现**（全仓无 `IssueDetail.graphql`，`bodyHTML` 仅存在于 schema 与文档），Issue/PR 详情、timeline、通知、搜索读路径全走 REST。实际落地的 GraphQL 面：读 `Viewer` / `RepositoryOverview` / `ViewerRepositories` / `PullRequestReviewThreads`；写 `UpdateIssue` / `ResolveReviewThread` / `UnresolveReviewThread`（外加 `IssueWriteContext` 读上下文）。完整决策记录（原意 / 现实 / 原因 / 回归触发条件）见 `docs/adr/0009-graphql-read-path-deviation.md`。下方内容保留作规划原文。）**
+
 - Codegen（response-based）、Fragment 复用、Normalized Cache（memory → SQLite 链）
 - 自定义 scalar 映射（DateTime、URI）
 - 官方玩法：`pagination-support-with-jetpack-paging` 示例对接 Paging 3 游标
-- 典型 Query：
+- 典型 Query（规划原文保留；其中 `IssueDetail` **未实现**，见本节顶部回写）：
 
 ```graphql
 query Viewer { viewer { login name avatarUrl bio url } }
@@ -416,7 +516,7 @@ query IssueDetail($owner: String!, $name: String!, $number: Int!, $after: String
 | 文件内容/更新/创建/删除 | `GET/PUT/DELETE /repos/{o}/{r}/contents/{path}` |
 | Git Tree | `GET /repos/{o}/{r}/git/trees/{sha}?recursive=1` |
 | PR Files | `GET /repos/{o}/{r}/pulls/{n}/files` |
-| Reviews | `GET/POST /repos/{o}/{r}/pulls/{n}/reviews` |
+| Reviews | 写：`POST /repos/{o}/{r}/pulls/{n}/reviews`；读：GraphQL `PullRequestReviewThreads`（REST 无会话线程等价端点） |
 | Checks | `GET /repos/{o}/{r}/commits/{ref}/check-runs` |
 | 分支/引用 | `GET/POST... /git/refs` |
 
@@ -449,6 +549,8 @@ query IssueDetail($owner: String!, $name: String!, $number: Int!, $after: String
 
 ### 5.2 主题模型
 
+> **（2026-09-11 回写：下表的 `AppThemePreferences` data class **从未落地**——该符号全仓 0 命中。实际实现是「扁平 `UserPreferencesRepository` 接口（DataStore 持久化）+ ADR-0004 的六套 `ThemeMode`」，见本节末「实际模型」。原 data class 保留作设计意图记录：其中 `styleVariant` / `contrastLevel` / `cornerScale` / `animationScale` / `iconStyle` / `codeFontFamily` / `showLineNumbers` 七个字段在实现中**或不存在、或换了载体**。）**
+
 ```kotlin
 data class AppThemePreferences(
     val themeMode: ThemeMode,       // SYSTEM / LIGHT / DARK
@@ -465,10 +567,27 @@ data class AppThemePreferences(
 )
 ```
 
-- 生成：Material Color Utilities（seed → 全 tonal palette）；`dynamicLight/DarkColorScheme()` 优先。
-- WebView 侧同步导出令牌（见 2.9）。
+**实际模型（现状，以此为准）**：
+
+| 维度 | 实现 | 证据 |
+|---|---|---|
+| 主题选择 | **单值 `ThemeMode` 六套**：`LIGHT / DARK / OLED / DYNAMIC_LIGHT / DYNAMIC_DARK / HIGH_CONTRAST` | ADR-0004 §1；`AppTheme.kt:68-98` |
+| 持久化 | 扁平 `UserPreferencesRepository` 接口（DataStore），**无聚合 data class** | `core/datastore/.../preferences/UserPreferencesRepository.kt` |
+| 种子色 | `seedColor: Color?`，**只作用于 `primary`**，其余角色取 M3 基线值；OLED / HIGH_CONTRAST 不收 seed | `ThemeColors.kt:499`、`AppTheme.kt:84-99` |
+| 圆角 | `cornerScale` + `AppShapes.from(cornerScale)` **已接线** | `AppTheme.kt:109` |
+| 动效强度 | `LocalMotionScale`（对应原 `animationScale`）**已接线** | `AppTheme.kt:103,113`、`AppMotion` |
+| 图标风格 | 三档图标风格 + `AppIcon` 统一入口**已接线**（`996dc18`） | `AppThemeHost` 消费点 |
+| `styleVariant` | **不存在**。原计划的 TONAL_SPOT/NEUTRAL/VIBRANT/GITHUB_CLASSIC 已由 ADR-0004 的六套主题取代 | ADR-0004 §1 |
+| `contrastLevel` | **不存在**（高对比以独立 `HIGH_CONTRAST` 主题套实现） | ADR-0004 §1 |
+| `codeFontFamily` / `showLineNumbers` | 存而**未消费**（死设置，挂账中） | 审计 `docs/ui-audit-2026-08-21.md` §2.1 |
+
+- 生成（**现状**）：动态色优先走 `dynamicLightColorScheme()` / `dynamicDarkColorScheme()`（Android 12+）；其余套为静态色板。
+- **⏳ Material Color Utilities（未实现）**：计划中的「seed → 全 tonal palette」**未落地**——MCU 直接依赖 0 命中，seed 只在 `lightColorScheme(primary = seed)` 里改了一个角色（`ThemeColors.kt:499`）。当前 seed 属**半成品**：视觉上仅主题色变化，容器/强调色族不跟随。若要补齐需显式引入 MCU 生成 tonal palette。
+- WebView 侧同步导出令牌（见 §2.9）：由 `MarkdownThemeTokens` + `MaterialYouFusionMapper` 承担（**注意：真机 WebView 不支持 CSS `color-mix`，混色必须在 Kotlin 侧预计算**）。
 
 ### 5.3 GitHub 语义状态色映射
+
+> **（2026-09-11 回写：下表为规划口径。**实际 `ExtendedColors` 的字段集与此不同**——实现的是 Alert 卡片语义（`noteContainer`/`onNoteContainer`、`tip`、`important`、`warning`、`caution` 各 2 字段）+ 品牌与状态族（`brand`、`success` 族、`danger` 族），共 **19 字段**（`core/designsystem/.../theme/ExtendedColors.kt`）；计划中的 `info` / `merged` / `draft` 三族**不存在**，`Merged`/`Draft` 状态改用 M3 原生角色（tertiary / surfaceContainerHigh）表达。下表保留作状态语义映射的设计依据。）**
 
 | GitHub 状态 | 语义 | Material You 映射 |
 |---|---|---|
@@ -478,7 +597,7 @@ data class AppThemePreferences(
 | Draft | 中性 | surfaceContainerHigh + onSurfaceVariant |
 | Checks success / failure / pending | 成功/错误/进行 | success / error / warning（扩展色） |
 
-扩展色定义：
+扩展色**原计划**定义（保留作历史记录）：
 
 ```kotlin
 data class ExtendedColors(
@@ -492,11 +611,13 @@ data class ExtendedColors(
 )
 ```
 
+**实际字段集（现状）**：`noteContainer` / `onNoteContainer`（Alert note，M3 primaryContainer 派生）、`tipContainer` / `onTipContainer`、`importantContainer` / `onImportantContainer`、`warningContainer` / `onWarningContainer`、`cautionContainer` / `onCautionContainer`、`brand`（GitHub 品牌蓝）、`success` / `onSuccess` / `successContainer` / `onSuccessContainer`、`danger` / `onDanger` / `dangerContainer` / `onDangerContainer`。
+
 ### 5.4 设计令牌
 
 - 颜色：一律 `MaterialTheme.colorScheme.*` + `ExtendedColors`，永不硬编码十六进制。
 - 尺寸：`AppDimens`（cornerSmall=8dp、cornerMedium=12dp、cornerLarge=16dp、cornerExtraLarge=28dp、列表横距 16dp、内容距 16dp、代码块 padding 12dp）
-- 字体：`AppTypography`（字阶、代码等宽追加）
+- 字体：`AppTypography`（字阶、代码等宽追加）—— ✅ **已落地并接线**（`165ad76`，`core/designsystem/.../theme/AppTypography.kt`：M3 baseline 15 档 + `markdownHeading1..6`；由 `MaterialTheme(typography = AppTypography.from())` 注入，`AppTheme.kt:114`）。
 
 ### 5.5 组件清单
 
@@ -615,7 +736,9 @@ MergeBox
 - 创建 PR（base/head）、编辑、关闭、重开
 - Review：approve / comment / request changes / submit、行内评论（position/side/anchor）
 - Merge（merge/squash/rebase）、Delete branch、Update branch
-- Mutation 示例：
+- > **（2026-09-11 回写：下列 GraphQL mutation 示例**保留作规划意图**，但**实际实现走 REST**——`PUT /repos/{owner}/{repo}/pulls/{number}/merge`（`core/github-rest/.../api/PullRequestApi.kt:204`，`mergeMethod` 经 `MergePullRequestRequest` 传参）。这与 §1.2 的「REST 写优先」原则一致，仅示例未同步。）**
+
+Mutation 示例（原计划）：
 
 ```graphql
 mutation MergePullRequest($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod) {
@@ -818,7 +941,7 @@ Compose UI 测试（Robolectric + compose-test）
 
 - ViewModel、UseCase、Repository、Mapper
 - **GitHubLinkParser**（绝对/相对/引用组合矩阵）
-- Markdown 特性检测、模板令牌生成器、CSS 生成器
+- Markdown 特性检测（`FeatureDetector.shouldFallback`，纯函数 + 单测）、模板令牌生成器、CSS 生成器；原计划的 `MarkdownRenderer` 抽象层测试项不存在（见 §2.4）
 - 配额/限流处理、PagingSource
 
 ### 12.3 API 集成测试
@@ -830,12 +953,15 @@ Compose UI 测试（Robolectric + compose-test）
 
 - 环境：Robolectric 4.10+（Native Graphics）+ compose ui-test、`testOptions.unitTests { isIncludeAndroidResources = true }`
 - 覆盖：IssueHeader 状态、StateChip、LabelChips、PR Tabs、主题切换、Markdown 链接点击、空/错/加载态
+- **例外边界（⏳ 已在 ADR-0007「代价」承认）**：WebView 内部内容的真实渲染在 Linux JVM 无法验证（Robolectric 无 WebView 引擎）——README/正文的端到端验证依赖 CI KVM 模拟器（`ci.yml:285-346`，api 30 + Maestro/adb 截图）；JVM 侧只能测 HTML 产物与分流逻辑（`WebViewHtmlBuilderTest` / `WebViewFixtureRenderModeTest`）
 
 ### 12.5 截图测试（Roborazzi）
 
 - 矩阵：Light / Dark / OLED / Dynamic color mock / 高对比；en / zh / ar-RTL；大字；各预设主题
 - 支持「点击后再截」：PullToRefresh、评论打开后状态
 - 产物：`build/outputs/roborazzi/*.png` + diff 图 —— Linux 本机即可预览
+
+> **（2026-09-11 回写：现状盘点——全仓 **66 张**基线（`core:markdown` 占 37：6 张 `MarkdownViewer_*` + 31 张 `MarkdownFixture_*`），覆盖以 Light/Dark × en（含少量 RTL）为主；**OLED / 高对比 / zh / 大字等维度未覆盖**。矩阵保留为目标；「产物 `build/outputs/roborazzi/*.png` 本机预览」无落地配方，CI 仅在 failure 上传产物（`ci.yml:155-163`）。）**
 
 ### 12.6 本机运行命令（Linux）
 
@@ -905,6 +1031,8 @@ jobs:
 | 列表滚动 | 稳定 60fps（高刷 90/120） |
 | APK | 依赖有意图（R8 + shrink） |
 
+> **（2026-09-12 回写：以上目标**均无实测数据**——macrobenchmark/baselineprofile 未接入（见 §14.3），仓库内无任何真机 benchmark 记录；目标保留。）**
+
 ### 14.2 Compose
 
 - stable 类 + remember/derivedStateOf + LazyColumn `key`/`contentType`
@@ -913,8 +1041,10 @@ jobs:
 
 ### 14.3 Baseline Profiles
 
-- androidx.benchmark 生成：启动路径、首页滚动、Issue 详情、README 渲染、主题切换
-- APK 内置 ProfileInstaller
+> **（2026-09-12 回写：⏳ **未实现**。`androidx.benchmark` / macrobenchmark / `baselineprofile` 插件全仓 0 命中；当前交付物是**手写**的 `app/src/main/baseline-prof.txt`（文件头 7-11 行自述：macrobenchmark 需真机/模拟器，与本仓「全 JVM」红线冲突）。`ProfileInstaller` 已接线（`libs.versions.toml:44,119`、`app/build.gradle.kts:201`），APK 内 profile 实测存在（`project-status.md:96`）。接入 macrobenchmark 后应替换手写产物。）**
+
+- 计划：androidx.benchmark 生成：启动路径、首页滚动、Issue 详情、README 渲染、主题切换
+- 现状：手写基线（按代码路径人工推导）+ APK 内置 ProfileInstaller
 
 ### 14.4 WebView 内存
 
@@ -947,11 +1077,11 @@ jobs:
 
 | 风险 | 影响 | 对策 |
 |---|---|---|
-| Markdown 渲染不一致 | README/Issue 显示不理想 | 原生优先 + 服务端 HTML 兜底 + 快照回归集 |
-| WebView 性能/内存 | 卡顿、OOM | 仅复杂内容用、复用单实例、快典 Destroy |
+| Markdown 渲染不一致 | README/Issue 显示不理想 | **WebView 主渲染（ADR-0007）** + 服务端 HTML 优先 / 离线 GFM 降级 + 快照回归集（原生 fixture 基线 ✅ 31 张已进门禁；WebView 路径产物回归 ⏳） |
+| WebView 性能/内存 | 卡顿、OOM | 主渲染通道（不再是「仅复杂内容用」）：复用单实例、离页 destroy、LeakCanary 监控 |
 | API 限流（REST/GraphQL） | 请求失败 | ETag + Room + Apollo 缓存 + 精细查询 + 分流 |
-| Highlights 语言覆盖不足 | 部分代码块无高亮 | v2 接 prism4j 自定义 codeFence 组件 |
-| fine-grained PAT 不支持 GraphQL | GraphQL 功能不可用 | PAT 模式降级 REST-only |
+| 代码块语言覆盖不足 | 部分代码块无高亮 | KotlinTextMate 7 grammar；扩展走「加 JSON 语法资产」（§2.12），prism4j 方案已废弃 |
+| fine-grained PAT 不支持 GraphQL | GraphQL 功能不可用 | PAT 模式降级 REST-only（✅ #230 已落地门控） |
 | 文件编辑冲突 | 用户数据丢失 | sha 校验、409 拦截、本地草稿保留 |
 | Material You × GitHub 语义冲突 | 状态识别不清 | 扩展语义色 token 体系 |
 | sora-editor LGPL-2.1 | 闭源合规 | 开源项目合法使用；闭源前再做评估 |
@@ -965,11 +1095,11 @@ jobs:
       Navigation Compose · Paging 3 · Hilt · DataStore · Room · Coil 3
 构建：Gradle version catalog · Convention plugins · AGP 最新稳定 · JDK17/21
 网络：OkHttp · Retrofit + kotlinx-serialization · Apollo Kotlin 5 · Chucker(debug)
-Markdown：mikepenz multiplatform-markdown-renderer 0.43.0（-m3、-code）
-  + WebViewAssetLoader + 服务端 HTML（/readme html / POST /markdown）+ markdown-it 兜底
+Markdown（短文本）：mikepenz multiplatform-markdown-renderer 0.38.1（-m3、-code、-coil3）+ KotlinTextMate 0.2.0
+Markdown（正文）：WebView（WebViewAssetLoader）+ 服务端 HTML（/readme html / POST /markdown）+ markdown-it 离线 GFM
 代码/编辑：Rosemoe Sora Editor（editor-compose + language-textmate）
-语法高亮：Highlights（原生代码块）→ prism4j（扩展）；Shiki（Web 兜底）
-主题：Material Color Utilities + dynamic color + 扩展语义色 + CSS 变量桥
+语法高亮：KotlinTextMate（原生短文本，7 grammar 资产）· highlight.js 11.11.1（WebView 通道，整包）· Sora TextMate（代码浏览）
+主题：dynamic color + 扩展语义色 + CSS 变量桥（⏳ Material Color Utilities 未接入，见 §5.2）
 图标：Material Symbols（compose-icons）+ Octicons（GitHub 专属）
 测试：JUnit4 · Robolectric(RNG) · Roborazzi · MockK · Turbine · MockWebServer · Apollo MockServer
 CI/CD：GitHub Actions · spotless · detekt · Android Lint · Konsist · Roborazzi · 签名 Release
@@ -981,3 +1111,5 @@ i18n：values/en-zh + plurals + lint 规则
 ## 18. 收尾说明
 
 > 一句话：**Kotlin + Compose + Material 3 全原生 UI；GraphQL 读、REST 写、AppAuth+PKCE 认证；Markdown 原生为主、WebView 服务端 HTML 兜底并在双端共享同一套 Material You 令牌与统一链接解析器；代码浏览编辑用 Sora Editor；全链路 JVM 测试在 Linux 上免模拟器运行；GitHub Actions 支撑 CI、截图回归与发布闭环；从基建第一天落实 i18n、令牌化与硬编码红线。**
+>
+> **（2026-09-12 回写：本句为规划期小结，两处已失真——① 数据层现为「REST 读为主、GraphQL 少数读位」（ADR-0009）；② Markdown 现为「WebView 主渲染 + 原生短文本」（ADR-0007）。一概以正文各节回写为准。）**
