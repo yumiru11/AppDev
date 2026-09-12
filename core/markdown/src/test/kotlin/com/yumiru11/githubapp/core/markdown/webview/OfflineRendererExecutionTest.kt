@@ -267,6 +267,75 @@ class OfflineRendererExecutionTest {
         assertTrue("<sup> 语义标签保留", html.contains("<sup>上标</sup>"))
     }
 
+    // ── #123 issue/PR 引用 + 裸 sha（2026-09-12） ──────────────────────────
+
+    @Test
+    fun offlineRender_fixture24_linkifiesBareIssueRefsToRepoRoute() {
+        val html = renderFixture("24-issue-ref")
+
+        assertTrue(
+            "裸 #123 → {repo}/issues/123（GitHub 对 PR 会 302 到 /pull/N）",
+            html.contains("<a href=\"https://github.com/octocat/Hello-World/issues/123\">#123</a>"),
+        )
+        assertFalse("owner/repo#456 不在本票词法内，不得凭空拼出链接", html.contains("issues/456"))
+        assertFalse("gh-123 不是链接形态", html.contains(">gh-123</a>"))
+    }
+
+    @Test
+    fun offlineRender_fixture25_linkifiesFullShaToCommitRoute() {
+        val html = renderFixture("25-commit-sha-ref")
+
+        assertTrue(
+            "完整 40 位 sha → {repo}/commit/<sha>",
+            html.contains(
+                "<a href=\"https://github.com/octocat/Hello-World/commit/4b825dc642cb6eb9a060e54bf8d69288fbee4904\">" +
+                    "4b825dc642cb6eb9a060e54bf8d69288fbee4904</a>",
+            ),
+        )
+        assertFalse("短 sha 不链接（本期口径 = 完整 40 位）", html.contains("commit/4b825dc\""))
+    }
+
+    @Test
+    fun offlineRender_issueRefsAndShas_insideCodeUrlsAndAnchors_areNotLinkified() {
+        val markdown =
+            """
+            ```text
+            #123 4b825dc642cb6eb9a060e54bf8d69288fbee4904
+            ```
+
+            行内：`#123` 与 `4b825dc642cb6eb9a060e54bf8d69288fbee4904`
+
+            [已有链接](https://example.com/issues/123)
+
+            URL：https://example.com/a#123
+
+            <a href="https://example.com">#123</a>
+            """.trimIndent()
+
+        val html = render(markdown)
+
+        assertTrue("围栏代码块里的引用必须原样保留", html.contains("#123 4b825dc642cb6eb9a060e54bf8d69288fbee4904"))
+        assertTrue("行内代码里的 #123 必须原样保留", html.contains("<code>#123</code>"))
+        assertTrue(
+            "已有链接与裸 URL 原文不变",
+            html.contains("https://example.com/issues/123") && html.contains("https://example.com/a#123"),
+        )
+        assertFalse(
+            "代码/URL/已有链接/HTML 锚内不得产出仓库引用链接",
+            html.contains("octocat/Hello-World/issues/123") || html.contains("octocat/Hello-World/commit/"),
+        )
+    }
+
+    @Test
+    fun offlineRender_issueRefsWithoutRepoContext_stayPlainText() {
+        val html = render("修复 #123 与 4b825dc642cb6eb9a060e54bf8d69288fbee4904", repoContext = null)
+
+        assertTrue("无仓库上下文时引用保持纯文本", html.contains("#123"))
+        assertFalse("不得凭空拼出 issues 链接", html.contains("/issues/123"))
+        assertFalse("不得凭空拼出 commit 链接", html.contains("/commit/"))
+        assertFalse("不得把 #123 写成页内锚点（bindLinks 会吞掉 # 开头 href）", html.contains("href=\"#123\""))
+    }
+
     // ── 共用 ────────────────────────────────────────────────────────────
 
     private fun renderFixture(id: String): String = render(MarkdownGfmFixtures.byId(id).markdown())

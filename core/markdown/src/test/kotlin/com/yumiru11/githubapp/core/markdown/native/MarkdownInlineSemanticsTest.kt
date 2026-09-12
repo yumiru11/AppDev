@@ -143,19 +143,86 @@ class MarkdownInlineSemanticsTest {
         assertEquals(0, result.getLinkAnnotations(0, result.length).size)
     }
 
+    // ── #123 issue/PR 引用与裸 sha（2026-09-12） ──────────────────────────
+
+    @Test
+    fun annotate_issueReferenceInParagraph_producesRepoIssueLink() {
+        val result = annotate("修复 #123，关联 #456。", baseRepoUrl = REPO_URL)
+
+        val links = result.getLinkAnnotations(0, result.length)
+        assertEquals("两个 issue 引用必须各产出一条链接", 2, links.size)
+        assertEquals("$REPO_URL/issues/123", (links[0].item as LinkAnnotation.Url).url)
+        assertEquals("$REPO_URL/issues/456", (links[1].item as LinkAnnotation.Url).url)
+        assertEquals("#123", result.text.substring(links[0].start, links[0].end))
+    }
+
+    @Test
+    fun annotate_fullShaInParagraph_producesCommitLink() {
+        val result = annotate("见提交 $FULL_SHA 的改动。", baseRepoUrl = REPO_URL)
+
+        val links = result.getLinkAnnotations(0, result.length)
+        assertEquals(1, links.size)
+        assertEquals("$REPO_URL/commit/$FULL_SHA", (links[0].item as LinkAnnotation.Url).url)
+        assertEquals("链接文本必须是 sha 原文", FULL_SHA, result.text.substring(links[0].start, links[0].end))
+    }
+
+    @Test
+    fun annotate_shortSha_staysPlainText_scopeIsFullFortyHex() {
+        val result = annotate("短 sha：4b825dc 不链接", baseRepoUrl = REPO_URL)
+
+        assertEquals("短 sha 不在本期口径（仅完整 40 位）", 0, result.getLinkAnnotations(0, result.length).size)
+    }
+
+    @Test
+    fun annotate_issueRefAndShaInsideCodeSpansAndFences_areLeftLiteral() {
+        val result =
+            annotate(
+                "行内 `#123` 与 `$FULL_SHA`：不链接。\n\n```text\n#123 $FULL_SHA\n```\n",
+                baseRepoUrl = REPO_URL,
+            )
+
+        assertEquals("行内代码/围栏里的引用不得产出链接", 0, result.getLinkAnnotations(0, result.length).size)
+        assertTrue("行内代码原文必须保留", result.text.contains("#123") && result.text.contains(FULL_SHA))
+    }
+
+    @Test
+    fun annotate_issueRefInsideUrlAndExistingLink_isNotLinkedTwice() {
+        val result =
+            annotate(
+                "URL https://example.com/x#123 与 [链接](https://example.com/issues/123) 结束",
+                baseRepoUrl = REPO_URL,
+            )
+
+        val repoLinks =
+            result.getLinkAnnotations(0, result.length).filter {
+                (it.item as? LinkAnnotation.Url)?.url?.startsWith(REPO_URL) == true
+            }
+        assertEquals("已有 URL/链接内部不得再注入仓库引用链接", 0, repoLinks.size)
+    }
+
+    @Test
+    fun annotate_issueRefWithoutRepoContext_staysPlainText() {
+        val result = annotate("修复 #123", baseRepoUrl = null)
+
+        assertEquals("无仓库上下文不能凭空拼 URL", 0, result.getLinkAnnotations(0, result.length).size)
+        assertTrue("原文必须保留", result.text.contains("#123"))
+    }
+
     // ── 共用 ────────────────────────────────────────────────────────────
 
     /** 用生产注解器跑 mikepenz 真实的 AnnotatedString 构建链（含默认节点处理）。 */
-    private fun annotate(markdown: String) =
-        markdown.buildMarkdownAnnotatedString(
-            style = TextStyle(),
-            annotatorSettings =
-                DefaultAnnotatorSettings(
-                    linkTextSpanStyle = TextLinkStyles(),
-                    codeSpanStyle = SpanStyle(),
-                    annotator = MarkdownInlineSemantics.annotator(TEST_STYLES),
-                ),
-        )
+    private fun annotate(
+        markdown: String,
+        baseRepoUrl: String? = null,
+    ) = markdown.buildMarkdownAnnotatedString(
+        style = TextStyle(),
+        annotatorSettings =
+            DefaultAnnotatorSettings(
+                linkTextSpanStyle = TextLinkStyles(),
+                codeSpanStyle = SpanStyle(),
+                annotator = MarkdownInlineSemantics.annotator(TEST_STYLES, baseRepoUrl),
+            ),
+    )
 
     /** 断言 needle 命中的区间上有满足 predicate 的 SpanStyle。 */
     private fun androidx.compose.ui.text.AnnotatedString.hasStyleOf(
@@ -169,6 +236,9 @@ class MarkdownInlineSemanticsTest {
     }
 
     private companion object {
+        const val REPO_URL = "https://github.com/octocat/Hello-World"
+        const val FULL_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
         val TEST_STYLES =
             MarkdownInlineStyles(
                 link = TextLinkStyles(style = SpanStyle(color = Color.Red, textDecoration = TextDecoration.Underline)),

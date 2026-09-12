@@ -211,6 +211,22 @@ class WebViewOfflineGfmCapabilityTest {
         )
     }
 
+    @Test
+    fun rendererJs_providesHandRolledIssueRefAndShaPlugins() {
+        val renderer = rendererJs()
+
+        assertTrue("裸 #123 引用插件必须存在（离线通道 → {repo}/issues/N）", renderer.contains("issueRefPlugin"))
+        assertTrue("完整 40 位 sha 插件必须存在（离线通道 → {repo}/commit/<sha>）", renderer.contains("commitShaPlugin"))
+        assertTrue(
+            "仓库上下文必须从 state.env 读取（renderOfflineHtml 把 data-base-repo 下发给插件）",
+            renderer.contains("state.env && state.env.repoContext"),
+        )
+        assertTrue(
+            "无仓库上下文时 repoBase 必须返回空（整段纯文本，绝不产 href=#123 这种页内锚点）",
+            renderer.contains("function repoBase"),
+        )
+    }
+
     private fun markdownItBundle(): String = readAsset("markdown-it.min.js")
 
     private fun rendererJs(): String = readAsset("renderer.js")

@@ -194,13 +194,18 @@ object MarkdownGfmFixtures {
                 "24-issue-ref",
                 "引用：`#123`、`owner/repo#123`、`gh-123`",
                 setOf(RenderPath.SERVER_HTML),
-                note = "GitHubLinkParser 只在链接点击时解析绝对 URL，正文里的裸 #123 不被 linkify",
+                note =
+                    "2026-09-12：离线/原生均已渲染**裸 `#123`** → `{repo}/issues/N`（GitHub 对 PR 302 到 " +
+                        "/pull/N；GitHubLinkParser 分流到应用内 Issue 路由）。`owner/repo#123` 与 `gh-123` " +
+                        "仍未实现（后者网页端本就是纯文本），夹具三条形态并不全部等价，故 path 仍不声明",
             ),
             Fixture(
                 "25-commit-sha-ref",
                 "提交引用（裸 sha）",
                 setOf(RenderPath.SERVER_HTML),
-                note = "同上：正文裸 sha 无自动链接",
+                note =
+                    "2026-09-12：离线/原生均已渲染**完整 40 位** sha → `{repo}/commit/<sha>`；" +
+                        "短 sha（网页端会链接）未实现，故 path 仍不声明",
             ),
             Fixture(
                 "26-emoji-shortcode",
