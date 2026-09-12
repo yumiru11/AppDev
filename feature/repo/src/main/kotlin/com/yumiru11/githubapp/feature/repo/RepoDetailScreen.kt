@@ -86,13 +86,14 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -124,6 +125,7 @@ import java.io.IOException
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.roundToInt
 
 private const val TAG = "ReadmeRender"
 
@@ -631,10 +633,6 @@ private fun RepoDetailContent(
     // 只在 README 分区生效：文件/Releases 分区有自己的滚动，不该被 README 的滚动位置影响
     val headerCollapse =
         if (tab == README_TAB_INDEX) (readmeScrollY / collapseDistancePx).coerceIn(0f, 1f) else 0f
-    // 头部自然高度只在实际展开时更新：收起过程中的测量值会被压缩后的约束污染，
-    // 若持续更新会形成"越收越小"的反馈回路。
-    var headerHeightPx by remember { mutableIntStateOf(0) }
-
     Column(
         modifier =
             modifier
@@ -648,31 +646,39 @@ private fun RepoDetailContent(
                 Modifier
                     .fillMaxWidth()
                     // 高度收缩 + 裁剪 = "收起"；alpha 同步淡出 = "渐隐"
-                    .height(
-                        with(LocalDensity.current) {
-                            (headerHeightPx * (1f - headerCollapse)).toDp()
-                        },
-                    ).clipToBounds()
-                    .padding(horizontal = 16.dp),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .onSizeChanged { size -> if (headerCollapse == 0f) headerHeightPx = size.height }
-                        .graphicsLayer {
-                            alpha = 1f - headerCollapse
+                    //
+                    // 🔴 自然高度必须在「不受限高度」下测量（UI-C01 回归修复）：
+                    // 旧实现用外层 `.height(headerHeightPx * (1 - collapse))` 做约束，
+                    // 而 headerHeightPx 初值 0 → 外层高 0dp → 内层 onSizeChanged 在
+                    // maxHeight=0 的约束下只可能测到 0，自然高度永远回填不上（自锁），
+                    // 仓库头整块被裁成 0 高（截图/dump 里 Avatar/Star 全缺）。
+                    // 改为在 layout 阶段以 Constraints.Infinity 测量自然高度：首帧即按
+                    // 自然高度渲染，收起只压缩外层可视高度、不再污染测量基准。
+                    .clipToBounds()
+                    .graphicsLayer { alpha = 1f - headerCollapse }
+                    .layout { measurable, constraints ->
+                        val placeable =
+                            measurable.measure(
+                                constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity),
+                            )
+                        val visibleHeight =
+                            (placeable.height * (1f - headerCollapse)).roundToInt().coerceAtLeast(0)
+                        layout(constraints.maxWidth, visibleHeight) {
                             // 向上位移收进裁剪区，避免"高度在收、内容却在原地下沉"的割裂感
-                            translationY = -headerCollapse * headerHeightPx * HEADER_COLLAPSE_DRIFT
-                        },
-            ) {
-                RepoHeader(
-                    state = state,
-                    onToggleStar = managementCallbacks.onToggleStar,
-                    onToggleWatch = managementCallbacks.onToggleWatch,
-                    onFork = managementCallbacks.onFork,
-                    onTopicClick = onTopicClick,
-                )
-            }
+                            placeable.place(
+                                0,
+                                (-headerCollapse * placeable.height * HEADER_COLLAPSE_DRIFT).roundToInt(),
+                            )
+                        }
+                    }.padding(horizontal = 16.dp),
+        ) {
+            RepoHeader(
+                state = state,
+                onToggleStar = managementCallbacks.onToggleStar,
+                onToggleWatch = managementCallbacks.onToggleWatch,
+                onFork = managementCallbacks.onFork,
+                onTopicClick = onTopicClick,
+            )
         }
 
         // 头部收起时不再需要那段留白，否则会留下一块"空气隙"
