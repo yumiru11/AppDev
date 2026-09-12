@@ -21,6 +21,7 @@
     <string name="search_tab_code">代码</string>
 
     <!-- 状态 -->
+    <string name="search_loading">搜索中…</string>
     <string name="search_empty">没有找到结果</string>
     <!-- 顶部细进度条读屏文案（#167 / UI16） -->
     <string name="search_in_progress">正在搜索…</string>

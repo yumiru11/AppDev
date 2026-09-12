@@ -32,9 +32,9 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -45,12 +45,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
@@ -275,7 +276,7 @@ fun PullRequestDetailScreen(
         ) {
             when (val state = uiState) {
                 is PullRequestDetailUiState.Loading -> {
-                    PullRequestLoadingContent(modifier = Modifier.fillMaxSize())
+                    AppCenteredLoadingState(modifier = Modifier.fillMaxSize())
                 }
 
                 is PullRequestDetailUiState.Error -> {
@@ -675,16 +676,30 @@ private fun SuccessContent(
     }
 }
 
-/** 四 Tab 行（与网页端对齐：Conversation/Commits/Checks/Files changed） */
+/**
+ * 四 Tab 行（与网页端对齐：Conversation/Commits/Checks/Files changed）。
+ *
+ * C1 修复：原实现是固定 [TabRow]，4 个 tab 均分宽度（411.dp 机型上每个约 102.dp，
+ * 去掉 `HorizontalTextPadding` 32.dp 后文本区仅 ~70.dp），"Conversation" / "Files changed"
+ * 被省略号截断成 "Conversa…" / "Files cha…"（CI 截图 pr-conversation / pr-commits /
+ * pr-actions 三张全中）——标签一旦省略就再也读不全。
+ *
+ * 改用 M3 1.4 的 [PrimaryScrollableTabRow]（primary tabs）：tab 宽度 =
+ * max(minTabWidth, 文本宽 + 32.dp)，在滚动容器里测量宽度不受限，标签要么完整可见、
+ * 要么整体滚出视口（可滚回），永不省略；宽度不够时横向滚动 + `edgePadding` 留白提示。
+ */
 @Composable
 private fun PrTabs(
     selectedTab: PullRequestTab,
     onTabSelected: (PullRequestTab) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    TabRow(
+    PrimaryScrollableTabRow(
         selectedTabIndex = selectedTab.ordinal,
         modifier = modifier.fillMaxWidth(),
+        containerColor = MaterialTheme.colorScheme.surface,
+        edgePadding = TAB_ROW_EDGE_PADDING,
+        minTabWidth = TAB_ROW_MIN_TAB_WIDTH,
     ) {
         PullRequestTab.entries.forEach { tab ->
             Tab(
@@ -730,8 +745,16 @@ private fun PrHeader(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             StatusChip(state = pullRequest.state)
-            Spacer(modifier = Modifier.width(8.dp))
-            MergeableChip(mergeableState = pullRequest.mergeableState)
+            // C4 根因修复：只有「还能合并」的 PR（OPEN / DRAFT）才该显示合并性徽标。
+            // GitHub 对已合并 / 已关闭的 PR 恒返回 `mergeable = null`（合并 ref 已不存在），
+            // 于是徽标会永远停在 "Checking mergeability…"。CI 三张 PR 截图
+            // （pr-conversation / pr-commits / pr-actions）拍的正是 PR 已 Merged 却仍挂着
+            // 这句待检查文案的「死状态」——那才是"死文案"的根因。这里直接不渲染，
+            // 与网页端一致（已合并的 PR 没有合并性可谈）。
+            if (pullRequest.state == PullRequestState.OPEN || pullRequest.state == PullRequestState.DRAFT) {
+                Spacer(modifier = Modifier.width(8.dp))
+                MergeableChip(mergeableState = pullRequest.mergeableState)
+            }
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
@@ -803,7 +826,17 @@ private fun StatusChip(state: PullRequestState) {
     )
 }
 
-/** Mergeable 状态徽标：可合并（primary）/ 冲突（error）/ 待检查（surfaceVariant） */
+/**
+ * Mergeable 状态徽标：可合并（primary）/ 冲突（error）/ 待检查（surfaceVariant + 进度指示）。
+ * 仅由 [PrHeader] 在 PR 还可合并（OPEN / DRAFT）时调用。
+ *
+ * C4 修复：`MergeableState.UNKNOWN` 表示 GitHub 尚未算完合并性（`mergeable == null`），
+ * 是一个**会自行消失的瞬时态**，但截图里只有一行静止的 "Checking mergeability…"，
+ * 看不出还在进行中。按 MergeBox 里 pendingAction 的既有做法补一个 12.dp 的内联
+ * [CircularProgressIndicator]（M3 自带组件、不引额外依赖、无自定义动画曲线）。
+ * 该指示器是装饰性的（无 contentDescription）：状态语义由相邻 Text 承载，
+ * 与 `ChecksSummaryRow` 的 pending 分支同款处理。
+ */
 @Composable
 private fun MergeableChip(mergeableState: MergeableState) {
     val (text, container, content) =
@@ -836,12 +869,24 @@ private fun MergeableChip(mergeableState: MergeableState) {
         shape = MaterialTheme.shapes.small,
         color = container,
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            color = content,
+        Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (mergeableState == MergeableState.UNKNOWN) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(INLINE_PROGRESS_SIZE),
+                    strokeWidth = INLINE_PROGRESS_STROKE,
+                    color = content,
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                color = content,
+            )
+        }
     }
 }
 
@@ -901,30 +946,51 @@ private fun ReviewerRow(reviewers: List<PullRequestUser>) {
     }
 }
 
-/** Checks 摘要行：combined status state（success/failure/pending） */
+/**
+ * Checks 摘要行：combined status state（success/failure/pending）。
+ *
+ * C4 修复：pending 原先渲染一个静止的 `Icons.Filled.Refresh` 圆箭头图标，看起来像
+ * 可点的"刷新"按钮，且完全看不出检查还在跑（CI 截图三张 PR 页都是 "Checks pending"
+ * 配一个死图标）。pending 分支改为内联 [CircularProgressIndicator]——语义明确
+ * （进行中）、与 MergeBox 的 pendingAction 做法一致、无自定义动画。
+ * success/failure 仍是状态图标，语义由文本承载，图标为纯装饰（contentDescription = null）。
+ */
 @Composable
 private fun ChecksSummaryRow(combinedStatus: CombinedStatus) {
+    val pending = combinedStatus.state != COMBINED_STATUS_SUCCESS && combinedStatus.state != COMBINED_STATUS_FAILURE
     val (text, color) =
-        when (combinedStatus.state) {
-            "success" -> {
-                stringResource(R.string.pull_request_checks_state_success) to MaterialTheme.colorScheme.primary
+        when {
+            pending -> {
+                stringResource(R.string.pull_request_checks_state_pending) to
+                    MaterialTheme.colorScheme.onSurfaceVariant
             }
 
-            "failure" -> {
-                stringResource(R.string.pull_request_checks_state_failure) to MaterialTheme.colorScheme.error
+            combinedStatus.state == COMBINED_STATUS_SUCCESS -> {
+                stringResource(R.string.pull_request_checks_state_success) to
+                    MaterialTheme.colorScheme.primary
             }
 
             else -> {
-                stringResource(R.string.pull_request_checks_state_pending) to MaterialTheme.colorScheme.onSurfaceVariant
+                stringResource(R.string.pull_request_checks_state_failure) to
+                    MaterialTheme.colorScheme.error
             }
         }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = combinedStatusIcon(combinedStatus.state),
-            contentDescription = text,
-            tint = color,
-            modifier = Modifier.size(16.dp),
-        )
+        if (pending) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(INLINE_PROGRESS_SIZE),
+                strokeWidth = INLINE_PROGRESS_STROKE,
+                color = color,
+            )
+        } else {
+            Icon(
+                imageVector = combinedStatusIcon(combinedStatus.state),
+                // 文案已由相邻 Text 承载，图标纯装饰（避免 TalkBack 播报两遍）
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(16.dp),
+            )
+        }
         Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = text,
@@ -934,12 +1000,12 @@ private fun ChecksSummaryRow(combinedStatus: CombinedStatus) {
     }
 }
 
-/** combined status state → 图标（success=CheckCircle / failure=Close / 其余=Refresh） */
+/** combined status state → 图标（仅 success/failure 有专属图标；pending 走进度指示） */
 private fun combinedStatusIcon(state: String?) =
-    when (state) {
-        "success" -> Icons.Filled.CheckCircle
-        "failure" -> Icons.Filled.Close
-        else -> Icons.Filled.Refresh
+    if (state == COMBINED_STATUS_SUCCESS) {
+        Icons.Filled.CheckCircle
+    } else {
+        Icons.Filled.Close
     }
 
 /** GitHub 标签 hex（RRGGBB）→ Color；解析失败返回 null（走 surfaceVariant 兜底） */
@@ -985,6 +1051,36 @@ private fun copyLink(
 
 private const val FIXED_ALPHA_MASK = 0xFF000000L
 private const val TAG = "PullRequestDetailScreen"
+
+/**
+ * GitHub combined status 的 state 取值（REST `/repos/{owner}/{repo}/commits/{ref}/status`）。
+ * 单一取值 `pending` 之外还有 `error`，两者在 UI 上同为「未通过/进行中」的兜底分支。
+ */
+private const val COMBINED_STATUS_SUCCESS = "success"
+private const val COMBINED_STATUS_FAILURE = "failure"
+
+/** 状态行内联进度指示尺寸（与 MergeBox 的 18.dp 按钮内转圈区分：这里是 labelMedium 行内） */
+private val INLINE_PROGRESS_SIZE = 12.dp
+
+/** 状态行内联进度指示描边（12.dp 直径下保持 M3 视觉粗细） */
+private val INLINE_PROGRESS_STROKE = 2.dp
+
+/**
+ * 四 Tab 行首尾留白（C1）。M3 语义：滚动 tab 行与首/尾 tab 之间的留白本身就是
+ * 「此行可横向滚动」的视觉提示（`PrimaryScrollableTabRow` 的 `edgePadding` 文档原话）。
+ * 与全 app 内容边距（AppDimens.contentPadding）同量级，与 SearchScreen 结果 Tab 行对齐。
+ */
+private val TAB_ROW_EDGE_PADDING = 16.dp
+
+/**
+ * 四 Tab 行 tab 最小宽度（C1）。
+ *
+ * 本页标签较长（en "Conversation" / "Files changed" 在 labelLarge 14sp 下约 88 / 80.dp，
+ * 加 32.dp 内边距后 120 / 112.dp），实际宽度由内容决定、64.dp 下限不会生效；
+ * 保留该下限是为了窄屏 / 短标签语种（zh-rCN「对话/提交/检查/文件」）下 tab 不至于挤成一团，
+ * 同时远高于 Material 48.dp 的最小触摸目标。放不下时按 M3 语义横向滚动。
+ */
+private val TAB_ROW_MIN_TAB_WIDTH = 64.dp
 
 /** PR 评论输入 BottomSheet（Material You 风格；写接口接入前 Submit 仅给出「暂未开放」反馈） */
 @OptIn(ExperimentalMaterial3Api::class)

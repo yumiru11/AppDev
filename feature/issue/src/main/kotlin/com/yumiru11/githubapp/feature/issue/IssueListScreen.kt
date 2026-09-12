@@ -45,6 +45,7 @@ import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
+import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueFilter
@@ -123,7 +124,7 @@ fun IssueListScreen(
             )
             when (val state = uiState) {
                 is IssueListUiState.Loading -> {
-                    IssueLoadingContent(modifier = Modifier.fillMaxSize())
+                    AppCenteredLoadingState(modifier = Modifier.fillMaxSize())
                 }
 
                 is IssueListUiState.Error -> {
@@ -198,7 +199,7 @@ private fun IssueListContent(
         }
 
         lazyItems.loadState.refresh is LoadState.Loading && lazyItems.itemCount == 0 -> {
-            IssueLoadingContent(modifier = modifier)
+            AppCenteredLoadingState(modifier = modifier)
         }
 
         lazyItems.itemCount == 0 -> {

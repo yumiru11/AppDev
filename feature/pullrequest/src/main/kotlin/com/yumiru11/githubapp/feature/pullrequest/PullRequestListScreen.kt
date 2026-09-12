@@ -44,6 +44,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Add
+import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequest
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFilter
@@ -112,7 +113,7 @@ fun PullRequestListScreen(
             )
             when (val state = uiState) {
                 is PullRequestListUiState.Loading -> {
-                    PullRequestLoadingContent(modifier = Modifier.fillMaxSize())
+                    AppCenteredLoadingState(modifier = Modifier.fillMaxSize())
                 }
 
                 is PullRequestListUiState.Error -> {
@@ -188,7 +189,7 @@ private fun PullRequestListContent(
         }
 
         lazyItems.loadState.refresh is LoadState.Loading && lazyItems.itemCount == 0 -> {
-            PullRequestLoadingContent(modifier = modifier)
+            AppCenteredLoadingState(modifier = modifier)
         }
 
         lazyItems.itemCount == 0 -> {
