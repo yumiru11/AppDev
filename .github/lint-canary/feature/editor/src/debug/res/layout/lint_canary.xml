@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  i18n lint 规则 canary（CI 临时注入，见 .github/scripts/lint-i18n-canary.sh）：
+  XML 布局里的硬编码文案 → HardcodedText。
+
+  本项目 UI 全部是 Compose（全仓 0 个 res/layout），所以这条规则在真实代码里**永远是 0 命中** ——
+  只有 canary 能证明它的检测器确实参与了分析。
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Lint canary hardcoded" />

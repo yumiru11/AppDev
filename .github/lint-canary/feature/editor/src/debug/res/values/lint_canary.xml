@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  i18n lint 规则 canary —— 由 .github/scripts/lint-i18n-canary.sh 在 CI 里**临时注入**到
+  feature/editor/src/debug/，跑完断言后删除（本目录不是任何模块的源码目录，不参与编译）。
+
+  为什么需要它：lint 里「规则没在跑」是**静默**的 —— 没有违规就没有任何痕迹，
+  registry 被跳过 / 规则被 disable / 检测器崩溃，报告里都看不出来（项目史上真发生过：
+  Compose 的 UiIssueRegistry 被整包跳过 15 项检查，见 app/build.gradle.kts 的 lint 段注释）。
+  所以这里放**必然违规**的 canary，把「检测器在跑」变成报告里可断言的事实。
+
+  ⚠️ 本文件的违规是**故意的**，不是待修的欠账。
+-->
+<resources>
+    <!-- MissingTranslation：values/ 有、values-zh-rCN/ 无 -->
+    <string name="lint_canary_untranslated">Lint canary: untranslated</string>
+
+    <!--
+      StringFormatInvalid（资源层触发，无需任何引用）：`%1$ g` —— 'g' 是已知转换符，
+      空格 flag 会让格式串被解析成「缺了转换符」，StringFormatDetector.checkTypes 直接报
+      Invalid format string。
+
+      ⚠️ 别改成 `%q`：未知转换符在 resourceFormatString 阶段就被判定 IGNORE（整体跳过），
+      报告里不会有任何命中 —— 2026-09-12 第一版 canary 实测踩过这个坑。
+    -->
+    <string name="lint_canary_bad_conversion">Lint canary %1$ g</string>
+
+    <!--
+      StringFormatInvalid（调用层触发）：含裸 `%` 的「非格式串」，被 LintCanary.kt 用
+      getString(res, args) 当格式串调用 → "not a valid format string" 错误。
+    -->
+    <string name="lint_canary_missing_conversion">Lint canary 100%</string>
+</resources>

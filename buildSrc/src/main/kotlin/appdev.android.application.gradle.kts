@@ -36,6 +36,18 @@ android {
             excludes += "META-INF/kotlin-project-structure-metadata.json"
         }
     }
+
+    lint {
+        // Compose/Lifecycle 库内 lint 检测器 disable 列表在 app/build.gradle.kts（模块级，
+        // 与 #170 的根因注释放在一起）；这里只放**全应用模块共有**的 i18n 契约。
+        abortOnError = true
+
+        // ── i18n 规则（plan.md §11.4 / 需求审计 §9.4）─────────────────────────────
+        // 契约、与另外两道 i18n 守卫的分工、防退化机制见
+        // buildSrc/src/main/kotlin/AppDevI18nLint.kt。
+        enableI18nRules()
+        verifyI18nRulesEnabled(project.path)
+    }
 }
 
 extensions.configure<KotlinAndroidProjectExtension>("kotlin") {
