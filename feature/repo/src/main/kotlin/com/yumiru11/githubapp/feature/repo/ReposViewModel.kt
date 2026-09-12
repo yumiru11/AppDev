@@ -32,7 +32,7 @@ import javax.inject.Provider
 /**
  * 「仓库」大分区（底部导航中间 Tab）ViewModel（#166 / UI01+UI02）。
  *
- * 此前该分区是 [com.yumiru11.githubapp.core.ui.PlaceholderScreen] 占位——三个底部 Tab
+ * 此前该分区是 `PlaceholderScreen`（core.ui，已随死代码清理删除）占位——三个底部 Tab
  * 里有一个点进去是空壳，属于功能与观感双重缺口。本次落地 ui-design §3.2 的完整形态：
  *
  * - **数据**：当前登录用户的仓库，GraphQL 游标分页（[ViewerRepositoriesPagingSource]，

@@ -57,7 +57,6 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppNavHost
 import com.yumiru11.githubapp.core.ui.MainTab
 import com.yumiru11.githubapp.core.ui.MainTabPager
-import com.yumiru11.githubapp.core.ui.PlaceholderScreen
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
 import com.yumiru11.githubapp.core.ui.navigateToParsedUrl
 import com.yumiru11.githubapp.core.ui.openExternalBrowser

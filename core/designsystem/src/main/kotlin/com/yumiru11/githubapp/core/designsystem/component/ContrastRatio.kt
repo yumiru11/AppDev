@@ -25,7 +25,13 @@ fun contrastRatio(
         (min(foregroundLuminance, backgroundLuminance) + 0.05f)
 }
 
-/** 该前景/背景组合是否达到 WCAG AA（≥ [WCAG_AA_NORMAL_TEXT_CONTRAST]）。 */
+/**
+ * 该前景/背景组合是否达到 WCAG AA（≥ [WCAG_AA_NORMAL_TEXT_CONTRAST]）。
+ *
+ * **保留声明（DEAD-1 核验）**：当前无生产调用方；它是 LabelChipColors 跨主题 AA 守卫
+ * （LabelChipColorsTest）的共用度量口径。删除会迫使测试自算阈值，违背本文件
+ * 「生产与测试共用同一实现」的初衷，故有意保留。
+ */
 fun meetsWcagAa(
     foreground: Color,
     background: Color,

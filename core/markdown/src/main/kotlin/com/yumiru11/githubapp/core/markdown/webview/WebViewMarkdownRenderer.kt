@@ -36,7 +36,7 @@ import okhttp3.OkHttpClient
 /**
  * WebView 高保真兜底渲染组件（plan.md §2.9 / T8）。
  *
- * 用法：T9 等宿主在 [FeatureDetector] 判定复杂内容后调用本组件渲染。
+ * 用法：宿主直接调用本组件渲染（ADR-0007：WebView 为主渲染通道；[FeatureDetector] 已不参与分流判定）。
  * 数据源优先级由调用方决定（服务端 HTML 优先 → 离线 markdown-it 兜底）。
  *
  * 安全（plan.md §2.14 红线）：

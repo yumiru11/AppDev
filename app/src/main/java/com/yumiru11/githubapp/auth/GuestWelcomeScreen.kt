@@ -27,6 +27,10 @@ import com.yumiru11.githubapp.R
  * - 全部文案走 [stringResource]（en + zh-rCN，禁硬编码）
  * - 全部颜色走 [MaterialTheme.colorScheme]，零硬编码十六进制
  * - 无 emoji 图标（空态仅文本 + 按钮）
+ *
+ * **保留声明（DEAD-1 核验）**：生产导航已无引用，唯一消费者是 Roborazzi 截图基准
+ * `GuestWelcomeScreen_{light,dark}.png`（GuestWelcomeScreenScreenshotTest）；基线依赖其渲染，
+ * 属有意保留，勿随死代码清理删除。
  */
 @Composable
 fun GuestWelcomeScreen(

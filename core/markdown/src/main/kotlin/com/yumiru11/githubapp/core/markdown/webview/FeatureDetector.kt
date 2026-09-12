@@ -46,6 +46,12 @@ enum class FallbackReason {
  *
  * 单个 markdown 表格由原生 renderer 渲染（ADR-0005：原生裁剪接受），
  * 仅多个 HTML table 块才判定为重型 HTML 走兜底。
+ *
+ * **保留声明（DEAD-2）**：自 ADR-0007 拍板 WebView 主渲染后，README/正文分流判定不再经本探测器，
+ * 生产代码已无调用方（仅 `FeatureDetectorTest` 覆盖）。这是**有意保留**的文档化墓碑：
+ * plan.md §2.2 仍把特性探测列为预处理层的一环，判定规则（mermaid/数学/重型 HTML/超长）
+ * 可作为未来非 WebView 通道的复用点；删除与否属产品决策（remaining-backlog §6 D-5），
+ * 请勿在未决策前当死代码清除。
  */
 object FeatureDetector {
     /** 超长文档行数阈值（plan.md §2.2：>2000 行视为超长） */
