@@ -148,7 +148,7 @@
 | EDITOR-1 | ⏳ 软换行不可切、replace 缺失、CRLF/编码未显式处理 |
 | DATA-1 ETag 持久化 | ⏳ `RestNetworkModule` 仍 `InMemoryEtagStore`，重启即失效 |
 | UI-1 窄屏 side-by-side diff | ⏳ 每栏 ~40 字符且无横向滚动（需 §6 决策） |
-| 覆盖率剩余模块 | 🔶 #255 补齐 6 个；`core:data` / `core:testing` / `core:ui` / `feature:auth` / `prototype` 按豁免说明不设阈值 |
+| 覆盖率剩余模块 | 🔶 2026-09-13 全量棘轮（`chore/coverage-ratchet-true-values`）：22 个有阈值模块按 #261 修复后的**真实**覆盖率重设（旧阈值普遍低于实测数十 pp，门禁曾形同虚设）；仍豁免 = `core:data` / `core:testing` / `core:ui` / `prototype`（理由见 `build.gradle.kts` 注释） |
 
 > 另有 8 项需产品/设计先 grill 的决策（窄屏 diff、feed 骨架、KaTeX/Mermaid、`FeatureDetector` 去留等），见 `remaining-backlog-2026-09-12.md` §6。
 
@@ -185,7 +185,7 @@
 | 约定 | 来源 |
 |---|---|
 | **模块级截图基线只能由 CI 录制**（`Record screenshots (CI canonical)` workflow）。本机与 runner 的 Robolectric 渲染不是逐字节相同，本机录的基线在 CI 上 verify 会全红 | #181 实测 8 张全红 |
-| **被 Robolectric 沙箱加载的类不产出 JaCoCo 覆盖数据** —— 测试全绿但覆盖率 0，会被 diff 门禁判红。希望进覆盖率门禁的逻辑必须能在**纯 JVM** 下测 | #181 |
+| ~~**被 Robolectric 沙箱加载的类不产出 JaCoCo 覆盖数据**（测试全绿但覆盖率 0）~~ **已证伪并修复（2026-09-13 #261）**：真实根因是 JaCoCo agent 默认 `inclnolocationclasses=false`，Robolectric `SandboxClassLoader` 定义的应用类无 CodeSource → 整类被静默跳过，**与「逻辑是否纯 JVM 可测」无关**。修复 = `includeNoLocationClasses=true` + `includes=com/yumiru11/*`（`build.gradle.kts` 的 `configureRobolectricCoverage`）。修复后 Robolectric 单测覆盖率真实入 exec（`:app` 2.61%→25.80%、`:core:designsystem` 71.2%→96.56%）；「希望进覆盖率门禁的逻辑必须纯 JVM 可测」的旧约束**不再成立** | #181 → #261 |
 | **不要用协程 withTimeout 包真实网络调用**：runTest 用虚拟时钟，超时会被「立刻」触发，测试拿到 null | #191 |
 | **MockWebServer 的顺序队列不可依赖**（并发请求会错位）；改用按路径 + page 路由的 Dispatcher | #191 |
 | **辅助查询（Star 总数 / viewer 登录名）失败不得拖垮整页**：包 runCatching，取不到就少显示一项 | #191 / #193 |

@@ -79,9 +79,14 @@ material3 1.5.0 线**：
 ### 已知遗留（本票未做，需单独决策）
 
 - `IssueStateUi.kt` / `PullRequestStateUi.kt` 的整页加载态**未**换成 `LoadingIndicator`。
-  原因：这两个文件不在 `build.gradle.kts` 的 `uiSourceExcludes` 中，且实测在覆盖率报告里
-  为 **0/24 已覆盖行**（Robolectric 加载的 Composable 不产 JaCoCo 数据，见 #181）；
-  `diffCoverageCheck` 是**比例门禁**，这两处会成为该票唯一纳入统计的文件 → 必然 0% 失败。
+  原因：这两个文件不在 `build.gradle.kts` 的 `uiSourceExcludes` 中，实测在覆盖率报告里
+  为 **0/19 已覆盖行**；`diffCoverageCheck` 是**比例门禁**，这两处会成为该票唯一纳入统计的
+  文件 → 必然 0% 失败。
+  > ⚠️ 2026-09-13 勘误（#261）：原文此处写「0/24 已覆盖行（Robolectric 加载的 Composable
+  > 不产 JaCoCo 数据，见 #181）」——该工具链结论已被 #261 证伪（真实根因是 JaCoCo agent
+  > 默认 `inclnolocationclasses=false` 跳过无 CodeSource 的沙箱类，已修复，见
+  > `configureRobolectricCoverage`）。修复后复测这两处仍为 0/19，原因是**没有单测渲染
+  > 这两个状态 UI**，与工具链无关。原决策（不换 `LoadingIndicator`、不放宽排除名单）不受影响。
   **不为此放宽门禁排除名单**（那正是 #210 刚修掉的「刷绿」行为）。
   后续二选一：① 给 `AppLoadingState` 增加「垂直居中」形态并把 4 个调用点（均在
   `*Screen.kt`，已被排除）切过去；② 单独立一张门禁票，把 `*StateUi*` 以具体后缀形式加入
