@@ -33,10 +33,11 @@ import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.CardGroup
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.githubauth.auth.AuthState
+import com.yumiru11.githubapp.core.githubrest.http.RateLimitSnapshot
 
 /**
  * 开发者分组（ui-design §3.6，#87 分组卡化）：PAT 输入（折叠项，明文开关）、REST-only
- * 降级提示（PAT 态展示）、剩余配额占位（待 API 接线）。
+ * 降级提示（PAT 态展示）、剩余配额行（GATE-2：直读 RateLimitStore 真实快照）。
  */
 @Composable
 internal fun DeveloperSettingsSection(
@@ -56,7 +57,7 @@ internal fun DeveloperSettingsSection(
         if (uiState.authState is AuthState.PAT) {
             item { RestOnlyNotice() }
         }
-        item { RateLimitRow() }
+        item { RateLimitRow(uiState.rateLimit) }
     }
 }
 
@@ -165,25 +166,48 @@ private fun RestOnlyNotice() {
     }
 }
 
-/** 剩余配额占位行（待 REST 通道配额 API 接线）。 */
+/**
+ * 剩余配额行（GATE-2）：展示最近一次观测到的「剩余 / 上限」与距重置时间。
+ *
+ * [rateLimit] == null 表示本进程尚未观测到任何带限流头的响应，显示「暂无数据」占位——
+ * 这是空态而非错误态：RateLimitStore 只是进程内最近快照，观测不到即「还没发过请求」，
+ * 不存在可呈现的错误。重置分钟数在组合期按当前时钟计算（每次响应都会刷新快照）。
+ */
 @Composable
-private fun RateLimitRow() {
-    Row(
+internal fun RateLimitRow(rateLimit: RateLimitSnapshot?) {
+    Column(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = stringResource(R.string.settings_rate_limit),
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = stringResource(R.string.settings_rate_limit_unavailable),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = stringResource(R.string.settings_rate_limit),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text =
+                    if (rateLimit == null) {
+                        stringResource(R.string.settings_rate_limit_no_data)
+                    } else {
+                        stringResource(
+                            R.string.settings_rate_limit_usage,
+                            rateLimit.remaining,
+                            rateLimit.limit,
+                        )
+                    },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (rateLimit != null) {
+            Text(
+                text = stringResource(R.string.settings_rate_limit_reset, rateLimit.resetInMinutes()),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

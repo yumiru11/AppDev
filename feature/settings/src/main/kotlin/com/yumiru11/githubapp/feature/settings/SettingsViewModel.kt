@@ -17,9 +17,12 @@ import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
+import com.yumiru11.githubapp.core.githubauth.auth.AuthState
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
 import com.yumiru11.githubapp.core.githubauth.token.SessionData
 import com.yumiru11.githubapp.core.githubauth.token.TokenStorage
+import com.yumiru11.githubapp.core.githubrest.http.RateLimitSnapshot
+import com.yumiru11.githubapp.core.githubrest.http.RateLimitStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +34,7 @@ import javax.inject.Inject
 /**
  * 设置页 ViewModel（T24）。
  *
- * - [uiState]：全部偏好 + 登录态 combine 快照（单一事实来源，UI 只读）
+ * - [uiState]：全部偏好 + 登录态 + 限流快照 combine 快照（单一事实来源，UI 只读）
  * - 各 setter 写 [UserPreferencesRepository]（DataStore 持久化）→ Flow 发射 →
  *   AppThemeHost/设置页即时重组（无需重启）
  * - [savePat]：开发者 PAT 模式，落盘 TokenStorage（isRestOnly=true，ADR-0003）
@@ -44,6 +47,7 @@ class SettingsViewModel
         private val preferences: UserPreferencesRepository,
         private val tokenStorage: TokenStorage,
         private val sessionManager: OAuthSessionManager,
+        private val rateLimitStore: RateLimitStore,
     ) : ViewModel() {
         val uiState: StateFlow<SettingsUiState> =
             combine(
@@ -85,8 +89,15 @@ class SettingsViewModel
                 ) { languageTag, stagger, backgroundUri, backgroundOpacity ->
                     MiscPrefs(languageTag, stagger, backgroundUri, backgroundOpacity)
                 },
-                sessionManager.authState,
-            ) { theme, style, glass, misc, authState ->
+                // 登录态 + 限流快照并成一组（GATE-2）：外层 combine 上限 5 流，已满，
+                // 且两者同属「会话侧只读状态」，合并语义也自然。
+                combine(
+                    sessionManager.authState,
+                    rateLimitStore.snapshot,
+                ) { authState, rateLimit ->
+                    SessionPrefs(authState, rateLimit)
+                },
+            ) { theme, style, glass, misc, session ->
                 SettingsUiState(
                     themeMode = theme.themeMode,
                     dynamicColorEnabled = theme.dynamicColorEnabled,
@@ -107,7 +118,8 @@ class SettingsViewModel
                     staggerEnabled = misc.staggerEnabled,
                     backgroundImageUri = misc.backgroundUri,
                     backgroundOpacity = misc.backgroundOpacity,
-                    authState = authState,
+                    authState = session.authState,
+                    rateLimit = session.rateLimit,
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -259,4 +271,10 @@ private data class MiscPrefs(
     /** #167 / UI04：背景图 URI 与不透明度 */
     val backgroundUri: String?,
     val backgroundOpacity: Float,
+)
+
+/** 会话侧只读状态聚合（GATE-2：登录态 + 限流快照并进外层 combine 的第 5 槽）。 */
+private data class SessionPrefs(
+    val authState: AuthState,
+    val rateLimit: RateLimitSnapshot?,
 )

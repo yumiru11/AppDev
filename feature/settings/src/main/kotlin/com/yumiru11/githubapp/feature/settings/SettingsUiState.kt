@@ -5,6 +5,7 @@ import com.yumiru11.githubapp.core.datastore.model.IconStyle
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.githubauth.auth.AuthState
+import com.yumiru11.githubapp.core.githubrest.http.RateLimitSnapshot
 
 /**
  * 设置页 UI 状态（全部偏好字段的一次快照，T24）。
@@ -38,6 +39,13 @@ data class SettingsUiState(
     /** 背景图统一不透明度（#167 / UI04，§7.4） */
     val backgroundOpacity: Float = 0.25f,
     val authState: AuthState = AuthState.Anonymous,
+    /**
+     * 最近一次观测到的 GitHub 限流快照（GATE-2）。
+     *
+     * 来源 = core:github-rest 的 RateLimitStore（EtagCacheInterceptor 在每条响应上录制）；
+     * null = 本次进程尚无任何带限流头的响应（开发者分组显示「暂无数据」占位，非错误态）。
+     */
+    val rateLimit: RateLimitSnapshot? = null,
 ) {
     /**
      * 毛玻璃逐项开关是否可交互：OLED / 高对比下 §6.3 强制禁用（此时总开关也被覆盖），

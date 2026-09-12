@@ -12,6 +12,9 @@ import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
 import com.yumiru11.githubapp.core.githubauth.auth.TokenEndpointClient
 import com.yumiru11.githubapp.core.githubauth.auth.TokenExchangeResult
 import com.yumiru11.githubapp.core.githubauth.token.InMemoryTokenStorage
+import com.yumiru11.githubapp.core.githubrest.http.InMemoryRateLimitStore
+import com.yumiru11.githubapp.core.githubrest.http.RateLimitSnapshot
+import com.yumiru11.githubapp.core.githubrest.http.RateLimitStore
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -225,7 +228,7 @@ class SettingsViewModelTest {
         runTest {
             val storage = InMemoryTokenStorage()
             val manager = OAuthSessionManager(storage, FakeTokenEndpointClient(), OAuthConfig())
-            val viewModel = SettingsViewModel(FakeUserPreferencesRepository(), storage, manager)
+            val viewModel = SettingsViewModel(FakeUserPreferencesRepository(), storage, manager, InMemoryRateLimitStore())
 
             viewModel.savePat("ghp_test_pat")
 
@@ -240,7 +243,7 @@ class SettingsViewModelTest {
         runTest {
             val storage = InMemoryTokenStorage()
             val manager = OAuthSessionManager(storage, FakeTokenEndpointClient(), OAuthConfig())
-            val viewModel = SettingsViewModel(FakeUserPreferencesRepository(), storage, manager)
+            val viewModel = SettingsViewModel(FakeUserPreferencesRepository(), storage, manager, InMemoryRateLimitStore())
 
             viewModel.savePat("   ")
 
@@ -460,13 +463,48 @@ class SettingsViewModelTest {
             }
         }
 
-    private fun createViewModel(): SettingsViewModel = createViewModel(FakeUserPreferencesRepository())
+    @Test
+    fun uiState_rateLimitSnapshotRecorded_emitsRemainingAndLimit() =
+        runTest {
+            val store = InMemoryRateLimitStore()
+            val viewModel = createViewModel(rateLimitStore = store)
 
-    private fun createViewModel(repository: UserPreferencesRepository): SettingsViewModel =
+            viewModel.uiState.test {
+                awaitItem()
+                store.record(
+                    RateLimitSnapshot(
+                        limit = 5000,
+                        remaining = 1234,
+                        resetEpochSeconds = System.currentTimeMillis() / 1000 + 3_600,
+                        resource = "core",
+                    ),
+                )
+                val state = awaitItem()
+                assertEquals(1234, state.rateLimit?.remaining)
+                assertEquals(5000, state.rateLimit?.limit)
+            }
+        }
+
+    @Test
+    fun uiState_noRateLimitSnapshot_emitsNullFallback() =
+        runTest {
+            // 空态：进程从未观测到带限流头的响应 → 状态字段为 null，UI 显示「暂无数据」而非崩溃
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                assertNull(awaitItem().rateLimit)
+            }
+        }
+
+    private fun createViewModel(
+        repository: UserPreferencesRepository = FakeUserPreferencesRepository(),
+        rateLimitStore: RateLimitStore = InMemoryRateLimitStore(),
+    ): SettingsViewModel =
         SettingsViewModel(
             preferences = repository,
             tokenStorage = InMemoryTokenStorage(),
             sessionManager = OAuthSessionManager(InMemoryTokenStorage(), FakeTokenEndpointClient(), OAuthConfig()),
+            rateLimitStore = rateLimitStore,
         )
 }
 
