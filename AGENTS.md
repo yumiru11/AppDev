@@ -7,14 +7,14 @@
 
 开发一个**功能全面的 Android GitHub 客户端**（轻量、流畅、全 Material You）。技术规划 = `plan.md`（41KB，必读），需求来源 = `request.txt`。应用名/包名仍为占位符：applicationId 与 namespace = `com.yumiru11.githubapp`（模块 namespace 用 `core.github_xxx` 下划线写法），产品定名后统一改。
 
-**当前状态（2026-09-12 修复波末）**：`main@fd899b9`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、**四张新缺陷票 #200–#203** 全部关闭；#166 / #167 已关闭（条目逐条对账）。本轮修复波共合入 **35 张 PR（#229–#264，剔除非 PR 的 issue #250，全部 squash）**：前半 #229–#255（26 张，已由 PR #257 回写），后半 **#256–#264（9 张）** —— #256 截图基线扩展（9 屏 / 20 帧 + 离线 ImageLoader 确定性）、#258 RepoDetail 头修复、#259 设置返回箭头 + FAB 底部留白、#260 门禁去空转、#261 JaCoCo×Robolectric 修复、#262 markdown 引用链接、#263 覆盖率阈值棘轮、#264 ETag 跨进程持久化。**已无 open PR**。
+**当前状态（2026-09-12 修复波末）**：`main@54eba10`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、**四张新缺陷票 #200–#203** 全部关闭；#166 / #167 已关闭（条目逐条对账）。本轮修复波共合入 **37 张 PR（#229–#266，剔除非 PR 的 issue #250，全部 squash）**：前半 #229–#255（26 张，已由 PR #257 回写），后半 **#256–#266（11 张）** —— #256 截图基线扩展（9 屏 / 20 帧 + 离线 ImageLoader 确定性）、#258 RepoDetail 头修复、#259 设置返回箭头 + FAB 底部留白、#260 门禁去空转、#261 JaCoCo×Robolectric 修复、#262 markdown 引用链接、#263 覆盖率阈值棘轮、#264 ETag 跨进程持久化、#265 后半波文档回写、#266 剩余 6 屏 15 帧基线补齐。**已无 open PR**。
 **当前活动票三张**：**#26（T25 真机项，需用户配 Secrets）**、#1（Spec，常开）、#71（截图测试面板，勿关）。（#250 已关闭 —— 探针断言 bug 由 #252 修复。）
 **已知真实缺陷：无。** **RepoDetail 仓库头整块不渲染（UI-C01）已由 #258 修复**：根因是 `headerHeightPx` 自锁 —— 首帧外层高 0dp → 内层 `onSizeChanged` 在 `maxHeight=0` 约束下只能测到 0 → 自然高度永远回填不上，头部被裁成 0 高。改为 `Modifier.layout` 以 `Constraints.Infinity` 在 layout 阶段测自然高度，首帧即按自然高度渲染；回归测试 `repoDetailScreen_success_rendersRepositoryHeaderBlock` 锁定，CI `repo-star` / `repo-actions` 帧已转绿（坏帧 2 → 0）。
 
 > 🔴 **四份审计报告已入库（2026-09-12，开工前必读其一）**
 > `docs/agents/` 下：`spec-audit-2026-09-11.md`（需求符合性 106 条判定 / 16 条缺口 / 20 条文档漂移）· `commit-audit-2026-09-11.md`（296 提交逐票核对）· `ui-audit-2026-09-11.md`（**含系统栏的 CI 真机帧**逐张读图，Roborazzi 基线看不到系统栏）· `markdown-consistency-2026-09-11.md`（GFM §2.3 逐条 + 三层回归说明）· `agp9-feasibility-2026-09-11.md`（工具链迁移实测）
 >
-> 🔴 **本轮新增入库（2026-09-12）**：`docs/agents/remaining-backlog-2026-09-12.md`（残余审计缺口收敛：已闭环钉死 / 仍待实现 / 过时反证；**#256–#264 后已再次收敛**，只留 AGP9 / 设计系统 / KaTeX-Mermaid / 原型归档 / 真机性能等真开口）· `docs/research/katex-mermaid-offline-feasibility.md`（离线 KaTeX/Mermaid 体积实测）· `docs/adr/0009-graphql-read-path-deviation.md`（读路径全 REST 的架构决定）
+> 🔴 **本轮新增入库（2026-09-12）**：`docs/agents/remaining-backlog-2026-09-12.md`（残余审计缺口收敛：已闭环钉死 / 仍待实现 / 过时反证；**#256–#266 后已再次收敛**，只留 AGP9 / 设计系统 / KaTeX-Mermaid / 原型归档 / 真机性能等真开口）· `docs/research/katex-mermaid-offline-feasibility.md`（离线 KaTeX/Mermaid 体积实测）· `docs/adr/0009-graphql-read-path-deviation.md`（读路径全 REST 的架构决定）
 
 > ⚠️ **唯一需要用户操作的前置（其余已知 P0 均已修复）**
 > **OAuth 真机 PKCE 仍需你申请并填写 client id**（注入点已实现，#239）。`app/build.gradle.kts:11-48` 三级解析、**先命中先取**：Gradle 属性 `-PoauthClientId` → `local.properties:oauthClientId` → 环境变量 `OAUTH_CLIENT_ID`，写入 `BuildConfig.OAUTH_CLIENT_ID`；由 app 装配层 `OAuthConfigModule` 构造 `OAuthConfig`（core:github-auth 不感知 BuildConfig，Konsist 禁 core→app）。

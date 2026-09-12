@@ -2,7 +2,7 @@
 
 > 本文件是当前进度的**权威快照**。每张票合并/关闭后更新。配合 `docs/agents/workflow.md`（流程）、`AGENTS.md`（环境）与 `docs/agents/task-audit-2026-09-06.md`（全量审计）阅读。
 > 本版修正 2026-09-06 审计发现的 §7 D01「文档三处失真」：AGENTS.md / project-status.md / FEEDBACK.md 已与 `gh` 票面 + git 历史对齐。
-> **基线**：`main@fd899b9`（2026-09-12 修复波末，35 张 PR #229–#264 全部 squash 合入，其中 #250 是 issue 非 PR；后半 #256–#264 见 §2.1）。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`。
+> **基线**：`main@54eba10`（2026-09-12 修复波末，37 张 PR #229–#266 全部 squash 合入，其中 #250 是 issue 非 PR；后半 #256–#266 见 §2.1）。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`。
 
 ## 1. 里程碑概览
 
@@ -15,7 +15,7 @@
 | M4 全功能（PR 深化/编辑提交/分支） | ✅ 完成（T16/T17/T23 已合入） |
 | M5 发布收尾（性能/签名 Release） | 🔶 进行中：Baseline Profile + i18n 覆盖断言 + RTL 基线 + 发布链路演练已落地（PR #186）；**冷启动实测 / macrobenchmark / 生产签名密钥仍需真机或 Secrets**（见 §3.2） |
 | M6 审计补全与 UI 打磨（2026-09-06 立项） | ✅ 9 张分类票 #163–#170 **全部关闭并合入**；#166/#167 的少数挂账项见 §3.1 |
-| M7 修复波 + 门禁/截图链路加固（2026-09-12） | ✅ **35 张 PR #229–#264 全部 squash 合入**：前半 26 张（#229–#255，明细见 §2.1）；后半 9 张 —— #256 截图基线扩展（9 屏/20 帧）、#258 RepoDetail 头修复、#259 设置返回箭头 + FAB 留白、#260 门禁去空转、#261 JaCoCo×Robolectric 修复、#262 markdown 引用链接、#263 阈值棘轮、#264 ETag 持久化。**已无 open PR** |
+| M7 修复波 + 门禁/截图链路加固（2026-09-12） | ✅ **37 张 PR #229–#266 全部 squash 合入**：前半 26 张（#229–#255，明细见 §2.1）；后半 11 张 —— #256 截图基线扩展（9 屏/20 帧）、#258 RepoDetail 头修复、#259 设置返回箭头 + FAB 留白、#260 门禁去空转、#261 JaCoCo×Robolectric 修复、#262 markdown 引用链接、#263 阈值棘轮、#264 ETag 持久化、#265 后半波文档回写、#266 剩余 6 屏 15 帧基线。**已无 open PR** |
 
 ## 2. 已完成（T1–T26 中 25 票 + 计划外交付 + 2026-09-12 修复波全部合入 main）
 
@@ -58,9 +58,9 @@
 | ui-audit #90 导航现代化 | #90 | 全局转场 + 预测返回 + @Serializable 类型安全路由 + 共享元素试点（PR #110） | ✅ |
 | 全量审计 | — | `docs/agents/task-audit-2026-09-06.md`（51 项发现 → 9 张分类票） | ✅ 报告入库 |
 
-### 2.1 2026-09-12 修复波（#229–#264，全部 squash 合入 main）
+### 2.1 2026-09-12 修复波（#229–#266，全部 squash 合入 main）
 
-> 前半 #229–#255（26 张）与后半 #256–#264（9 张）同表。#250 是 issue 非 PR，不计入。
+> 前半 #229–#255（26 张）与后半 #256–#266（11 张）同表。#250 是 issue 非 PR，不计入。
 
 | PR | 范围 | 交付 |
 |---|---|---|
@@ -98,6 +98,8 @@
 | #262 | markdown | `#123` issue/PR 引用 + 裸 40-hex sha **双通道**链接化（离线 `renderer.js` 插件 + 原生 `MarkdownInlineSemantics`，复用 `GitHubLinkParser` 语义）；代码块/行内码/已有链接/裸 URL 不误伤；零基线漂移 |
 | #263 | 覆盖率 | 22 个有阈值模块按 #261 后**真实**覆盖率重设棘轮（只升不降）+ 逐条负向验证；重写过时的「Robolectric 是工具链边界 / #181」说法（project-status + `coverageExcludes` 注释） |
 | #264 | 数据 | ETag 缓存**跨进程持久化**（`RoomEtagStore` + `EtagCache` 表 + Migration 5→6，按账号 `EtagScopeProvider` 隔离，登出/切号全清，容量/TTL 上限）；新 store 实例证明 304-on-restart |
+| #265 | 文档 | 后半波回写：AGENTS.md / project-status 对账到 #264（本表 #256–#264、方法学、剩余清单）+ `remaining-backlog` 剪枝（已闭环逐条勾除） |
+| #266 | 截图 | 补齐剩余 6 屏 / 15 帧基线（Repos list+grid+guest、CreateRepo、ReleaseCreate、CommitDetail list+diff、CreateIssue、PullRequestCreate）；三个目标模块已在 verify 名单内，无需改 ci.yml |
 
 ## 3. 进行中：审计补全波（2026-09-06 立项，9 张分类票 #163–#171）
 
@@ -180,7 +182,7 @@
 | diffCoverage 软门禁从未实测 | ✅ 已修两个真缺陷并转**硬门禁**（PR #181）：① 阈值口径把 80 当 8000%；② 非可执行行计入分母造成假失败 |
 | Nightly 全量截图/多设备/性能基线 | ✅ 已落地（PR #181 的 nightly.yml：verify / 全模块 record+diff / release 体积 / 失败汇总） |
 | 应用图标缺失 / Bundle 语言拆分 | ✅ 已闭环（PR #174：自适应+主题化单色层图标、Bundle 语言拆分） |
-| **截图基线覆盖（2026-09-12 修复波）** | ✅ 大幅补齐：模块级基线纳入 CI verify（app + 13 模块，PR #188/#256）；#245 补 OLED/高对比/zh + RTL；#249 补 `:feature:pullrequest`；#256 补 9 屏/20 帧（Home/RepoDetail/FileViewer/Branches/Search/MarkdownEditor/Profile/Gists/Settings）+ 离线 ImageLoader 确定性；#252 修探针；#260 加帧闭包断言。当前入库 **99 张 PNG（非 prototype）**；TEST-2 仅余少量低 ROI 屏 |
+| **截图基线覆盖（2026-09-12 修复波）** | ✅ 大幅补齐：模块级基线纳入 CI verify（app + 13 模块，PR #188/#256）；#245 补 OLED/高对比/zh + RTL；#249 补 `:feature:pullrequest`；#256 补 9 屏/20 帧（Home/RepoDetail/FileViewer/Branches/Search/MarkdownEditor/Profile/Gists/Settings）+ 离线 ImageLoader 确定性；#252 修探针；#260 加帧闭包断言。当前入库 **114 张 PNG（非 prototype）**（#266 再补 6 屏/15 帧：Repos 3 + CreateRepo/ReleaseCreate/CreateIssue/PullRequestCreate 各 2 + CommitDetail 3）；TEST-2 仅余少量低 ROI 屏 |
 | **RepoDetail 仓库头整块不渲染（UI-C01）** | ✅ 已修复（#258）：根因 `headerHeightPx` 自锁，改 `Modifier.layout` 量自然高度；回归测试 + `repo-star`/`repo-actions` 帧转绿（坏帧 2→0）。已知真实缺陷清单**已清空** |
 
 ## 5. 更新规则
