@@ -45,6 +45,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.designsystem.component.AppStateColorRole
+import com.yumiru11.githubapp.core.designsystem.component.appStateColors
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
@@ -625,26 +627,42 @@ private fun checkRunIcon(checkRun: CheckRun): ImageVector =
         }
     }
 
-/** Check Run → 语义色（成功=primary/失败=error/进行中=primary/其余=onSurfaceVariant） */
-@Composable
-private fun checkRunTint(checkRun: CheckRun): Color =
+/** 会「红灯」的结论：失败/超时（GitHub 语义为 failed check）。 */
+private val CHECK_RUN_FAILING_CONCLUSIONS = setOf(CheckRunConclusion.FAILURE, CheckRunConclusion.TIMED_OUT)
+
+/**
+ * Check Run → 语义色角色（纯映射，可单测；plan.md §5.3 Checks 状态色）。
+ *
+ * 语义表（审计 P1：旧实现 success/pending 同用 `primary`，多个状态不可区分）：
+ * - success → SUCCESS（绿，成功）
+ * - failure / timed_out → DANGER（红，失败）
+ * - action_required → WARNING（琥珀，需人工处理）
+ * - queued / in_progress → WARNING（琥珀，pending，GitHub 的黄点）
+ * - skipped / neutral / cancelled / 未知 → SURFACE_VARIANT（中性灰，无结论）
+ *
+ * `cancelled` 归中性灰而非红：GitHub 把它渲染成灰色斜杠圆圈（取消不等于失败），
+ * 与 `skipped` 同族。角色到色值由 designsystem 的 `appStateColors` 统一决定。
+ */
+internal fun checkRunColorRole(checkRun: CheckRun): AppStateColorRole =
     when {
-        checkRun.status == CheckRunStatus.COMPLETED && checkRun.conclusion == CheckRunConclusion.SUCCESS -> {
-            MaterialTheme.colorScheme.primary
-        }
+        checkRun.status == CheckRunStatus.COMPLETED &&
+            checkRun.conclusion == CheckRunConclusion.SUCCESS -> AppStateColorRole.SUCCESS
 
-        checkRun.status == CheckRunStatus.COMPLETED && checkRun.conclusion == CheckRunConclusion.FAILURE -> {
-            MaterialTheme.colorScheme.error
-        }
+        checkRun.status == CheckRunStatus.COMPLETED &&
+            checkRun.conclusion in CHECK_RUN_FAILING_CONCLUSIONS -> AppStateColorRole.DANGER
 
-        checkRun.status == CheckRunStatus.IN_PROGRESS -> {
-            MaterialTheme.colorScheme.primary
-        }
+        checkRun.status == CheckRunStatus.COMPLETED &&
+            checkRun.conclusion == CheckRunConclusion.ACTION_REQUIRED -> AppStateColorRole.WARNING
 
-        else -> {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        }
+        checkRun.status == CheckRunStatus.IN_PROGRESS ||
+            checkRun.status == CheckRunStatus.QUEUED -> AppStateColorRole.WARNING
+
+        else -> AppStateColorRole.SURFACE_VARIANT
     }
+
+/** Check Run → 语义色（成功=success/失败=danger/进行中与待处理=warning/跳过与中性=中性灰） */
+@Composable
+private fun checkRunTint(checkRun: CheckRun): Color = appStateColors(checkRunColorRole(checkRun)).accent
 
 /** Check Run → 状态文案（status + conclusion 组合） */
 @Composable

@@ -13,9 +13,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
@@ -36,13 +38,69 @@ enum class GitHubStatus {
     CONFLICTING,
 }
 
-/** 状态 → 语义色角色（纯映射，[gitHubStatusColorRole] 可单测） */
+/**
+ * 状态 → 语义色角色（纯映射，[gitHubStatusColorRole] 可单测）。
+ *
+ * 角色是**色语义的唯一词汇表**：Issue/PR 状态与 Checks 状态（pending →
+ * WARNING）都归一到这 6 个角色，具体色值只由 [appStateColors] 决定
+ * （plan.md §5.3「成功/进行中/失败/跳过/中性应各不相同」）。
+ */
 enum class AppStateColorRole {
     SUCCESS,
     DANGER,
+    WARNING,
     TERTIARY,
     SURFACE_VARIANT,
     ERROR,
+}
+
+/**
+ * 语义色角色的三件套：强调色（圆点/图标）、容器底色、容器内容色。
+ *
+ * 与 `LabelChipColors` 同款「把色值决策收敛到一处」的做法：调用方只认角色，
+ * 不认色槽，深浅主题自动适配。
+ */
+@Immutable
+data class AppStateColors(
+    val accent: Color,
+    val container: Color,
+    val onContainer: Color,
+)
+
+/**
+ * 语义色角色 → 实际色值（零硬编码色：全部取自 [ExtendedColors] / [MaterialTheme]）。
+ *
+ * `WARNING`（Checks pending）取自 plan.md §5.3 的扩展色 warning 家族。
+ */
+@Composable
+fun appStateColors(role: AppStateColorRole): AppStateColors {
+    val colorScheme = MaterialTheme.colorScheme
+    val extended = MaterialTheme.extendedColors
+    return when (role) {
+        AppStateColorRole.SUCCESS -> {
+            AppStateColors(extended.success, extended.successContainer, extended.onSuccessContainer)
+        }
+
+        AppStateColorRole.DANGER -> {
+            AppStateColors(extended.danger, extended.dangerContainer, extended.onDangerContainer)
+        }
+
+        AppStateColorRole.WARNING -> {
+            AppStateColors(extended.warning, extended.warningContainer, extended.onWarningContainer)
+        }
+
+        AppStateColorRole.TERTIARY -> {
+            AppStateColors(colorScheme.tertiary, colorScheme.tertiaryContainer, colorScheme.onTertiaryContainer)
+        }
+
+        AppStateColorRole.SURFACE_VARIANT -> {
+            AppStateColors(colorScheme.outline, colorScheme.surfaceVariant, colorScheme.onSurfaceVariant)
+        }
+
+        AppStateColorRole.ERROR -> {
+            AppStateColors(colorScheme.error, colorScheme.errorContainer, colorScheme.onErrorContainer)
+        }
+    }
 }
 
 /**
@@ -80,37 +138,36 @@ fun AppStateChip(
     modifier: Modifier = Modifier,
     stateDescription: String? = null,
 ) {
-    val colorScheme = MaterialTheme.colorScheme
-    val extended = MaterialTheme.extendedColors
-    val (dotColor, containerColor, contentColor) =
-        when (gitHubStatusColorRole(status)) {
-            AppStateColorRole.SUCCESS -> {
-                Triple(extended.success, extended.successContainer, extended.onSuccessContainer)
-            }
+    AppStateChip(
+        role = gitHubStatusColorRole(status),
+        label = label,
+        modifier = modifier,
+        stateDescription = stateDescription,
+    )
+}
 
-            AppStateColorRole.DANGER -> {
-                Triple(extended.danger, extended.dangerContainer, extended.onDangerContainer)
-            }
-
-            AppStateColorRole.TERTIARY -> {
-                Triple(colorScheme.tertiary, colorScheme.tertiaryContainer, colorScheme.onTertiaryContainer)
-            }
-
-            AppStateColorRole.SURFACE_VARIANT -> {
-                Triple(colorScheme.outline, colorScheme.surfaceVariant, colorScheme.onSurfaceVariant)
-            }
-
-            AppStateColorRole.ERROR -> {
-                Triple(colorScheme.error, colorScheme.errorContainer, colorScheme.onErrorContainer)
-            }
-        }
+/**
+ * 按语义色角色渲染同一款徽标。
+ *
+ * 供 [GitHubStatus] 覆盖不到的领域状态复用（如 Checks 的 pending →
+ * [AppStateColorRole.WARNING]，plan.md §5.3），避免各 feature 自己造
+ * 「状态 → 颜色」的第二套映射。
+ */
+@Composable
+fun AppStateChip(
+    role: AppStateColorRole,
+    label: String,
+    modifier: Modifier = Modifier,
+    stateDescription: String? = null,
+) {
+    val colors = appStateColors(role)
     Surface(
         modifier =
             modifier.semantics(mergeDescendants = true) {
                 if (stateDescription != null) this.stateDescription = stateDescription
             },
         shape = RoundedCornerShape(percent = 50),
-        color = containerColor,
+        color = colors.container,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -121,13 +178,13 @@ fun AppStateChip(
                     Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(dotColor),
+                        .background(colors.accent),
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = contentColor,
+                color = colors.onContainer,
             )
         }
     }

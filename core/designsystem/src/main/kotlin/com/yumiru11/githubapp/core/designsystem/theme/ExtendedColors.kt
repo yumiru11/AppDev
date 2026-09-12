@@ -13,8 +13,9 @@ import androidx.compose.ui.graphics.Color
  * Semantic color extensions beyond Material 3's [ColorScheme].
  *
  * These tokens serve domain-specific roles (GitHub alert cards, brand identity,
- * success/danger semantics) that T7/T26 will consume. Components MUST reference
- * these tokens — never hardcode color values.
+ * success/danger semantics, and the GitHub state colors of plan.md §5.3 —
+ * success/warning/info/merged/draft) that T7/T26 will consume. Components MUST
+ * reference these tokens — never hardcode color values.
  *
  * Color origin labels (per field):
  * - **Material-derived** — mapped from Material 3 color roles
@@ -61,6 +62,34 @@ data class ExtendedColors(
     val onDanger: Color,
     /** Text/icon on dangerContainer. Semantic. */
     val onDangerContainer: Color,
+    /**
+     * Attention accent — "Checks pending" (plan.md §5.3: pending → warning).
+     * GitHub attention foreground; same source as [onWarningContainer], so alert
+     * cards and check-run states share one amber. Semantic.
+     *
+     * First of the §5.3 state fields that the 2026-09-11 audit found missing
+     * (8 in total); every palette (light/dark/OLED/high-contrast×2) sets all of
+     * them, pinned to the matching Material roles by ThemePaletteTest so the values
+     * stay traceable to plan.md §5.3 rather than invented here.
+     */
+    val warning: Color,
+    /** Text/icon on a solid [warning] surface. Semantic. */
+    val onWarning: Color,
+    /**
+     * Informational accent — blue, GitHub's `accent` family and the
+     * "Open / reopened" state colour (plan.md §5.3). Semantic (info-blue).
+     */
+    val info: Color,
+    /** Text/icon on a solid [info] surface. Semantic. */
+    val onInfo: Color,
+    /** Merged-PR accent (plan.md §5.3: merged → tertiary, the purple family). Semantic. */
+    val merged: Color,
+    /** Text/icon on a solid [merged] surface. Semantic. */
+    val onMerged: Color,
+    /** Draft-PR chip background (plan.md §5.3: draft → surfaceContainerHigh). Material-derived. */
+    val draft: Color,
+    /** Text/icon on [draft] (plan.md §5.3: draft → onSurfaceVariant). Material-derived. */
+    val onDraft: Color,
 )
 
 /** Default extended colors for preview / testing. */
@@ -86,6 +115,15 @@ val DefaultExtendedColors =
         dangerContainer = Color(0xFFFFEBE9),
         onDanger = Color(0xFFFFFFFF),
         onDangerContainer = Color(0xFFCF222E),
+        // plan.md §5.3 state colors — mirrors lightPalette so previews/tests match LIGHT
+        warning = Color(0xFF9A6700),
+        onWarning = Color(0xFFFFFFFF),
+        info = Color(0xFF0969DA),
+        onInfo = Color(0xFFFFFFFF),
+        merged = Color(0xFF8250DF),
+        onMerged = Color(0xFFFFFFFF),
+        draft = Color(0xFFE6E9ED),
+        onDraft = Color(0xFF656D76),
     )
 
 private val LocalExtendedColors = staticCompositionLocalOf { DefaultExtendedColors }
@@ -107,13 +145,24 @@ val MaterialTheme.extendedColors: ExtendedColors
  * Derive [ExtendedColors] from a Material [ColorScheme].
  *
  * Maps Material 3 color roles to semantic roles using a best-effort heuristic.
- * Palette functions in [Palette.kt] provide manually tuned values; this
+ * Palette functions in [ThemeColors.kt] provide manually tuned values; this
  * function is a fallback for custom or dynamic color schemes.
+ *
+ * Composable only because callers use it inside composition; the derivation
+ * itself is the pure [extendedColorsFrom] so it stays unit-testable on the JVM
+ * (dynamic / seed schemes have no screenshot path).
  *
  * @param colorScheme the active Material 3 [ColorScheme]
  */
 @Composable
-fun rememberExtendedColors(colorScheme: ColorScheme): ExtendedColors =
+fun rememberExtendedColors(colorScheme: ColorScheme): ExtendedColors = extendedColorsFrom(colorScheme)
+
+/**
+ * Pure role mapping behind [rememberExtendedColors] (JVM unit-testable).
+ *
+ * @param colorScheme the active Material 3 [ColorScheme]
+ */
+internal fun extendedColorsFrom(colorScheme: ColorScheme): ExtendedColors =
     ExtendedColors(
         // Alert note → primary family (info-blue)
         noteContainer = colorScheme.primaryContainer,
@@ -142,4 +191,16 @@ fun rememberExtendedColors(colorScheme: ColorScheme): ExtendedColors =
         dangerContainer = colorScheme.errorContainer,
         onDanger = colorScheme.onError,
         onDangerContainer = colorScheme.onErrorContainer,
+        // State colors (plan.md §5.3) — dynamic/seed schemes have no hand-tuned
+        // amber/gray, so warning borrows the tertiary family it already uses for
+        // warningContainer, info follows the note blue, merged is tertiary and
+        // draft is the neutral surface pair.
+        warning = colorScheme.tertiary,
+        onWarning = colorScheme.onTertiary,
+        info = colorScheme.primary,
+        onInfo = colorScheme.onPrimary,
+        merged = colorScheme.tertiary,
+        onMerged = colorScheme.onTertiary,
+        draft = colorScheme.surfaceContainerHigh,
+        onDraft = colorScheme.onSurfaceVariant,
     )
