@@ -92,6 +92,15 @@ fun lightPalette(): ThemeColors =
                 dangerContainer = Color(0xFFFFEBE9), // Semantic
                 onDanger = Color(0xFFFFFFFF), // Semantic
                 onDangerContainer = Color(0xFFCF222E), // Semantic
+                // ── plan.md §5.3 state colors（审计 P1：spec 的 8 个缺失字段）──
+                warning = Color(0xFF9A6700), // GitHub attention fg — 同 onWarningContainer
+                onWarning = Color(0xFFFFFFFF), // Semantic
+                info = Color(0xFF0969DA), // GitHub accent blue — 同 primary
+                onInfo = Color(0xFFFFFFFF), // Semantic
+                merged = Color(0xFF8250DF), // Merged 紫（§5.3 tertiary）— 同 tertiary
+                onMerged = Color(0xFFFFFFFF), // Semantic — 同 onTertiary
+                draft = Color(0xFFE6E9ED), // Draft 中性底（§5.3）— 同 surfaceContainerHigh
+                onDraft = Color(0xFF656D76), // Draft 中性内容（§5.3）— 同 onSurfaceVariant
             ),
     )
 
@@ -166,6 +175,15 @@ fun darkPalette(): ThemeColors =
                 dangerContainer = Color(0xFF3D0F0F), // Semantic
                 onDanger = Color(0xFF0D1117), // Semantic
                 onDangerContainer = Color(0xFFFFA198), // Semantic
+                // ── plan.md §5.3 state colors（审计 P1：spec 的 8 个缺失字段）──
+                warning = Color(0xFFE3B341), // GitHub attention fg (dark) — 同 onWarningContainer
+                onWarning = Color(0xFF0D1117), // Semantic
+                info = Color(0xFF79C0FF), // GitHub accent blue (dark) — 同 primary
+                onInfo = Color(0xFF0D2942), // Semantic — 同 onPrimary
+                merged = Color(0xFFD2A8FF), // Merged 紫（§5.3 tertiary）— 同 tertiary
+                onMerged = Color(0xFF271052), // Semantic — 同 onTertiary
+                draft = Color(0xFF21262D), // Draft 中性底（§5.3）— 同 surfaceContainerHigh
+                onDraft = Color(0xFF8B949E), // Draft 中性内容（§5.3）— 同 onSurfaceVariant
             ),
     )
 
@@ -240,6 +258,15 @@ fun oledPalette(): ThemeColors =
                 dangerContainer = Color(0xFF3D0F0F), // Semantic
                 onDanger = Color(0xFF000000), // Semantic (pure black bg)
                 onDangerContainer = Color(0xFFFFA198), // Semantic
+                // ── plan.md §5.3 state colors（审计 P1：spec 的 8 个缺失字段）──
+                warning = Color(0xFFE3B341), // GitHub attention fg — 同 onWarningContainer
+                onWarning = Color(0xFF000000), // OLED 纯黑墨色（同 onSuccess/onDanger）
+                info = Color(0xFF79C0FF), // GitHub accent blue — 同 primary
+                onInfo = Color(0xFF0D2942), // Semantic — 同 onPrimary
+                merged = Color(0xFFD2A8FF), // Merged 紫（§5.3 tertiary）— 同 tertiary
+                onMerged = Color(0xFF271052), // Semantic — 同 onTertiary
+                draft = Color(0xFF161B22), // Draft 中性底（§5.3）— 同 surfaceContainerHigh
+                onDraft = Color(0xFF8B949E), // Draft 中性内容（§5.3）— 同 onSurfaceVariant
             ),
     )
 
@@ -362,6 +389,15 @@ fun highContrastLightPalette(): ThemeColors =
                 dangerContainer = Color(0xFFFFD8DB), // Semantic (HC)
                 onDanger = Color(0xFFFFFFFF), // Semantic
                 onDangerContainer = Color(0xFFA40E26), // Semantic (HC)
+                // ── plan.md §5.3 state colors（审计 P1：spec 的 8 个缺失字段）──
+                warning = Color(0xFF7A4E00), // GitHub attention fg (HC) — 同 onWarningContainer
+                onWarning = Color(0xFFFFFFFF), // Semantic
+                info = Color(0xFF0550AE), // GitHub accent blue (HC) — 同 primary
+                onInfo = Color(0xFFFFFFFF), // Semantic — 同 onPrimary
+                merged = Color(0xFF6E40C9), // Merged 紫（§5.3 tertiary）— 同 tertiary
+                onMerged = Color(0xFFFFFFFF), // Semantic — 同 onTertiary
+                draft = Color(0xFFD0D7DE), // Draft 中性底（§5.3）— 同 surfaceContainerHigh
+                onDraft = Color(0xFF4B5360), // Draft 中性内容（§5.3）— 同 onSurfaceVariant
             ),
     )
 
@@ -432,6 +468,15 @@ fun highContrastDarkPalette(): ThemeColors =
                 dangerContainer = Color(0xFF5C1D18), // Semantic (HC)
                 onDanger = Color(0xFF010409), // Semantic
                 onDangerContainer = Color(0xFFFF7B72), // Semantic
+                // ── plan.md §5.3 state colors（审计 P1：spec 的 8 个缺失字段）──
+                warning = Color(0xFFFFD874), // GitHub attention fg (HC dark) — 同 onWarningContainer
+                onWarning = Color(0xFF010409), // Semantic
+                info = Color(0xFF58A6FF), // GitHub accent blue (HC dark) — 同 primary
+                onInfo = Color(0xFF00264D), // Semantic — 同 onPrimary
+                merged = Color(0xFFBC8CFF), // Merged 紫（§5.3 tertiary）— 同 tertiary
+                onMerged = Color(0xFF2A1060), // Semantic — 同 onTertiary
+                draft = Color(0xFF21262D), // Draft 中性底（§5.3）— 同 surfaceContainerHigh
+                onDraft = Color(0xFFADBAC7), // Draft 中性内容（§5.3）— 同 onSurfaceVariant
             ),
     )
 

@@ -1,13 +1,20 @@
 package com.yumiru11.githubapp.core.designsystem.component
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.designsystem.theme.ExtendedColors
+import com.yumiru11.githubapp.core.designsystem.theme.extendedColors
+import com.yumiru11.githubapp.core.designsystem.theme.lightPalette
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,6 +51,21 @@ class GitHubStatusColorRoleTest {
     @Test
     fun gitHubStatusColorRole_conflicting_mapsToError() {
         assertEquals(AppStateColorRole.ERROR, gitHubStatusColorRole(GitHubStatus.CONFLICTING))
+    }
+
+    @Test
+    fun appStateColorRole_checkStateFamily_coversWarningRole() {
+        // 审计 P1：Checks 的 pending 需要一个 warning 角色（此前 6 个角色里没有）
+        // 成功 / 待处理 / 失败 / 中性灰 必须落在四个不同角色上
+        val checkRoles =
+            listOf(
+                AppStateColorRole.SUCCESS,
+                AppStateColorRole.WARNING,
+                AppStateColorRole.DANGER,
+                AppStateColorRole.SURFACE_VARIANT,
+            )
+        assertEquals(4, checkRoles.toSet().size)
+        assertTrue(checkRoles.contains(AppStateColorRole.WARNING))
     }
 }
 
@@ -104,5 +126,72 @@ class AppStateChipTest {
             }
         }
         labels.forEach { label -> composeRule.onNodeWithText(label).assertIsDisplayed() }
+    }
+
+    @Test
+    fun appStateChip_warningRole_rendersLabel() {
+        // 审计 P1：WARNING 渲染分支（Checks pending），GitHubStatus 覆盖不到，
+        // 走角色重载；无第二套「状态 → 颜色」映射
+        composeRule.setContent {
+            AppTheme { AppStateChip(role = AppStateColorRole.WARNING, label = "Pending") }
+        }
+        composeRule.onNodeWithText("Pending").assertIsDisplayed()
+    }
+
+    @Test
+    fun appStateChip_roleOverload_rendersEveryRole() {
+        val labels = AppStateColorRole.entries.map { role -> role.name }
+        composeRule.setContent {
+            AppTheme {
+                androidx.compose.foundation.layout.Column {
+                    AppStateColorRole.entries.forEach { role ->
+                        AppStateChip(role = role, label = role.name)
+                    }
+                }
+            }
+        }
+        labels.forEach { label -> composeRule.onNodeWithText(label).assertIsDisplayed() }
+    }
+
+    @Test
+    fun appStateColors_warningRole_resolvesExtendedWarningTokens() {
+        // 色值决策收敛到 appStateColors 一处：WARNING = 扩展色 warning 家族
+        var resolved: AppStateColors? = null
+        var expected: ExtendedColors? = null
+        composeRule.setContent {
+            AppTheme(themeMode = ThemeMode.LIGHT) {
+                resolved = appStateColors(AppStateColorRole.WARNING)
+                expected = MaterialTheme.extendedColors
+            }
+        }
+        assertEquals(expected!!.warning, resolved!!.accent)
+        assertEquals(expected!!.warningContainer, resolved!!.container)
+        assertEquals(expected!!.onWarningContainer, resolved!!.onContainer)
+    }
+
+    @Test
+    fun appStateColors_checkStateRoles_resolveToDistinctAccents() {
+        // 防退化回「成功/进行中同用 primary」（审计 P1）：四个状态家族四个不同强调色
+        var accents: Map<AppStateColorRole, Color> = emptyMap()
+        var expected: ExtendedColors? = null
+        var expectedOutline: Color? = null
+        composeRule.setContent {
+            AppTheme(themeMode = ThemeMode.LIGHT) {
+                accents =
+                    listOf(
+                        AppStateColorRole.SUCCESS,
+                        AppStateColorRole.WARNING,
+                        AppStateColorRole.DANGER,
+                        AppStateColorRole.SURFACE_VARIANT,
+                    ).associateWith { role -> appStateColors(role).accent }
+                expected = MaterialTheme.extendedColors
+                expectedOutline = MaterialTheme.colorScheme.outline
+            }
+        }
+        assertEquals(4, accents.values.toSet().size)
+        assertEquals(expected!!.success, accents[AppStateColorRole.SUCCESS])
+        assertEquals(expected!!.warning, accents[AppStateColorRole.WARNING])
+        assertEquals(expected!!.danger, accents[AppStateColorRole.DANGER])
+        assertEquals(expectedOutline, accents[AppStateColorRole.SURFACE_VARIANT])
     }
 }
