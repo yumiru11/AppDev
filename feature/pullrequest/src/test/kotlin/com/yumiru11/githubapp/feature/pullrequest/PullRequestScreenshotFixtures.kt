@@ -255,3 +255,30 @@ internal fun pullRequestDetailViewModel(tab: PullRequestTab = PullRequestTab.CON
 
 /** head 分支 sha（详情页文件列表缓存键的一部分，夹具内多处引用）。 */
 internal const val HEAD_SHA = "abc123"
+
+// ── 创建 PR 页（T23）────────────────────────────────────────────────────
+
+/**
+ * 创建 PR 页 ViewModel：真实 VM + [PullRequestRepository] 桩。
+ *
+ * - 分支候选 = main + feature 分支（base 默认 main、head 默认 feature）
+ * - WRITE 权限（`canCreate = true`，顶栏 Create 可用）
+ * - 标题 / 正文已填（正文经 DraftText，与屏上输入等价；不发任何写请求）
+ */
+internal fun pullRequestCreateScreenshotViewModel(): PullRequestCreateViewModel {
+    val repository =
+        mockk<PullRequestRepository>(relaxed = true) {
+            coEvery { repositoryControl("octocat", "Hello-World") } returns
+                RepositoryControl(viewerPermission = ViewerPermission.WRITE, defaultBranch = "main")
+            coEvery { branches("octocat", "Hello-World") } returns
+                Result.success(listOf("main", "feature/screenshot-baseline-remainder"))
+        }
+    return PullRequestCreateViewModel(
+        SavedStateHandle(mapOf("owner" to "octocat", "repo" to "Hello-World")),
+        repository,
+        draftSaver(RecordingDraftRepository()),
+    ).apply {
+        updateTitle("test(ui): 补齐创建 PR 页截图基线")
+        bodyDraft.onChanged("- 六屏十五帧\n- 基线由 CI canonical workflow 录制")
+    }
+}

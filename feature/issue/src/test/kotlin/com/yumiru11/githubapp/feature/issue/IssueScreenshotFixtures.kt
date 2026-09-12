@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.feature.issue
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.paging.PagingData
+import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
 import com.yumiru11.githubapp.feature.issue.data.IssueRepository
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueLabel
@@ -119,3 +120,32 @@ internal fun isoDaysAgo(days: Long): String =
         .now()
         .minus(days, java.time.temporal.ChronoUnit.DAYS)
         .toString()
+
+// ── 创建 Issue 页（T14 / #163 L02）────────────────────────────────────────
+
+/**
+ * 创建 Issue 页 ViewModel：真实 VM + [IssueRepository] 桩。
+ *
+ * - 标签候选项加载完成（#163 L02 的多选 chips 可见，非空态提示）
+ * - 正文草稿在 [RecordingDraftRepository] 预置 → 构造时同步恢复（草稿恢复路径的像素面）
+ * - 标题是屏内 `remember` 局部状态（无法从外部预填），保持空串
+ */
+internal fun createIssueScreenshotViewModel(): CreateIssueViewModel {
+    val repository =
+        mockk<IssueRepository>(relaxed = true) {
+            coEvery { getLabels("octocat", "Hello-World") } returns
+                listOf(
+                    IssueLabel(name = "bug", color = "d73a4a"),
+                    IssueLabel(name = "enhancement", color = "a2eeef"),
+                    IssueLabel(name = "documentation", color = "0075ca"),
+                )
+        }
+    val drafts = RecordingDraftRepository()
+    drafts.drafts[DraftTargets.newIssue("octocat", "Hello-World")] =
+        "复现步骤：\n1. 打开仓库分区\n2. 点右下角新建 Issue\n\n期望：表单可用，标签可选。"
+    return CreateIssueViewModel(
+        SavedStateHandle(mapOf("owner" to "octocat", "repo" to "Hello-World")),
+        repository,
+        draftSaver(drafts),
+    )
+}
