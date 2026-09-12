@@ -18,17 +18,18 @@ import java.io.File
  * KaTeX / Mermaid 运行时。
  *
  * 本类把 `docs/agents/markdown-consistency-2026-09-11.md` 里关于离线通道的每一条结论
- * **变成断言**：结论变了而断言没动 → 测试红，强制同步报告。反之，某天补上了
- * markdown-it-footnote，本类也会红，提醒把对应 §2.3 条目的 `paths` 从 SERVER_HTML
- * 升级为 SERVER_HTML + OFFLINE_GFM。
+ * **变成断言**：结论变了而断言没动 → 测试红，强制同步报告。
+ *
+ * 2026-09-12 起，脚注/emoji/锚点由 `renderer.js` 的自维护插件补齐（与 Alert/任务列表同一
+ * 做法），bundle 依旧不打包对应插件——**真实渲染行为**由 `OfflineRendererExecutionTest`
+ * （Node 执行真实 renderer.js）覆盖，本类只保「能力面 + 缺口集合」的产物级契约。
  *
  * ## 边界（诚实声明）
  *
- * - markdown-it 未打包 footnote/emoji/anchor 插件 ⇒ 这些写法在离线通道**不可能**被渲染
- *   （不是「可能没渲染」，是产物里根本没有对应代码）。
+ * - markdown-it bundle 未打包 footnote/emoji/anchor 插件；离线能力由 renderer.js 自维护，
+ *   修改插件清单必须同步 `OFFLINE_MARKERS` 与一致性报告。
  * - 核心语法（标题/列表/表格/删除线/代码/链接/自动链接/内联 HTML）由 markdown-it 14.1.0
- *   核心特性提供，本类用**版本横幅 + 选项字面量**锁定，不做语义级渲染断言
- *   （JVM 无 JS 引擎，无法执行 bundle 比对 DOM）。
+ *   核心特性提供，本类用**版本横幅 + 选项字面量**锁定，不做语义级渲染断言。
  *
  * 测试命名规范：methodName_scenario_expectedBehavior。
  */
@@ -52,12 +53,19 @@ class WebViewOfflineGfmCapabilityTest {
     }
 
     @Test
-    fun markdownItBundle_doesNotBundleFootnoteEmojiOrAnchorPlugins() {
+    fun markdownItBundle_doesNotBundlePlugins_rendererJsHandRollsThem() {
         val bundle = markdownItBundle()
 
-        assertFalse("markdown-it 14.1.0 未打包 markdown-it-footnote → 脚注在离线通道不可渲染", bundle.contains("footnote"))
-        assertFalse("未打包 markdown-it-emoji → :rocket: 短码在离线通道不可渲染", bundle.contains("emoji"))
-        assertFalse("未打包 markdown-it-anchor → 锚点 id 在离线通道不生成", bundle.contains("anchor"))
+        // bundle 保持原样（无 footnote/emoji/anchor 插件）；升级 bundle 会改变离线能力面
+        assertFalse("markdown-it 14.1.0 未打包 markdown-it-footnote", bundle.contains("footnote"))
+        assertFalse("未打包 markdown-it-emoji", bundle.contains("emoji"))
+        assertFalse("未打包 markdown-it-anchor", bundle.contains("anchor"))
+
+        // 三个能力由 renderer.js 的自维护插件提供（2026-09-12 补齐，同 Alert/任务列表做法）
+        val renderer = rendererJs()
+        assertTrue("脚注插件必须存在（footnotePlugin）", renderer.contains("footnotePlugin"))
+        assertTrue("emoji 短码插件必须存在（emojiPlugin）", renderer.contains("emojiPlugin"))
+        assertTrue("标题锚点插件必须存在（anchorPlugin）", renderer.contains("anchorPlugin"))
     }
 
     @Test
@@ -95,13 +103,17 @@ class WebViewOfflineGfmCapabilityTest {
     }
 
     @Test
-    fun rendererJs_declaresNoAnchorScrollApi_asDocumentedGap() {
-        // plan §2.9 约定 Kotlin→JS 的 scrollToAnchor(id)；全仓（含 Kotlin 调用点）无实现。
-        // 本断言把「锚点跳转未实现」钉住：实现后此断言会红，提醒更新 catalog 的 28-anchor-jump。
-        assertFalse("scrollToAnchor 尚未实现（§2.3「锚点跳转」当前无渲染路径）", rendererJs().contains("scrollToAnchor"))
+    fun rendererJs_exposesAnchorScrollApi_headingIdsAndClickInterception() {
+        // plan §2.9 约定 Kotlin→JS 的 scrollToAnchor(id)：2026-09-12 由 renderer.js 落地。
+        // heading id 生成（anchorPlugin）→ # 链接点击拦截 → WebView 内滚动，三步缺一不可。
+        val renderer = rendererJs()
+
+        assertTrue("必须暴露 Kotlin 可 evaluateJavascript 的入口", renderer.contains("window.scrollToAnchor = scrollToAnchor"))
+        assertTrue("标题必须生成 slug id（anchorPlugin）", renderer.contains("anchorPlugin"))
+        assertTrue("页内 # 锚点必须滚动而不是走 onLinkClick", renderer.contains("href.charAt(0) === '#'"))
         assertTrue(
-            "28-anchor-jump 必须被登记为无渲染路径",
-            MarkdownGfmFixtures.byId("28-anchor-jump").paths.isEmpty(),
+            "28-anchor-jump 必须被登记为离线通道已支持",
+            MarkdownGfmFixtures.RenderPath.OFFLINE_GFM in MarkdownGfmFixtures.byId("28-anchor-jump").paths,
         )
     }
 
@@ -152,18 +164,13 @@ class WebViewOfflineGfmCapabilityTest {
         // 不含 OFFLINE_GFM 路径的夹具 = 离线通道的已知缺口，必须与报告一致
         val expected =
             setOf(
-                "17-image-relative",
-                "21-relative-link",
                 "22-mention-user",
                 "23-mention-org-team",
                 "24-issue-ref",
                 "25-commit-sha-ref",
-                "26-emoji-shortcode",
-                "28-anchor-jump",
                 "29-image-lazy",
                 "33-math-katex",
                 "34-mermaid",
-                "35-footnote",
             )
         val actual =
             MarkdownGfmFixtures.ALL
@@ -182,8 +189,8 @@ class WebViewOfflineGfmCapabilityTest {
                 .map { it.id }
 
         assertEquals(
-            "离线通道覆盖的 §2.3 条目数（报告中的 🔶/✅ 统计口径）",
-            23,
+            "离线通道覆盖的 §2.3 条目数（2026-09-12 修复后：23 + 相对图/相对链/emoji/锚点/脚注）",
+            28,
             offlineIds.size,
         )
     }
@@ -227,13 +234,18 @@ class WebViewOfflineGfmCapabilityTest {
                 "14-code-language-tag" to MARKDOWN_IT_BANNER,
                 "15-syntax-highlight" to "highlightElement",
                 "16-code-copy" to "md-copy-btn",
+                "17-image-relative" to "raw.githubusercontent.com",
                 "18-image-github-cache-domain" to MARKDOWN_IT_BANNER,
                 "19-external-link" to MARKDOWN_IT_BANNER,
                 "20-autolink" to "linkify: true",
+                "21-relative-link" to "/blob/HEAD/",
+                "26-emoji-shortcode" to "emojiPlugin",
                 "27-github-alerts" to "githubAlertPlugin",
+                "28-anchor-jump" to "scrollToAnchor",
                 "30-image-zoom" to "onImageClick",
                 "31-image-gif" to MARKDOWN_IT_BANNER,
                 "32-inline-html" to "html: true",
+                "35-footnote" to "footnotePlugin",
             )
 
         const val MARKDOWN_IT_BANNER = "markdown-it 14.1.0"

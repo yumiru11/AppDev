@@ -112,6 +112,79 @@ class OfflineRendererExecutionTest {
         assertFalse("无仓库上下文时不得凭空造出 raw 域", html.contains("raw.githubusercontent.com"))
     }
 
+    // ── emoji 短码 / 脚注 / 锚点（审计 §9 第 4 条的三项补齐，2026-09-12） ────
+
+    @Test
+    fun offlineRender_emojiShortcodes_areConvertedOutsideCode() {
+        val html = renderFixture("26-emoji-shortcode")
+
+        assertTrue("`:rocket:` → 🚀、`:tada:` → 🎉", html.contains("🚀") && html.contains("🎉"))
+        assertTrue("`:+1:` / `:bug:` / `:sparkles:` 也在映射表内", html.contains("👍") && html.contains("🐛") && html.contains("✨"))
+        assertFalse("已识别的短码不得残留原文", html.contains(":rocket:") || html.contains(":tada:"))
+    }
+
+    @Test
+    fun offlineRender_emojiShortcodes_doNotTouchFencedOrInlineCode() {
+        val markdown =
+            """
+            ```text
+            :rocket: **:tada:**
+            ```
+
+            行内：`:rocket:` 与 `:+1:`
+            """.trimIndent()
+
+        val html = render(markdown)
+
+        assertTrue("围栏代码块里的短码必须原样保留", html.contains(":rocket: **:tada:**"))
+        assertTrue("行内代码里的短码必须原样保留", html.contains("<code>:rocket:</code>"))
+        assertTrue("行内代码里的 +1 短码必须原样保留", html.contains("<code>:+1:</code>"))
+        assertFalse("代码里的短码不得被替换成 emoji", html.contains("🚀") || html.contains("👍"))
+    }
+
+    @Test
+    fun offlineRender_footnoteRefsAndDefinitions_renderGitHubLikeStructure() {
+        val html = renderFixture("35-footnote")
+
+        assertTrue("引用 → [data-footnote-ref] 上标链接", html.contains("data-footnote-ref"))
+        assertTrue("定义区 → section.footnotes", html.contains("<section class=\"footnotes\" data-footnotes>"))
+        assertTrue("编号按引用出现顺序", html.contains("id=\"fn-1\"") && html.contains("id=\"fn-2\""))
+        assertTrue("回跳锚点齐备", html.contains("data-footnote-backref") && html.contains("href=\"#fnref-1\""))
+        assertTrue("定义正文按 markdown 渲染（含行内代码）", html.contains("<code>代码</code>"))
+        assertFalse("定义行不得不残留在正文", html.contains("[^1]:") || html.contains("[^note]:"))
+    }
+
+    @Test
+    fun offlineRender_footnoteWithoutDefinition_staysLiteralText() {
+        // 无定义时不能把正文吃掉（GitHub 同样按普通文本渲染）
+        val html = render("正文[^ghost] 继续。")
+
+        assertTrue("未定义的脚注引用保留原文", html.contains("[^ghost]"))
+        assertFalse("不得凭空生成脚注区", html.contains("class=\"footnotes\""))
+    }
+
+    @Test
+    fun offlineRender_headingAnchors_generateSlugIdsAndKeepAnchorLinks() {
+        val html = renderFixture("28-anchor-jump")
+
+        assertTrue("中文标题 → 同名 id", html.contains("id=\"目标章节\""))
+        assertTrue("英文标题 → GitHub slug id", html.contains("id=\"section-with-hyphen\""))
+        assertTrue("页内锚点保持 # 形态（点击交给 scrollToAnchor）", html.contains("href=\"#section-with-hyphen\""))
+        assertTrue(
+            "中文锚点的百分号编码形态也保持 # 开头（scrollToAnchor 会 decode）",
+            html.contains("href=\"#%E7%9B%AE%E6%A0%87%E7%AB%A0%E8%8A%82\""),
+        )
+        assertFalse("不得把 # 锚点改写成绝对链接", html.contains("github.com/octocat/Hello-World/blob/HEAD/#"))
+    }
+
+    @Test
+    fun offlineRender_duplicateHeadings_getSuffixedSlugIds() {
+        val html = render("## Same\n\n## Same\n")
+
+        assertTrue("首个标题用基础 slug", html.contains("id=\"same\""))
+        assertTrue("重复标题必须加 -1 后缀（否则锚点只能跳到第一个）", html.contains("id=\"same-1\""))
+    }
+
     // ── 共用 ────────────────────────────────────────────────────────────
 
     private fun renderFixture(id: String): String = render(MarkdownGfmFixtures.byId(id).markdown())

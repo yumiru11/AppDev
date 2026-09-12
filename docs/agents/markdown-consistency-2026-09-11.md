@@ -12,10 +12,14 @@
 
 ## 0. 一句话结论
 
-§2.3 的 **35 条**里：**7 条**有渲染且回归可执行、**24 条**有渲染但像素基线待云端录制、
-**4 条**完全没有渲染路径（锚点跳转 / 图片懒加载 / KaTeX / Mermaid）。
+§2.3 的 **35 条**里：**8 条**有渲染且回归可执行、**24 条**有渲染但像素基线待云端录制、
+**3 条**完全没有渲染路径（图片懒加载 / KaTeX / Mermaid）。
 WebView 路径的**产物层**回归已覆盖全部 35 条；**像素层**在 Linux JVM 上对 WebView
 永远不可测，只能靠 CI 模拟器截图与真机走查。
+
+> **2026-09-12 更新**：D3（离线相对链接/图片重写）与 emoji 短码、脚注、锚点跳转已随
+> `fix/offline-gfm-relative-urls` 修复；下面的表格与统计已同步为修复后的状态。离线渲染
+> 的行为证据从「源码文本断言」升级为「Node 真实执行 `renderer.js`」（`OfflineRendererExecutionTest`）。
 
 ## 1. 方法与分层（先读这一节，否则下面的 ✅ 会被误读）
 
@@ -58,29 +62,31 @@ App 侧要保证的是「不要把它弄坏」（清洗、相对 URL 改写、CS
 | `14-code-language-tag` | 代码语言标注 | ✅ | ✅ | ✅ | 🟡 |
 | `15-syntax-highlight` | 语法高亮 | ✅ | ✅ | ✅ | 🟡 |
 | `16-code-copy` | 代码块复制按钮 | ✅ | ✅ | ✅ | 🟡 |
-| `17-image-relative` | 图片（相对路径引用） | ✅ | ✅ | — | 🟡 |
+| `17-image-relative` | 图片（相对路径引用） | ✅ | ✅ | ✅ | 🟡 |
 | `18-image-github-cache-domain` | 图片（GitHub 缓存域） | ✅ | ✅ | ✅ | 🟡 |
 | `19-external-link` | 外部链接 | ✅ | ✅ | ✅ | 🟡 |
 | `20-autolink` | 自动链接（裸 URL） | ✅ | ✅ | ✅ | 🟡 |
-| `21-relative-link` | 相对链接（`./`、`../`、`/owner/repo`） | ✅ | ✅ | — | 🟡 |
+| `21-relative-link` | 相对链接（`./`、`../`、`/owner/repo`） | ✅ | ✅ | ✅ | 🟡 |
 | `22-mention-user` | 提及：`@user` | — | ✅ | — | ✅ |
 | `23-mention-org-team` | 提及：`@org/team` | — | ✅ | — | ✅ |
 | `24-issue-ref` | 引用：`#123`、`owner/repo#123`、`gh-123` | — | ✅ | — | ✅ |
 | `25-commit-sha-ref` | 提交引用（裸 sha） | — | ✅ | — | ✅ |
-| `26-emoji-shortcode` | Emoji 短句：`:rocket:` | — | ✅ | — | ✅ |
+| `26-emoji-shortcode` | Emoji 短句：`:rocket:` | — | ✅ | ✅ | ✅ |
 | `27-github-alerts` | GitHub Alerts：`[!NOTE]`/`[!TIP]`/`[!IMPORTANT]`/`[!WARNING]`/`[!CAUTION]` | ✅ | ✅ | ✅ | 🟡 |
-| `28-anchor-jump` | 锚点跳转（`#section`） | — | — | — | ❌ |
+| `28-anchor-jump` | 锚点跳转（`#section`） | — | — | ✅ | ✅ |
 | `29-image-lazy` | 图片：懒加载 | — | — | — | ❌ |
 | `30-image-zoom` | 图片：点击放大 | ✅ | ✅ | ✅ | 🟡 |
 | `31-image-gif` | 图片：GIF | — | ✅ | ✅ | ✅ |
 | `32-inline-html` | 内嵌 HTML（安全子集） | ✅ | ✅ | ✅ | 🟡 |
 | `33-math-katex` | Math/KaTeX（兜底通道，可选） | — | — | — | ❌ |
 | `34-mermaid` | Mermaid（兜底通道，可选） | — | — | — | ❌ |
-| `35-footnote` | 脚注（尽力而为，不保证与网页完全一致） | — | ✅ | — | ✅ |
+| `35-footnote` | 脚注（尽力而为，不保证与网页完全一致） | — | ✅ | ✅ | ✅ |
 <!-- END FIXTURE TABLE -->
 
-> 注：`35-footnote` 与 `22`–`26` 一样是**服务端 HTML 独占**——路径列上原生与离线都是 `—`，
-> 表示「降级通道不渲染脚注 / 提及 / 引用 / emoji」，**不是**「README 里看不到脚注」。
+> 注：`22`–`25` 仍是**服务端 HTML 独占**——路径列上原生与离线都是 `—`，
+> 表示「降级通道不渲染提及 / 引用」，**不是**「README 里看不到这些写法」。
+> 2026-09-12 后 `26-emoji-shortcode` 与 `35-footnote` 已补入离线通道（`renderer.js` 自维护
+> 插件），`17`/`21` 的相对路径改写也移到了渲染产物层。
 > 这类条目落在 `✅` 是因为 App 侧要保证的只是「不把 GitHub 渲染好的 HTML 弄坏」，
 > 而这由第 ③ 层回归锁定。判读时请同时看路径列与状态列。
 
@@ -91,11 +97,11 @@ App 侧要保证的是「不要把它弄坏」（清洗、相对 URL 改写、CS
 | 口径 | 数量 |
 |---|---|
 | §2.3 原子条目总数 | 35 |
-| ✅ 有渲染 + 回归可执行 | **7** |
+| ✅ 有渲染 + 回归可执行 | **8** |
 | 🟡 有渲染 + 原生像素基线待录制（WebView 产物回归已就位） | **24** |
-| ❌ 无渲染路径 | **4** |
+| ❌ 无渲染路径 | **3** |
 | 服务端 HTML 通道覆盖 | 31 / 35 |
-| 离线 GFM 通道覆盖 | 23 / 35 |
+| 离线 GFM 通道覆盖 | 28 / 35 |
 | 原生通道覆盖 | 24 / 35 |
 
 严格口径（只认「基线已生效的像素回归」）：**0**——因为 24 条原生基线尚未录制，
@@ -103,36 +109,37 @@ App 侧要保证的是「不要把它弄坏」（清洗、相对 URL 改写、CS
 
 ## 3. 最严重的 3 个缺口
 
-### 缺口 1（最严重）：离线 GFM 通道缺 12 条 §2.3 写法，其中 2 条是「功能坏了」而非「样式不同」
+### 缺口 1：离线 GFM 通道仍缺 7 条 §2.3 写法（2026-09-11 时点为 12 条）
 
 离线 GFM（markdown-it 14.1.0 + renderer.js）是 **Issue/PR 正文的唯一通道**，也是 README
-服务端异常时的降级通道。产物级证据（`WebViewOfflineGfmCapabilityTest`）：
+服务端异常时的降级通道。产物级证据（`WebViewOfflineGfmCapabilityTest`）。
+2026-09-12 的修复波补上 5 条（相对链接、相对图片、emoji 短码、锚点跳转、脚注）；
+相对链接/图片的改写移到 markdown-it 渲染产物层（`renderer.js` 的 `rewriteRelativeUrls`，
+Node 真实执行回归 `OfflineRendererExecutionTest`）。当前剩余缺口：
 
 | 缺失写法 | 产物证据 |
 |---|---|
-| 相对链接、相对图片 | `WebViewHtmlBuilder.kt:86` 的 `rewriteRelativeUrls(buildContentBlock(...))` 在离线模式下作用在**已转义的属性值**上，正则匹配不到 `<img src>`；WebView base 是 `https://appassets.androidplatform.net/`（`WebViewMarkdownRenderer.kt:226`）→ 相对路径解析到 appassets 域 404 |
 | `@user` / `@org/team` 提及 | markdown-it 无 mention 插件 |
-| `#123` / `owner/repo#123` / `gh-123` 引用 | 同上，正文裸引用不被 linkify（`GfmNativeParserCapabilityTest.issueReferenceFixture_hashSyntax_isNotAutolinked` 同样在原生侧证否） |
+| `#123` / `owner/repo#123` / `gh-123` 引用 | 正文裸引用不被 linkify（`GfmNativeParserCapabilityTest.issueReferenceFixture_hashSyntax_isNotAutolinked` 同样在原生侧证否） |
 | 裸 sha 提交引用 | 同上 |
-| Emoji 短码 `:rocket:` | `markdown-it.min.js` 不含 `emoji` 字样（未打包 markdown-it-emoji）；`plan.md` §2.2① 的 `GhMarkdownProcessor`（emoji→Unicode）**全仓无实现** |
-| 锚点跳转 | 无 markdown-it-anchor；`plan.md:202` 约定的 `scrollToAnchor(id)` 无任何调用点 |
 | 图片懒加载 | 全仓无 `loading="lazy"` 注入点（`plan.md:271` 的约定未落地） |
 | KaTeX / Mermaid | `assets/webview/` 无对应运行时 |
-| 脚注 | `markdown-it.min.js` 不含 `footnote` 字样（未打包 markdown-it-footnote） |
 
-前两条是**功能性损坏**：Issue 正文里 `![img](./docs/x.png)` 与 `[doc](./docs/a.md)`
-在网页端可点可看，在 App 里是死链。这也是本报告里唯一「用户一定能感知」的一类缺口。
+> 曾经的 D3 是**功能性损坏**：离线产物不改写相对路径，而 WebView base 是
+> `https://appassets.androidplatform.net/`（`WebViewMarkdownRenderer.kt:226`），
+> Issue 正文里的 `![img](./docs/x.png)` 与 `[doc](./docs/a.md)` 全是死链。
+> 修复后离线与服务端 HTML 两条通道对同一仓库解析出同样的链接（同一套规则，两侧各有回归）。
 
 ### 缺口 2：原生短文本通道的 2 个缺陷（`<details>` 正文重复渲染、相对图片永不解析）
 
 见 §4 的 D1 / D2。二者都在**用户可见的正文**里，且都在 §2.3 明确要求的写法上。
 
-### 缺口 3：4 条「完全没有渲染路径」的写法
+### 缺口 3：3 条「完全没有渲染路径」的写法
 
-`28-anchor-jump`、`29-image-lazy`、`33-math-katex`、`34-mermaid`。
-其中**锚点跳转**与**图片懒加载**是 `plan.md` §2.9 / §2.13 已经**拍板过的约定**（不是可选加分项），
+`29-image-lazy`、`33-math-katex`、`34-mermaid`（`28-anchor-jump` 已于 2026-09-12 落地）。
+其中**图片懒加载**是 `plan.md` §2.13 已经**拍板过的约定**（不是可选加分项），
 `math` 与 `mermaid` 才是 §2.3 标注「兜底通道，可选」。审计若按「未排票」计，
-应把前两条与后两条分开计权。
+应把前者与后两者分开计权。
 
 ## 4. 发现但**未修**的真实渲染缺陷（本票只记录，不修）
 
@@ -143,7 +150,7 @@ App 侧要保证的是「不要把它弄坏」（清洗、相对 URL 改写、CS
 |---|---|---|---|
 | **D1** | `<details>` 采用 GitHub 惯用的**空行分隔**写法时，块正文被**重复渲染**：一份折叠进卡片，一份以普通段落**常驻可见** → 折叠语义失效 + 内容重复 | 视觉证据：`MarkdownFixture_32-inline-html_light_actual.png`（录制基线时可直接复核）；代码路径 `HtmlDetailsParser.kt:32-39`（借区间到 `</details>` 取 body）+ CommonMark 空行终止 HTML block → 中间段落成为独立 `PARAGRAPH` 被正常渲染；`EnhancedHtmlBlock.kt:48-56` 只处理 HTML_BLOCK 自身 | 原生通道；README/正文里最常见的 details 写法 |
 | **D2** | `EnhancedMarkdownViewer` **未把 `baseRepoUrl` 透传**给 `EnhancedMarkdownImage` → 相对路径图片在增强链上永远解析不到 raw 域 | `EnhancedMarkdownViewer.kt:176` `image = { model -> EnhancedMarkdownImage(model) }`（对比同文件 `EnhancedParagraph(model, baseRepoUrl)` 有透传）；`EnhancedMarkdownImage.kt:63` 只有拿到 `baseRepoUrl` 才会 `resolveRawImageUrl` | 原生通道；`FileViewerScreen` / `FileEditScreen` / `RepoDetailScreen:1467` 的预览与正文 |
-| **D3** | 离线 GFM 不重写相对链接/图片（缺口 1 的代码根因） | `WebViewHtmlBuilder.kt:86`；既有测试 `WebViewHtmlBuilderTest.build_offlineMode_withBaseRepoUrl_doesNotRewriteEscapedRawMarkdown` 已把该行为**固化为期望**，修 D3 必须同时改这条测试 | Issue/PR 正文 + README 降级路径 |
+| **D3** | 离线 GFM 不重写相对链接/图片（缺口 1 的代码根因） | `WebViewHtmlBuilder.kt:86`；既有测试 `WebViewHtmlBuilderTest.build_offlineMode_withBaseRepoUrl_doesNotRewriteEscapedRawMarkdown` 曾把该行为**固化为期望** | Issue/PR 正文 + README 降级路径（✅ 2026-09-12 修复：改写移到 `renderer.js` 渲染产物层，旧测试期望已随之修正） |
 | **D4** | 原生链**无 coil-gif 依赖** → GIF 只出首帧 | `gradle/libs.versions.toml:144-146` 只有 `coil-compose` / `coil-network-okhttp` / `coil-svg`；`catalog 31-image-gif` 因此不含 NATIVE | 原生通道 |
 | **D5** | 内嵌 HTML 的**内联标签语义丢失**：`<kbd>` / `<sub>` / `<sup>` 降级为纯文本（网页端有 kbd 样式与上下标）；`<script>` 标签被剥离但其正文 `alert(1)` 仍可见 | 视觉证据：`MarkdownFixture_32-inline-html_light_actual.png` 中 `Ctrl + C`、`下标`、`上标` 均无对应排版；`EnhancedHtmlBlock.kt:62-72` 走 `stripHtmlTags` 纯文本降级 | 原生通道 |
 | **D6** | `plan.md` §2.10 的字体变量命名与实现**漂移**：文档写 `--md-sys-font-sans` / `--md-sys-font-mono`，实现是 `--fontStack-sansSerif` / `--fontStack-monospace`（`markdown-you.css:23,209` 消费的是后者） | `WebViewMaterialYouTokenContractTest.buildCss_fontVariables_deviateFromPlanSection210NamesAsDocumented` 双向锁定 | **文档失真**（功能正常），但会让「按 §2.10 核对实现」的人得出错误结论 |
@@ -276,9 +283,9 @@ headless 采集任务）→ 用 `Record screenshots (CI canonical)` 重新录制
 
 1. **修 D1 / D2**（原生通道的可见错误，改动小、影响面明确），并为二者各自补一条针对性单测。
 2. **修 D3**（离线 GFM 相对链接/图片）：属于「功能不可用」，同时要改既有测试
-   `build_offlineMode_withBaseRepoUrl_doesNotRewriteEscapedRawMarkdown` 的期望。
+   `build_offlineMode_withBaseRepoUrl_doesNotRewriteEscapedRawMarkdown` 的期望。（✅ 2026-09-12 完成）
 3. **录制 31 张原生基线**（走 CI workflow），让 24 条 `🟡` 变成真正生效的像素回归。
 4. **补离线 GFM 的 emoji 短码**（`plan.md` §2.2① 的 `GhMarkdownProcessor` 从未实现），
-   这是 Issue 正文里最常见的不一致。
+   这是 Issue 正文里最常见的不一致。（✅ 2026-09-12 完成：renderer.js 自维护插件，同批补上脚注与锚点跳转）
 5. **原型模块复活或归档**：按 §6 的最小路径，或直接把 4 张基线移入 `docs/` 作为历史留痕并删模块。
 6. **订正 `plan.md` §2.10 的字体变量名**与 §16 风险表的「原生优先」措辞（文档失真，属 #171）。

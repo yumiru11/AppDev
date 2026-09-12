@@ -106,7 +106,7 @@ internal object NodeRendererHarness {
             val process =
                 ProcessBuilder(candidate, "--version")
                     .redirectErrorStream(true)
-                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectOutput(File("/dev/null"))
                     .start()
             val finished = process.waitFor(20, TimeUnit.SECONDS)
             if (!finished) process.destroyForcibly()

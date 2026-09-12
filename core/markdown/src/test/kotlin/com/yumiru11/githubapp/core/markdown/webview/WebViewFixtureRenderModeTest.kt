@@ -163,9 +163,10 @@ class WebViewFixtureRenderModeTest {
     }
 
     @Test
-    fun relativeUrlRewrite_fixture17And21_rewritesOnlyInServerHtmlMode() {
-        // 离线模式不改写原始 markdown 的相对路径（raw 已转义为属性值，正则无从匹配）；
-        // 这是 catalog 中 17/21 不含 OFFLINE_GFM 路径的代码级证据。
+    fun relativeUrlRewrite_fixture17And21_contextGoesToOfflineRenderer_kotlinRewritesServerHtmlOnly() {
+        // 离线模式：Kotlin 不在原始 markdown 上做 URL 改写（raw 已转义为属性值，正则必然误伤代码围栏）；
+        // 相对路径的改写由 renderer.js 在 markdown-it 渲染产物层完成——Kotlin 只传 data-base-repo。
+        // 真实改写产物由 OfflineRendererExecutionTest（node 执行 renderer.js）证明。
         val imageFixture = MarkdownGfmFixtures.byId("17-image-relative").markdown()
         val linkFixture = MarkdownGfmFixtures.byId("21-relative-link").markdown()
 
@@ -186,14 +187,22 @@ class WebViewFixtureRenderModeTest {
                 baseRepoUrl = "https://github.com/octocat/Hello-World",
             )
 
-        assertFalse("离线模式不得改写 raw markdown 的相对图片", offlineImageHtml.contains("raw.githubusercontent.com/octocat/Hello-World/HEAD"))
+        assertFalse("离线模式不得在 markdown 文本层改写相对图片", offlineImageHtml.contains("raw.githubusercontent.com/octocat/Hello-World/HEAD"))
         assertTrue(
-            "离线模式原样保留相对图片路径（因此取不到图，见 catalog 17 的说明）",
+            "相对图片原文必须无损交给 renderer.js（改写发生在渲染产物层）",
             offlineImageHtml.contains("./docs/screenshot.png"),
         )
         assertTrue(
-            "离线模式原样保留相对链接路径（因此点不开，见 catalog 21 的说明）",
+            "仓库上下文必须交给 renderer.js（它才可能改写）",
+            offlineImageHtml.contains("data-base-repo=\"octocat/Hello-World\""),
+        )
+        assertTrue(
+            "相对链接原文必须无损交给 renderer.js",
             offlineLinkHtml.contains("./docs/architecture.md"),
+        )
+        assertTrue(
+            "链接夹具同样必须携带仓库上下文",
+            offlineLinkHtml.contains("data-base-repo=\"octocat/Hello-World\""),
         )
 
         val serverHtml =
@@ -214,12 +223,20 @@ class WebViewFixtureRenderModeTest {
         )
 
         assertEquals(
-            "17/21 必须被登记为「离线路径不支持」——上面的产物断言就是这条登记的依据",
-            setOf(MarkdownGfmFixtures.RenderPath.NATIVE, MarkdownGfmFixtures.RenderPath.SERVER_HTML),
+            "17/21 必须被登记为三路径全支持（离线改写由 renderer.js 在产物层完成，2026-09-12）",
+            setOf(
+                MarkdownGfmFixtures.RenderPath.NATIVE,
+                MarkdownGfmFixtures.RenderPath.SERVER_HTML,
+                MarkdownGfmFixtures.RenderPath.OFFLINE_GFM,
+            ),
             MarkdownGfmFixtures.byId("17-image-relative").paths,
         )
         assertEquals(
-            setOf(MarkdownGfmFixtures.RenderPath.NATIVE, MarkdownGfmFixtures.RenderPath.SERVER_HTML),
+            setOf(
+                MarkdownGfmFixtures.RenderPath.NATIVE,
+                MarkdownGfmFixtures.RenderPath.SERVER_HTML,
+                MarkdownGfmFixtures.RenderPath.OFFLINE_GFM,
+            ),
             MarkdownGfmFixtures.byId("21-relative-link").paths,
         )
     }

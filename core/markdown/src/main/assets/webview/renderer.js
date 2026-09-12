@@ -10,8 +10,9 @@
  *    - 任务列表 checkbox change → onCheckboxClick(index, checked)
  *    - ResizeObserver → onHeightChanged(height)
  * 3. 离线模式（OFFLINE_MARKDOWN_IT）：调用 markdown-it 渲染原始 markdown，
- *    补 GitHub Alert / 任务列表两个最小 GFM 插件，并用 highlight.js 高亮代码块；
- *    渲染产物再按仓库上下文改写相对链接/图片（见 renderOfflineHtml 的说明）
+ *    补 GitHub Alert / 任务列表 / emoji 短码 / 脚注 / 标题锚点五个最小 GFM 插件，
+ *    并用 highlight.js 高亮代码块；渲染产物再按仓库上下文改写相对链接/图片
+ *    （见 renderOfflineHtml 的说明）
  *
  * 安全：本脚本不接收任何 token；token 仅由 PrivateImageInterceptor 加到网络请求。
  * 仓库上下文（`owner/repo`）不是凭据，由 `data-base-repo` 属性传入（公开信息）。
@@ -42,6 +43,12 @@
         anchor.addEventListener('click', function (event) {
           event.preventDefault();
           var href = anchor.getAttribute('href') || '';
+          // 页内锚点（#section、脚注 #fn-1 / #fnref-1）：WebView 内滚动，不交给 Kotlin
+          // （过去 # 链接会走 onLinkClick → 外部浏览器/应用内路由，锚点永远跳不动）
+          if (href.charAt(0) === '#') {
+            scrollToAnchor(href.slice(1));
+            return;
+          }
           if (ANDROID_BRIDGE && href) {
             ANDROID_BRIDGE.onLinkClick(href);
           }
@@ -298,6 +305,301 @@
     });
   }
 
+  // ── 离线 GFM 补齐：emoji 短码 / 标题锚点 / 脚注（审计 §9 第 4 条） ──────
+  //
+  // 三个插件都只作用于 markdown-it 解析后的 token 流：代码围栏是块级 code/fence token、
+  // 行内代码是 code_inline token——都不经过 text token（emoji）或 \s 规则（脚注/锚点），
+  // 「不误伤代码」是结构保证而不是正则巧合。
+
+  /**
+   * 页内锚点滚动（plan.md §2.9 的 Kotlin→JS 契约 `scrollToAnchor(id)`）。
+   *
+   * 由两处调用：`bindLinks` 拦截 `a[href^="#"]` 点击、以及 Kotlin 侧
+   * `WebView.evaluateJavascript("scrollToAnchor('…')")`。
+   * 找不到目标时返回 false（调用方无需处理，页面保持原位）。
+   */
+  function scrollToAnchor(id) {
+    var target = String(id == null ? '' : id).replace(/^#/, '');
+    if (!target) return false;
+    try {
+      target = decodeURIComponent(target);
+    } catch (e) {
+      // 非法百分号编码：按原样查找
+    }
+    var element = document.getElementById(target);
+    if (!element) return false;
+    if (element.scrollIntoView) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    return true;
+  }
+
+  // Kotlin 侧可 evaluateJavascript 的入口（发现页/目录跳转预留的公共 API）
+  window.scrollToAnchor = scrollToAnchor;
+
+  /** GitHub 常用 emoji 短码 → Unicode（gemoji 精选子集；未收录的短码原样保留）。 */
+  var EMOJI_DATA =
+    'smile:😄,smiley:😃,grin:😁,laughing:😆,satisfied:😆,sweat_smile:😅,rofl:🤣,joy:😂,' +
+    'relaxed:☺️,blush:😊,innocent:😇,slightly_smiling_face:🙂,upside_down_face:🙃,wink:😉,' +
+    'heart_eyes:😍,smiling_face_with_three_hearts:🥰,kissing_heart:😘,kissing:😗,' +
+    'kissing_smiling_eyes:😙,kissing_closed_eyes:😚,yum:😋,stuck_out_tongue:😛,' +
+    'stuck_out_tongue_winking_eye:😜,stuck_out_tongue_closed_eyes:😝,zany_face:🤪,' +
+    'face_with_raised_eyebrow:🤨,nerd_face:🤓,sunglasses:😎,star_struck:🤩,partying_face:🥳,' +
+    'smirk:😏,unamused:😒,disappointed:😞,pensive:😔,worried:😟,confused:😕,' +
+    'slightly_frowning_face:🙁,frowning_face:☹️,persevere:😣,confounded:😖,tired_face:😫,' +
+    'weary:😩,triumph:😤,angry:😠,rage:😡,no_mouth:😶,neutral_face:😐,expressionless:😑,' +
+    'hushed:😯,frowning:😦,anguished:😧,open_mouth:😮,astonished:😲,flushed:😳,pleading_face:🥺,' +
+    'fearful:😨,cold_sweat:😰,disappointed_relieved:😥,cry:😢,sob:😭,scream:😱,sweat:😓,' +
+    'sleepy:😪,sleeping:😴,dizzy_face:😵,exploding_head:🤯,face_with_thermometer:🤒,' +
+    'face_with_head_bandage:🤕,nauseated_face:🤢,sneezing_face:🤧,mask:😷,cowboy_hat_face:🤠,' +
+    'smiling_imp:😈,imp:👿,japanese_ogre:👹,japanese_goblin:👺,clown_face:🤡,ghost:👻,skull:💀,' +
+    'alien:👽,robot:🤖,poop:💩,hankey:💩,angel:😇,santa:🎅,baby:👶,' +
+    'heart:❤️,broken_heart:💔,two_hearts:💕,sparkling_heart:💖,heartpulse:💗,heartbeat:💓,' +
+    'blue_heart:💙,green_heart:💚,yellow_heart:💛,purple_heart:💜,orange_heart:🧡,black_heart:🖤,' +
+    'white_heart:🤍,gift_heart:💝,cupid:💘,kiss:💋,love_letter:💌,100:💯,anger:💢,boom:💥,' +
+    'collision:💥,dizzy:💫,sparkles:✨,star:⭐,star2:🌟,comet:☄️,zap:⚡,fire:🔥,sunny:☀️,' +
+    'rainbow:🌈,cloud:☁️,snowflake:❄️,snowman:⛄,droplet:💧,ocean:🌊,earth_africa:🌍,' +
+    'earth_americas:🌎,earth_asia:🌏,full_moon:🌕,new_moon:🌑,crescent_moon:🌙,sun_with_face:🌞,' +
+    'thumbsup:👍,+1:👍,thumbsdown:👎,-1:👎,ok_hand:👌,punch:👊,fist:✊,v:✌️,wave:👋,raised_hand:✋,' +
+    'hand:✋,raised_hands:🙌,open_hands:👐,pray:🙏,clap:👏,muscle:💪,metal:🤘,point_left:👈,' +
+    'point_right:👉,point_up:☝️,point_down:👇,point_up_2:👆,writing_hand:✍️,nail_care:💅,selfie:🤳,' +
+    'eyes:👀,eye:👁️,ear:👂,nose:👃,tongue:👅,lips:👄,brain:🧠,' +
+    'dog:🐶,cat:🐱,mouse:🐭,hamster:🐹,rabbit:🐰,fox_face:🦊,bear:🐻,panda_face:🐼,koala:🐨,' +
+    'tiger:🐯,lion:🦁,cow:🐮,pig:🐷,pig_nose:🐽,frog:🐸,monkey:🐵,see_no_evil:🙈,hear_no_evil:🙉,' +
+    'speak_no_evil:🙊,chicken:🐔,penguin:🐧,bird:🐦,baby_chick:🐤,hatching_chick:🐣,hatched_chick:🐥,' +
+    'duck:🦆,eagle:🦅,owl:🦉,bat:🦇,wolf:🐺,boar:🐗,horse:🐴,unicorn:🦄,bee:🐝,honeybee:🐝,' +
+    'bug:🐛,butterfly:🦋,snail:🐌,beetle:🐞,ant:🐜,spider:🕷️,spider_web:🕸️,scorpion:🦂,crab:🦀,' +
+    'snake:🐍,lizard:🦎,turtle:🐢,tropical_fish:🐠,fish:🐟,blowfish:🐡,dolphin:🐬,whale:🐳,' +
+    'whale2:🐋,crocodile:🐊,leopard:🐆,zebra:🦓,gorilla:🦍,elephant:🐘,rhino:🦏,sheep:🐑,goat:🐐,' +
+    'rooster:🐓,turkey:🦃,peacock:🦚,parrot:🦜,swan:🦢,flamingo:🦩,dove:🕊️,dragon:🐉,' +
+    'dragon_face:🐲,t_rex:🦖,sauropod:🦕,octopus:🐙,shell:🐚,squid:🦑,shrimp:🦐,cherry_blossom:🌸,' +
+    'rose:🌹,wilted_flower:🥀,tulip:🌷,hibiscus:🌺,bouquet:💐,sunflower:🌻,four_leaf_clover:🍀,' +
+    'maple_leaf:🍁,fallen_leaf:🍂,leaves:🍃,mushroom:🍄,cactus:🌵,palm_tree:🌴,evergreen_tree:🌲,' +
+    'deciduous_tree:🌳,seedling:🌱,herb:🌿,ear_of_rice:🌾,chestnut:🌰,apple:🍎,green_apple:🍏,' +
+    'pear:🍐,tangerine:🍊,lemon:🍋,banana:🍌,watermelon:🍉,grapes:🍇,strawberry:🍓,melon:🍈,' +
+    'cherries:🍒,peach:🍑,pineapple:🍍,kiwi_fruit:🥝,tomato:🍅,eggplant:🍆,avocado:🥑,' +
+    'broccoli:🥦,cucumber:🥒,carrot:🥕,corn:🌽,hot_pepper:🌶️,potato:🥔,sweet_potato:🍠,' +
+    'bread:🍞,croissant:🥐,baguette_bread:🥖,pretzel:🥨,pancakes:🥞,cheese:🧀,meat_on_bone:🍖,' +
+    'poultry_leg:🍗,hamburger:🍔,fries:🍟,pizza:🍕,hotdog:🌭,sandwich:🥪,taco:🌮,burrito:🌯,' +
+    'ramen:🍜,spaghetti:🍝,curry:🍛,sushi:🍣,bento:🍱,rice:🍚,rice_ball:🍙,rice_cracker:🍘,' +
+    'egg:🥚,fried_egg:🍳,honey_pot:🍯,cake:🍰,birthday:🎂,custard:🍮,lollipop:🍭,candy:🍬,' +
+    'chocolate_bar:🍫,icecream:🍦,ice_cream:🍨,doughnut:🍩,cookie:🍪,milk_glass:🥛,coffee:☕,' +
+    'tea:🍵,sake:🍶,beer:🍺,beers:🍻,clinking_glasses:🥂,wine_glass:🍷,cocktail:🍸,' +
+    'tropical_drink:🍹,champagne:🍾,' +
+    'rocket:🚀,tada:🎉,confetti_ball:🎊,balloon:🎈,gift:🎁,sparkler:🎇,fireworks:🎆,' +
+    'checkered_flag:🏁,trophy:🏆,medal_sports:🏅,first_place_medal:🥇,second_place_medal:🥈,' +
+    'third_place_medal:🥉,soccer:⚽,basketball:🏀,football:🏈,baseball:⚾,tennis:🎾,volleyball:🏐,' +
+    'rugby_football:🏉,golf:⛳,fishing_pole_and_fish:🎣,dart:🎯,8ball:🎱,game_die:🎲,video_game:🎮,' +
+    'musical_note:🎵,notes:🎶,headphones:🎧,microphone:🎤,guitar:🎸,violin:🎻,trumpet:🎺,drum:🥁,' +
+    'movie_camera:🎥,clapper:🎬,art:🎨,camera:📷,iphone:📱,computer:💻,desktop_computer:🖥️,' +
+    'keyboard:⌨️,printer:🖨️,floppy_disk:💾,cd:💿,dvd:📀,tv:📺,radio:📻,battery:🔋,electric_plug:🔌,' +
+    'bulb:💡,flashlight:🔦,candle:🕯️,wastebasket:🗑️,moneybag:💰,money_with_wings:💸,dollar:💵,' +
+    'credit_card:💳,gem:💎,scales:⚖️,wrench:🔧,hammer:🔨,hammer_and_wrench:🛠️,nut_and_bolt:🔩,' +
+    'gear:⚙️,chains:⛓️,bomb:💣,hocho:🔪,dagger:🗡️,crossed_swords:⚔️,shield:🛡️,smoking:🚬,' +
+    'coffin:⚰️,crystal_ball:🔮,telescope:🔭,microscope:🔬,satellite:📡,syringe:💉,pill:💊,ring:💍,' +
+    'key:🔑,lock:🔒,unlock:🔓,closed_lock_with_key:🔐,bell:🔔,no_bell:🔕,bookmark:🔖,link:🔗,' +
+    'paperclip:📎,pushpin:📌,round_pushpin:📍,scissors:✂️,pen:🖊️,fountain_pen:🖋️,pencil2:✏️,' +
+    'crayon:🖍️,paintbrush:🖌️,mag:🔍,mag_right:🔎,mailbox:📫,package:📦,page_facing_up:📄,' +
+    'page_with_curl:📃,clipboard:📋,memo:📝,book:📖,open_book:📖,books:📚,newspaper:📰,notebook:📓,' +
+    'ledger:📒,closed_book:📕,green_book:📗,blue_book:📘,orange_book:📙,scroll:📜,calendar:📅,' +
+    'date:📆,chart_with_upwards_trend:📈,chart_with_downwards_trend:📉,bar_chart:📊,file_folder:📁,' +
+    'open_file_folder:📂,spiral_notepad:🗒️,file_cabinet:🗄️,framed_picture:🖼️,warning:⚠️,' +
+    'no_entry:⛔,no_entry_sign:🚫,stop_sign:🛑,construction:🚧,rotating_light:🚨,traffic_light:🚦,' +
+    'vertical_traffic_light:🚥,recycle:♻️,beginner:🔰,sos:🆘,speaker:🔈,sound:🔉,loud_sound:🔊,' +
+    'mute:🔇,mega:📣,loudspeaker:📢,question:❓,grey_question:❔,exclamation:❗,grey_exclamation:❕,' +
+    'white_check_mark:✅,heavy_check_mark:✔️,x:❌,o:⭕,o2:🅾️,negative_squared_cross_mark:❎,' +
+    'curly_loop:➰,loop:➿,arrow_up:⬆️,arrow_down:⬇️,arrow_left:⬅️,arrow_right:➡️,' +
+    'arrows_clockwise:🔃,arrows_counterclockwise:🔄,anchor:⚓,boat:⛵,ship:🚢,airplane:✈️,' +
+    'helicopter:🚁,steam_locomotive:🚂,train:🚆,metro:🚇,tram:🚊,bus:🚌,ambulance:🚑,' +
+    'fire_engine:🚒,police_car:🚓,taxi:🚕,car:🚗,bike:🚲,motorcycle:🏍️,walking:🚶,runner:🏃,' +
+    'dancer:💃,man_dancing:🕺,couple:👫,family:👨‍👩‍👧';
+
+  var EMOJI_SHORTCODES = (function () {
+    var map = {};
+    EMOJI_DATA.split(',').forEach(function (pair) {
+      var separator = pair.indexOf(':');
+      if (separator > 0) map[pair.slice(0, separator)] = pair.slice(separator + 1);
+    });
+    return map;
+  })();
+
+  /**
+   * emoji 短码：`:rocket:` → 🚀（GitHub 惯用写法，§2.3 第 26 条）。
+   *
+   * 只重写 inline token 的 text 子节点：`code_inline`（行内代码）是独立 token 类型，
+   * 围栏/缩进代码块是块级 token（不进入 inline children）——代码里的 `:rocket:` 结构上不可能被替换。
+   */
+  function emojiPlugin(md) {
+    md.core.ruler.after('inline', 'emoji_shortcodes', function (state) {
+      var tokens = state.tokens;
+      for (var i = 0; i < tokens.length; i++) {
+        if (tokens[i].type !== 'inline' || !tokens[i].children) continue;
+        var children = tokens[i].children;
+        for (var j = 0; j < children.length; j++) {
+          if (children[j].type !== 'text') continue;
+          children[j].content = children[j].content.replace(/:([a-z0-9_+-]+):/g, function (match, name) {
+            return Object.prototype.hasOwnProperty.call(EMOJI_SHORTCODES, name) ? EMOJI_SHORTCODES[name] : match;
+          });
+        }
+      }
+    });
+  }
+
+  /** GitHub slug 的字符剔除：保留字母/数字/组合符号/连字符（CJK 字母不会被剔除）。 */
+  var SLUG_STRIP = (function () {
+    try {
+      return new RegExp('[^\\p{L}\\p{N}\\p{M}\\-]', 'gu');
+    } catch (e) {
+      // 老 WebView 不支持 Unicode 属性转义：退化为 ASCII 规则（CJK 标题退化为 section-N）
+      return /[^a-z0-9\-]/g;
+    }
+  })();
+
+  /**
+   * 标题锚点 id：`## Section With Hyphen` → `<h2 id="section-with-hyphen">`（GitHub slug 规则，
+   * 重复标题追加 `-1`、`-2`）。配合 `scrollToAnchor` 实现 `#section` 跳转（§2.3 第 28 条）。
+   */
+  function anchorPlugin(md) {
+    function slugify(text) {
+      return String(text).trim().toLowerCase().replace(/\s+/g, '-').replace(SLUG_STRIP, '');
+    }
+
+    function textOf(inline) {
+      var out = '';
+      var children = inline.children || [];
+      for (var i = 0; i < children.length; i++) {
+        var child = children[i];
+        if (child.type === 'text' || child.type === 'code_inline') out += child.content;
+        if (child.type === 'softbreak' || child.type === 'hardbreak') out += ' ';
+      }
+      return out;
+    }
+
+    md.core.ruler.after('emoji_shortcodes', 'anchor_headings', function (state) {
+      var tokens = state.tokens;
+      if (!state.env.__anchorCounts) state.env.__anchorCounts = {};
+      var counts = state.env.__anchorCounts;
+      for (var i = 0; i < tokens.length; i++) {
+        if (tokens[i].type !== 'heading_open') continue;
+        var inline = tokens[i + 1];
+        if (!inline || inline.type !== 'inline') continue;
+        var base = slugify(textOf(inline)) || 'section';
+        var seen = counts[base] || 0;
+        counts[base] = seen + 1;
+        tokens[i].attrSet('id', seen === 0 ? base : base + '-' + seen);
+      }
+    });
+  }
+
+  /**
+   * 脚注：`[^1]` 引用 + `[^1]: 定义`（§2.3 第 35 条，尽力而为）。
+   *
+   * 简化点（相对 markdown-it-footnote）：定义只支持行首 + 四空格缩进续行，不支持多段落
+   * 定义的嵌套块解析；编号按引用出现顺序，重复引用复用同一编号。产物形态对齐
+   * github-markdown-css：`[data-footnote-ref]`、`.footnotes`、`data-footnote-backref`。
+   */
+  function footnotePlugin(md) {
+    function ensureEnv(env) {
+      if (!env.footnotes) {
+        env.footnotes = { defs: {}, order: [], indexMap: {}, refCounts: {} };
+      }
+      return env.footnotes;
+    }
+
+    function lineText(state, line) {
+      return state.src.slice(state.bMarks[line] + state.tShift[line], state.eMarks[line]);
+    }
+
+    function footnoteDefRule(state, startLine, endLine, silent) {
+      var match = /^\[\^([^\]\s]+)\]:[ \t]?(.*)$/.exec(lineText(state, startLine));
+      if (!match) return false;
+      if (silent) return true;
+
+      var footnotes = ensureEnv(state.env);
+      var label = match[1];
+      var content = match[2];
+      var next = startLine + 1;
+      // 四空格缩进的续行并入定义；空行/非缩进行结束定义
+      while (next < endLine) {
+        var text = lineText(state, next);
+        if (text.trim() === '' || state.sCount[next] < 4) break;
+        content += '\n' + text.replace(/^ {0,4}/, '');
+        next++;
+      }
+      footnotes.defs[label] = content;
+      state.line = next;
+      return true;
+    }
+
+    function footnoteRefRule(state, silent) {
+      var start = state.pos;
+      if (state.src.charCodeAt(start) !== 0x5B || state.src.charCodeAt(start + 1) !== 0x5E) return false;
+      var end = state.src.indexOf(']', start + 2);
+      if (end < 0) return false;
+      var label = state.src.slice(start + 2, end);
+      if (!label || /[\s\[\]]/.test(label)) return false;
+      var defs = state.env.footnotes && state.env.footnotes.defs;
+      // 无定义 = 普通文本（GitHub 同样如此），不能因为缺定义把正文吃掉
+      if (!defs || !Object.prototype.hasOwnProperty.call(defs, label)) return false;
+      if (!silent) {
+        var token = state.push('footnote_ref', '', 0);
+        token.meta = { label: label };
+      }
+      state.pos = end + 1;
+      return true;
+    }
+
+    md.block.ruler.before('reference', 'footnote_def', footnoteDefRule, { alt: ['paragraph', 'reference'] });
+    md.inline.ruler.before('link', 'footnote_ref', footnoteRefRule);
+
+    md.renderer.rules.footnote_ref = function (tokens, idx, options, env) {
+      var footnotes = env.footnotes;
+      if (!footnotes) return '';
+      var label = tokens[idx].meta.label;
+      if (!footnotes.indexMap[label]) {
+        footnotes.order.push(label);
+        footnotes.indexMap[label] = footnotes.order.length;
+      }
+      var number = footnotes.indexMap[label];
+      footnotes.refCounts[label] = (footnotes.refCounts[label] || 0) + 1;
+      var occurrence = footnotes.refCounts[label];
+      var refId = occurrence === 1 ? 'fnref-' + number : 'fnref-' + number + '-' + occurrence;
+      return '<sup class="footnote-ref"><a href="#fn-' + number + '" id="' + refId +
+        '" data-footnote-ref aria-describedby="footnote-label">' + number + '</a></sup>';
+    };
+  }
+
+  /**
+   * 追加脚注定义区（在 markdown-it 渲染完成后）。
+   *
+   * `env.footnotes.order` 由 `footnote_ref` 渲染规则按输出顺序填充——定义正文此时才做
+   * 第二次 `md.render`（定义里可以有行内 markdown，但不能有新的脚注定义）。
+   */
+  function appendFootnotes(md, html, env) {
+    var footnotes = env && env.footnotes;
+    if (!footnotes || !footnotes.order.length) return html;
+
+    var items = footnotes.order.map(function (label) {
+      var number = footnotes.indexMap[label];
+      var body = md.render(footnotes.defs[label]).trim();
+      var backref =
+        '<a href="#fnref-' + number + '" class="data-footnote-backref" data-footnote-backref' +
+        ' aria-label="Back to reference ' + number + '">↩</a>';
+      if (/<\/p>$/.test(body)) {
+        body = body.replace(/<\/p>$/, ' ' + backref + '</p>');
+      } else {
+        body += '<p>' + backref + '</p>';
+      }
+      return '<li id="fn-' + number + '">' + body + '</li>';
+    });
+
+    return html +
+      '\n<section class="footnotes" data-footnotes>\n' +
+      '<h2 class="sr-only" id="footnote-label">Footnotes</h2>\n<ol>\n' +
+      items.join('\n') +
+      '\n</ol>\n</section>\n';
+  }
+
   // ── 离线通道：仓库上下文与相对 URL 改写 ───────────────────────────────
   //
   // 为什么改写发生在这一层（而不是 Kotlin 的 WebViewHtmlBuilder）：
@@ -418,6 +720,9 @@
     var md = window.markdownit({ html: true, linkify: true, breaks: false });
     md.use(githubAlertPlugin);
     md.use(taskListPlugin);
+    md.use(emojiPlugin);
+    md.use(anchorPlugin);
+    md.use(footnotePlugin);
     return md;
   }
 
@@ -435,7 +740,10 @@
   function renderOfflineHtml(raw, options) {
     var opts = options || {};
     if (typeof window.markdownit === 'undefined') return null;
-    return rewriteRelativeUrls(createMarkdownIt().render(raw), opts.repoContext);
+    var md = createMarkdownIt();
+    var env = {};
+    var html = appendFootnotes(md, md.render(raw, env), env);
+    return rewriteRelativeUrls(html, opts.repoContext);
   }
 
   function renderOfflineMarkdown() {
@@ -461,9 +769,13 @@
   window.__appdevMarkdownPlugins = {
     githubAlertPlugin: githubAlertPlugin,
     taskListPlugin: taskListPlugin,
+    emojiPlugin: emojiPlugin,
+    anchorPlugin: anchorPlugin,
+    footnotePlugin: footnotePlugin,
     renderOfflineHtml: renderOfflineHtml,
     rewriteRelativeUrls: rewriteRelativeUrls,
     parseRepoContext: parseRepoContext,
+    scrollToAnchor: scrollToAnchor,
   };
 
   function init() {

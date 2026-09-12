@@ -143,7 +143,7 @@ class OfflineRelativeUrlRewriteTest {
         assertTrue("相对链接 → blob 域（点击后由 GitHubLinkParser 走应用内路由）", renderer.contains("/blob/HEAD/"))
         assertTrue(
             "改写必须在 DOMPurify 清洗之前（相对 src 会被 URI 白名单剔除）",
-            renderer.indexOf("rewriteRelativeUrls(createMarkdownIt().render(raw)") in
+            renderer.indexOf("renderOfflineHtml(raw, { repoContext:") in
                 0..<renderer.indexOf("sanitizeNode(root)"),
         )
     }
