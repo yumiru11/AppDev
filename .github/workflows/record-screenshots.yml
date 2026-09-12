@@ -68,6 +68,11 @@ jobs:
             :feature:issue:recordRoborazziDebug \
             :feature:notifications:recordRoborazziDebug \
             :feature:pullrequest:recordRoborazziDebug \
+            :feature:home:recordRoborazziDebug \
+            :feature:search:recordRoborazziDebug \
+            :feature:editor:recordRoborazziDebug \
+            :feature:profile:recordRoborazziDebug \
+            :feature:settings:recordRoborazziDebug \
             --no-daemon
 
       - name: Collect recorded baselines

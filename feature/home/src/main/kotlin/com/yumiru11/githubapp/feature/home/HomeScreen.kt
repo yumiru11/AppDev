@@ -142,6 +142,8 @@ fun HomeScreen(
     onCreateRepo: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
+    // 与 viewModel 同形参化：屏幕级测试可直接注入（默认 hiltViewModel() 保持生产接线不变）
+    pickerViewModel: RepoPickerViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     // Trending（L08）：空列表 = 小节不渲染（数据层失败静默降级）
@@ -226,6 +228,7 @@ fun HomeScreen(
                             onCreateIssue = onCreateIssue,
                             onViewPullRequests = onViewPullRequests,
                             onCreateRepo = onCreateRepo,
+                            pickerViewModel = pickerViewModel,
                         )
                     }
                 }
@@ -302,8 +305,8 @@ private fun HomeSuccessContent(
     onCreateIssue: (owner: String, repo: String) -> Unit,
     onViewPullRequests: (owner: String, repo: String) -> Unit,
     onCreateRepo: () -> Unit,
+    pickerViewModel: RepoPickerViewModel,
 ) {
-    val pickerViewModel: RepoPickerViewModel = hiltViewModel()
     val pickerUiState by pickerViewModel.uiState.collectAsStateWithLifecycle()
     var pickerVisible by rememberSaveable { mutableStateOf(false) }
     var pickerTarget by rememberSaveable { mutableStateOf(PickerTarget.CREATE_ISSUE) }
