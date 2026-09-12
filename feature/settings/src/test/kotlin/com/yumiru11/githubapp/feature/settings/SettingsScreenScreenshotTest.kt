@@ -54,14 +54,14 @@ class SettingsScreenScreenshotTest {
     @Test
     fun settingsScreen_lightTheme_matchesBaseline() {
         composeRule.captureScreenshotDeterministic(name = "SettingsScreen_light", darkTheme = false) {
-            SettingsScreen(viewModel = settingsViewModel(dark = false))
+            SettingsScreen(viewModel = settingsViewModel(dark = false), onBackClick = {})
         }
     }
 
     @Test
     fun settingsScreen_darkTheme_matchesBaseline() {
         composeRule.captureScreenshotDeterministic(name = "SettingsScreen_dark", darkTheme = true) {
-            SettingsScreen(viewModel = settingsViewModel(dark = true))
+            SettingsScreen(viewModel = settingsViewModel(dark = true), onBackClick = {})
         }
     }
 }
