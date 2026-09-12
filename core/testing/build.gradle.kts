@@ -14,6 +14,8 @@ dependencies {
     api(platform(libs.compose.bom))
     api(libs.compose.ui)
     api(libs.compose.material3)
+    // Coil（截图捕获期间的离线 ImageLoader：禁网，见 OfflineImageLoader.kt）
+    api(libs.coil)
     // Compose UI 测试（createComposeRule / createAndroidComposeRule）
     api(libs.compose.ui.test.junit4)
     debugApi(libs.compose.ui.test.manifest)

@@ -8,6 +8,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
+import coil3.SingletonImageLoader
 import com.github.takahirom.roborazzi.captureRoboImage
 
 /**
@@ -40,7 +41,10 @@ import com.github.takahirom.roborazzi.captureRoboImage
  * 3. `activity.window.decorView.draw(Canvas(bitmap))`：手工绘制到 Bitmap
  *    （Robolectric Native Graphics 下 `captureToImage()` 的 forceRedraw 会 2s 超时，不可用）；
  * 4. `Bitmap.captureRoboImage(file)`：Roborazzi 的 Bitmap 重载**不做 idle 等待**，
- *    直接做 baseline 写入（record）或比对（verify）。
+ *    直接做 baseline 写入（record）或比对（verify）；
+ * 5. [installOfflineImageLoader]：捕获期间禁网（`AsyncImage` 的 http 请求短路为失败、
+ *    渲染空白）——加载与否取决于真实网络往返，是录制/校验之间最大的非确定性来源
+ *    （2026-09-12 实测：record 空白基线 verify 时被拉出头像，`ProfileScreen_light` 失败）。
  *
  * 调用方必须持有 `createAndroidComposeRule<ComponentActivity>()`（或同族 rule），
  * 并且**不要再调用** `captureRoboImage(content)` / `ScreenshotTest.captureScreenshot`
@@ -60,15 +64,20 @@ fun AndroidComposeTestRule<*, ComponentActivity>.captureScreenshotDeterministic(
     content: @Composable () -> Unit,
 ) {
     mainClock.autoAdvance = false
-    setContent {
-        MaterialTheme(colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()) {
-            content()
+    installOfflineImageLoader()
+    try {
+        setContent {
+            MaterialTheme(colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()) {
+                content()
+            }
         }
-    }
-    mainClock.advanceTimeBy(advanceMillis)
+        mainClock.advanceTimeBy(advanceMillis)
 
-    val view = activity.window.decorView
-    val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-    view.draw(Canvas(bitmap))
-    bitmap.captureRoboImage("$screenshotDir/$name.png")
+        val view = activity.window.decorView
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        bitmap.captureRoboImage("$screenshotDir/$name.png")
+    } finally {
+        SingletonImageLoader.reset()
+    }
 }
