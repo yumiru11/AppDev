@@ -83,60 +83,55 @@ tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
 //   T4 diff coverage：diffCoverageCheck（见文件底部，git diff 行级比对聚合 XML）。
 
 // 每模块覆盖率基线阈值（LINE COVEREDRATIO，0~1）。
-// 规则（2026-08-16 定稿，2026-08-20 v2 因 UI 排除口径修订）：
+// 规则（2026-08-16 定稿；2026-08-20 v2 因 UI 排除口径修订；2026-09-13 #261 修复后全量重设）：
 //   - 逻辑模块（UseCase/Repository/ViewModel/模型/DTO/解析器为主）：地板 50~80
 //   - UI/渲染模块（markdown/designsystem）：地板 25~70（Composable 主要靠 Roborazzi 截图兜底）
 //   - 网络 DTO 模块（github-rest）：地板 15
-//   - app / feature/auth：豁免（纯 UI 装配，无规则，只进聚合报告）
-//   - 阈值 = max(地板, 实测 - 2pt)，保证 CI 今天能过；地板作为 Phase C 目标（testing-strategy.md §4）
-//   - 实测口径：coverageReport 聚合数据（全部模块 exec 合并，含跨模块执行；全量非 synthetic 生产类
-//     分母，Hilt 生成代码与 UI 层已排除——见 coverageExcludes 的 2026-08-20 v2 收紧说明）
-//   - 2026-08-20 v2 实测（UI 排除后逻辑口径，根 coverageReport XML 按包前缀归模块汇总）：
-//     导航 96.1 / github-data 97.5 / datastore 84.8 / github-graphql 93.5 / github-auth 72.4 /
-//     github-rest 82.3 / markdown 46.9 / designsystem 71.2 / repo 93.9 / profile 91.1 /
-//     notifications 91.5 / home 83.5 / issue 70.2 / settings 100.0。
-//     多数逻辑模块达 85%+；github-auth/issue 受未补分支测试影响偏低，markdown 受渲染 Composable
-//     （非 Card/Section 命名的 UI）拖累，均为 Phase C 补齐目标，不强行抬阈（否则 CI 红）。
+//   - 地板作为 Phase C 目标（testing-strategy.md §4）；棘轮后阈值已普遍高于地板
+//   - 棘轮规则（2026-09-13 起）：阈值 = max(旧阈值, floor2(实测 − 0.5pt))，即【只升不降】。
+//     floor2 = 两位小数向下取整，故 2 位小数粒度下实际余量落在 0.5~1.5pp（逐条注明）；
+//     实测逼近时宁保留旧阈，不为凑整数把阈值抬到 <0.5pp 余量。
+//   - 实测口径（与 coverageVerify 完全同源）：各模块 jacocoTestReport XML 的 LINE COVEREDRATIO
+//     （classDirectories = 本模块类 + coverageExcludes；executionData = 全部模块 exec 并集）。
+//   - 2026-09-13 全量实测（#261 修复后的真实口径）：数值见每条「实测」注释。跨环境复核：
+//     CI（main@3f78814, run 34708949868）聚合 LINE = 2,091 missed / 11,738 total，与本机逐位一致。
+//   - ⚠️ 为什么此前阈值是假口径：#261 前 JaCoCo agent 默认 inclnolocationclasses=false，Robolectric
+//     SandboxClassLoader 定义的应用类（无 CodeSource）整类被静默跳过 → 旧实测普遍比真实低数十 pp
+//     （如 :core:markdown 0.45 vs 真实 0.76、:app 0.02 vs 真实 0.26），门禁形同虚设。
+//     #261 修复（includeNoLocationClasses=true + includes=com/yumiru11/*）后按真实值一次性重设。
 val coverageThresholds =
     mapOf(
-        ":core:navigation" to 0.94, // 实测 96.1%
-        ":core:github-data" to 0.95, // 实测 97.5%
-        ":core:datastore" to 0.83, // 实测 84.8%（地板 80，Phase C 目标）
-        ":feature:repo" to 0.92, // 实测 93.9%（地板 70，Phase C 目标）
-        ":feature:profile" to 0.89, // 实测 91.1%（地板 60，Phase C 目标）
-        ":feature:notifications" to 0.89, // 实测 91.5%（地板 60，Phase C 目标）
-        ":feature:home" to 0.81, // 实测 83.5%（地板 60，Phase C 目标）
-        ":core:github-graphql" to 0.91, // 实测 93.5%
-        ":core:github-auth" to 0.70, // 实测 72.4%（地板 50~80，Phase C 目标）
-        ":feature:issue" to 0.68, // 实测 70.2%（地板 50，Phase C 目标）
-        ":core:markdown" to 0.45, // 实测 46.9%（UI/渲染，地板 70，Phase C 目标）
-        ":core:designsystem" to 0.69, // 实测 71.2%（UI/渲染，地板 66.7）
-        ":feature:settings" to 0.98, // 实测 100.0%
-        ":core:github-rest" to 0.80, // 实测 82.3%（v1 误将 ContentApi/FileContentDto 排除致 0.75，v2 回正）
-        // 2026-09-11 新增：提交级审计发现该模块是**三重盲区**（0 张截图基线 / 不在 CI 任何门禁 /
-        // 6 个 UI 类被 JaCoCo 排除且排除理由声称的"截图兜底"在本模块并不存在）。
-        // 纳入后至少让 dto/mapper/ViewModel 这些**单测可达**的逻辑层进报告与门禁。
-        // 阈值取实测值向下取整（项目惯例）：73.9% → 0.73。
-        ":feature:pullrequest" to 0.73, // 实测 73.9%（2026-09-11 首次纳入：此前该模块不在阈值表 → 无 jacocoTestReport → diff 门禁看不见它的新增行）
-        // ── 2026-09-12 阈值补齐（chore/coverage-thresholds）────────────────────────
-        // 背景：审计发现 26 个模块仅 15 个有阈值 → 其余模块 coverageVerify 不注册验证任务，
-        // 覆盖率可无声腐烂。本批对「有自身单测 exec、可测」的 6 个模块按【实测值棘轮】补阈
-        // （阈值 = 实测值小幅下浮，2 位小数取整所致落在 −0.6~1.4pp，逐条注明）。
-        // 实测口径 = 各模块 jacocoTestReport XML 的 LINE COVEREDRATIO（合并全部模块 exec，
-        // 与 coverageVerify 的 executionData/classDirectories 完全同源）。
-        // 未纳入本批的 5 个模块（无 exec 验证恒 skip / 类全排除 / 实测 0%）逐条说明见 PR body。
-        ":app" to 0.02, // 实测 2.61%（13/498 行；纯 UI 装配曾豁免，现按实测棘轮，防 13 行覆盖无声归零）
-        ":core:common" to 0.99, // 实测 100.0%（23/23 行）
-        ":core:editor" to 0.51, // 实测 52.35%（M3EditorThemeKt/MarkdownComposerKt 等 Compose 类不入单测，拉低分母；逻辑类高覆盖）
-        ":feature:search" to 0.53, // 实测 53.93%（VM/分页/缓存已覆盖；SearchResultRowsKt/SearchTopBarKt 纯 UI 不入单测）
-        ":feature:editor" to 0.58, // 实测 59.38%（19/32 行，分母极小，1 行 ≈ 3.1pp，后续调阈需谨慎）
-        // ── 2026-09-13 Robolectric 覆盖率修复（chore/jacoco-robolectric-coverage）────────
-        // 根因：JaCoCo agent 默认 inclnolocationclasses=false，只插桩带 CodeSource 的类；Robolectric
-        // 的 SandboxClassLoader 用 4 参 defineClass 定义应用类（无 CodeSource）→ 整类被静默跳过。
-        // 修复：includeNoLocationClasses=true + includes=com/yumiru11/*（见 configureRobolectricCoverage）。
-        // 修复后本模块 Robolectric 单测覆盖真正进 exec，按【新实测值】棘轮（口径同 #255）。
-        ":core:database" to 0.85, // 实测 86.43%（618/715 行；修复前 5.17%——Room *_Impl 现由 DAO Robolectric 测试真实覆盖）
-        ":feature:auth" to 0.99, // 实测 100.00%（25/25 行；修复前 0.00%——AuthViewModel 由 Robolectric 单测覆盖，LoginScreen 已入 coverageExcludes）
+        ":core:navigation" to 0.96, // 实测 96.69%（263/272 行；余量 0.69pp，旧阈 0.94）
+        ":core:github-data" to 0.97, // 实测 97.79%（265/271 行；余量 0.79pp，旧阈 0.95）
+        ":core:datastore" to 0.88, // 实测 89.33%（226/253 行；余量 1.33pp，旧阈 0.83）
+        ":feature:repo" to 0.94, // 实测 95.49%（1567/1641 行；余量 1.49pp，旧阈 0.92）
+        ":feature:profile" to 0.90, // 实测 91.40%（255/279 行；余量 1.40pp，旧阈 0.89）
+        ":feature:notifications" to 0.93, // 实测 93.75%（180/192 行；余量 0.75pp，旧阈 0.89）
+        ":feature:home" to 0.87, // 实测 88.32%（242/274 行；余量 1.32pp，旧阈 0.81）
+        ":core:github-graphql" to 0.99, // 实测 100.00%（14/14 行；余量 1.00pp，旧阈 0.91）
+        ":core:github-auth" to 0.78, // 实测 78.60%（224/285 行；余量 0.60pp，旧阈 0.70）
+        ":feature:issue" to 0.82, // 实测 83.30%（818/982 行；余量 1.30pp，旧阈 0.68）
+        ":core:markdown" to 0.75, // 实测 76.21%（1275/1673 行；余量 1.21pp，旧阈 0.45）
+        ":core:designsystem" to 0.96, // 实测 96.56%（589/610 行；余量 0.56pp，旧阈 0.69）
+        ":feature:settings" to 0.99, // 实测 100.00%（170/170 行；余量 1.00pp，旧阈 0.98）
+        ":core:github-rest" to 0.92, // 实测 92.76%（935/1008 行；余量 0.76pp，旧阈 0.80）
+        // 2026-09-11 首次纳入：提交级审计发现该模块是**三重盲区**（0 张截图基线 / 不在 CI 任何门禁 /
+        // 6 个 UI 类被 JaCoCo 排除且排除理由声称的"截图兜底"在本模块并不存在）；2026-09-13 按真值棘轮。
+        ":feature:pullrequest" to 0.79, // 实测 80.00%（1244/1555 行；余量 1.00pp，旧阈 0.73）
+        // ── 2026-09-12 补阈批次（#255）：5 个「有自身单测 exec、可测」模块从无阈值到有阈值。
+        // 2026-09-13 按 #261 后真值复测棘轮；4 个豁免模块的当前口径见文末 GATE-3 注释。
+        ":app" to 0.25, // 实测 25.80%（129/500 行；余量 0.80pp；旧阈 0.02 是 #261 前的假口径）
+        ":core:common" to 0.99, // 实测 100.00%（23/23 行；余量 1.00pp，维持旧阈）
+        // core:editor：M3EditorThemeKt/MarkdownComposerKt 等 Compose 类不入单测拉低分母；逻辑类高覆盖。
+        ":core:editor" to 0.51, // 实测 52.35%（156/298 行；余量 1.35pp，维持旧阈）
+        // feature:search：VM/分页/缓存已覆盖；SearchResultRowsKt/SearchTopBarKt 纯 UI 不入单测。
+        ":feature:search" to 0.53, // 实测 53.93%（288/534 行；余量 0.93pp，维持旧阈）
+        // feature:editor：分母极小（32 行），1 行 ≈ 3.1pp，后续调阈需谨慎。
+        ":feature:editor" to 0.58, // 实测 59.38%（19/32 行；余量 1.38pp，维持旧阈）
+        // ── 2026-09-13 Robolectric 覆盖率修复批次（#261）────────────────────────────
+        // 根因/修复见上方长注释；这两条在 #261 已按真值棘轮，本次全量重设后数值不变。
+        ":core:database" to 0.85, // 实测 86.43%（618/715 行；余量 1.43pp；#261 前 5.17%）
+        ":feature:auth" to 0.99, // 实测 100.00%（25/25 行；余量 1.00pp；#261 前 0.00%）
     )
 
 // JaCoCo 分析排除：生成代码/样板（R/BuildConfig/Manifest/Hilt 产物）+ UI 层，不计入分母
@@ -157,7 +152,10 @@ val coverageExcludes =
         "**/*_HiltComponents*.class",
         "**/Dagger*Component*.class",
         "**/*_Factory.class",
-        // ── UI 层排除（单测门禁只查逻辑；Composable 由真机/截图管线兑底）────────
+        // ── UI 层排除（口径选择：单测门禁只查逻辑；UI 视觉由真机/截图管线兜底）────────
+        // ⚠️ 这是【口径选择】，不是工具链限制：#261 修复后 Robolectric 单测（含截图测试）的
+        // 覆盖数据会真实进入 exec（见 coverageThresholds 上方注释）；排除 UI 类是为了让单测门禁
+        // 聚焦可断言的逻辑。若要调整名单，需与文件底部 diff 门禁的 uiSourceExcludes 同步决策。
         // 包路径排除：纯 UI 子包，全仓唯一、无逻辑命中。
         //   designsystem 的 component/token/icon 子包 = 0% 纯 UI（token 用【具体前缀】
         //     **/designsystem/token/**，避免误伤 core:github-auth 的 token 包——OAuth 逻辑）；
@@ -363,8 +361,13 @@ fun Project.registerCoverageTasks() {
         // 被 --exclude-task / NO-SOURCE）——此时**必须红**，不得静默 SKIP。旧实现用
         // onlyIf 跳过验证，等于该模块的覆盖率门禁空转（残余审计 G-02/G-03，PR #255 前的
         // 5 个豁免模块就是靠这种空转「看起来有阈值」）。
-        // 只约束 coverageThresholds 里声明了阈值的模块；无阈值模块不注册本任务（照旧跳过，
-        // 即文件顶部注释里的 :core:data / :core:testing / :core:ui / :feature:auth / :prototype）。
+        // 只约束 coverageThresholds 里声明了阈值的模块；仍豁免的 4 个模块不注册本任务（照旧跳过）：
+        //   :core:data —— 无 src/test、无自身 exec（设阈会被 GATE-3 判「有阈值却无 exec」）；
+        //     模型类仅被其它模块测试顺带执行，进聚合报告但不单独设阈；
+        //   :core:testing —— 测试基建模块（MainDispatcherRule / ScreenshotTest / GitHubFakes），
+        //     按定义由被测模块执行，无独立测试与 exec（#215）；
+        //   :core:ui —— 有测试与 exec，但类全被 `**/ui/**` 排除 → 分母 0 类，设阈无意义；
+        //   :prototype —— 一次性渲染原型（registerCoverageTasks 提前 return）。
         doFirst {
             if (execData.files.none { it.exists() }) {
                 throw GradleException(
@@ -483,32 +486,38 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 // 逻辑部分已抽成可测纯函数（BackgroundScrim 有 5 例 JVM 断言；色板/动效换算在
                 // core:designsystem 各自有测试）—— 这里排除的只是无法单测的装配代码。
                 // 实测（PR #197）：不加这两条，动一行接线就会被 diff 门禁判成"未覆盖新增行"。
-                // 且 Robolectric 沙箱加载的类不产 JaCoCo 数据（#181 结论），补测试也解决不了。
+                // ⚠️ 2026-09-13 更正（#261）：旧注释称"Robolectric 沙箱加载的类不产 JaCoCo 数据"
+                // 已被证伪（真实根因 = agent 跳过无 CodeSource 类，已修复；AppThemeHost 实测
+                // 62/62 行、SystemBarContrast 3/3 行现均被覆盖）。此排除保留为 diff 门禁口径，
+                // 与工具链无关；是否移出留给单独的 diff 门禁清理决策。
                 Regex("""(^|/)AppThemeHost\.kt$"""),
                 Regex("""(^|/)AppBackground\.kt$"""),
                 // MainActivity.kt：单 Activity 入口 = 根级 Compose 装配层（T23 接线修复暴露）。
                 // 文件内容是 setContent + AppNavHost 的 20 个 screen lambda 装配、深链/OAuth
-                // intent 分流与 locale 切换，无独立可单测逻辑；:app 本就**没有**覆盖率阈值
-                // （见 coverageThresholds 注释「app / feature/auth：豁免（纯 UI 装配）」），
-                // 逻辑模块的门禁不受影响。不排除的真实后果（实测 PR 前）：改 2 个 lambda 接线
-                // 新增 24 行里有 13 行可执行、仅 7 行被覆盖 → 53.8% < 80%，CI diff 门禁必红。
+                // intent 分流与 locale 切换，无独立可单测逻辑。:app 自 #255 起已有覆盖率阈值
+                // （2026-09-13 棘轮至 0.25），但本文件 #261 修复后实测仅 42/367 行被覆盖——
+                // 属于「装配代码占比大、单测只能触达一部分」的形态。不排除的真实后果（实测 PR 前）：
+                // 改 2 个 lambda 接线新增 24 行里有 13 行可执行、仅 7 行被覆盖 → 53.8% < 80%，
+                // CI diff 门禁必红。
                 Regex("""(^|/)MainActivity\.kt$"""),
                 // SystemBarContrast.kt（PR #215）：单个 `Window.disableNavigationBarContrastScrim()`
                 // 扩展函数，只有「取 API 版本判断 + 一行 setter」，**没有可断言的逻辑分支**；
                 // 它已由 `MainActivityNavBarContrastTest` 的 4 例覆盖行为契约（对其调用的断言走的是
-                // 同一函数），但 Robolectric 沙箱加载的类不产 JaCoCo 数据（#181 结论）→ 报告里恒 0。
+                // 同一函数）。⚠️ 2026-09-13 更正（#261）：旧注释称"报告里恒 0（Robolectric 沙箱
+                // 类不产 JaCoCo 数据）"已被证伪——修复后实测 3/3 行被覆盖。排除保留为口径选择
+                // （本次不改名单；可单独立票复核是否移出）。
                 Regex("""(^|/)SystemBarContrast\.kt$"""),
                 // 纯 Composable 的 BottomSheet：*Sheet.kt（feature 模块把 UI 混在根包，如
                 // feature/pullrequest/{ReviewSheet,LineCommentSheet}.kt —— 包目录排除够不着）。
-                // 为什么必须排除：这两个文件是**整文件 @Composable**，而「被 Robolectric 沙箱加载的
-                // 类不产出 JaCoCo 覆盖数据」（#181，见 docs/agents/project-status.md §3.2）——
-                // `SheetRenderCoverageTest` 3 例全绿且真的渲染了这两个 Sheet，报告里却仍是
-                // 0/104 与 0/69。即**补测试解决不了**，这不是「测试还没写」，是工具链边界；
-                // 与同文件下方 AppThemeHost/AppBackground 的排除理由同源。
+                // 为什么排除：这两个文件是**整文件 @Composable**、无独立可断言的逻辑分支，
+                // 「Sheet 该长什么样」由 Roborazzi 截图基线（app 模块）与真机走查兜底。
+                // ⚠️ 2026-09-13 更正（#261）：旧注释把「报告里 0/104 与 0/69」归因于「被 Robolectric
+                // 沙箱加载的类不产出 JaCoCo 覆盖数据」——已证伪（沙箱类现正常入 exec）。真实的
+                // 0/104 解释是这些类早已被本文件 coverageExcludes 的 *ReviewSheet*.class /
+                // *LineCommentSheet*.class 排除，报告里根本不出现；该归因错误不改变排除结论。
                 // 实测（UI22 × #219 merge）：不加这条，仅因这五处 Sheet 套一层玻璃容器
                 // （-w 口径下净增 30 行：每文件 1 行 import + 几行调用）就带出 103 行新增
-                // 可执行行、覆盖 0/103 → diff 门禁必红。故此排除是**工具链事实**，非放水；
-                // 「Sheet 该长什么样」由 Roborazzi 截图基线（app 模块）与真机走查兜底。
+                // 可执行行 → diff 门禁按比例判定必红。故此排除是口径选择，非工具链事实。
                 // 命名安全性：*Sheet.kt 只命中 BottomSheet Composable，全仓无逻辑类同名。
                 Regex("""(^|/)[^/]*Sheet\.kt$"""),
             )
