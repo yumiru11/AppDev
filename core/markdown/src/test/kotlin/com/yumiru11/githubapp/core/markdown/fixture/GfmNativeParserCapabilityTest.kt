@@ -1,5 +1,13 @@
 package com.yumiru11.githubapp.core.markdown.fixture
 
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.TextStyle
+import com.mikepenz.markdown.annotator.DefaultAnnotatorSettings
+import com.mikepenz.markdown.annotator.buildMarkdownAnnotatedString
+import com.yumiru11.githubapp.core.markdown.native.MarkdownInlineSemantics
+import com.yumiru11.githubapp.core.markdown.native.MarkdownInlineStyles
 import org.intellij.markdown.IElementType
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
@@ -186,8 +194,10 @@ class GfmNativeParserCapabilityTest {
     }
 
     @Test
-    fun nonNativeFixtures_mentionsIssueRefsEmojiFootnotes_produceNoDedicatedElement() {
-        // 记录「原生链按纯文本渲染」的事实：这些写法没有任何专用 AST 元素可渲染
+    fun nonNativeFixtures_produceNoDedicatedParserElement_renderingIsAnnotatorLayer() {
+        // 解析器层面的事实（保留红证明能力）：这些写法没有任何专用 AST 元素。
+        // 渲染在**注解层**补齐——@user（#251）、#123 / 完整 40 位 sha（本票）由
+        // MarkdownInlineSemantics 写 LinkAnnotation.Url；emoji（26）与脚注（35）原生链仍按纯文本渲染。
         val noDedicatedElement =
             listOf("22-mention-user", "23-mention-org-team", "24-issue-ref", "25-commit-sha-ref", "26-emoji-shortcode", "35-footnote")
 
@@ -206,14 +216,51 @@ class GfmNativeParserCapabilityTest {
     }
 
     @Test
-    fun issueReferenceFixture_hashSyntax_isNotAutolinked() {
-        // #123 / owner/repo#123 / gh-123 不会被 linkify（GitHubLinkParser 只解析绝对 URL）
+    fun issueReferenceAndShaFixtures_annotatorLayer_producesRepoLinks() {
+        // 解析器不 linkify（见上），但注解层必须补齐：
+        //   #123 → {repo}/issues/123（GitHub 对 PR 会 302 到 /pull/N）
+        //   完整 40 位 hex sha → {repo}/commit/<sha>
+        // 这是「能力存在」的正向证据；负向（代码/URL/已有链接内不链接）由 MarkdownInlineSemanticsTest 覆盖。
+        val issueUrls = linkUrlsOf(MarkdownGfmFixtures.byId("24-issue-ref").markdown())
+        assertTrue(
+            "24-issue-ref 的裸 #123 必须被注解器渲染为 issue 链接，实际 = $issueUrls",
+            "$REPO_URL/issues/123" in issueUrls,
+        )
+
+        val shaUrls = linkUrlsOf(MarkdownGfmFixtures.byId("25-commit-sha-ref").markdown())
+        assertTrue(
+            "25-commit-sha-ref 的完整 sha 必须被注解器渲染为 commit 链接，实际 = $shaUrls",
+            "$REPO_URL/commit/$FULL_SHA" in shaUrls,
+        )
+    }
+
+    @Test
+    fun issueReferenceFixture_hashSyntax_isNotAutolinkedByParser_annotatorCompensates() {
+        // #123 / owner/repo#123 / gh-123 不会被解析器 linkify（GitHubLinkParser 负责点击；
+        // 正文引用由注解层补齐——见上一条测试）
         val types = elementTypesOf("24-issue-ref")
         val autolinks =
             listOf(GFMTokenTypes.GFM_AUTOLINK, MarkdownElementTypes.AUTOLINK, MarkdownTokenTypes.EMAIL_AUTOLINK)
                 .filter { it in types }
 
-        assertTrue("正文裸 #123 / gh-123 不应被自动链接，实际出现 $autolinks", autolinks.isEmpty())
+        assertTrue("正文裸 #123 / gh-123 不应被解析器自动链接，实际出现 $autolinks", autolinks.isEmpty())
+    }
+
+    /** 用生产注解器（真实 mikepenz AnnotatedString 构建链）取 markdown 产物里的链接 URL。 */
+    private fun linkUrlsOf(markdown: String): List<String> {
+        val annotated =
+            markdown.buildMarkdownAnnotatedString(
+                style = TextStyle(),
+                annotatorSettings =
+                    DefaultAnnotatorSettings(
+                        linkTextSpanStyle = TextLinkStyles(),
+                        codeSpanStyle = SpanStyle(),
+                        annotator = MarkdownInlineSemantics.annotator(TEST_STYLES, REPO_URL),
+                    ),
+            )
+        return annotated
+            .getLinkAnnotations(0, annotated.length)
+            .mapNotNull { (it.item as? LinkAnnotation.Url)?.url }
     }
 
     private fun parse(fixtureId: String): ASTNode = parser.buildMarkdownTreeFromString(MarkdownGfmFixtures.byId(fixtureId).markdown())
@@ -252,6 +299,17 @@ class GfmNativeParserCapabilityTest {
     }
 
     private companion object {
+        const val REPO_URL = "https://github.com/octocat/Hello-World"
+        const val FULL_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+        val TEST_STYLES =
+            MarkdownInlineStyles(
+                link = TextLinkStyles(),
+                kbd = SpanStyle(),
+                subscript = SpanStyle(),
+                superscript = SpanStyle(),
+            )
+
         val IMAGE_FIXTURE_IDS =
             listOf("17-image-relative", "18-image-github-cache-domain", "29-image-lazy", "30-image-zoom", "31-image-gif")
 

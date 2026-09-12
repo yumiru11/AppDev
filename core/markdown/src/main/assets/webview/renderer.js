@@ -10,7 +10,8 @@
  *    - 任务列表 checkbox change → onCheckboxClick(index, checked)
  *    - ResizeObserver → onHeightChanged(height)
  * 3. 离线模式（OFFLINE_MARKDOWN_IT）：调用 markdown-it 渲染原始 markdown，
- *    补 GitHub Alert / 任务列表 / emoji 短码 / 脚注 / 标题锚点 / @user 提及六个最小 GFM 插件，
+ *    补 GitHub Alert / 任务列表 / emoji 短码 / 脚注 / 标题锚点 / @user 提及 /
+ *    #123 引用 / 完整 sha 引用八个最小 GFM 插件，
  *    并用 highlight.js 高亮代码块；渲染产物再按仓库上下文改写相对链接/图片
  *    （见 renderOfflineHtml 的说明）
  * 4. 服务端 HTML 主通道（SERVER_HTML）同样用 highlight.js 高亮代码块（双预算护栏，
@@ -505,29 +506,43 @@
     });
   }
 
-  // ── 离线 GFM 补齐：@user 提及（2026-09-12） ─────────────────────────────
+  // ── 离线 GFM 补齐：@user / #123 / 裸 sha（2026-09-12） ──────────────────
   //
   // 只做**用户**提及：`@org/team` 没有应用内路由（GitHubLinkParser 明确把 `@org/team`
   // 归为 External），因此整段保持纯文本——绝不允许把 `@org` 从 `@org/team` 里切出来
   // 半截链接（负向前瞻 `(?![A-Za-z0-9\-/])` 保证）。
   //
+  // #123 / 裸 sha 需要仓库上下文（`owner/repo`）才能拼出绝对 URL：无上下文时整段保持纯
+  // 文本（`href="#123"` 会被 WebView 的 bindLinks 当成页内锚点吞掉，绝不能产出）。
+  // `#123` → `{repo}/issues/123`（GitHub 对 PR 会 302 到 /pull/N）；**完整 40 位** hex
+  // sha → `{repo}/commit/<sha>`（短 sha 不链接，避免误伤正文里的短 hex 词）。
+  // 点击后由 Kotlin 侧 GitHubLinkParser 分流到应用内 Issue/Commit 路由。
+  //
   // 作用面与 emojiPlugin 同构：只改写 inline token 的 text 子节点。行内代码是 code_inline
-  // token、围栏是块级 token，结构上不进 text 子节点；已有链接（link_open…link_close）
-  // 之间整段跳过，避免 <a> 嵌套。邮箱（`octocat@github.com`）因 @ 前是词字符而不匹配。
+  // token、围栏是块级 token，结构上不进 text 子节点；已有链接（link_open…link_close）与
+  // 内联 HTML 的 <a> 之间整段跳过，避免 <a> 嵌套。邮箱（`octocat@github.com`）因 @ 前是
+  // 词字符而不匹配；`#123` 前是词字符/`#`/`/` 时不匹配；sha 前后必须是词边界。
 
   /** 提及词法：GitHub 用户名为 1–39 位字母/数字/连字符，首尾不得是连字符。 */
   var MENTION_SOURCE = '(^|[^\\w./+@-])@([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)(?![A-Za-z0-9\\-/])';
+  /** issue/PR 引用词法：仓库内裸 `#123`（`owner/repo#123` 的 `#` 前是词字符，不命中）。 */
+  var ISSUE_REF_SOURCE = '(^|[^\\w#/])#(\\d+)(?![0-9])';
+  /** 裸提交词法：**完整 40 位** hex。 */
+  var COMMIT_SHA_SOURCE = '(^|[^\\w@#])([0-9a-fA-F]{40})(?![0-9a-fA-F])';
+  /** 内联 HTML 锚：html:true 下原样透传，必须计入 link 深度护栏（否则会嵌第二层 <a>）。 */
+  var HTML_ANCHOR_OPEN = /^<a(?:\s[^>]*)?>/i;
+  var HTML_ANCHOR_CLOSE = /^<\/a\s*>/i;
   var GITHUB_PROFILE_BASE = 'https://github.com/';
 
   /**
-   * 把一段 text 切成「纯文本 / 提及」片段；没有提及返回 null（调用方保持原 token）。
+   * 把一段 text 按 `source` 切成「纯文本 / 链接」片段；没有命中返回 null（调用方保持原 token）。
    *
    * 每次调用新建 RegExp：避免共享 `g` 正则的 lastIndex 状态串味。
    *
-   * @returns {Array<{text: string}|{mention: string, user: string}>|null}
+   * @returns {Array<{text: string}|{href: string, label: string}>|null}
    */
-  function mentionSegments(content) {
-    var pattern = new RegExp(MENTION_SOURCE, 'g');
+  function referenceSegments(content, source, hrefOf, labelOf) {
+    var pattern = new RegExp(source, 'g');
     var segments = [];
     var cursor = 0;
     var found = false;
@@ -537,7 +552,7 @@
       // 前缀（空白/标点）并入前一段纯文本，不能丢
       var before = content.slice(cursor, match.index) + match[1];
       if (before) segments.push({ text: before });
-      segments.push({ mention: '@' + match[2], user: match[2] });
+      segments.push({ href: hrefOf(match[2]), label: labelOf(match[2]) });
       cursor = match.index + match[0].length;
     }
     if (!found) return null;
@@ -545,29 +560,81 @@
     return segments;
   }
 
-  /** inline children 就地改写：提及 → link_open/text/link_close 三连 token。 */
-  function linkifyMentionTokens(state, children) {
+  function mentionSegments(content) {
+    return referenceSegments(
+      content,
+      MENTION_SOURCE,
+      function (user) {
+        return GITHUB_PROFILE_BASE + user;
+      },
+      function (user) {
+        return '@' + user;
+      },
+    );
+  }
+
+  /** `{owner}/{repo}` → `https://github.com/{owner}/{repo}`；无上下文返回 null。 */
+  function repoBase(ctx) {
+    return ctx ? GITHUB_BASE + ctx.owner + '/' + ctx.repo : null;
+  }
+
+  function issueRefSegments(content, base) {
+    return referenceSegments(
+      content,
+      ISSUE_REF_SOURCE,
+      function (number) {
+        return base + '/issues/' + number;
+      },
+      function (number) {
+        return '#' + number;
+      },
+    );
+  }
+
+  function commitShaSegments(content, base) {
+    return referenceSegments(
+      content,
+      COMMIT_SHA_SOURCE,
+      function (sha) {
+        return base + '/commit/' + sha;
+      },
+      function (sha) {
+        return sha;
+      },
+    );
+  }
+
+  /**
+   * inline children 就地改写：片段 → link_open/text/link_close 三连 token。
+   *
+   * link 深度护栏覆盖两类锚：markdown 链接 token 与内联 HTML 的 `<a>`。
+   */
+  function linkifyTextTokens(state, children, segmentsOf, context) {
     var result = [];
     var linkDepth = 0;
     for (var i = 0; i < children.length; i++) {
       var token = children[i];
       if (token.type === 'link_open') linkDepth++;
       if (token.type === 'link_close') linkDepth--;
+      if (token.type === 'html_inline') {
+        if (HTML_ANCHOR_OPEN.test(token.content)) linkDepth++;
+        if (HTML_ANCHOR_CLOSE.test(token.content)) linkDepth--;
+      }
       if (token.type !== 'text' || linkDepth > 0) {
         result.push(token);
         continue;
       }
-      var segments = mentionSegments(token.content);
+      var segments = segmentsOf(token.content, context);
       if (!segments) {
         result.push(token);
         continue;
       }
       for (var s = 0; s < segments.length; s++) {
-        if (segments[s].user) {
+        if (segments[s].href) {
           var open = newToken(state, 'link_open', 'a', 1);
-          open.attrSet('href', GITHUB_PROFILE_BASE + segments[s].user);
+          open.attrSet('href', segments[s].href);
           var label = newToken(state, 'text', '', 0);
-          label.content = segments[s].mention;
+          label.content = segments[s].label;
           result.push(open, label, newToken(state, 'link_close', 'a', -1));
         } else {
           var text = newToken(state, 'text', '', 0);
@@ -583,7 +650,6 @@
    * `@user` → `<a href="https://github.com/user">@user</a>`（GitHub 网页端同样把它渲染成链接）。
    *
    * 点击后由 Kotlin 侧 `GitHubLinkParser.parseUrl → ParsedUrl.User` 分流到应用内用户页。
-   * 运行时机与 emojiPlugin 一致（inline 之后的 core 规则），且只动 text token。
    */
   function mentionPlugin(md) {
     md.core.ruler.after('inline', 'mention_links', function (state) {
@@ -591,7 +657,39 @@
       for (var i = 0; i < tokens.length; i++) {
         var inline = tokens[i];
         if (inline.type !== 'inline' || !inline.children) continue;
-        inline.children = linkifyMentionTokens(state, inline.children);
+        inline.children = linkifyTextTokens(state, inline.children, mentionSegments, null);
+      }
+    });
+  }
+
+  /**
+   * `#123` → `{repo}/issues/123`（GitHub 对 PR 会 302 到 /pull/N）。
+   *
+   * 无仓库上下文（`data-base-repo` 缺失/非法）→ 整段纯文本，绝不产 `href="#123"`。
+   */
+  function issueRefPlugin(md) {
+    md.core.ruler.after('inline', 'github_issue_refs', function (state) {
+      var base = repoBase(parseRepoContext(state.env && state.env.repoContext));
+      if (!base) return;
+      var tokens = state.tokens;
+      for (var i = 0; i < tokens.length; i++) {
+        var inline = tokens[i];
+        if (inline.type !== 'inline' || !inline.children) continue;
+        inline.children = linkifyTextTokens(state, inline.children, issueRefSegments, base);
+      }
+    });
+  }
+
+  /** **完整 40 位** hex sha → `{repo}/commit/<sha>`（短 sha 不链接）。 */
+  function commitShaPlugin(md) {
+    md.core.ruler.after('inline', 'github_commit_shas', function (state) {
+      var base = repoBase(parseRepoContext(state.env && state.env.repoContext));
+      if (!base) return;
+      var tokens = state.tokens;
+      for (var i = 0; i < tokens.length; i++) {
+        var inline = tokens[i];
+        if (inline.type !== 'inline' || !inline.children) continue;
+        inline.children = linkifyTextTokens(state, inline.children, commitShaSegments, base);
       }
     });
   }
@@ -875,6 +973,8 @@
     md.use(anchorPlugin);
     md.use(footnotePlugin);
     md.use(mentionPlugin);
+    md.use(issueRefPlugin);
+    md.use(commitShaPlugin);
     return md;
   }
 
@@ -893,7 +993,8 @@
     var opts = options || {};
     if (typeof window.markdownit === 'undefined') return null;
     var md = createMarkdownIt();
-    var env = {};
+    // 仓库上下文随 env 下发（issue 引用/sha 插件在 inline token 层就必须知道 owner/repo）
+    var env = { repoContext: opts.repoContext };
     var html = appendFootnotes(md, md.render(raw, env), env);
     // 懒加载属性在 URL 改写前注入：两者都只动属性，互不依赖；产物由 Node 回归断言
     return rewriteRelativeUrls(addImageLoadingAttributes(html), opts.repoContext);
@@ -927,6 +1028,10 @@
     footnotePlugin: footnotePlugin,
     mentionPlugin: mentionPlugin,
     mentionSegments: mentionSegments,
+    issueRefPlugin: issueRefPlugin,
+    commitShaPlugin: commitShaPlugin,
+    issueRefSegments: issueRefSegments,
+    commitShaSegments: commitShaSegments,
     renderOfflineHtml: renderOfflineHtml,
     rewriteRelativeUrls: rewriteRelativeUrls,
     parseRepoContext: parseRepoContext,

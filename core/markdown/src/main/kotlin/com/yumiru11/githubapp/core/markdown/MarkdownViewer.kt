@@ -64,7 +64,7 @@ fun MarkdownViewer(
     val state = rememberMarkdownState(markdown, immediate = true)
     val scheme = MaterialTheme.colorScheme
     // 内联语义（@user 提及 / kbd / sub / sup）：经 Markdown(annotator) 下发给全部 MarkdownText
-    val inlineSemantics = rememberMarkdownInlineSemantics()
+    val inlineSemantics = rememberMarkdownInlineSemantics(baseRepoUrl)
 
     // 链接点击接线：renderer 0.38.1 无 link 槽位，所有链接统一走 LocalUriHandler
     // （annotatorSettings 内部唯一消费点，构建 LinkAnnotation.Url 后经 openUri 分发）。

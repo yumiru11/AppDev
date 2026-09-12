@@ -70,7 +70,7 @@ fun EnhancedMarkdownViewer(
     val state = rememberMarkdownState(preparedMarkdown, immediate = true)
     val scheme = MaterialTheme.colorScheme
     // 内联语义（@user 提及 / kbd / sub / sup）：经 Markdown(annotator) 下发给全部 MarkdownText
-    val inlineSemantics = rememberMarkdownInlineSemantics()
+    val inlineSemantics = rememberMarkdownInlineSemantics(baseRepoUrl)
     val currentOnInternalLink by rememberUpdatedState(onInternalLink)
     val currentBaseRepoUrl by rememberUpdatedState(baseRepoUrl)
     val linkUriHandler =
