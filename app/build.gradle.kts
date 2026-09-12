@@ -251,7 +251,9 @@ dependencies {
 }
 
 // Konsist 无原生任务：以过滤后的单测任务充当 konsistCheck（只跑 konsist 包下的架构测试）。
-// isFailOnNoMatchingTests = false 保证过滤无匹配时空跑通过；T2 起该包含正式架构护栏规则
+// ★ GATE-5a（2026-09-13）：isFailOnNoMatchingTests **必须为 true**（Gradle 默认值）。
+// 旧值 false 让「过滤无匹配」静默通过——konsist 包被改名/删除、过滤模式写错时，
+// konsistCheck 绿灯但一个架构护栏都没跑（残余审计 G-08 / P2-8）。
 
 // 禁用 AAR metadata 检查：mikepenz markdown-renderer 0.43.0 要求 compileSdk 37，
 // 但 android-37 平台尚未发布，compileSdk 36 编译无问题（API 兼容）
@@ -304,6 +306,7 @@ tasks.register<Test>("konsistCheck") {
     useJUnit()
     filter {
         includeTestsMatching("com.yumiru11.githubapp.konsist.*")
-        isFailOnNoMatchingTests = false
+        // 无匹配测试 = 架构护栏已空转 → 失败（不得静默通过）
+        isFailOnNoMatchingTests = true
     }
 }

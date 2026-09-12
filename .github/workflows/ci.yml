@@ -416,12 +416,13 @@ jobs:
             # 脚本输出到 artifacts/screenshots/，供后续 Collect/Upload/评论步骤
             bash .github/scripts/screenshots.sh
 
-      # 截图已由 screenshots.sh 直接输出到 artifacts/screenshots/；失败也保留供排查
+      # 截图已由 screenshots.sh 直接输出到 artifacts/screenshots/；失败也保留供排查。
+      # GATE-5b：本步从「仅 echo 文件数」升级为可失败校验——帧清单必须闭合（screenshots.sh
+      # 声明的每一帧都有产出或显式处置标记）、无 0 字节 PNG、坏帧汇总产物存在。
+      # 实现在 .github/scripts/verify-screenshots.sh（可离线负向验证）。
       - name: Verify screenshots collected
         if: always()
-        run: |
-          mkdir -p artifacts/screenshots
-          echo "files: $(find artifacts/screenshots -name '*.png' | wc -l)" 
+        run: bash .github/scripts/verify-screenshots.sh artifacts/screenshots
 
       - name: Upload screenshots
         if: always()

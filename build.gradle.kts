@@ -290,6 +290,9 @@ fun Project.configureRobolectricCoverage() {
 fun Project.registerCoverageTasks() {
     // prototype/ 是一次性渲染原型（throwaway），测试源码编译不过且不属于覆盖率门禁范围，跳过
     if (path.startsWith(":prototype")) return
+    // 注意：进入下方 tasks.register 的配置 lambda 后 receiver 是 Task，`path` 会解析成
+    // 任务路径（:core:common:jacocoTestCoverageVerification）；这里先捕获项目路径供报错信息用。
+    val modulePath = path
     val srcDirs = files(listOf("src/main/kotlin", "src/main/java").map { file(it) }.filter { it.exists() })
     val classDirs =
         files(
@@ -356,8 +359,23 @@ fun Project.registerCoverageTasks() {
         dependsOn(coverageTestTaskPaths)
         classDirectories.setFrom(classDirs)
         executionData.setFrom(mergedExecData)
-        // 无单元测试的模块没有 exec 数据，跳过验证（没有测试可测）
-        onlyIf("存在单元测试执行数据") { execData.files.any { it.exists() } }
+        // ★ GATE-3（2026-09-13）：有阈值却无 exec 数据 = 该模块单测被静默跳过（从未执行 /
+        // 被 --exclude-task / NO-SOURCE）——此时**必须红**，不得静默 SKIP。旧实现用
+        // onlyIf 跳过验证，等于该模块的覆盖率门禁空转（残余审计 G-02/G-03，PR #255 前的
+        // 5 个豁免模块就是靠这种空转「看起来有阈值」）。
+        // 只约束 coverageThresholds 里声明了阈值的模块；无阈值模块不注册本任务（照旧跳过，
+        // 即文件顶部注释里的 :core:data / :core:testing / :core:ui / :feature:auth / :prototype）。
+        doFirst {
+            if (execData.files.none { it.exists() }) {
+                throw GradleException(
+                    "覆盖率门禁失败：模块 $modulePath 在 coverageThresholds 里声明了阈值（$threshold），" +
+                        "但找不到该模块的单元测试执行数据——约定路径 " +
+                        "${layout.buildDirectory.get().asFile}/outputs/unit_test_code_coverage/**/*.exec 下无文件。" +
+                        "有阈值却不产生 exec，说明单测被跳过或从未执行——覆盖率验证拒绝空转：" +
+                        "请检查 src/test 是否存在、testDebugUnitTest 是否被 --exclude-task / NO-SOURCE 跳过。",
+                )
+            }
+        }
         violationRules {
             rule {
                 limit {
