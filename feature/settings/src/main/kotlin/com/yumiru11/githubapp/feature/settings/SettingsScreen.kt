@@ -10,7 +10,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -42,6 +46,7 @@ import com.yumiru11.githubapp.core.designsystem.token.resolveEffectiveMotionScal
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -78,11 +83,7 @@ fun SettingsScreen(
             motionScale = effectiveMotionScale,
         ) {
             Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = { Text(stringResource(R.string.settings_title)) },
-                    )
-                },
+                topBar = { SettingsTopBar(onBackClick = onBackClick) },
                 modifier = modifier,
             ) { paddingValues ->
                 LazyColumn(
@@ -120,6 +121,27 @@ fun SettingsScreen(
             }
         }
     }
+}
+
+/**
+ * 设置页顶栏（UI-3）：设置是二级页（自个人页/入口导航进入），补返回箭头 ——
+ * 此前屏内无返回可供性，只能靠系统返回手势/按键。图标用项目统一矢量图标
+ * （AutoMirrored，RTL 自动镜像），文案走 stringResource。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun SettingsTopBar(onBackClick: () -> Unit) {
+    TopAppBar(
+        title = { Text(stringResource(R.string.settings_title)) },
+        navigationIcon = {
+            IconButton(onClick = onBackClick) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.settings_back),
+                )
+            }
+        },
+    )
 }
 
 /** 分组标题（M3 设置规范：labelLarge + primary 色；`heading()` 语义供 TalkBack 按节跳转，缺陷 #19）。 */

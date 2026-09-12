@@ -2,6 +2,7 @@
 <resources>
     <!-- 设置页（T24） -->
     <string name="settings_title">设置</string>
+    <string name="settings_back">返回</string>
 
     <!-- 外观分组 -->
     <string name="settings_appearance_group">外观</string>

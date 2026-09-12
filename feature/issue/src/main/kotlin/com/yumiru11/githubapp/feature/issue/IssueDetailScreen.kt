@@ -400,6 +400,20 @@ private fun IssueMoreMenu(
     }
 }
 
+/**
+ * [SuccessContent] 列表 contentPadding（纯函数供数值断言；UI-5）。
+ *
+ * 评论 FAB 悬浮在列表右下：底部必须预留 [AppDimens.fabContentClearance]（96dp），
+ * 否则末条时间线内容滚到底时被 FAB 压住（修复前 bottom 仅 8dp）。
+ */
+internal fun issueDetailContentPadding(): PaddingValues =
+    PaddingValues(
+        start = AppDimens.contentPadding,
+        end = AppDimens.contentPadding,
+        top = 8.dp,
+        bottom = AppDimens.fabContentClearance,
+    )
+
 @Composable
 private fun SuccessContent(
     state: IssueDetailUiState.Success,
@@ -419,7 +433,7 @@ private fun SuccessContent(
     val issue = state.issue
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = issueDetailContentPadding(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item(key = "header") {
