@@ -41,6 +41,7 @@ import com.mikepenz.markdown.model.ImageTransformer
 import com.mikepenz.markdown.model.markdownExtendedSpans
 import com.mikepenz.markdown.model.markdownPadding
 import com.mikepenz.markdown.model.rememberMarkdownState
+import com.yumiru11.githubapp.core.markdown.native.NativeMarkdownPreprocessor
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import org.intellij.markdown.MarkdownElementTypes
 
@@ -61,7 +62,11 @@ fun EnhancedMarkdownViewer(
     imageTransformer: ImageTransformer = Coil3ImageTransformerImpl,
     darkTheme: Boolean = isSystemInDarkTheme(),
 ) {
-    val state = rememberMarkdownState(markdown, immediate = true)
+    // 渲染前预处理（缺陷 #1/#4）：删除 <script> 元素正文、把 <details> 区域折叠成单块，
+    // 避免外层解析重复渲染折叠正文。preparedMarkdown 是解析链路的唯一文本来源，
+    // 组件内 model.content 与 node 偏移均指向它。
+    val preparedMarkdown = remember(markdown) { NativeMarkdownPreprocessor.prepare(markdown) }
+    val state = rememberMarkdownState(preparedMarkdown, immediate = true)
     val scheme = MaterialTheme.colorScheme
     val currentOnInternalLink by rememberUpdatedState(onInternalLink)
     val currentBaseRepoUrl by rememberUpdatedState(baseRepoUrl)
@@ -173,7 +178,7 @@ fun EnhancedMarkdownViewer(
                         unorderedList = { model -> EnhancedUnorderedList(model) },
                         orderedList = { model -> EnhancedOrderedList(model) },
                         checkbox = { model -> MarkdownCheckBox(model.content, model.node, model.typography.text) },
-                        image = { model -> EnhancedMarkdownImage(model) },
+                        image = { model -> EnhancedMarkdownImage(model, baseRepoUrl = baseRepoUrl) },
                         table = { model ->
                             EnhancedMarkdownTable(model = model)
                         },

@@ -80,7 +80,9 @@ fun EnhancedMarkdownImage(
             // stretch=false（徽章段落）：保持原始尺寸——用户反馈 fillMaxWidth 是「导弹」（2026-08-16）。
             if (stretch) {
                 coil3.compose.AsyncImage(
-                    model = src,
+                    // resolvedSrc：相对路径（docs/x.png）在有 baseRepoUrl 时已解析为 raw 域，
+                    // 直接用 src 会让 Coil 拿到相对路径 → 永远加载失败（缺陷 #2）。
+                    model = resolvedSrc,
                     contentDescription = null,
                     contentScale = ContentScale.FillWidth,
                     modifier = Modifier.fillMaxWidth(),

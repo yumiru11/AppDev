@@ -55,6 +55,23 @@ internal fun resolveRawImageUrl(
     path: String,
 ): String {
     val stripped = baseRepoUrl.removePrefix("https://github.com/").trim('/')
-    val cleanPath = path.trimStart('/')
-    return "https://raw.githubusercontent.com/$stripped/HEAD/$cleanPath"
+    return "https://raw.githubusercontent.com/$stripped/HEAD/${normalizeRelativePath(path)}"
+}
+
+/**
+ * 相对路径归一化：去掉 `./`、折叠 `../`（越过仓库根时钳制在根，与 #232 离线通道同语义）。
+ *
+ * GitHub 正文里的相对图片几乎都写成 `./docs/x.png`；原样拼进 raw URL 会得到
+ * `…/HEAD/./docs/x.png`（部分 CDN 路径不规范会 404），必须先归一化（缺陷 #2 的配套）。
+ */
+private fun normalizeRelativePath(path: String): String {
+    val stack = ArrayDeque<String>()
+    path.trimStart('/').split('/').forEach { segment ->
+        when (segment) {
+            "", "." -> Unit
+            ".." -> if (stack.isNotEmpty()) stack.removeLast()
+            else -> stack.addLast(segment)
+        }
+    }
+    return stack.joinToString("/")
 }

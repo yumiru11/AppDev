@@ -74,6 +74,41 @@ class EnhancedHtmlBlockTest {
     }
 
     @Test
+    fun resolveRawImageUrl_dotSlashPrefix_isNormalized() {
+        assertEquals(
+            "https://raw.githubusercontent.com/owner/repo/HEAD/docs/screenshot.png",
+            com.yumiru11.githubapp.core.markdown.native.resolveRawImageUrl(
+                "https://github.com/owner/repo",
+                "./docs/screenshot.png",
+            ),
+        )
+    }
+
+    @Test
+    fun resolveRawImageUrl_parentSegments_areFoldedAndClampedAtRoot() {
+        assertEquals(
+            "https://raw.githubusercontent.com/owner/repo/HEAD/assets/diagram.png",
+            com.yumiru11.githubapp.core.markdown.native.resolveRawImageUrl(
+                "https://github.com/owner/repo",
+                "../assets/diagram.png",
+            ),
+        )
+        assertEquals(
+            "https://raw.githubusercontent.com/owner/repo/HEAD/a.png",
+            com.yumiru11.githubapp.core.markdown.native.resolveRawImageUrl(
+                "https://github.com/owner/repo",
+                "docs/../../a.png",
+            ),
+        )
+    }
+
+    @Test
+    fun stripHtmlTags_scriptElement_dropsTagAndContent() {
+        assertEquals("", stripHtmlTags("<script>\nalert(1)\n</script>"))
+        assertEquals("a\n\nb", stripHtmlTags("<p>a</p>\n<script>alert(1)</script>\n<p>b</p>"))
+    }
+
+    @Test
     fun parseAll_relativeImage_withoutBaseRepoUrl_returnsEmpty() {
         val content = "<p><img src=\"docs/x.png\"></p>"
         val node = parseHtmlBlockNode(content)

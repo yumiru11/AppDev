@@ -158,8 +158,8 @@ object MarkdownGfmFixtures {
                 note =
                     "离线通道由 renderer.js 在 markdown-it 渲染产物层改写相对 img src → raw 域" +
                         "（2026-09-12 修复；Node 真实执行回归见 OfflineRendererExecutionTest）。" +
-                        "原生侧另有缺陷：EnhancedMarkdownViewer 未把 baseRepoUrl 透传给 " +
-                        "EnhancedMarkdownImage（见报告「发现但未修」第 2 条）",
+                        "原生侧 2026-09-12 修复：EnhancedMarkdownViewer 透传 baseRepoUrl 到图片组件，" +
+                        "raw URL 拼接前归一化 ./ 与 ../（EnhancedMarkdownImageBaseUrlTest）",
             ),
             Fixture("18-image-github-cache-domain", "图片（GitHub 缓存域）", ALL_PATHS),
             Fixture("19-external-link", "外部链接", ALL_PATHS),
@@ -239,7 +239,10 @@ object MarkdownGfmFixtures {
                 "31-image-gif",
                 "图片：GIF",
                 setOf(RenderPath.SERVER_HTML, RenderPath.OFFLINE_GFM),
-                note = "WebView 原生支持 GIF 动画；原生链无 coil-gif 依赖 → 动图只出首帧",
+                note =
+                    "WebView 原生支持 GIF 动画；原生链 2026-09-12 增加 coil-gif 3.4.0" +
+                        "（ServiceLoader 自动注册 AnimatedImageDecoder / GifDecoder，见 CoilGifDecoderTest）。" +
+                        "原生像素基线待 CI canonical 重录后再把本夹具纳入 NATIVE",
             ),
             Fixture(
                 "32-inline-html",
@@ -250,8 +253,10 @@ object MarkdownGfmFixtures {
                     "夹具只含 <details> / <kbd> / <sub> / <sup> / <script>，**刻意不含 shields 徽章**：" +
                         "徽章渲染走 coil3 AsyncImage 且无注入口，需要真实网络 → 像素不确定，" +
                         "不能进 golden 基线（徽章解析本身由 EnhancedHtmlBlockTest 覆盖）。" +
-                        "已知偏差：<details> 采用 GitHub 惯用的「空行分隔」写法时，块正文会被同时" +
-                        "折叠进卡片**并**以普通段落常驻可见（重复渲染，见报告「发现但未修」第 1 条）",
+                        "2026-09-12 修复：空行写法的折叠正文重复（NativeMarkdownPreprocessor 把 " +
+                        "<details> 区域折叠为单块）与 <script> 正文残留（元素整体删除）；语义证据见 " +
+                        "EnhancedMarkdownDetailsTest / EnhancedMarkdownScriptTest，原生像素基线待 " +
+                        "CI canonical 重录后反映修复",
             ),
             Fixture(
                 "33-math-katex",
