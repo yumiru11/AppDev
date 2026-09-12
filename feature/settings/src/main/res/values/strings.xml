@@ -2,6 +2,7 @@
 <resources>
     <!-- Settings screen (T24) -->
     <string name="settings_title">Settings</string>
+    <string name="settings_back">Back</string>
 
     <!-- Appearance group -->
     <string name="settings_appearance_group">Appearance</string>

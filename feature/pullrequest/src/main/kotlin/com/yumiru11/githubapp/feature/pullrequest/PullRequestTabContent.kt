@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.designsystem.component.AppStateColorRole
 import com.yumiru11.githubapp.core.designsystem.component.appStateColors
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.RenderMode
@@ -70,6 +71,20 @@ import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestTimelineItem
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewComment
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThread
 
+/**
+ * PR 详情四 Tab 列表的 contentPadding（纯函数供数值断言；UI-5）。
+ *
+ * 评论 FAB 悬浮在列表右下：底部预留 [AppDimens.fabContentClearance]（96dp），
+ * 四个 Tab 的末条内容滚到底时都不再被 FAB 压住（修复前 bottom 仅 8dp）。
+ */
+internal fun pullRequestTabContentPadding(): PaddingValues =
+    PaddingValues(
+        start = AppDimens.contentPadding,
+        end = AppDimens.contentPadding,
+        top = 8.dp,
+        bottom = AppDimens.fabContentClearance,
+    )
+
 /** Conversation Tab：PR 正文（WebView）+ 时间线（评论/Review/行内评论/提交引用/事件） */
 @Composable
 internal fun ConversationTab(
@@ -86,7 +101,7 @@ internal fun ConversationTab(
 ) {
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = pullRequestTabContentPadding(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (!pullRequest.body.isNullOrBlank()) {
@@ -233,7 +248,7 @@ internal fun CommitsTab(
     }
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = pullRequestTabContentPadding(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(items = commits, key = { it.sha }) { commit ->
@@ -263,7 +278,7 @@ internal fun ChecksTab(
     }
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = pullRequestTabContentPadding(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(items = checkRuns, key = { it.id }) { checkRun ->
@@ -296,7 +311,7 @@ internal fun FilesTab(
     }
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = pullRequestTabContentPadding(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(items = files, key = { it.filename }) { file ->

@@ -355,8 +355,12 @@ class MainActivity : ComponentActivity() {
                                         onOpenExternal = { url -> openExternalBrowser(context, url) },
                                     )
                                 },
+                                // UI-3：设置是二级页，补屏内返回（与系统返回同路径）
                                 settingsScreen = {
-                                    SettingsScreen(viewModel = settingsViewModel)
+                                    SettingsScreen(
+                                        viewModel = settingsViewModel,
+                                        onBackClick = { navController.popBackStack() },
+                                    )
                                 },
                                 issueListScreen = { owner, repo, onIssueClick ->
                                     IssueListScreen(

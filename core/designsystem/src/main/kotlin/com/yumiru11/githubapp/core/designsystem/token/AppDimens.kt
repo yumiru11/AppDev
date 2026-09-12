@@ -29,4 +29,11 @@ object AppDimens {
 
     /** 最小触点（M3 无障碍基线；#87 SeedColorRow 色块等小控件的触区下限） */
     val minTouchTarget: Dp = 48.dp
+
+    /**
+     * FAB 下方内容避让（UI-5）：ExtendedFloatingActionButton（56dp 高）悬浮在内容右下角，
+     * 滚动容器底部须预留该留白，保证末条内容可滚到 FAB 之上、不被压住。
+     * 口径 = FAB 高 56dp + 底边距 16dp + 呼吸位 24dp = 96dp（M3 FAB 避让基线）。
+     */
+    val fabContentClearance: Dp = 96.dp
 }
