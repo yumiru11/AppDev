@@ -23,6 +23,16 @@ import com.yumiru11.githubapp.core.designsystem.token.LocalMotionScale
  * default scale of 1f they equal the M3 defaults, so callers that don't pass
  * it see unchanged visuals.
  *
+ * Typography is explicitly injected from [AppTypography] (plan.md §5.4
+ * "字体：AppTypography"), so the M3 type scale has a single source of truth
+ * instead of the MaterialTheme built-in defaults. Values are the official
+ * M3 baseline, i.e. field-for-field identical to "no typography passed" →
+ * no visual change; the markdown heading calibration point
+ * (FEEDBACK #11/#23) lives in [AppTypography.markdownHeading1]..[AppTypography.markdownHeading6].
+ * There is no `fontScale` parameter: the settings screen has no font-size
+ * slider (only 圆角强度 / 动画强度), and system font scaling already applies
+ * at the sp rendering layer.
+ *
  * [motionScale] is provided via [LocalMotionScale] (ui-design §4.4): callers
  * pass `min(DataStore motionScale, system animator scale)` so every
  * [AppMotion.scaledDuration] consumer honours the system "remove animations"
@@ -101,6 +111,7 @@ fun AppTheme(
             // 缩放 ≤ 0 时退化为标准方案（零回弹）；注意 spring 无时长概念，
             // 逐帧「落终态」仍需调用方自行判定缩放（见 AppMotionScheme KDoc）。
             motionScheme = AppMotionScheme.forMotionScale(motionScale),
+            typography = AppTypography.from(),
             content = content,
         )
     }

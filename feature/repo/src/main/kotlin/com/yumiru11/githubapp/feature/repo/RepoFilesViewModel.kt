@@ -6,6 +6,7 @@
 
 package com.yumiru11.githubapp.feature.repo
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -554,15 +555,37 @@ class RepoFilesViewModel
             return TreeState.Loaded(transform(current.rootNodes))
         }
 
-        /** 异常 → 错误类型（404 → NOT_FOUND，IO → NETWORK，其余 → UNKNOWN） */
-        private fun mapError(e: Throwable): RepoErrorType =
-            when {
-                e is HttpException && (e.code() == 401 || e.code() == 403) -> RepoErrorType.FORBIDDEN
-                e is HttpException && e.code() == 404 -> RepoErrorType.NOT_FOUND
-                e is IOException -> RepoErrorType.NETWORK
-                else -> RepoErrorType.UNKNOWN
-            }
+        /**
+         * 异常 → 错误域。
+         *
+         * **404 一律是「路径不存在」而非「仓库不存在」**（#201 P0）：本 ViewModel 的每个
+         * 请求都发生在仓库已加载之后（`GET /repos/{o}/{r}` 已 200 才可能走到这里），
+         * 所以 contents/blob 的 404 只能说明**该文件/目录已删除或改名**。旧实现映射为
+         * [RepoErrorType.NOT_FOUND]，界面把「文件不存在」说成「Repository not found」，
+         * 还配了一个必然再次 404 的 Retry（CI 帧 `editor.png` 实证）。
+         */
+        private fun mapError(e: Throwable): RepoErrorType {
+            val type =
+                when {
+                    e is HttpException && (e.code() == 401 || e.code() == 403) -> RepoErrorType.FORBIDDEN
+                    e is HttpException && e.code() == 404 -> RepoErrorType.PATH_NOT_FOUND
+                    e is IOException -> RepoErrorType.NETWORK
+                    else -> RepoErrorType.UNKNOWN
+                }
+            // 失败留档：错误域映射是排查的起点（CI logcat 过滤 RepoFiles 即可定位是
+            // 「路径没了」还是「网络挂了」；#201 的问题正是靠 logcat 里的 contents 404 反查出来的）
+            Log.i(TAG, "loadFailed type=$type httpCode=${(e as? HttpException)?.code()} cause=${e.javaClass.simpleName}")
+            return type
+        }
     }
+
+/**
+ * 文件域加载失败日志 tag（CI/真机 logcat 过滤：`adb logcat -s RepoFiles`）。
+ *
+ * #201 的定位链就是靠 logcat 里的 `contents/README.md → 404` 反查出来的；
+ * 之前这条路径**一行日志都没有**，只能靠 UI 截图猜。
+ */
+private const val TAG = "RepoFiles"
 
 /**
  * 文件编辑流程事件（T22；UI 层消费——Snackbar 文案 / 剪贴板复制）。
