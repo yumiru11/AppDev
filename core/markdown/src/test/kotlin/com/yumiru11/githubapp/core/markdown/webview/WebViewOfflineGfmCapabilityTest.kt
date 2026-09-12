@@ -164,7 +164,6 @@ class WebViewOfflineGfmCapabilityTest {
         // 不含 OFFLINE_GFM 路径的夹具 = 离线通道的已知缺口，必须与报告一致
         val expected =
             setOf(
-                "22-mention-user",
                 "23-mention-org-team",
                 "24-issue-ref",
                 "25-commit-sha-ref",
@@ -188,9 +187,27 @@ class WebViewOfflineGfmCapabilityTest {
                 .map { it.id }
 
         assertEquals(
-            "离线通道覆盖的 §2.3 条目数（2026-09-12 修复后：23 + 相对图/相对链/emoji/锚点/脚注/图片懒加载）",
-            29,
+            "离线通道覆盖的 §2.3 条目数（2026-09-12 @user 提及补齐后：23 + 相对图/相对链/emoji/锚点/脚注/图片懒加载 + 提及）",
+            30,
             offlineIds.size,
+        )
+    }
+
+    @Test
+    fun rendererJs_purifyPinsInlineHtmlSemanticsAndMentionPlugin() {
+        val renderer = rendererJs()
+
+        assertTrue(
+            "@user 提及插件必须存在（离线通道 → github.com/<user>）",
+            renderer.contains("mentionPlugin"),
+        )
+        assertTrue(
+            "<kbd>/<sub>/<sup> 必须显式钉在 DOMPurify 白名单（ADD_TAGS），防后续改配置时静默丢语义",
+            renderer.contains("ADD_TAGS") && renderer.contains("'kbd', 'sub', 'sup'"),
+        )
+        assertFalse(
+            "不得把 style/script 放进 ADD_TAGS（那不是语义钉住，是安全放宽）",
+            renderer.contains("ADD_TAGS: ['script'") || renderer.contains("ADD_TAGS: ['style'"),
         )
     }
 
@@ -238,6 +255,7 @@ class WebViewOfflineGfmCapabilityTest {
                 "19-external-link" to MARKDOWN_IT_BANNER,
                 "20-autolink" to "linkify: true",
                 "21-relative-link" to "/blob/HEAD/",
+                "22-mention-user" to "mentionPlugin",
                 "26-emoji-shortcode" to "emojiPlugin",
                 "27-github-alerts" to "githubAlertPlugin",
                 "28-anchor-jump" to "scrollToAnchor",

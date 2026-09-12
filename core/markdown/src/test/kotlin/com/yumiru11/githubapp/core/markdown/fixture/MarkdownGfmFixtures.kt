@@ -175,14 +175,20 @@ object MarkdownGfmFixtures {
             Fixture(
                 "22-mention-user",
                 "提及：`@user`",
-                setOf(RenderPath.SERVER_HTML),
-                note = "原生 + 离线 markdown-it 均无 mention 插件，按纯文本渲染",
+                setOf(RenderPath.SERVER_HTML, RenderPath.OFFLINE_GFM),
+                note =
+                    "离线通道 2026-09-12 由 renderer.js 的 mentionPlugin 补齐（@user → github.com/<user>；" +
+                        "行内代码/围栏/邮箱/已有链接结构上不误伤）；原生通道同批由 MarkdownInlineSemantics " +
+                        "注解器实现（MarkdownInlineSemanticsTest），像素基线待 CI canonical 录制后再纳入 NATIVE。" +
+                        "@org/team 无应用内路由，整段保持纯文本",
             ),
             Fixture(
                 "23-mention-org-team",
                 "提及：`@org/team`",
                 setOf(RenderPath.SERVER_HTML),
-                note = "同 @user，无 org/team mention 支持",
+                note =
+                    "无团队提及渲染：GitHubLinkParser 把 @org/team 归为 External（无应用内路由），" +
+                        "离线/原生均整段保持纯文本，不做半截 @org 链接",
             ),
             Fixture(
                 "24-issue-ref",
@@ -256,7 +262,10 @@ object MarkdownGfmFixtures {
                         "2026-09-12 修复：空行写法的折叠正文重复（NativeMarkdownPreprocessor 把 " +
                         "<details> 区域折叠为单块）与 <script> 正文残留（元素整体删除）；语义证据见 " +
                         "EnhancedMarkdownDetailsTest / EnhancedMarkdownScriptTest，原生像素基线待 " +
-                        "CI canonical 重录后反映修复",
+                        "CI canonical 重录后反映修复；同日第二批恢复 <kbd>/<sub>/<sup> 语义（原生 " +
+                        "MarkdownInlineSemantics 注解器 + 离线 DOMPurify ADD_TAGS 钉住），" +
+                        "语义证据见 MarkdownInlineSemanticsTest / OfflineRendererExecutionTest，" +
+                        "原生像素基线同样待 CI canonical 重录",
             ),
             Fixture(
                 "33-math-katex",

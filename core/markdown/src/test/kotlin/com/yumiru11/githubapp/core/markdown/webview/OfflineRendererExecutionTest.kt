@@ -205,6 +205,68 @@ class OfflineRendererExecutionTest {
         assertTrue("缺失的 decoding 仍要补 async", html.contains("decoding=\"async\""))
     }
 
+    // ── @user 提及 + kbd/sub/sup 语义（2026-09-12） ────────────────────────
+
+    @Test
+    fun offlineRender_fixture22_linkifiesUserMentions() {
+        val html = renderFixture("22-mention-user")
+
+        assertTrue(
+            "@user 必须渲染为 github.com 用户页链接",
+            html.contains("<a href=\"https://github.com/octocat\">@octocat</a>"),
+        )
+        assertTrue(
+            "同一段里的多个提及都要覆盖",
+            html.contains("<a href=\"https://github.com/yumiru11\">@yumiru11</a>"),
+        )
+    }
+
+    @Test
+    fun offlineRender_mentionsInsideCodeSpansAndFences_areNotLinkified() {
+        // 已知陷阱：任何在 raw markdown 上跑 @user 正则的方案都会误伤代码；这里在 inline token 层做
+        val markdown =
+            """
+            ```text
+            @octocat
+            ```
+
+            行内：`@octocat` 与 `a@b.com`
+
+            邮箱 octocat@github.com 结束
+            """.trimIndent()
+
+        val html = render(markdown)
+
+        assertTrue("行内代码里的 user 必须保持原文", html.contains("<code>@octocat</code>"))
+        assertTrue("邮箱自动链接不得被提及规则抢走", html.contains("mailto:octocat@github.com"))
+        assertFalse(
+            "代码块/行内代码/邮箱里不得出现任何提及链接",
+            html.contains("href=\"https://github.com/\""),
+        )
+    }
+
+    @Test
+    fun offlineRender_fixture23_teamMention_isNotPartiallyLinkified() {
+        val html = renderFixture("23-mention-org-team")
+
+        assertTrue("团队提及保持纯文本", html.contains("@github/docs"))
+        assertFalse(
+            "不得把 @github 从 @github/docs 里切出来半截链接",
+            html.contains("href=\"https://github.com/github\""),
+        )
+        assertFalse("整段团队提及不得被链接化", html.contains("href=\"https://github.com/android\""))
+    }
+
+    @Test
+    fun offlineRender_fixture32_preservesKbdSubSupSemanticTags() {
+        val html = renderFixture("32-inline-html")
+
+        assertTrue("<kbd> 必须原样保留（DOMPurify 白名单钉住）", html.contains("<kbd>Ctrl</kbd>"))
+        assertTrue("第二个键帽同样保留", html.contains("<kbd>C</kbd>"))
+        assertTrue("<sub> 语义标签保留", html.contains("<sub>下标</sub>"))
+        assertTrue("<sup> 语义标签保留", html.contains("<sup>上标</sup>"))
+    }
+
     // ── 共用 ────────────────────────────────────────────────────────────
 
     private fun renderFixture(id: String): String = render(MarkdownGfmFixtures.byId(id).markdown())

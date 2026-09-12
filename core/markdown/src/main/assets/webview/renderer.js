@@ -10,7 +10,7 @@
  *    - 任务列表 checkbox change → onCheckboxClick(index, checked)
  *    - ResizeObserver → onHeightChanged(height)
  * 3. 离线模式（OFFLINE_MARKDOWN_IT）：调用 markdown-it 渲染原始 markdown，
- *    补 GitHub Alert / 任务列表 / emoji 短码 / 脚注 / 标题锚点五个最小 GFM 插件，
+ *    补 GitHub Alert / 任务列表 / emoji 短码 / 脚注 / 标题锚点 / @user 提及六个最小 GFM 插件，
  *    并用 highlight.js 高亮代码块；渲染产物再按仓库上下文改写相对链接/图片
  *    （见 renderOfflineHtml 的说明）
  * 4. 服务端 HTML 主通道（SERVER_HTML）同样用 highlight.js 高亮代码块（双预算护栏，
@@ -29,6 +29,11 @@
   var PURIFY_CONFIG = {
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'style'],
     FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style'],
+    // <kbd>/<sub>/<sup> 是 DOMPurify 默认白名单内的惰性排版标签（离线通道的内嵌 HTML
+    // 语义依赖它们；2026-09-12 恢复语义）。显式 ADD_TAGS 是**防漂移钉住**：后续若有人
+    // 换成 ALLOWED_TAGS 或扩充 FORBID_TAGS，不会静默丢掉这三个标签的语义。
+    // 不新增任何属性/协议面——不是安全放宽。
+    ADD_TAGS: ['kbd', 'sub', 'sup'],
     ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i
   };
 
@@ -500,6 +505,97 @@
     });
   }
 
+  // ── 离线 GFM 补齐：@user 提及（2026-09-12） ─────────────────────────────
+  //
+  // 只做**用户**提及：`@org/team` 没有应用内路由（GitHubLinkParser 明确把 `@org/team`
+  // 归为 External），因此整段保持纯文本——绝不允许把 `@org` 从 `@org/team` 里切出来
+  // 半截链接（负向前瞻 `(?![A-Za-z0-9\-/])` 保证）。
+  //
+  // 作用面与 emojiPlugin 同构：只改写 inline token 的 text 子节点。行内代码是 code_inline
+  // token、围栏是块级 token，结构上不进 text 子节点；已有链接（link_open…link_close）
+  // 之间整段跳过，避免 <a> 嵌套。邮箱（`octocat@github.com`）因 @ 前是词字符而不匹配。
+
+  /** 提及词法：GitHub 用户名为 1–39 位字母/数字/连字符，首尾不得是连字符。 */
+  var MENTION_SOURCE = '(^|[^\\w./+@-])@([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)(?![A-Za-z0-9\\-/])';
+  var GITHUB_PROFILE_BASE = 'https://github.com/';
+
+  /**
+   * 把一段 text 切成「纯文本 / 提及」片段；没有提及返回 null（调用方保持原 token）。
+   *
+   * 每次调用新建 RegExp：避免共享 `g` 正则的 lastIndex 状态串味。
+   *
+   * @returns {Array<{text: string}|{mention: string, user: string}>|null}
+   */
+  function mentionSegments(content) {
+    var pattern = new RegExp(MENTION_SOURCE, 'g');
+    var segments = [];
+    var cursor = 0;
+    var found = false;
+    var match;
+    while ((match = pattern.exec(content)) !== null) {
+      found = true;
+      // 前缀（空白/标点）并入前一段纯文本，不能丢
+      var before = content.slice(cursor, match.index) + match[1];
+      if (before) segments.push({ text: before });
+      segments.push({ mention: '@' + match[2], user: match[2] });
+      cursor = match.index + match[0].length;
+    }
+    if (!found) return null;
+    if (cursor < content.length) segments.push({ text: content.slice(cursor) });
+    return segments;
+  }
+
+  /** inline children 就地改写：提及 → link_open/text/link_close 三连 token。 */
+  function linkifyMentionTokens(state, children) {
+    var result = [];
+    var linkDepth = 0;
+    for (var i = 0; i < children.length; i++) {
+      var token = children[i];
+      if (token.type === 'link_open') linkDepth++;
+      if (token.type === 'link_close') linkDepth--;
+      if (token.type !== 'text' || linkDepth > 0) {
+        result.push(token);
+        continue;
+      }
+      var segments = mentionSegments(token.content);
+      if (!segments) {
+        result.push(token);
+        continue;
+      }
+      for (var s = 0; s < segments.length; s++) {
+        if (segments[s].user) {
+          var open = newToken(state, 'link_open', 'a', 1);
+          open.attrSet('href', GITHUB_PROFILE_BASE + segments[s].user);
+          var label = newToken(state, 'text', '', 0);
+          label.content = segments[s].mention;
+          result.push(open, label, newToken(state, 'link_close', 'a', -1));
+        } else {
+          var text = newToken(state, 'text', '', 0);
+          text.content = segments[s].text;
+          result.push(text);
+        }
+      }
+    }
+    return result;
+  }
+
+  /**
+   * `@user` → `<a href="https://github.com/user">@user</a>`（GitHub 网页端同样把它渲染成链接）。
+   *
+   * 点击后由 Kotlin 侧 `GitHubLinkParser.parseUrl → ParsedUrl.User` 分流到应用内用户页。
+   * 运行时机与 emojiPlugin 一致（inline 之后的 core 规则），且只动 text token。
+   */
+  function mentionPlugin(md) {
+    md.core.ruler.after('inline', 'mention_links', function (state) {
+      var tokens = state.tokens;
+      for (var i = 0; i < tokens.length; i++) {
+        var inline = tokens[i];
+        if (inline.type !== 'inline' || !inline.children) continue;
+        inline.children = linkifyMentionTokens(state, inline.children);
+      }
+    });
+  }
+
   /** GitHub slug 的字符剔除：保留字母/数字/组合符号/连字符（CJK 字母不会被剔除）。 */
   var SLUG_STRIP = (function () {
     try {
@@ -778,6 +874,7 @@
     md.use(emojiPlugin);
     md.use(anchorPlugin);
     md.use(footnotePlugin);
+    md.use(mentionPlugin);
     return md;
   }
 
@@ -828,6 +925,8 @@
     emojiPlugin: emojiPlugin,
     anchorPlugin: anchorPlugin,
     footnotePlugin: footnotePlugin,
+    mentionPlugin: mentionPlugin,
+    mentionSegments: mentionSegments,
     renderOfflineHtml: renderOfflineHtml,
     rewriteRelativeUrls: rewriteRelativeUrls,
     parseRepoContext: parseRepoContext,

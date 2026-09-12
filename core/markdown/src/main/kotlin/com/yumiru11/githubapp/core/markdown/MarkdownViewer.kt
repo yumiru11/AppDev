@@ -31,6 +31,7 @@ import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.markdownExtendedSpans
 import com.mikepenz.markdown.model.rememberMarkdownState
+import com.yumiru11.githubapp.core.markdown.native.rememberMarkdownInlineSemantics
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 
@@ -62,6 +63,8 @@ fun MarkdownViewer(
     val darkTheme = isSystemInDarkTheme()
     val state = rememberMarkdownState(markdown, immediate = true)
     val scheme = MaterialTheme.colorScheme
+    // 内联语义（@user 提及 / kbd / sub / sup）：经 Markdown(annotator) 下发给全部 MarkdownText
+    val inlineSemantics = rememberMarkdownInlineSemantics()
 
     // 链接点击接线：renderer 0.38.1 无 link 槽位，所有链接统一走 LocalUriHandler
     // （annotatorSettings 内部唯一消费点，构建 LinkAnnotation.Url 后经 openUri 分发）。
@@ -116,6 +119,7 @@ fun MarkdownViewer(
         Markdown(
             state,
             imageTransformer = Coil3ImageTransformerImpl,
+            annotator = inlineSemantics,
             colors = colors,
             typography = typography,
             extendedSpans =
