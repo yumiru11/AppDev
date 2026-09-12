@@ -246,6 +246,145 @@ class RepoFilesViewModelTest {
             coVerify(exactly = 0) { repoRepository.getChildTree(any(), any(), any(), any()) }
         }
 
+    // ---- TREE 深链：expandTreePath（初始视图自动展开到目标目录） ----
+
+    @Test
+    fun expandTreePath_nestedPath_expandsEachLevelSequentially() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns
+                        Result.success(listOf(treeNode("src", "src", isDirectory = true, sha = "srcsha")))
+                    coEvery { getChildTree("octocat", "Hello-World", "srcsha", "src") } returns
+                        Result.success(listOf(treeNode("main", "src/main", isDirectory = true, sha = "mainsha")))
+                    coEvery { getChildTree("octocat", "Hello-World", "mainsha", "src/main") } returns
+                        Result.success(listOf(treeNode("Main.kt", "src/main/Main.kt")))
+                }
+            val viewModel = viewModel(repoRepository)
+            viewModel.loadRootTree("main")
+
+            viewModel.expandTreePath("src/main")
+
+            val src = (viewModel.uiState.value.treeState as TreeState.Loaded).rootNodes[0]
+            assertTrue("第一级目录应展开", src.isExpanded)
+            val mainDir = src.children!![0]
+            assertTrue("第二级目录应展开", mainDir.isExpanded)
+            assertEquals("src/main/Main.kt", mainDir.children!![0].path)
+            // 逐级按需拉取：两级各一次，不多不少
+            coVerify(exactly = 1) { repoRepository.getChildTree("octocat", "Hello-World", "srcsha", "src") }
+            coVerify(exactly = 1) { repoRepository.getChildTree("octocat", "Hello-World", "mainsha", "src/main") }
+        }
+
+    @Test
+    fun expandTreePath_calledTwice_doesNotReloadExpandedLevels() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns
+                        Result.success(listOf(treeNode("src", "src", isDirectory = true, sha = "srcsha")))
+                    coEvery { getChildTree(any(), any(), any(), any()) } returns
+                        Result.success(listOf(treeNode("Main.kt", "src/Main.kt")))
+                }
+            val viewModel = viewModel(repoRepository)
+            viewModel.loadRootTree("main")
+
+            viewModel.expandTreePath("src")
+            viewModel.expandTreePath("src")
+
+            // 幂等：第二次调用命中 isExpanded 分支，不再请求子树
+            coVerify(exactly = 1) { repoRepository.getChildTree(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun expandTreePath_unknownPath_stopsWithoutAnyFetch() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns
+                        Result.success(listOf(treeNode("src", "src", isDirectory = true, sha = "srcsha")))
+                }
+            val viewModel = viewModel(repoRepository)
+            viewModel.loadRootTree("main")
+
+            viewModel.expandTreePath("docs")
+
+            // 路径不存在（已删除/改名）：静默停在根树，不弹错
+            val src = (viewModel.uiState.value.treeState as TreeState.Loaded).rootNodes[0]
+            assertTrue(!src.isExpanded)
+            coVerify(exactly = 0) { repoRepository.getChildTree(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun expandTreePath_terminalIsFile_expandsParentOnly() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns
+                        Result.success(listOf(treeNode("src", "src", isDirectory = true, sha = "srcsha")))
+                    coEvery { getChildTree(any(), any(), any(), any()) } returns
+                        Result.success(listOf(treeNode("Main.kt", "src/Main.kt")))
+                }
+            val viewModel = viewModel(repoRepository)
+            viewModel.loadRootTree("main")
+
+            // /tree/ 语义是目录；万一路径末段是文件，展开到父目录就停（不把文件当树拉）
+            viewModel.expandTreePath("src/Main.kt")
+
+            coVerify(exactly = 1) { repoRepository.getChildTree(any(), any(), any(), any()) }
+            val src = (viewModel.uiState.value.treeState as TreeState.Loaded).rootNodes[0]
+            assertTrue(src.isExpanded)
+        }
+
+    @Test
+    fun expandTreePath_childFetchFailure_stopsWithTreeIntact() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns
+                        Result.success(listOf(treeNode("src", "src", isDirectory = true, sha = "srcsha")))
+                    coEvery { getChildTree(any(), any(), any(), any()) } returns Result.failure(IOException("down"))
+                }
+            val viewModel = viewModel(repoRepository)
+            viewModel.loadRootTree("main")
+
+            viewModel.expandTreePath("src/main")
+
+            // 子树加载失败：保持收起（不抛异常、不破坏已加载的根树）
+            val src = (viewModel.uiState.value.treeState as TreeState.Loaded).rootNodes[0]
+            assertTrue(!src.isExpanded)
+            assertNull(src.children)
+        }
+
+    @Test
+    fun expandTreePath_blankPath_isNoOp() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns
+                        Result.success(listOf(treeNode("src", "src", isDirectory = true, sha = "srcsha")))
+                }
+            val viewModel = viewModel(repoRepository)
+            viewModel.loadRootTree("main")
+
+            viewModel.expandTreePath("  ".trim())
+            viewModel.expandTreePath("/")
+
+            coVerify(exactly = 0) { repoRepository.getChildTree(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun expandTreePath_beforeRootLoaded_isNoOp() =
+        runTest {
+            val repoRepository = mockk<RepoRepository>()
+            val viewModel = viewModel(repoRepository)
+
+            viewModel.expandTreePath("src")
+
+            // 根树未加载：静默等待（UI 侧以 tree Loaded 为触发键，此处保证不崩）
+            assertTrue(viewModel.uiState.value.treeState is TreeState.Loading)
+            coVerify(exactly = 0) { repoRepository.getChildTree(any(), any(), any(), any()) }
+        }
+
     @Test
     fun openFile_success_setsSelectedAndLoaded() =
         runTest {

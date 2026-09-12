@@ -265,4 +265,59 @@ class GitHubLinkParserTest {
             GitHubLinkParser.parseUrl("justaword") is ParsedUrl.External,
         )
     }
+
+    // ---- 搜索页（github.com/search?q=…，spec-audit §10 P2）----
+
+    @Test
+    fun parseUrl_searchUrl_returnsSearchWithQuery() {
+        // 回归：`search` 必须在校验「单段 → 用户页」之前命中，否则被解析成登录名 search 的用户页
+        assertEquals(
+            ParsedUrl.Search("roborazzi"),
+            GitHubLinkParser.parseUrl("https://github.com/search?q=roborazzi"),
+        )
+    }
+
+    @Test
+    fun parseUrl_searchUrl_percentEncodedQueryIsDecoded() {
+        assertEquals(
+            ParsedUrl.Search("kotlin coroutines"),
+            GitHubLinkParser.parseUrl("https://github.com/search?q=kotlin%20coroutines"),
+        )
+    }
+
+    @Test
+    fun parseUrl_searchUrl_plusInQueryDecodesToSpace() {
+        // query 语义下 `+` = 空格（HTML form 编码）
+        assertEquals(
+            ParsedUrl.Search("kotlin coroutines"),
+            GitHubLinkParser.parseUrl("https://github.com/search?q=kotlin+coroutines"),
+        )
+    }
+
+    @Test
+    fun parseUrl_searchUrl_queryNotFirstParam_stillExtracted() {
+        // GitHub 实际链接常见 `?type=repositories&q=…`，q 不在首个参数位
+        assertEquals(
+            ParsedUrl.Search("material3"),
+            GitHubLinkParser.parseUrl("https://github.com/search?type=repositories&q=material3"),
+        )
+    }
+
+    @Test
+    fun parseUrl_searchUrlWithoutQuery_returnsEmptySearch() {
+        // 无 q 的搜索页：普通搜索入口（AppRoute.Search 的 query 为空串）
+        assertEquals(
+            ParsedUrl.Search(""),
+            GitHubLinkParser.parseUrl("https://github.com/search"),
+        )
+    }
+
+    @Test
+    fun parseUrl_searchUrl_malformedPercentSequence_fallsBackToRawQuery() {
+        // 畸形 % 序列不能让解析器抛异常：回退原文，宁可搜到字面量（见 extractQueryParam 注释）
+        assertEquals(
+            ParsedUrl.Search("100%zz"),
+            GitHubLinkParser.parseUrl("https://github.com/search?q=100%zz"),
+        )
+    }
 }

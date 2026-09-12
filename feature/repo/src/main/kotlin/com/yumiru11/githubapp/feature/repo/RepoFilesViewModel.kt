@@ -85,50 +85,92 @@ class RepoFilesViewModel
             val state = _uiState.value
             if (state.treeState !is TreeState.Loaded || !node.isDirectory) return
 
-            if (node.isExpanded) {
+            when {
                 // 收起：只更新标记，子节点保留缓存（再次展开免网络）
-                _uiState.update {
-                    it.copy(
-                        treeState =
-                            updateTree { roots ->
-                                FileTreeBuilder.updateNode(roots, node.path) { n -> n.copy(isExpanded = false) }
-                            },
-                    )
-                }
-            } else {
-                val children = node.children
-                if (children != null) {
-                    _uiState.update {
-                        it.copy(
-                            treeState =
-                                updateTree { roots ->
-                                    FileTreeBuilder.updateNode(roots, node.path) { n -> n.copy(isExpanded = true) }
-                                },
-                        )
-                    }
-                } else {
-                    viewModelScope.launch {
-                        repoRepository.getChildTree(owner, repo, node.sha, node.path).fold(
-                            onSuccess = { childNodes ->
-                                _uiState.update {
-                                    it.copy(
-                                        treeState =
-                                            updateTree { roots ->
-                                                FileTreeBuilder.updateNode(roots, node.path) { n ->
-                                                    n.copy(children = childNodes, isExpanded = true)
-                                                }
-                                            },
-                                    )
-                                }
-                            },
-                            onFailure = {
-                                // 子树加载失败：保持收起（用户可重试点击），不阻塞其他操作
-                            },
-                        )
+                node.isExpanded -> setExpanded(node.path, expanded = false)
+
+                // 已有缓存：直接展开
+                node.children != null -> setExpanded(node.path, expanded = true)
+
+                else -> viewModelScope.launch { loadChildrenAndExpand(node) }
+            }
+        }
+
+        /**
+         * TREE 深链：根树就绪后按目录路径逐级展开（每级按需拉子树），供「文件」分区初始
+         * 定位到 `github.com/{owner}/{repo}/tree/{ref}/{path}` 的目标目录。
+         *
+         * 顺序推进而非并发：下一级节点只在前一级子树回填后才存在（[findNode] 在当前已加载
+         * 状态里查找），逐级 await 同时就是「失败即停」的自然边界。路径不存在（目录已删除/
+         * 改名）或最后一段是文件时静默停在已展开层级 —— 深链不应因此弹错误。
+         */
+        fun expandTreePath(path: String) {
+            val normalized = path.trim().trim('/')
+            if (normalized.isEmpty()) return
+            viewModelScope.launch {
+                var prefix = ""
+                for (segment in normalized.split('/').filter { it.isNotBlank() }) {
+                    prefix = if (prefix.isEmpty()) segment else "$prefix/$segment"
+                    val node = findNode(prefix) ?: return@launch
+                    if (!node.isDirectory) return@launch
+                    if (node.isExpanded) continue
+                    if (node.children != null) {
+                        setExpanded(prefix, expanded = true)
+                    } else {
+                        loadChildrenAndExpand(node)
                     }
                 }
             }
         }
+
+        /** 加载子树并展开；失败保持收起（用户可重试点击），不阻塞其他操作。 */
+        private suspend fun loadChildrenAndExpand(node: GitTreeNode) {
+            repoRepository.getChildTree(owner, repo, node.sha, node.path).fold(
+                onSuccess = { childNodes ->
+                    _uiState.update {
+                        it.copy(
+                            treeState =
+                                updateTree { roots ->
+                                    FileTreeBuilder.updateNode(roots, node.path) { n ->
+                                        n.copy(children = childNodes, isExpanded = true)
+                                    }
+                                },
+                        )
+                    }
+                },
+                onFailure = {
+                    // 子树加载失败：保持收起（用户可重试点击），不阻塞其他操作
+                },
+            )
+        }
+
+        private fun setExpanded(
+            path: String,
+            expanded: Boolean,
+        ) {
+            _uiState.update {
+                it.copy(
+                    treeState =
+                        updateTree { roots ->
+                            FileTreeBuilder.updateNode(roots, path) { n -> n.copy(isExpanded = expanded) }
+                        },
+                )
+            }
+        }
+
+        /** 在当前已加载的树里按完整路径找节点（未展开的子树不在状态里，自然找不到）。 */
+        private fun findNode(path: String): GitTreeNode? {
+            val roots = (_uiState.value.treeState as? TreeState.Loaded)?.rootNodes ?: return null
+            return findNodeIn(roots, path)
+        }
+
+        private fun findNodeIn(
+            nodes: List<GitTreeNode>,
+            path: String,
+        ): GitTreeNode? =
+            nodes.firstNotNullOfOrNull { node ->
+                if (node.path == path) node else node.children?.let { findNodeIn(it, path) }
+            }
 
         fun openFile(
             node: GitTreeNode,

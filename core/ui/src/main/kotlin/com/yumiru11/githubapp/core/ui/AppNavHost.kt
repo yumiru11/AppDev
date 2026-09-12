@@ -17,6 +17,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
@@ -30,7 +31,6 @@ import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.EditorContentHolder
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.screens.ProfileScreen
-import com.yumiru11.githubapp.core.ui.screens.SearchScreen as PlaceholderSearchScreen
 
 /**
  * 应用导航宿主：入口 Composable，内部 Navigation Compose NavHost（#90 类型安全路由）。
@@ -65,7 +65,15 @@ fun AppNavHost(
     homeScreen: @Composable () -> Unit = {},
     loginScreen: @Composable () -> Unit = {},
     searchScreen: @Composable (initialQuery: String) -> Unit = {},
-    repoDetailScreen: @Composable (owner: String, repo: String, ref: String) -> Unit = { _, _, _ -> },
+    repoDetailScreen: @Composable (
+        owner: String,
+        repo: String,
+        ref: String,
+        showFiles: Boolean,
+        treePath: String,
+        showReleases: Boolean,
+        releaseTag: String,
+    ) -> Unit = { _, _, _, _, _, _, _ -> },
     createRepoScreen: @Composable (onCreated: (owner: String, repo: String) -> Unit) -> Unit = {},
     releaseCreateScreen: @Composable (
         owner: String,
@@ -176,7 +184,15 @@ fun AppNavHost(
                             ),
                     ) {
                         provideNavTransitionScope {
-                            repoDetailScreen(route.owner, route.repo, route.ref)
+                            repoDetailScreen(
+                                route.owner,
+                                route.repo,
+                                route.ref,
+                                route.showFiles,
+                                route.treePath,
+                                route.showReleases,
+                                route.releaseTag,
+                            )
                         }
                     }
                 }
@@ -322,11 +338,20 @@ fun AppNavHost(
                 }
 
                 // Discussion 深链历史崩溃修复（#90）：GitHubLinkParser 会产出 ParsedUrl.Discussion，
-                // 旧字符串体系下映射出的路由无对应 destination → 导航即崩溃；注册占位与 COMMIT 同策略
-                composable<AppRoute.Discussion> {
-                    provideNavTransitionScope {
-                        PlaceholderSearchScreen()
-                    }
+                // 旧字符串体系下映射出的路由无对应 destination → 导航即崩溃；注册占位与 COMMIT 同策略。
+                //
+                // spec-audit §10 P2 修复：占位屏是**静默死路**（用户点进来只看到“Coming soon”）。
+                // 应用无 Discussions 屏（v1 范围），改为显式转外部浏览器——GitHub 的 Discussions
+                // 页面在浏览器里是完整可用内容，也不是“什么都不发生”。弹出后回退上一页，不让
+                // 用户从浏览器返回时停在一个空屏幕。
+                composable<AppRoute.Discussion> { backStackEntry ->
+                    val route = backStackEntry.toRoute<AppRoute.Discussion>()
+                    DiscussionExternalRedirect(
+                        owner = route.owner,
+                        repo = route.repo,
+                        number = route.number,
+                        onOpened = { navController.popBackStack() },
+                    )
                 }
 
                 composable<AppRoute.Blob> { backStackEntry ->
@@ -360,7 +385,8 @@ private fun AnimatedVisibilityScope.provideNavTransitionScope(content: @Composab
  * 处理 [ParsedUrl] 外链导航。
  *
  * - [ParsedUrl.External] → 返回 false（由 [ExternalLinkHost] 处理）
- * - 其他 → 导航到对应类型安全 route 并返回 true
+ * - 其他 → 导航到对应类型安全 route 并返回 true；`fromParsedUrl` 返回 null（如无仓库
+ *   语境的 IssueRef）同样返回 false，由调用方兜底，不留静默死路
  */
 fun navigateToParsedUrl(
     navController: NavHostController,
@@ -371,6 +397,32 @@ fun navigateToParsedUrl(
     navController.navigate(route)
     return true
 }
+
+/**
+ * Discussion 外部重定向目的地：应用无 Discussions 屏，显式落外部浏览器后回退上一页。
+ *
+ * 单独抽为 Composable + 纯函数 URL 构造器，以便 URL 形态可单测（见 DiscussionRedirectTest）。
+ */
+@Composable
+private fun DiscussionExternalRedirect(
+    owner: String,
+    repo: String,
+    number: Int,
+    onOpened: () -> Unit,
+) {
+    val context = LocalContext.current
+    LaunchedEffect(owner, repo, number) {
+        openExternalBrowser(context, discussionBrowserUrl(owner, repo, number))
+        onOpened()
+    }
+}
+
+/** Discussions 讨论页的 GitHub 标准 URL（外部兜底目的地）。 */
+internal fun discussionBrowserUrl(
+    owner: String,
+    repo: String,
+    number: Int,
+): String = "https://github.com/$owner/$repo/discussions/$number"
 
 // ── #90 全局转场规格（来源 ui-audit 提案 #6） ──
 //

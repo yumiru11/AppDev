@@ -151,16 +151,25 @@ fun RepoDetailScreen(
     repo: String,
     onBackClick: () -> Unit = {},
     initialRef: String? = null,
+    /** TREE 深链：初始落「文件」分区（无路径也直接看到文件浏览而非 README） */
+    initialShowFiles: Boolean = false,
+    /** TREE 深链：文件分区自动展开到的仓库内路径（空 = 只到根树） */
+    initialTreePath: String = "",
+    /** RELEASE 深链：初始落「Releases」分区 */
+    initialShowReleases: Boolean = false,
+    /** RELEASE 深链：Releases 分区展开该 tag 的 Release 详情（空 = 只到列表） */
+    initialReleaseTag: String = "",
     onBranchesClick: (owner: String, repo: String, currentRef: String?) -> Unit = { _, _, _ -> },
     /** L05：新建 Release 表单页（Releases Tab 入口） */
     onCreateRelease: (owner: String, repo: String) -> Unit = { _, _ -> },
     /** L06：点击 Topic chip → 搜索页（query = topic:xxx） */
     onTopicClick: (topic: String) -> Unit = {},
     viewModel: RepoDetailViewModel = hiltViewModel(),
+    // 与 viewModel 同形参化：屏幕级测试可直接注入（默认 hiltViewModel() 保持生产接线不变）
+    filesViewModel: RepoFilesViewModel = hiltViewModel(),
     actions: RepoDetailActions = LocalRepoDetailActions.current,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val filesViewModel: RepoFilesViewModel = hiltViewModel()
     val filesState by filesViewModel.uiState.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -245,6 +254,10 @@ fun RepoDetailScreen(
                             actions = actions,
                             onRetryReadme = { viewModel.retry() },
                             initialRef = initialRef,
+                            initialShowFiles = initialShowFiles,
+                            initialTreePath = initialTreePath,
+                            initialShowReleases = initialShowReleases,
+                            initialReleaseTag = initialReleaseTag,
                             onBranchesClick = { onBranchesClick(owner, repo, filesState.currentRef) },
                             onTopicClick = onTopicClick,
                             managementCallbacks =
@@ -575,12 +588,18 @@ private fun RepoDetailContent(
     actions: RepoDetailActions,
     onRetryReadme: () -> Unit,
     initialRef: String? = null,
+    initialShowFiles: Boolean = false,
+    initialTreePath: String = "",
+    initialShowReleases: Boolean = false,
+    initialReleaseTag: String = "",
     onBranchesClick: () -> Unit,
     onTopicClick: (String) -> Unit = {},
     managementCallbacks: RepoManagementCallbacks,
     modifier: Modifier = Modifier,
 ) {
-    var tab by rememberSaveable { mutableIntStateOf(0) }
+    // 深链初始分区：TREE → 文件，RELEASE → Releases；两者同帧不会同时来自解析器，
+    // 同真时文件优先（见 repoDetailInitialTab）。rememberSaveable：旋转/重建保留用户实际切到的分区。
+    var tab by rememberSaveable { mutableIntStateOf(repoDetailInitialTab(initialShowFiles, initialShowReleases)) }
 
     // ── README 下滑收起头部（#167 / UI10，ui-design §3.8 A 版）────────────────
     // A 版口径（用户拍板）：README 下滑时，仓库头（名称/描述/统计/Star·Watch·Fork）
@@ -682,6 +701,7 @@ private fun RepoDetailContent(
                     defaultBranch = state.repo.defaultBranch,
                     currentRef = filesState.currentRef,
                     initialRef = initialRef,
+                    initialTreePath = initialTreePath,
                     onBranchesClick = onBranchesClick,
                 )
             }
@@ -692,6 +712,7 @@ private fun RepoDetailContent(
                         state = state,
                         actions = actions,
                         callbacks = managementCallbacks,
+                        initialTag = initialReleaseTag,
                     )
                 }
             }
@@ -708,6 +729,7 @@ private fun FilesTab(
     defaultBranch: String?,
     currentRef: String?,
     initialRef: String? = null,
+    initialTreePath: String = "",
     onBranchesClick: () -> Unit,
 ) {
     Box(Modifier.padding(horizontal = 16.dp)) {
@@ -740,6 +762,7 @@ private fun FilesTab(
                 treeState = filesState.treeState,
                 defaultBranch = defaultBranch,
                 initialRef = initialRef,
+                initialTreePath = initialTreePath,
                 viewModel = filesViewModel,
             )
         }
@@ -1107,10 +1130,23 @@ private fun ReleasesSection(
     state: RepoDetailUiState.Success,
     actions: RepoDetailActions,
     callbacks: RepoManagementCallbacks,
+    initialTag: String = "",
 ) {
     LaunchedEffect(Unit) {
         callbacks.onEnsureReleasesLoaded()
         callbacks.onEnsureTagsLoaded()
+    }
+
+    // RELEASE 深链（/releases/tag/{tag}）：列表就绪后按 tag 精确匹配并展开该 Release 详情；
+    // 匹配不到（tag 只有 git tag、或已删除/草稿被过滤）就停在列表 —— 深链不弹错误。
+    // one-shot：用户收起详情/切 Tab 返回后不再重展开（rememberSaveable 跨配置变更保留）。
+    var initialTagConsumed by rememberSaveable(initialTag) { mutableStateOf(false) }
+    LaunchedEffect(state.releasesState, initialTag) {
+        if (initialTagConsumed || initialTag.isBlank()) return@LaunchedEffect
+        val loaded = state.releasesState as? ReleasesState.Loaded ?: return@LaunchedEffect
+        val releaseId = findReleaseIdByTag(loaded.releases, initialTag) ?: return@LaunchedEffect
+        initialTagConsumed = true
+        callbacks.onReleaseClick(releaseId)
     }
 
     if (state.expandedReleaseId != null) {
@@ -1837,6 +1873,37 @@ private val RELEASE_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern
 
 /** README 分区索引（头部收起只在 README 分区生效，见 RepoDetailContent 注释） */
 private const val README_TAB_INDEX = 0
+
+/** 文件分区索引（TREE 深链初始落点） */
+private const val FILES_TAB_INDEX = 1
+
+/** Releases 分区索引（RELEASE 深链初始落点） */
+private const val RELEASES_TAB_INDEX = 2
+
+/**
+ * 深链初始分区（TREE → 文件 / RELEASE → Releases；其余 → README）。
+ *
+ * 两个提示同真不会来自解析器（一次只解析一个 URL）；若同真，文件优先——
+ * TREE 语义更强（携带路径定位），且 showFiles 无路径时也比 Releases 更接近链接原意。
+ */
+internal fun repoDetailInitialTab(
+    showFiles: Boolean,
+    showReleases: Boolean,
+): Int =
+    when {
+        showFiles -> FILES_TAB_INDEX
+        showReleases -> RELEASES_TAB_INDEX
+        else -> README_TAB_INDEX
+    }
+
+/**
+ * Releases 列表里按 tag 精确匹配（GitHub tag 区分大小写；前缀相同不算命中，如 v1 ≠ v1.0）。
+ * 未命中返回 null = 停在列表（该 tag 可能只有 git tag，没有对应 Release）。
+ */
+internal fun findReleaseIdByTag(
+    releases: List<Release>,
+    tag: String,
+): Long? = releases.firstOrNull { it.tagName == tag }?.id
 
 /**
  * README 下滑多少距离后头部完全收起（#167 / UI10，A 版跟手渐隐）。

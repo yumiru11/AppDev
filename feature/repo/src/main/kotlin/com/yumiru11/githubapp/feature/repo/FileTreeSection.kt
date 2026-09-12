@@ -38,6 +38,8 @@ fun FileTreeSection(
     treeState: TreeState,
     defaultBranch: String?,
     initialRef: String? = null,
+    /** TREE 深链：树就绪后自动展开到的仓库内目录路径（空 = 只到根树） */
+    initialTreePath: String = "",
     viewModel: RepoFilesViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -45,6 +47,16 @@ fun FileTreeSection(
     val ref = initialRef?.takeIf { it.isNotBlank() } ?: defaultBranch ?: DEFAULT_REF
     LaunchedEffect(ref) {
         viewModel.loadRootTree(ref)
+    }
+
+    // 以「树是否已 Loaded」为键：根树加载完成前后各只触发一次（等待根树是必要的，
+    // 展开路径的第一段就在根树里）；[RepoFilesViewModel.expandTreePath] 自身幂等，
+    // 已展开层级不会重复请求。
+    val treeLoaded = treeState is TreeState.Loaded
+    LaunchedEffect(treeLoaded, initialTreePath) {
+        if (treeLoaded && initialTreePath.isNotBlank()) {
+            viewModel.expandTreePath(initialTreePath)
+        }
     }
 
     when (treeState) {

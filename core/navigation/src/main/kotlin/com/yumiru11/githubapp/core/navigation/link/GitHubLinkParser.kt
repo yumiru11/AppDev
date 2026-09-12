@@ -4,6 +4,8 @@
 
 package com.yumiru11.githubapp.core.navigation.link
 
+import java.net.URLDecoder
+
 /**
  * 解析 GitHub 链接的纯函数结果。
  *
@@ -96,6 +98,17 @@ sealed interface ParsedUrl {
 object GitHubLinkParser {
     private const val GITHUB_HOST = "github.com"
     private const val SHA_LENGTH = 40
+
+    /**
+     * 全局搜索页首段（`github.com/search?q=…`）。
+     *
+     * GitHub 把 `search` 作为保留首段（同名用户不存在），故命中即可判定为搜索页；
+     * 判定必须发生在「单段 → 用户页」之前——否则 `github.com/search?q=x` 会被解析成
+     * 登录名 `search` 的用户页（既不存在的账号，也彻底丢掉 query）。
+     */
+    private const val SEARCH_SEGMENT = "search"
+
+    private const val QUERY_PARAM = "q"
 
     fun parseUrl(input: String): ParsedUrl {
         val raw = input.trim()
@@ -198,10 +211,14 @@ object GitHubLinkParser {
         path: String,
         original: String,
     ): ParsedUrl {
-        // 去掉 query string（?tab=... 等）
+        // 去 query 前先判搜索页：`search?q=…` 的 query 就是搜索词本身，不能丢（见 [SEARCH_SEGMENT]）
         val pathOnly = path.substringBefore('?')
         val segments = pathOnly.split('/').filter { it.isNotEmpty() }
         if (segments.isEmpty()) return ParsedUrl.External(original)
+
+        if (segments.first() == SEARCH_SEGMENT) {
+            return ParsedUrl.Search(extractQueryParam(path, QUERY_PARAM).orEmpty())
+        }
 
         // 单段视为用户页
         if (segments.size == 1) {
@@ -288,6 +305,28 @@ object GitHubLinkParser {
         val segments = base.split('/').filter { it.isNotEmpty() }
         if (segments.size != 2) return null to null
         return segments[0] to segments[1]
+    }
+
+    /**
+     * 取 query string 里某个参数的值（percent 解码；`+` 按 query 语义还原为空格）。
+     *
+     * 解码失败（URL 含非法 `%` 序列、非 UTF-8 字节）时**回退原文**：深链来自任意仓库页面，
+     * 宁可搜到原样的字面量，也不能因为一个畸形链接让解析器抛异常。
+     */
+    private fun extractQueryParam(
+        path: String,
+        name: String,
+    ): String? {
+        val query = path.substringAfter('?', missingDelimiterValue = "")
+        if (query.isEmpty()) return null
+        val raw =
+            query
+                .split('&')
+                .firstNotNullOfOrNull { pair ->
+                    val key = pair.substringBefore('=')
+                    if (key == name) pair.substringAfter('=', missingDelimiterValue = "") else null
+                } ?: return null
+        return runCatching { URLDecoder.decode(raw, Charsets.UTF_8.name()) }.getOrDefault(raw)
     }
 
     private fun isBareSha(value: String): Boolean {
