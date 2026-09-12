@@ -93,7 +93,15 @@ class ReposListInsetsGeometryTest {
         )
     }
 
-    /** 渲染「生产 contentPadding 公式 + 真底栏」并滚到末项，返回末项底边与底栏上沿。 */
+    /**
+     * 渲染「生产 contentPadding 公式 + 真底栏」并滚到末项，返回末项底边与底栏上沿。
+     *
+     * 本函数**故意**忽略 Scaffold 的 innerPadding（故抑制 UnusedMaterial3ScaffoldPaddingParameter）：
+     * 断言目标就是「列表自身的 contentPadding 公式（reposListContentPadding）足以避开底栏」；
+     * 若在此消费 innerPadding，等于把待测公式换成 Scaffold 的默认 padding，测试即失去意义
+     * （反向护栏 reposListContentPadding_zeroBottomContentPadding_* 同源）。
+     */
+    @Suppress("UnusedMaterial3ScaffoldPaddingParameter")
     private fun renderReposListUnderThreeButtonNav(
         bottomContentPadding: Dp,
         spec: SystemBarInsets.InsetsSpec = SystemBarInsets.THREE_BUTTON,

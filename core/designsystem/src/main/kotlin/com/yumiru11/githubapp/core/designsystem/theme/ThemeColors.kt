@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.core.designsystem.theme
 
 import android.content.Context
 import android.os.Build
+import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -280,7 +281,14 @@ fun oledPalette(): ThemeColors =
  * Extracted as a pure function so the SDK gate is unit-testable without
  * Robolectric; [dynamicLightColors] / [dynamicDarkColors] use it to decide
  * between real extraction and the fixed fallback palettes (ADR-0004).
+ *
+ * [ChecksSdkIntAtLeast]：这个自定义门禁对 `dynamicLightColorScheme` 等 API 31
+ * 调用点是「lint 看不见的守卫」—— 库模块 lint 恢复后 `:core:designsystem:lintDebug`
+ * 首次暴露 NewApi 误报（2026-09-12）。注解把「返回 true ⇒ SDK_INT ≥ S」告知 lint，
+ * 检测器即可正确推断调用点已被门禁保护（默认参数即 [Build.VERSION.SDK_INT]，
+ * 生产调用点全部走无参形式，语义成立）。
  */
+@ChecksSdkIntAtLeast(api = Build.VERSION_CODES.S)
 internal fun supportsDynamicColors(apiLevel: Int = Build.VERSION.SDK_INT): Boolean = apiLevel >= Build.VERSION_CODES.S
 
 /**

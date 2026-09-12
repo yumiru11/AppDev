@@ -24,7 +24,10 @@ internal fun extractAuthorizationCode(callbackUri: String): String? {
             val key = pair.substring(0, eq)
             val value = pair.substring(eq + 1)
             if (key == PARAM_CODE && value.isNotBlank()) {
-                URLDecoder.decode(value, StandardCharsets.UTF_8)
+                // 用 (String, String) 重载而非 (String, Charset)：后者是 API 33+ 才有的重载，
+                // 在 minSdk 26 的设备上会抛 NoSuchMethodError（lint NewApi 在库模块 lint 恢复后
+                // 首次报出，2026-09-12）。UTF-8 是 URLDecoder 强制支持的编码，不会抛异常。
+                URLDecoder.decode(value, StandardCharsets.UTF_8.name())
             } else {
                 null
             }

@@ -462,6 +462,13 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 // → 永不进覆盖率报告）。若不排除，门禁会把「测试基建」判成「生产代码未覆盖」，
                 // 这是口径错误而非覆盖率不足（#215 实测：core/testing 的 40 行占未覆盖 40/42）。
                 .filterNot { it.contains("core/testing/src/") }
+                // ★ buildSrc 整体排除（2026-09-12，PR #235 实证）：
+                // buildSrc 是**构建工具链**（AppDevI18nLint 自定义 lint 规则等），在 Gradle
+                // 配置期/构建期执行，没有 JaCoCo 插桩，也没有独立测试与覆盖率口径
+                // （不进 coverageThresholds / registerCoverageTasks）→ 报告里恒为 0/N，
+                // 与 core/testing 同属**口径错误而非覆盖率不足**（#235 实测：22 行可执行
+                // 全未覆盖，占比 0/22，使总体 4.5% < 80% 误红）。
+                .filterNot { it.startsWith("buildSrc/") }
                 .toList()
         if (changedFiles.isEmpty()) {
             logger.lifecycle("diffCoverageCheck: 无变更的生产源码文件（base=$base），通过")
