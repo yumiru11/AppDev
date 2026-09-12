@@ -275,7 +275,9 @@ jobs:
 
   notify-failure:
     name: Report nightly failure
-    needs: [quality, module-screenshots, release-shrink]
+    # GATE-4：必须显式列出**全部** job——漏掉 screenshot-drift / screenshot-refresh 时，
+    # 仅它们失败则 needs 全绿 → failure() 为假 → 本 job 根本不跑，nightly 红了也没人知道。
+    needs: [quality, module-screenshots, screenshot-drift, screenshot-refresh, release-shrink]
     if: failure()
     runs-on: ubuntu-latest
     permissions:

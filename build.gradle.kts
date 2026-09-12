@@ -156,8 +156,11 @@ val coverageExcludes =
         //   *Screen*/*Dialog*/*Card*/*Section* —— UI 屏幕/弹窗/卡片/分段（如 GitHubAlertCard、
         //     设置段、文件树段），无逻辑同名类；
         //   *Composable* —— 罕见但无害（仅命中字面含 Composable 的类）；
-        //   *EditorView*/*EditorTheme*/*EditorController* —— core:editor 的 Sora 视图/主题/控制句柄
-        //     （隔离 Sora 类型、单测不可达，core:editor 无阈值）；
+        //   *EditorViewKt*/*EditorTheme*/*EditorController* —— core:editor 的 Sora 视图/主题/控制句柄
+        //     （隔离 Sora 类型、单测不可达，core:editor 无阈值）；视图是 @Composable 顶层函数，
+        //     编译产物为 CodeEditorViewKt.class / MarkdownEditorViewKt.class，故带 Kt 后缀 ——
+        //     GATE-1：`**/*EditorView*.class` 会连带排除 MarkdownEditorViewModel.class
+        //     （feature:editor 的逻辑 VM，有完整单测，必须留在覆盖率报告里）；
         //   *TabContent*/*TimelineItems* —— PR 详情四 Tab 内容装配 / 时间线条目渲染（纯 Composable，
         //     feature 根包无 ui/ 子包，只能靠具体后缀命中）。
         // 严禁回退 v1 宽模式（已用上方具体后缀替代）：
@@ -167,14 +170,15 @@ val coverageExcludes =
         //   *Tab* 误伤 AppDatabase/DatabaseModule/MarkdownTableData/MarkdownTableParser；
         //   *Component*/*Controller* 误伤逻辑控制器；
         //   *Theme* 误伤 core:datastore 的 ThemeMode（逻辑偏好模型）——故仅用 *EditorTheme*；
-        //   *View* 误伤 *ViewModel（逻辑）——故仅用 *EditorView*（*ViewModel 经 diff 门禁显式放行）。
+        //   *View* 误伤 *ViewModel（逻辑）——故仅用 *EditorViewKt*（精确到 @Composable 编译产物，
+        //     MarkdownEditorViewModel 不在其中）。
         "**/*Screen*.class",
         "**/*Screen\$*.class",
         "**/*Dialog*.class",
         "**/*Composable*.class",
         "**/*Card*.class",
         "**/*Section*.class",
-        "**/*EditorView*.class",
+        "**/*EditorViewKt*.class",
         "**/*EditorTheme*.class",
         "**/*EditorController*.class",
         "**/*TabContent*.class",
@@ -383,7 +387,10 @@ abstract class DiffCoverageCheck : DefaultTask() {
         // 包目录（纯 UI 子包，全仓唯一、无逻辑命中）；文件名 token 仅命中 UI，绝不命中逻辑。
         // 严禁 v1 宽模式（*Content*/*Item*/*Tab*/*Component*/*Controller* 会误伤逻辑模型/DTO/
         // 数据库类）。*Theme* 会误伤 core:datastore 的 ThemeMode（逻辑偏好），*View* 会误伤
-        // *ViewModel（逻辑），故用具体后缀（*EditorTheme*/*EditorView*）并显式放行 *ViewModel。
+        // *ViewModel（逻辑），故用具体后缀（*EditorTheme*/*EditorView.kt 精确匹配）——
+        // GATE-1：`*EditorView[^/]*\.kt$` 会误伤 MarkdownEditorViewModel.kt（有完整单测的逻辑
+        // VM），收紧为 `*EditorView\.kt$`（只命中 CodeEditorView.kt / MarkdownEditorView.kt
+        // 两个纯 Composable，编译产物 XxxEditorViewKt.class 与上面的 JaCoCo 排除对齐）。
         val uiSourceExcludes =
             listOf(
                 // 包目录
@@ -400,7 +407,7 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 Regex("""(^|/)[^/]*Dialog[^/]*\.kt$"""),
                 Regex("""(^|/)[^/]*Card[^/]*\.kt$"""),
                 Regex("""(^|/)[^/]*Section[^/]*\.kt$"""),
-                Regex("""(^|/)[^/]*EditorView[^/]*\.kt$"""),
+                Regex("""(^|/)[^/]*EditorView\.kt$"""),
                 Regex("""(^|/)[^/]*EditorTheme[^/]*\.kt$"""),
                 Regex("""(^|/)[^/]*EditorController[^/]*\.kt$"""),
                 Regex("""(^|/)[^/]*TabContent[^/]*\.kt$"""),
