@@ -49,8 +49,13 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
-      # 覆盖全部有 src/test/screenshots 的模块。record 模式不做 idle 等待与比对，
-      # 因此 :feature:issue 那种「无限动画导致 verify 挂死」的测试在这里是安全的。
+      # 覆盖全部有 src/test/screenshots 的模块。
+      # 2026-09-12 更正（旧注释误以为「record 不做 idle 等待所以安全」）：record 与 verify 走同一
+      # 条 compose 捕获路径，同样调用 ShadowLooper.shadowMainLooper().idle() —— :feature:issue
+      # 曾经的无限动画挂起在 record 下一样存在（CI 实测：该模块 test 任务 11:13:15→11:29:51
+      # 共 16.5 分钟，其余模块同任务均 < 1 分钟；本机 record 直接挂死）。该问题已由
+      # core:testing 的 captureScreenshotDeterministic（冻结时钟 + 手工 draw + Bitmap 捕获）
+      # 从测试侧修复。
       - name: Record all screenshots
         run: |
           ./gradlew \

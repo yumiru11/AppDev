@@ -44,4 +44,8 @@ dependencies {
 
     // 测试：core:testing 已 api 导出 JUnit4/Robolectric/Roborazzi/compose-test
     testImplementation(project(":core:testing"))
+    // 主题模式矩阵截图（AppTopBarMatrixScreenshotTest）需要 ThemeMode 枚举；
+    // ThemeMode 归属 core:datastore（与 core:designsystem 的 AppTheme 参数同源），
+    // 仅测试源集使用，不进主代码依赖图。
+    testImplementation(project(":core:datastore"))
 }

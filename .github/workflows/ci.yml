@@ -185,12 +185,23 @@ jobs:
       #    录制入口：Actions → "Record screenshots (CI canonical)" → 下载 artifact 后提交。
       #    本地若 verify 模块级基线失败，先怀疑环境差异，**不要**直接 record 覆盖。
       #
-      # ② :feature:issue 不在本步骤：它的截图测试用真实 ViewModel + Paging 渲染，首帧落不到
-      #    "loaded" 态 → 屏幕上是 CircularProgressIndicator（无限动画）→ Robolectric 的
-      #    waitForIdle 永不收敛，verify **挂死**（本地 timeout 420s → exit 124；record 模式
-      #    不等待 idle 所以正常）。该模块的漂移改由 nightly 的 "screenshot drift" job 兜底。
+      # ② :feature:issue 已纳入（2026-09-12 修复，原排除注释保留在下方供对照）：
+      #    旧注释归因「首帧落不到 loaded 态」不准确 —— 帧里其实已有列表数据，真正挂死的是
+      #    Roborazzi 的 compose 捕获路径：截图前它调用 ShadowLooper.shadowMainLooper().idle()
+      #    （Roborazzi.kt captureScreenIfMultipleWindows），而屏幕里的无限动画
+      #    （PullToRefreshBox 刷新指示器 / CircularProgressIndicator）每帧通过 Choreographer
+      #    续订下一帧 → looper 队列永不为空 → idle() 永不返回。本机 jstack 实证：主线程
+      #    RUNNABLE、CPU 47.9s 全烧在 ShadowPausedLooper.idle ← captureScreenIfMultipleWindows；
+      #    最小复现：单独一个 AppCenteredLoadingState() 在 verify/record 下即挂死（150s timeout）。
+      #    修复：IssueListScreen light/dark/rtl 与详情 RTL 全屏帧改用 core:testing 的
+      #    captureScreenshotDeterministic（冻结组合时钟 autoAdvance=false + advanceTimeBy(2000)
+      #    + 手工 draw decorView + Bitmap.captureRoboImage —— Bitmap 重载不做 idle 等待），
+      #    同代码两次独立运行 PNG md5 相同（探针双跑实测 b506b0b4…）；该模块录/验均不再挂。
+      #    （历史参照）旧注释：:feature:issue 的截图首帧为 CircularProgressIndicator，
+      #    Robolectric waitForIdle 永不收敛 → verify 挂死；漂移曾由 nightly drift job 兜底。
       # ✅ 模块级基线已就位（CI 权威录制，见 "Record screenshots (CI canonical)" workflow），
-      # 本步骤覆盖 app + 6 个模块 —— D02「模块级截图基线不在任何门禁」到此闭环。
+      # 本步骤覆盖 app + 7 个模块（含 :feature:issue）—— D02「模块级截图基线不在任何门禁」
+      # 到此闭环。
       #
       # ⚠️ 重新录制基线只能走那个 workflow，**不要**在本机 record 后提交：Robolectric Native
       # Graphics 的渲染依赖运行环境（字体/原生库/JDK），本机与 runner 出的 PNG 不是逐字节
@@ -203,6 +214,7 @@ jobs:
             :core:designsystem:verifyRoborazziDebug \
             :core:markdown:verifyRoborazziDebug \
             :feature:auth:verifyRoborazziDebug \
+            :feature:issue:verifyRoborazziDebug \
             :feature:repo:verifyRoborazziDebug \
             :feature:notifications:verifyRoborazziDebug \
             --no-daemon
