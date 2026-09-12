@@ -1,11 +1,26 @@
 plugins {
     id("appdev.android.library")
+    // 截图基线（Roborazzi）：提供 recordRoborazziDebug / verifyRoborazziDebug 任务
+    alias(libs.plugins.roborazzi)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }
 
 android {
     namespace = "com.yumiru11.githubapp.feature.search"
+
+    defaultConfig {
+        // core:github-auth 库 manifest 的 ${appAuthRedirectScheme} 占位符（ADR-0001 自定义 scheme）；
+        // Robolectric 测试开资源表后 testManifest 合并需要（home/settings/issue 同款）
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.yumiru11.githubapp"
+    }
+
+    // Robolectric compose 截图测试需要资源表（SearchScreen 文案全走 stringResource）
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 dependencies {
