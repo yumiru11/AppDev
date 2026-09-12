@@ -200,7 +200,7 @@ jobs:
       #    （历史参照）旧注释：:feature:issue 的截图首帧为 CircularProgressIndicator，
       #    Robolectric waitForIdle 永不收敛 → verify 挂死；漂移曾由 nightly drift job 兜底。
       # ✅ 模块级基线已就位（CI 权威录制，见 "Record screenshots (CI canonical)" workflow），
-      # 本步骤覆盖 app + 7 个模块（含 :feature:issue）—— D02「模块级截图基线不在任何门禁」
+      # 本步骤覆盖 app + 8 个模块（含 :feature:issue / :feature:pullrequest）—— D02「模块级截图基线不在任何门禁」
       # 到此闭环。
       #
       # ⚠️ 重新录制基线只能走那个 workflow，**不要**在本机 record 后提交：Robolectric Native
@@ -217,6 +217,7 @@ jobs:
             :feature:issue:verifyRoborazziDebug \
             :feature:repo:verifyRoborazziDebug \
             :feature:notifications:verifyRoborazziDebug \
+            :feature:pullrequest:verifyRoborazziDebug \
             --no-daemon
 
       - name: Upload Roborazzi diffs (on failure)
