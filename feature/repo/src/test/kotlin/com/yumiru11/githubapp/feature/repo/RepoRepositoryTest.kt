@@ -463,6 +463,62 @@ class RepoRepositoryTest {
             assertTrue(result.isFailure)
         }
 
+    // ── 文件内容缓存（spec-audit §3.6 / plan §4.6：branch+path+blob sha） ────────
+
+    @Test
+    fun getFileContent_sameRevision_reusesCacheWithoutSecondRequest() =
+        runTest {
+            coEvery { contentApi.getFileContent("octocat", "Hello-World", "Main.kt", "main") } returns
+                fileContentDto(text = "val a = 1", sha = "blob-1")
+
+            val first = repository.getFileContent("octocat", "Hello-World", "Main.kt", "main", "blob-1")
+            val second = repository.getFileContent("octocat", "Hello-World", "Main.kt", "main", "blob-1")
+
+            assertEquals(first, second)
+            coVerify(exactly = 1) { contentApi.getFileContent("octocat", "Hello-World", "Main.kt", "main") }
+        }
+
+    @Test
+    fun getFileContent_differentRevision_refetchesAndReturnsFreshContent() =
+        runTest {
+            coEvery { contentApi.getFileContent("octocat", "Hello-World", "Main.kt", "main") } returnsMany
+                listOf(fileContentDto(text = "old", sha = "blob-1"), fileContentDto(text = "new", sha = "blob-2"))
+
+            val old = repository.getFileContent("octocat", "Hello-World", "Main.kt", "main", "blob-1")
+            val new = repository.getFileContent("octocat", "Hello-World", "Main.kt", "main", "blob-2")
+
+            assertEquals("old", old.getOrNull()?.text)
+            assertEquals("新 revision 不得命中旧缓存", "new", new.getOrNull()?.text)
+            coVerify(exactly = 2) { contentApi.getFileContent("octocat", "Hello-World", "Main.kt", "main") }
+        }
+
+    @Test
+    fun getFileContent_responseShaDiffersFromRevision_isNotCached() =
+        runTest {
+            // branch 已移动：调用方 revision=blob-old，但服务端返回 blob-new → 不得写入旧 key
+            coEvery { contentApi.getFileContent("octocat", "Hello-World", "Main.kt", "main") } returns
+                fileContentDto(text = "moved", sha = "blob-new")
+
+            repository.getFileContent("octocat", "Hello-World", "Main.kt", "main", "blob-old")
+            repository.getFileContent("octocat", "Hello-World", "Main.kt", "main", "blob-old")
+
+            coVerify(exactly = 2) { contentApi.getFileContent("octocat", "Hello-World", "Main.kt", "main") }
+        }
+
+    private fun fileContentDto(
+        text: String,
+        sha: String?,
+    ): FileContentDto =
+        FileContentDto(
+            name = "Main.kt",
+            path = "Main.kt",
+            sha = sha,
+            size = text.length.toLong(),
+            type = "file",
+            content = Base64.getEncoder().encodeToString(text.toByteArray()),
+            encoding = "base64",
+        )
+
     // ── T22 文件编辑提交（Contents API + 409 冲突） ─────────────────────────────
 
     @Test

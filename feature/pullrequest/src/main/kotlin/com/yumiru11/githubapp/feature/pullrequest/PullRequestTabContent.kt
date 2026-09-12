@@ -2,6 +2,9 @@
 
 package com.yumiru11.githubapp.feature.pullrequest
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -176,8 +179,8 @@ private fun PullRequestBodyWebView(
     AppImageOverlay(imageUrl = previewImageUrl, onDismiss = { previewImageUrl = null })
 }
 
-/** WebView 正文 bridge：内部链接 → 应用内导航；外部链接 → 浏览器；纯锚点忽略。 */
-@Suppress("EmptyFunctionBlock") // onCodeCopy/onCheckboxClick/onHeightChanged 为预留/T14 占位
+/** WebView 正文 bridge：内部链接 → 应用内导航；外部链接 → 浏览器；代码块 → 剪贴板。 */
+@Suppress("EmptyFunctionBlock") // onCheckboxClick/onHeightChanged 为预留/T14 占位
 @Composable
 private fun createPullRequestBridgeCallback(
     onInternalLink: (ParsedUrl) -> Unit,
@@ -195,7 +198,10 @@ private fun createPullRequestBridgeCallback(
             onInternalLink(parsed)
         }
 
-        override fun onCodeCopy(code: String) {}
+        override fun onCodeCopy(code: String) {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("code", code))
+        }
 
         override fun onImageClick(src: String) {
             onImageClick(src)

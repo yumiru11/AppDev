@@ -22,6 +22,8 @@ import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.util.Base64
+import java.util.Collections
+import java.util.LinkedHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -46,6 +48,20 @@ class RepoRepository
         private val contentApi: ContentApi,
         private val gitRefApi: GitRefApi,
     ) {
+        /**
+         * 文件内容缓存（key = `owner/repo/ref/path@blobSha`，LRU）。
+         *
+         * spec-audit §3.6：plan §4.6 要求文件内容按 `branch+path+sha` 缓存，此前 0 命中。
+         * 同步包装保证并发调用下 get/put 原子（LinkedHashMap 本身非线程安全）。
+         */
+        private val fileContentCache: MutableMap<String, FileContentData> =
+            Collections.synchronizedMap(
+                object : LinkedHashMap<String, FileContentData>(CACHE_INITIAL_CAPACITY, CACHE_LOAD_FACTOR, true) {
+                    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, FileContentData>): Boolean =
+                        size > FILE_CONTENT_CACHE_ENTRIES
+                },
+            )
+
         /**
          * 获取仓库元数据。
          */
@@ -101,7 +117,9 @@ class RepoRepository
         /**
          * 获取文件内容并分类（T11 验收：大文件/二进制给提示而非卡死）。
          *
-         * 解码 → [FileClassifier] 判定（TOO_LARGE 不取内容；BINARY 嗅探；MARKDOWN/CODE 返回文本）。
+         * 无 revision 时直连网络（重试/深链/冲突重载路径）；树内浏览文件时走带 `revision` 的
+         * 重载以启用缓存。解码 → [FileClassifier] 判定（TOO_LARGE 不取内容；BINARY 嗅探；
+         * MARKDOWN/CODE 返回文本）。
          *
          * @param ref 分支/Tag/SHA（Contents API ref 查询参数，null 由调用方传默认分支名）
          */
@@ -110,21 +128,48 @@ class RepoRepository
             repo: String,
             path: String,
             ref: String?,
-        ): Result<FileContentData> =
-            runCatching {
+        ): Result<FileContentData> = getFileContent(owner, repo, path, ref, revision = null)
+
+        /**
+         * 获取文件内容（按 `branch+path+blob sha` 缓存；plan §4.6 / spec-audit §3.6）。
+         *
+         * @param revision 调用方从 git tree 拿到的 blob sha（`GitTreeNode.sha`）：它是文件内容
+         *   在该分支上的 revision 身份。分支推进后同路径的 sha 改变，旧 revision 的缓存自然
+         *   不再命中，杆绝「新提交后仍显示旧内容」。null = 无 revision，直连网络且不读写缓存。
+         */
+        suspend fun getFileContent(
+            owner: String,
+            repo: String,
+            path: String,
+            ref: String?,
+            revision: String?,
+        ): Result<FileContentData> {
+            val cacheKey = revision?.let { "$owner/$repo/$ref/$path@$it" }
+            if (cacheKey != null) {
+                fileContentCache[cacheKey]?.let { return Result.success(it) }
+            }
+            return runCatching {
                 val dto = contentApi.getFileContent(owner, repo, path, ref)
                 val bytes = dto.decodeBytes()
                 val kind = FileClassifier.classify(dto.name, dto.size, bytes)
                 val text = if (kind == FileKind.CODE || kind == FileKind.MARKDOWN) bytes?.decodeToString().orEmpty() else null
-                FileContentData(
-                    fileName = dto.name,
-                    path = dto.path,
-                    size = dto.size,
-                    kind = kind,
-                    text = text,
-                    sha = dto.sha,
-                )
+                val data =
+                    FileContentData(
+                        fileName = dto.name,
+                        path = dto.path,
+                        size = dto.size,
+                        kind = kind,
+                        text = text,
+                        sha = dto.sha,
+                    )
+                // 只有响应 sha 与调用方 revision 一致才缓存：分支已移动时响应 sha 不同，
+                // 按旧 revision 缓存会把「不是该 revision 的内容」挂在旧 key 下。
+                if (cacheKey != null && dto.sha != null && dto.sha == revision) {
+                    fileContentCache[cacheKey] = data
+                }
+                data
             }
+        }
 
         /**
          * 获取 README 内容（Task B：README 一律 WebView 渲染）。
@@ -437,6 +482,11 @@ class RepoRepository
 
         private companion object {
             const val TAG = "ReadmeRender"
+
+            /** 文件内容缓存容量（LRU；单条内容可能较大，保持小容量） */
+            const val FILE_CONTENT_CACHE_ENTRIES = 8
+            const val CACHE_INITIAL_CAPACITY = 8
+            const val CACHE_LOAD_FACTOR = 0.75f
         }
     }
 

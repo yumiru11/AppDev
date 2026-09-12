@@ -201,7 +201,10 @@ body {
   vertical-align: text-bottom;
 }
 
-/* Code copy button overlay. */
+/* Code copy button overlay.
+   触屏（无 hover）常显低强调 + :active 按压反馈；hover 设备仍悬停/聚焦才显示。
+   此前按钮 opacity:0 + pre:hover 显隐、且由 renderer.js 内联样式写死——手机上既无
+   hover 又不可见，等于不存在（2026-09-12 审计缺口）。视觉统一收敛到本规则。 */
 .md-copy-btn {
   position: absolute;
   top: 6px;
@@ -215,6 +218,19 @@ body {
   border: none;
   cursor: pointer;
   opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+/* 无悬停能力的设备（触屏/手写笔）：常显但不抢眼，避免完全遮住代码正文 */
+@media (hover: none) {
+  .md-copy-btn {
+    opacity: 0.72;
+  }
+}
+
+.md-copy-btn:active {
+  opacity: 1;
+  transform: scale(0.9);
 }
 
 .markdown-body pre:hover .md-copy-btn,

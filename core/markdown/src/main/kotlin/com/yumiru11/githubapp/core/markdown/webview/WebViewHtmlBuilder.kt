@@ -92,13 +92,7 @@ object WebViewHtmlBuilder {
     ): String {
         val themeMarker = if (isDark) "dark" else "light"
         val contentBlock = buildContentBlock(sanitizedHtml, renderMode, baseRepoUrl)
-        val offlineScripts =
-            if (renderMode == RenderMode.OFFLINE_MARKDOWN_IT) {
-                "\n    <script src=\"${ASSET_BASE}markdown-it.min.js\"></script>" +
-                    "\n    <script src=\"${ASSET_BASE}highlight.min.js\"></script>"
-            } else {
-                ""
-            }
+        val runtimeScripts = runtimeScripts(renderMode, sanitizedHtml)
 
         return buildString {
             append("<!DOCTYPE html>\n")
@@ -123,7 +117,7 @@ object WebViewHtmlBuilder {
             append("\n  <style id=\"theme-vars\">\n")
             append(themeVariables)
             append("  </style>\n")
-            append(offlineScripts)
+            append(runtimeScripts)
             append("\n  <script src=\"${ASSET_BASE}purify.min.js\"></script>\n")
             append("</head>\n")
             append("<body data-theme=\"$themeMarker\">\n")
@@ -135,6 +129,27 @@ object WebViewHtmlBuilder {
             append("</html>\n")
         }
     }
+
+    /**
+     * 运行时脚本：离线模式恒加载 markdown-it + highlight.js；服务端 HTML 模式只在内容含代码块
+     * （`<pre`）时加载 highlight.js —— README 主通道此前完全不高亮（2026-09-12 审计缺口 1），
+     * 但无代码块的页面也不应为约 130KB 的 highlight.js 付解析成本。
+     */
+    private fun runtimeScripts(
+        renderMode: RenderMode,
+        sanitizedHtml: String,
+    ): String =
+        buildString {
+            if (renderMode == RenderMode.OFFLINE_MARKDOWN_IT) {
+                append("\n    <script src=\"${ASSET_BASE}markdown-it.min.js\"></script>")
+            }
+            if (renderMode == RenderMode.OFFLINE_MARKDOWN_IT || containsCodeBlock(sanitizedHtml)) {
+                append("\n    <script src=\"${ASSET_BASE}highlight.min.js\"></script>")
+            }
+        }
+
+    /** 服务端 HTML 的代码块形态：GitHub 渲染为 `<div class="highlight"><pre><code …>`。 */
+    private fun containsCodeBlock(html: String): Boolean = html.contains("<pre", ignoreCase = true)
 
     /**
      * 构建内容块（取决于渲染模式）。

@@ -402,7 +402,7 @@ class RepoFilesViewModelTest {
             val repoRepository =
                 mockk<RepoRepository> {
                     coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("Main.kt", "Main.kt")))
-                    coEvery { getFileContent("octocat", "Hello-World", "Main.kt", "main") } returns
+                    coEvery { getFileContent("octocat", "Hello-World", "Main.kt", "main", any()) } returns
                         Result.success(FileContentData("Main.kt", "Main.kt", 4L, FileKind.CODE, "code"))
                 }
             val viewModel = viewModel(repoRepository)
@@ -422,7 +422,7 @@ class RepoFilesViewModelTest {
             val repoRepository =
                 mockk<RepoRepository> {
                     coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("Main.kt", "Main.kt")))
-                    coEvery { getFileContent(any(), any(), any(), any()) } returns Result.failure(httpException(404))
+                    coEvery { getFileContent(any(), any(), any(), any(), any()) } returns Result.failure(httpException(404))
                 }
             val viewModel = viewModel(repoRepository)
             viewModel.loadRootTree("main")
@@ -457,7 +457,7 @@ class RepoFilesViewModelTest {
             val repoRepository =
                 mockk<RepoRepository> {
                     coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("Main.kt", "Main.kt")))
-                    coEvery { getFileContent(any(), any(), any(), any()) } returns Result.failure(IOException("down"))
+                    coEvery { getFileContent(any(), any(), any(), any(), any()) } returns Result.failure(IOException("down"))
                 }
             val viewModel = viewModel(repoRepository)
             viewModel.loadRootTree("main")
@@ -473,7 +473,8 @@ class RepoFilesViewModelTest {
                 FileViewState.Loaded(FileContentData("Main.kt", "Main.kt", 4L, FileKind.CODE, "code")),
                 viewModel.uiState.value.fileState,
             )
-            coVerify(exactly = 2) { repoRepository.getFileContent(any(), any(), "Main.kt", any()) }
+            coVerify(exactly = 1) { repoRepository.getFileContent(any(), any(), "Main.kt", any()) }
+            coVerify(exactly = 1) { repoRepository.getFileContent(any(), any(), "Main.kt", any(), any()) }
         }
 
     @Test
@@ -482,7 +483,7 @@ class RepoFilesViewModelTest {
             val repoRepository =
                 mockk<RepoRepository> {
                     coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("Main.kt", "Main.kt")))
-                    coEvery { getFileContent(any(), any(), any(), any()) } returns
+                    coEvery { getFileContent(any(), any(), any(), any(), any()) } returns
                         Result.success(FileContentData("Main.kt", "Main.kt", 4L, FileKind.CODE, "code"))
                 }
             val viewModel = viewModel(repoRepository)
@@ -526,7 +527,7 @@ class RepoFilesViewModelTest {
     ): RepoFilesViewModel {
         coEvery { repoRepository.getTree(any(), any(), any()) } returns
             Result.success(listOf(treeNode("Main.kt", "Main.kt")))
-        coEvery { repoRepository.getFileContent(any(), any(), any(), any()) } returns
+        coEvery { repoRepository.getFileContent(any(), any(), any(), any(), any()) } returns
             Result.success(FileContentData("Main.kt", "Main.kt", 4L, kind, text, sha))
         val vm = viewModel(repoRepository, drafts)
         vm.loadRootTree("main")
@@ -712,8 +713,9 @@ class RepoFilesViewModelTest {
             val repoRepository =
                 mockk<RepoRepository> {
                     coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("Main.kt", "Main.kt")))
-                    // 单一 getFileContent 桩（openFile 与重载共用）：远端最新内容。
-                    // 不用双桩/answers 计数——MockK 多桩匹配顺序易混淆，单桩天然确定。
+                    // openFile 走带 revision 的重载、冲突重载走直连重载：两桩都指向同一远端最新内容。
+                    coEvery { getFileContent(any(), any(), any(), any(), any()) } returns
+                        Result.success(FileContentData("Main.kt", "Main.kt", 9L, FileKind.CODE, "remote-new", "blob-latest"))
                     coEvery { getFileContent(any(), any(), any(), any()) } returns
                         Result.success(FileContentData("Main.kt", "Main.kt", 9L, FileKind.CODE, "remote-new", "blob-latest"))
                     coEvery { updateFileContent(any(), any(), any(), any(), any(), any(), any()) } returns
@@ -729,7 +731,7 @@ class RepoFilesViewModelTest {
             val conflictState = vm.uiState.value.editState
             assertEquals(ConflictOperation.UPDATE, (conflictState as FileEditState.Conflict).operation)
             assertEquals("latest99", conflictState.latestSha)
-            coVerify(exactly = 1) { repoRepository.getFileContent(any(), any(), any(), any()) }
+            coVerify(exactly = 1) { repoRepository.getFileContent(any(), any(), any(), any(), any()) }
 
             vm.reloadAfterConflict()
 
@@ -738,7 +740,8 @@ class RepoFilesViewModelTest {
                 FileEditState.Editing(isNew = false, text = "remote-new", sha = "blob-latest", isMarkdown = false),
                 vm.uiState.value.editState,
             )
-            coVerify(exactly = 2) { repoRepository.getFileContent(any(), any(), any(), any()) }
+            coVerify(exactly = 1) { repoRepository.getFileContent(any(), any(), any(), any()) }
+            coVerify(exactly = 1) { repoRepository.getFileContent(any(), any(), any(), any(), any()) }
         }
 
     @Test
@@ -915,7 +918,8 @@ class RepoFilesViewModelTest {
                 FileViewState.Loaded(FileContentData("Main.kt", "Main.kt", 4L, FileKind.CODE, "code", "blob-old")),
                 vm.uiState.value.fileState,
             )
-            coVerify(exactly = 2) { repoRepository.getFileContent(any(), any(), any(), any()) }
+            coVerify(exactly = 1) { repoRepository.getFileContent(any(), any(), any(), any()) }
+            coVerify(exactly = 1) { repoRepository.getFileContent(any(), any(), any(), any(), any()) }
         }
 
     @Test
@@ -924,17 +928,10 @@ class RepoFilesViewModelTest {
             val repoRepository =
                 mockk<RepoRepository> {
                     coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("Main.kt", "Main.kt")))
-                    // 单桩 + 计数：第 1 次（openFile）成功返回旧内容；第 2 次（冲突重载）网络失败。
-                    // 不用双桩——MockK 多桩匹配顺序易混淆（本项目血泪）。
-                    var fetchCount = 0
-                    coEvery { getFileContent(any(), any(), any(), any()) } answers {
-                        fetchCount++
-                        if (fetchCount == 1) {
-                            Result.success(FileContentData("Main.kt", "Main.kt", 4L, FileKind.CODE, "code", "blob-old"))
-                        } else {
-                            Result.failure(IOException("down"))
-                        }
-                    }
+                    coEvery { getFileContent(any(), any(), any(), any(), any()) } returns
+                        Result.success(FileContentData("Main.kt", "Main.kt", 4L, FileKind.CODE, "code", "blob-old"))
+                    // 冲突重载（无 revision 直连）网络失败
+                    coEvery { getFileContent(any(), any(), any(), any()) } returns Result.failure(IOException("down"))
                     coEvery { updateFileContent(any(), any(), any(), any(), any(), any(), any()) } returns
                         Result.success(FileCommitResult.Conflict("latest99"))
                 }
@@ -1065,7 +1062,7 @@ class RepoFilesViewModelTest {
     private fun viewerSetup(repoRepository: RepoRepository): RepoFilesViewModel {
         coEvery { repoRepository.getTree(any(), any(), any()) } returns
             Result.success(listOf(treeNode("Main.kt", "Main.kt")))
-        coEvery { repoRepository.getFileContent(any(), any(), any(), any()) } returns
+        coEvery { repoRepository.getFileContent(any(), any(), any(), any(), any()) } returns
             Result.success(FileContentData("Main.kt", "Main.kt", 4L, FileKind.CODE, "code"))
         val vm = viewModel(repoRepository)
         vm.loadRootTree("main")
@@ -1279,7 +1276,7 @@ class RepoFilesViewModelTest {
             drafts.store(draftKey(), "from-disk")
             val repoRepository = mockk<RepoRepository>(relaxed = true)
             coEvery { repoRepository.getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("Main.kt", "Main.kt")))
-            coEvery { repoRepository.getFileContent(any(), any(), any(), any()) } returns
+            coEvery { repoRepository.getFileContent(any(), any(), any(), any(), any()) } returns
                 Result.success(FileContentData("Main.kt", "Main.kt", 4L, FileKind.CODE, "remote", "blob-old"))
             val vm = viewModel(repoRepository, draftSaver(drafts))
             vm.loadRootTree("main")

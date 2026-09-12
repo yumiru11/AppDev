@@ -515,8 +515,8 @@ private fun IssueBodyWebView(
     AppImageOverlay(imageUrl = previewImageUrl, onDismiss = { previewImageUrl = null })
 }
 
-/** WebView 正文 bridge：内部链接 → 应用内导航；外部链接 → 浏览器；checkbox → 任务列表反向同步。 */
-@Suppress("EmptyFunctionBlock") // onCodeCopy/onHeightChanged 为预留占位
+/** WebView 正文 bridge：内部链接 → 应用内导航；外部链接 → 浏览器；checkbox → 任务列表反向同步；代码块 → 剪贴板。 */
+@Suppress("EmptyFunctionBlock") // onHeightChanged 为预留占位
 @Composable
 private fun createIssueBridgeCallback(
     onInternalLink: (ParsedUrl) -> Unit,
@@ -535,7 +535,10 @@ private fun createIssueBridgeCallback(
             onInternalLink(parsed)
         }
 
-        override fun onCodeCopy(code: String) {}
+        override fun onCodeCopy(code: String) {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("code", code))
+        }
 
         override fun onImageClick(src: String) {
             onImageClick(src)

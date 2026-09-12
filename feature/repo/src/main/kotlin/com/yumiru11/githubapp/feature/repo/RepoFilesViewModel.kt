@@ -208,7 +208,9 @@ class RepoFilesViewModel
                 )
             }
             viewModelScope.launch {
-                repoRepository.getFileContent(owner, repo, node.path, ref).fold(
+                // 传 node.sha（blob sha）作为 revision：文件内容缓存按 branch+path+sha 键控
+                // （plan §4.6）；分支推进后同一个 node 不会复用，但不同 revision 必然 miss。
+                repoRepository.getFileContent(owner, repo, node.path, ref, node.sha).fold(
                     onSuccess = { data ->
                         _uiState.update { it.copy(fileState = FileViewState.Loaded(data)) }
                     },

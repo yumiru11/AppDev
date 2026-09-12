@@ -1,6 +1,7 @@
 package com.yumiru11.githubapp.core.markdown.webview
 
 import com.yumiru11.githubapp.core.markdown.fixture.MarkdownGfmFixtures
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -183,6 +184,25 @@ class OfflineRendererExecutionTest {
 
         assertTrue("首个标题用基础 slug", html.contains("id=\"same\""))
         assertTrue("重复标题必须加 -1 后缀（否则锚点只能跳到第一个）", html.contains("id=\"same-1\""))
+    }
+
+    // ── 图片懒加载（审计缺口 3，2026-09-12） ─────────────────────────────
+
+    @Test
+    fun offlineRender_images_injectLazyLoadingAndAsyncDecoding() {
+        val html = render("![a](./docs/x.png)\n\n<img src=\"inline/img.png\" alt=\"i\">\n")
+
+        assertEquals("markdown 图与内联 HTML 图都要补", 2, Regex("loading=\\\"lazy\\\"").findAll(html).count())
+        assertEquals("异步解码同步注入", 2, Regex("decoding=\\\"async\\\"").findAll(html).count())
+    }
+
+    @Test
+    fun offlineRender_imageWithExplicitLoading_keepsExistingValue() {
+        val html = render("<img src=\"x.png\" loading=\"eager\">")
+
+        assertTrue("显式 loading 不得被覆盖", html.contains("loading=\"eager\""))
+        assertFalse("不得同时出现 lazy", html.contains("loading=\"lazy\""))
+        assertTrue("缺失的 decoding 仍要补 async", html.contains("decoding=\"async\""))
     }
 
     // ── 共用 ────────────────────────────────────────────────────────────
