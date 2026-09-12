@@ -300,3 +300,16 @@ body {
   mask-position: center;
 }
 
+
+/* 脚注标题用视觉隐藏（github-markdown.css 未打包 .sr-only；脚注区结构对齐 GitHub） */
+.markdown-body .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

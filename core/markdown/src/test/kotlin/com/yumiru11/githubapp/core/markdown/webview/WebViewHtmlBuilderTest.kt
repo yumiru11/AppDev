@@ -519,9 +519,16 @@ class WebViewHtmlBuilderTest {
     }
 
     @Test
-    fun build_offlineMode_withBaseRepoUrl_doesNotRewriteEscapedRawMarkdown() {
-        // 离线原始 markdown 已转义注入属性值，<img src="..."> 文本不得被 URL 改写正则误伤
-        val markdown = "```html\n<img src=\"docs/x.png\">\n```"
+    fun build_offlineMode_withBaseRepoUrl_keepsRawMarkdownAndHandsRepoContextToRendererJs() {
+        // ⚠️ 本测试的前身 build_offlineMode_withBaseRepoUrl_doesNotRewriteEscapedRawMarkdown
+        // 把**错误行为固化成了期望**（离线通道完全不改写相对链接/图片 → Issue 正文里的相对链接
+        // 点击 404、相对图片显示不出来，见报告 D3）。本票修正期望：
+        // - Kotlin 依然不在 markdown 文本上做 URL 改写（`./docs/x.png` 与代码围栏里的示例文本
+        //   无法区分，正则必然误伤）；
+        // - 但必须把仓库上下文以 `data-base-repo` 交给 renderer.js，由它在 markdown-it 渲染
+        //   产物上改写（代码块里的内容此刻已是转义文本，误伤不可能）。
+        // 「真的改写了」由 OfflineRendererExecutionTest（node 执行真实 renderer.js）证明。
+        val markdown = "```html\n<img src=\"docs/x.png\">\n```\n\n![img](./docs/real.png)"
 
         val html =
             WebViewHtmlBuilder.build(
@@ -532,6 +539,8 @@ class WebViewHtmlBuilderTest {
             )
 
         assertTrue("escaped code fence must survive", html.contains("&lt;img src=&quot;docs/x.png&quot;&gt;"))
-        assertFalse("raw markdown must not be url-rewritten", html.contains("raw.githubusercontent.com"))
+        assertFalse("markdown 文本层不得做 URL 改写（会误伤代码围栏）", html.contains("raw.githubusercontent.com"))
+        assertTrue("仓库上下文必须交给 renderer.js", html.contains("data-base-repo=\"octo/hello\""))
+        assertTrue("相对图片的原始写法必须无损传给 renderer.js", html.contains("![img](./docs/real.png)"))
     }
 }

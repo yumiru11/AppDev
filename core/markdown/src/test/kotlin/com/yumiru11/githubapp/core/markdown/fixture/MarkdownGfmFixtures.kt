@@ -154,11 +154,12 @@ object MarkdownGfmFixtures {
             Fixture(
                 "17-image-relative",
                 "图片（相对路径引用）",
-                setOf(RenderPath.NATIVE, RenderPath.SERVER_HTML),
+                ALL_PATHS,
                 note =
-                    "离线 GFM 不重写原始 markdown 的相对 img src（WebViewHtmlBuilder 只改写已渲染 HTML），" +
-                        "base 为 appassets 域 → 离线路径相对图片取不到。原生侧另有缺陷：" +
-                        "EnhancedMarkdownViewer 未把 baseRepoUrl 透传给 EnhancedMarkdownImage（见报告「发现但未修」第 2 条）",
+                    "离线通道由 renderer.js 在 markdown-it 渲染产物层改写相对 img src → raw 域" +
+                        "（2026-09-12 修复；Node 真实执行回归见 OfflineRendererExecutionTest）。" +
+                        "原生侧另有缺陷：EnhancedMarkdownViewer 未把 baseRepoUrl 透传给 " +
+                        "EnhancedMarkdownImage（见报告「发现但未修」第 2 条）",
             ),
             Fixture("18-image-github-cache-domain", "图片（GitHub 缓存域）", ALL_PATHS),
             Fixture("19-external-link", "外部链接", ALL_PATHS),
@@ -166,8 +167,10 @@ object MarkdownGfmFixtures {
             Fixture(
                 "21-relative-link",
                 "相对链接（`./`、`../`、`/owner/repo`）",
-                setOf(RenderPath.NATIVE, RenderPath.SERVER_HTML),
-                note = "原生链在点击时分流解析（resolveMarkdownUrl）；离线 GFM 不做相对 href 重写",
+                ALL_PATHS,
+                note =
+                    "原生链在点击时分流解析（resolveMarkdownUrl）；离线通道由 renderer.js 在渲染产物层" +
+                        "改写（blob/HEAD 与站点路由形态，2026-09-12 修复）",
             ),
             Fixture(
                 "22-mention-user",
@@ -196,8 +199,11 @@ object MarkdownGfmFixtures {
             Fixture(
                 "26-emoji-shortcode",
                 "Emoji 短句：`:rocket:`",
-                setOf(RenderPath.SERVER_HTML),
-                note = "markdown-it 14.1.0 未打包 markdown-it-emoji；plan §2.2① 的 GhMarkdownProcessor（emoji 短码→Unicode）无实现",
+                setOf(RenderPath.SERVER_HTML, RenderPath.OFFLINE_GFM),
+                note =
+                    "原生链无 emoji 插件（mikepenz 按纯文本渲染）；离线通道由 renderer.js 的 " +
+                        "emojiPlugin 补齐（gemoji 常用子集 → Unicode，2026-09-12）；未收录的短码原样保留。" +
+                        "代码块/行内代码结构上不受影响",
             ),
             Fixture(
                 "27-github-alerts",
@@ -208,10 +214,11 @@ object MarkdownGfmFixtures {
             Fixture(
                 "28-anchor-jump",
                 "锚点跳转（`#section`）",
-                emptySet(),
+                setOf(RenderPath.OFFLINE_GFM),
                 note =
-                    "未实现：离线未打包 markdown-it-anchor，WebView 侧无 heading id 生成；" +
-                        "plan §2.9 约定的 Kotlin→JS scrollToAnchor(id) 全仓无调用点",
+                    "离线通道：renderer.js 的 anchorPlugin 生成 GitHub slug 的 heading id，并暴露 " +
+                        "window.scrollToAnchor(id)；页内 # 链接点击走 WebView 内滚动（2026-09-12）。" +
+                        "服务端 HTML / 原生通道无 id 生成与滚动绑定",
             ),
             Fixture(
                 "29-image-lazy",
@@ -258,8 +265,10 @@ object MarkdownGfmFixtures {
             Fixture(
                 "35-footnote",
                 "脚注（尽力而为，不保证与网页完全一致）",
-                setOf(RenderPath.SERVER_HTML),
-                note = "markdown-it 14.1.0 未打包 markdown-it-footnote；服务端 HTML 通道由 GitHub 渲染脚注",
+                setOf(RenderPath.SERVER_HTML, RenderPath.OFFLINE_GFM),
+                note =
+                    "离线通道由 renderer.js 的 footnotePlugin 补齐（单行/四空格续行定义，" +
+                        "2026-09-12）；服务端 HTML 通道由 GitHub 渲染脚注。简化点：多段落定义不嵌套解析",
             ),
         )
 
