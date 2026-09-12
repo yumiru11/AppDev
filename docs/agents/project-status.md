@@ -2,7 +2,7 @@
 
 > 本文件是当前进度的**权威快照**。每张票合并/关闭后更新。配合 `docs/agents/workflow.md`（流程）、`AGENTS.md`（环境）与 `docs/agents/task-audit-2026-09-06.md`（全量审计）阅读。
 > 本版修正 2026-09-06 审计发现的 §7 D01「文档三处失真」：AGENTS.md / project-status.md / FEEDBACK.md 已与 `gh` 票面 + git 历史对齐。
-> **基线**：`main@217cdd7`（2026-09-12 修复波末，26 张 PR #229–#255 全部 squash 合入；#256 仍 open。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`）。
+> **基线**：`main@fd899b9`（2026-09-12 修复波末，35 张 PR #229–#264 全部 squash 合入，其中 #250 是 issue 非 PR；后半 #256–#264 见 §2.1）。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`。
 
 ## 1. 里程碑概览
 
@@ -15,7 +15,7 @@
 | M4 全功能（PR 深化/编辑提交/分支） | ✅ 完成（T16/T17/T23 已合入） |
 | M5 发布收尾（性能/签名 Release） | 🔶 进行中：Baseline Profile + i18n 覆盖断言 + RTL 基线 + 发布链路演练已落地（PR #186）；**冷启动实测 / macrobenchmark / 生产签名密钥仍需真机或 Secrets**（见 §3.2） |
 | M6 审计补全与 UI 打磨（2026-09-06 立项） | ✅ 9 张分类票 #163–#170 **全部关闭并合入**；#166/#167 的少数挂账项见 §3.1 |
-| M7 修复波 + 门禁/截图链路加固（2026-09-12） | ✅ **26 张 PR #229–#255 全部 squash 合入**：审计 P0 收口（OAuth 注入 #239、PAT 降级 #230）+ 设计系统/语义色 #231 + 离线 GFM #232/#237/#251 + 深链 #233/#248 + 草稿 #234 + i18n lint #235 + 覆盖率棘轮 #255 + 截图链路可信化 #245/#246/#252 + 文档回写 #236/#244（明细见 §2.1）。**#256（9 屏 20 帧基线扩展）仍 open** |
+| M7 修复波 + 门禁/截图链路加固（2026-09-12） | ✅ **35 张 PR #229–#264 全部 squash 合入**：前半 26 张（#229–#255，明细见 §2.1）；后半 9 张 —— #256 截图基线扩展（9 屏/20 帧）、#258 RepoDetail 头修复、#259 设置返回箭头 + FAB 留白、#260 门禁去空转、#261 JaCoCo×Robolectric 修复、#262 markdown 引用链接、#263 阈值棘轮、#264 ETag 持久化。**已无 open PR** |
 
 ## 2. 已完成（T1–T26 中 25 票 + 计划外交付 + 2026-09-12 修复波全部合入 main）
 
@@ -58,7 +58,9 @@
 | ui-audit #90 导航现代化 | #90 | 全局转场 + 预测返回 + @Serializable 类型安全路由 + 共享元素试点（PR #110） | ✅ |
 | 全量审计 | — | `docs/agents/task-audit-2026-09-06.md`（51 项发现 → 9 张分类票） | ✅ 报告入库 |
 
-### 2.1 2026-09-12 修复波（#229–#255，全部 squash 合入 main）
+### 2.1 2026-09-12 修复波（#229–#264，全部 squash 合入 main）
+
+> 前半 #229–#255（26 张）与后半 #256–#264（9 张）同表。#250 是 issue 非 PR，不计入。
 
 | PR | 范围 | 交付 |
 |---|---|---|
@@ -88,6 +90,14 @@
 | #253 | 设置 | 开发者设置接入真实配额数据（GATE-2），移除「待接入」占位 |
 | #254 | 清理 | 死代码/遗留文件核验后删除（`FeatureDetector` 按 ADR 保留并注释）（DEAD-1/DEAD-2） |
 | #255 | 覆盖率 | 6 个无阈值模块补 LINE 棘轮（`app` / `core:common` / `core:editor` / `core:database` / `feature:search` / `feature:editor`），5 个豁免附说明 + 负向验证 |
+| #256 | 截图 | 9 屏 / 20 帧基线扩展（Home/RepoDetail/FileViewer/Branches/Search/MarkdownEditor/Profile/Gists/Settings）；无限动画屏走 `captureScreenshotDeterministic` + **离线 ImageLoader** 消除头像加载非确定性；重录受 #258/#259 影响的 4 帧（RepoDetail/Settings light+dark） |
+| #258 | 仓库详情 | 仓库头整块不渲染修复（`headerHeightPx` 自锁 → `Modifier.layout` 以 `Constraints.Infinity` 量自然高度）+ 回归测试 `repoDetailScreen_success_rendersRepositoryHeaderBlock`；CI `repo-star`/`repo-actions` 帧转绿（坏帧 2→0） |
+| #259 | UI | 设置页返回箭头（`SettingsTopBar` + `onBackClick`）+ Issue/PR 详情底部避开 FAB（`AppDimens.fabContentClearance=96.dp` + 纯函数 padding，含反向护栏测试） |
+| #260 | CI/门禁 | 去空转：覆盖率模块声明阈值却无 exec 数据时**硬失败**（旧行为 SKIPPED + BUILD SUCCESSFUL）；`konsistCheck` `isFailOnNoMatchingTests` false→true；新增 `.github/scripts/verify-screenshots.sh` 断言帧清单闭合（≥1 PNG、无 0 字节、每帧有产出或显式处置） |
+| #261 | 覆盖率 | JaCoCo × Robolectric 盲区修复（`includeNoLocationClasses=true` + `includes=com/yumiru11/*`，`configureRobolectricCoverage`）；真值 `:app` 2.61%→**25.80%**、`:core:database` 5.17%→86.43%、`:feature:auth` 0%→100% |
+| #262 | markdown | `#123` issue/PR 引用 + 裸 40-hex sha **双通道**链接化（离线 `renderer.js` 插件 + 原生 `MarkdownInlineSemantics`，复用 `GitHubLinkParser` 语义）；代码块/行内码/已有链接/裸 URL 不误伤；零基线漂移 |
+| #263 | 覆盖率 | 22 个有阈值模块按 #261 后**真实**覆盖率重设棘轮（只升不降）+ 逐条负向验证；重写过时的「Robolectric 是工具链边界 / #181」说法（project-status + `coverageExcludes` 注释） |
+| #264 | 数据 | ETag 缓存**跨进程持久化**（`RoomEtagStore` + `EtagCache` 表 + Migration 5→6，按账号 `EtagScopeProvider` 隔离，登出/切号全清，容量/TTL 上限）；新 store 实例证明 304-on-restart |
 
 ## 3. 进行中：审计补全波（2026-09-06 立项，9 张分类票 #163–#171）
 
@@ -137,6 +147,7 @@
 ### 3.3 修复波后仍剩余（2026-09-12 核验）
 
 > 完整可执行清单（含 file:line 证据与规模）见 `docs/agents/remaining-backlog-2026-09-12.md`；下列为该清单的收敛摘要。
+> **2026-09-12 后半波（#256–#264）已闭环**：MD-1 / MD-2 / MD-3（#237/#251/#262）、TEST-1（#249）、GATE-1（#247）、GATE-2（#253）、GATE-3 / GATE-5（#255/#260/#261/#263）、GATE-4（#247 nightly 汇总补 needs）、DATA-1（#264）、DEAD-1 / DEAD-2（#254）、UI-3 / UI-5（#259）、REPO-1（#248）、覆盖率假值（#261/#263）；TEST-2 已大幅收敛（#249/#256）。剩余仍为真开口的见下表。
 
 | 项 | 状态 / 说明 |
 |---|---|
@@ -144,13 +155,14 @@
 | 生产签名密钥 | 🔶 需用户在 Secrets 配 `KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` |
 | AGP 9.x 迁移 | ⏳ 未做；是 Q01 Compose lint 失效的根因解，可行性实测路线见 `docs/agents/agp9-feasibility-2026-09-11.md` |
 | 设计系统 SPEC-1 / SPEC-2 | ⏳ `App*` 组件 10 个仅 1 个落地；间距未令牌化（裸 `.dp` 约 639 处） |
-| MD-1 剩余 | ⏳ `@user` 已修（#251），Issue 引用 `#123`、裸 sha 仍未渲染 |
 | EDITOR-1 | ⏳ 软换行不可切、replace 缺失、CRLF/编码未显式处理 |
-| DATA-1 ETag 持久化 | ⏳ `RestNetworkModule` 仍 `InMemoryEtagStore`，重启即失效 |
 | UI-1 窄屏 side-by-side diff | ⏳ 每栏 ~40 字符且无横向滚动（需 §6 决策） |
+| SPEC-3 @mention 补全 | ⏳ `MarkdownComposer.mentions` 生产调用点仍不传值 |
+| UI-2 / UI-4 / UI-6 / UI-7 | ⏳ 选中态对比 / No-README 空态 / 文件树时间列 / feed 骨架——均未动 |
+| DATA-2 / PROTO-1 / PERF-1 / PERF-2 | ⏳ `core:data` 无测试配置 / 原型归档决策 / 冷启动+macrobenchmark（真机）/ 跨端像素 diff——见 backlog §3.3 |
 | 覆盖率剩余模块 | 🔶 2026-09-13 全量棘轮（`chore/coverage-ratchet-true-values`）：22 个有阈值模块按 #261 修复后的**真实**覆盖率重设（旧阈值普遍低于实测数十 pp，门禁曾形同虚设）；仍豁免 = `core:data` / `core:testing` / `core:ui` / `prototype`（理由见 `build.gradle.kts` 注释） |
 
-> 另有 8 项需产品/设计先 grill 的决策（窄屏 diff、feed 骨架、KaTeX/Mermaid、`FeatureDetector` 去留等），见 `remaining-backlog-2026-09-12.md` §6。
+> 另有若干需产品/设计先 grill 的决策（窄屏 diff、feed 骨架、KaTeX/Mermaid、原型去留等，D-5/D-7 已闭环），见 `remaining-backlog-2026-09-12.md` §6。
 
 
 ## 4. 遗留事项（未闭环）
@@ -168,8 +180,8 @@
 | diffCoverage 软门禁从未实测 | ✅ 已修两个真缺陷并转**硬门禁**（PR #181）：① 阈值口径把 80 当 8000%；② 非可执行行计入分母造成假失败 |
 | Nightly 全量截图/多设备/性能基线 | ✅ 已落地（PR #181 的 nightly.yml：verify / 全模块 record+diff / release 体积 / 失败汇总） |
 | 应用图标缺失 / Bundle 语言拆分 | ✅ 已闭环（PR #174：自适应+主题化单色层图标、Bundle 语言拆分） |
-| **截图基线覆盖（2026-09-12 修复波）** | 🔶 大幅补齐：模块级基线纳入 CI verify（app + 6 模块，PR #188）；#245 补 OLED/高对比/zh + RTL；#249 补 `:feature:pullrequest`；#252 修复探针。#256 仍在扩（9 屏/20 帧）；仍有多屏缺基线（TEST-2） |
-| **RepoDetail 仓库头整块不渲染（UI-C01）** | 🔴 真实缺陷，修复中：`fix/repodetail-header-render`（尚无提交）；验收 = `repo-star` / `repo-actions` 帧转绿 |
+| **截图基线覆盖（2026-09-12 修复波）** | ✅ 大幅补齐：模块级基线纳入 CI verify（app + 13 模块，PR #188/#256）；#245 补 OLED/高对比/zh + RTL；#249 补 `:feature:pullrequest`；#256 补 9 屏/20 帧（Home/RepoDetail/FileViewer/Branches/Search/MarkdownEditor/Profile/Gists/Settings）+ 离线 ImageLoader 确定性；#252 修探针；#260 加帧闭包断言。当前入库 **99 张 PNG（非 prototype）**；TEST-2 仅余少量低 ROI 屏 |
+| **RepoDetail 仓库头整块不渲染（UI-C01）** | ✅ 已修复（#258）：根因 `headerHeightPx` 自锁，改 `Modifier.layout` 量自然高度；回归测试 + `repo-star`/`repo-actions` 帧转绿（坏帧 2→0）。已知真实缺陷清单**已清空** |
 
 ## 5. 更新规则
 
@@ -197,7 +209,7 @@
 | 约定 | 来源 |
 |---|---|
 | **含无限动画的屏必须用 `captureScreenshotDeterministic`** —— `captureRoboImage(content)` 会 `ShadowLooper.idle()`；无限动画使主 looper 队列永不空 → verify/record 挂死（`:feature:issue` 7min+ 根因）。改用冻结时钟 + 固定 `advanceTimeBy` + 手工 draw + `Bitmap.captureRoboImage` | #245 |
-| **截图基线只能由 CI canonical 录制**（`Record screenshots (CI canonical)` / `record-screenshots.yml`）；本机 `recordRoborazziDebug` 禁止（渲染非逐字节相同，本机录的 CI verify 全红）。⏳ 「录制前先 rebase 到最新 main」待核实 | #181 / #245 |
+| **截图基线只能由 CI canonical 录制**（`Record screenshots (CI canonical)` / `record-screenshots.yml`）；本机 `recordRoborazziDebug` 禁止（渲染非逐字节相同，本机录的 CI verify 全红）。**录制前必须先 rebase 到最新 main**（已证实：#256 rebase 至 #259 后录制，仅重录 4 帧） | #181 / #245 / #256 |
 | **截图探针语义**：`TabRow` 选中态 = `selected`；M3 `SegmentedButton` = `checkable/checked`（radio 语义）；`ExtendedFAB` 文案不进 uiautomator dump，须 `try_tap_fab`（判据右下角 x≥0.7w 且 y≥0.85h，放宽会误点 diff 行）；M3 `OutlinedTextField` placeholder 不当就绪信号（#250）；探针不得静默降级为 `opt:` | #250 / #252 |
 | **时间炸弹**：截图/测试夹具禁止写死绝对时间戳，一律相对时间（`isoDaysAgo`） | #246 |
 | **守卫先做红证明**：恒真守卫会以「在跑但什么都没查」上线——修复波抓到 i18n lint canary 自引用、`repo-actions` 探针空洞、RTL `@Config(qualifiers)` 假测试三例 | #235 / #245 / #252 |

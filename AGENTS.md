@@ -7,14 +7,14 @@
 
 开发一个**功能全面的 Android GitHub 客户端**（轻量、流畅、全 Material You）。技术规划 = `plan.md`（41KB，必读），需求来源 = `request.txt`。应用名/包名仍为占位符：applicationId 与 namespace = `com.yumiru11.githubapp`（模块 namespace 用 `core.github_xxx` 下划线写法），产品定名后统一改。
 
-**当前状态（2026-09-12 修复波末）**：`main@217cdd7`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、**四张新缺陷票 #200–#203** 全部关闭；#166 / #167 已关闭（条目逐条对账）。本轮修复波合入 **26 张 PR（#229–#255，全部 squash）**；#256（9 屏 20 帧截图基线扩展）截至本版仍 **open**。
-**当前活动票四张**：**#26（T25 真机项，需用户配 Secrets）**、#1（Spec，常开）、#71（截图测试面板，勿关）、**#250（commit-dialog 探针断言 bug——已由 #252 修复，待关）**。
-**已知真实缺陷（修复中）**：**RepoDetail 仓库头整块不渲染（UI-C01）**——Avatar/描述/统计/Star·Watch·Fork/语言栏全缺；#252 给 `repo-actions` 探针补 `desc:"Avatar"` 闸门后由假绿转红坐实（`screenshots.sh:421` 的 `repo-star` 亦同证）。修复分支 `fix/repodetail-header-render`（worktree `repo-header-fix`，截至本版**尚无提交**）。**验收 = `repo-star` / `repo-actions` 帧转绿。**
+**当前状态（2026-09-12 修复波末）**：`main@fd899b9`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、**四张新缺陷票 #200–#203** 全部关闭；#166 / #167 已关闭（条目逐条对账）。本轮修复波共合入 **35 张 PR（#229–#264，剔除非 PR 的 issue #250，全部 squash）**：前半 #229–#255（26 张，已由 PR #257 回写），后半 **#256–#264（9 张）** —— #256 截图基线扩展（9 屏 / 20 帧 + 离线 ImageLoader 确定性）、#258 RepoDetail 头修复、#259 设置返回箭头 + FAB 底部留白、#260 门禁去空转、#261 JaCoCo×Robolectric 修复、#262 markdown 引用链接、#263 覆盖率阈值棘轮、#264 ETag 跨进程持久化。**已无 open PR**。
+**当前活动票三张**：**#26（T25 真机项，需用户配 Secrets）**、#1（Spec，常开）、#71（截图测试面板，勿关）。（#250 已关闭 —— 探针断言 bug 由 #252 修复。）
+**已知真实缺陷：无。** **RepoDetail 仓库头整块不渲染（UI-C01）已由 #258 修复**：根因是 `headerHeightPx` 自锁 —— 首帧外层高 0dp → 内层 `onSizeChanged` 在 `maxHeight=0` 约束下只能测到 0 → 自然高度永远回填不上，头部被裁成 0 高。改为 `Modifier.layout` 以 `Constraints.Infinity` 在 layout 阶段测自然高度，首帧即按自然高度渲染；回归测试 `repoDetailScreen_success_rendersRepositoryHeaderBlock` 锁定，CI `repo-star` / `repo-actions` 帧已转绿（坏帧 2 → 0）。
 
 > 🔴 **四份审计报告已入库（2026-09-12，开工前必读其一）**
 > `docs/agents/` 下：`spec-audit-2026-09-11.md`（需求符合性 106 条判定 / 16 条缺口 / 20 条文档漂移）· `commit-audit-2026-09-11.md`（296 提交逐票核对）· `ui-audit-2026-09-11.md`（**含系统栏的 CI 真机帧**逐张读图，Roborazzi 基线看不到系统栏）· `markdown-consistency-2026-09-11.md`（GFM §2.3 逐条 + 三层回归说明）· `agp9-feasibility-2026-09-11.md`（工具链迁移实测）
 >
-> 🔴 **本轮新增入库（2026-09-12）**：`docs/agents/remaining-backlog-2026-09-12.md`（残余审计缺口收敛：已闭环钉死 / 仍待实现 / 过时反证）· `docs/research/katex-mermaid-offline-feasibility.md`（离线 KaTeX/Mermaid 体积实测）· `docs/adr/0009-graphql-read-path-deviation.md`（读路径全 REST 的架构决定）
+> 🔴 **本轮新增入库（2026-09-12）**：`docs/agents/remaining-backlog-2026-09-12.md`（残余审计缺口收敛：已闭环钉死 / 仍待实现 / 过时反证；**#256–#264 后已再次收敛**，只留 AGP9 / 设计系统 / KaTeX-Mermaid / 原型归档 / 真机性能等真开口）· `docs/research/katex-mermaid-offline-feasibility.md`（离线 KaTeX/Mermaid 体积实测）· `docs/adr/0009-graphql-read-path-deviation.md`（读路径全 REST 的架构决定）
 
 > ⚠️ **唯一需要用户操作的前置（其余已知 P0 均已修复）**
 > **OAuth 真机 PKCE 仍需你申请并填写 client id**（注入点已实现，#239）。`app/build.gradle.kts:11-48` 三级解析、**先命中先取**：Gradle 属性 `-PoauthClientId` → `local.properties:oauthClientId` → 环境变量 `OAUTH_CLIENT_ID`，写入 `BuildConfig.OAUTH_CLIENT_ID`；由 app 装配层 `OAuthConfigModule` 构造 `OAuthConfig`（core:github-auth 不感知 BuildConfig，Konsist 禁 core→app）。
@@ -29,8 +29,9 @@
 > 1. **判断 Kotlin 库成员可用性，`javap` 不够** —— JVM `public` 可能是 Kotlin `internal`（`javap` 看不到 `@Metadata` 那一层）。**唯一可靠做法：用真实 Kotlin 编译探针引用目标符号、跑 `compileDebugKotlin`、读错误原文。** 本轮在 material3 1.4.0 与 1.5.0-alpha18 上各撞一次。
 > 2. **断言/门禁必须做「红→绿双向验证」** —— 任何守卫/断言先证明「缺陷形态下必红」。修复波两次抓到恒真守卫：**i18n lint canary 自引用断言**（期望值取自被检查的同一清单 → 恒真；已改为独立 `REQUIRED_I18N_LINT_RULES` + 运行期 canary，见 `buildSrc/.../AppDevI18nLint.kt:43,66,72`）、**`repo-actions` 探针空洞**（仓库头缺失仍假绿，补 `desc:"Avatar"` 闸门后才转红，#252）。RTL 旧写法 `@Config(qualifiers="...ldrtl")` 亦是「永远绿的假测试」，改组合内显式注入 + SHA 互斥断言（#245）。**不经红证明的守卫会以「在跑但什么都没查」的形态上线。**
 > 3. **含无限动画的屏必须用 `captureScreenshotDeterministic`** —— Roborazzi `captureRoboImage(content)` 截图前会 `ShadowLooper.idle()` 排空主 looper，而无限动画（转圈 / 下拉刷新指示器）每帧经 Choreographer 续订 → `idle()` 永不返回 → verify/record 挂死（`:feature:issue` 7min+ 挂起根因）。`core:testing` 的 `captureScreenshotDeterministic`（冻结 `mainClock.autoAdvance=false` + 固定 `advanceTimeBy` + 手工 `decorView.draw(Canvas)` + `Bitmap.captureRoboImage` 不做 idle 等待）才稳。⏳ 待核实：普通 `testDebugUnitTest`（未开 record/verify）下 `captureRoboImage` 不落盘，需当心「测试绿≠拍了帧」。
-> 4. **截图基线只能由 CI canonical 录制** —— `record-screenshots.yml`（`Record screenshots (CI canonical)`）是唯一权威录制环境；本机 `recordRoborazziDebug` **禁止**（渲染与 runner 非逐字节相同，本机录的基线 CI verify 全红）。⏳ 待核实：录制前需先 rebase 到最新 main。
+> 4. **截图基线只能由 CI canonical 录制** —— `record-screenshots.yml`（`Record screenshots (CI canonical)`）是唯一权威录制环境；本机 `recordRoborazziDebug` **禁止**（渲染与 runner 非逐字节相同，本机录的基线 CI verify 全红）。**录制前必须先 rebase 到最新 main**（**已证实**：#256 即 rebase 至 #259 后录制，仅重录语义确实变化的 4 帧）。
 > 5. **截图探针语义 + 时间炸弹** —— Compose `TabRow` 选中态是 `selected`，M3 `SegmentedButton` 是 `checkable/checked`（radio 语义，`selected` 恒 false，pr-diff 两帧假红根因）；`ExtendedFAB` 文案不进 uiautomator dump，须 `try_tap_fab` 结构性定位（**判据必须限制右下角 x ≥ 0.7w 且 y ≥ 0.85h**，放宽到「底部最大可点区域」会误点 diff 行，`adb-helpers.sh:840-842`）；M3 `OutlinedTextField` 的 placeholder 仅在聚焦且为空时渲染，**不得当就绪信号**（#250）。截图/测试夹具**禁止写死绝对时间戳**，一律相对时间（`isoDaysAgo`，#246）。探针不得静默降级为 `opt:`。
+> 6. **截图捕获必须禁网（离线 ImageLoader）** —— `AsyncImage` 的真实网络往返会让录制/校验两次运行不可复现（`ProfileScreen_light` 曾因头像时有时无单独 verify 红）。`captureScreenshotDeterministic` 在捕获期 `installOfflineImageLoader()`（拦截器短路 http(s) 图片 → Coil `ErrorResult` → 渲染空白，与既有全部基线一致），`finally` reset（#256）。机制由临时 Robolectric 探针实证后删除。
 
 ## 核心决策（来自 plan.md，勿偏离）
 
@@ -70,13 +71,15 @@
 ```bash
 ./gradlew --no-daemon spotlessCheck      # ktlint 格式（修正用 spotlessApply）
 ./gradlew --no-daemon detekt             # 静态分析（config/detekt/detekt.yml 基线）
-./gradlew --no-daemon konsistCheck       # 架构测试（Konsist 分层依赖方向）
+./gradlew --no-daemon konsistCheck       # 架构测试（Konsist 分层依赖方向；无匹配测试已改为硬失败，#260）
 ./gradlew --no-daemon :app:lintDebug     # Android Lint（abortOnError）
 ./gradlew --no-daemon :app:testDebugUnitTest    # 单测
-./gradlew --no-daemon coverageVerify     # JaCoCo 覆盖率硬门禁（聚合各模块 jacocoTestCoverageVerification；阈值表 build.gradle.kts coverageThresholds）
-./gradlew --no-daemon :app:verifyRoborazziDebug # 截图基准校验
+./gradlew --no-daemon coverageVerify     # JaCoCo 覆盖率硬门禁（22 模块阈值见 build.gradle.kts coverageThresholds；无 exec 数据 = 硬失败，#260）
+./gradlew --no-daemon :app:verifyRoborazziDebug # 截图基准校验（app；模块需逐个列）
 ./gradlew --no-daemon :app:assembleDebug # 打 debug APK
 ```
+
+> **截图 verify 覆盖面（CI 同款，`ci.yml:210-227`）**：`app` + **13 个模块** —— `:core:ui` / `:core:designsystem` / `:core:markdown` / `:feature:auth` / `:feature:issue` / `:feature:repo` / `:feature:notifications` / `:feature:pullrequest` / `:feature:home` / `:feature:search` / `:feature:editor` / `:feature:profile` / `:feature:settings`；录制名单（`record-screenshots.yml`）与 verify 名单镜像。**帧闭包断言**：`.github/scripts/verify-screenshots.sh`（#260）要求 ≥1 张 PNG、无 0 字节 PNG、`screenshots.sh` 声明的每帧必有产出或显式处置标记（`.skipped.txt`），帧数下限 28。
 
 快速验证（大量编辑后查 error，最快）：
 ```bash
@@ -87,7 +90,8 @@
 
 **⚠️ 铁律（血泪教训）**：
 - 本地验证必须与 CI 门禁**命令级对齐**——只跑 compile/test 会漏 spotless/detekt，CI 必挂（T4/T6/T7 曾爆 9 个违规）。任何实现/修复任务验证命令**必须含 `spotlessCheck + detekt`**
-- **覆盖率门禁同理必跑**：CI 有 `coverageVerify` 硬门禁（各模块 LINE ≥ coverageThresholds 阈值），AGENTS 旧清单漏列导致「本地全绿 CI 必挂」重演（2026-08-21 feature:home 0.8043 < 0.81：新增 HomeTab.kt 枚举类不在 JaCoCo 排除名单且无单测）。新增/删除生产代码后必须跑 `coverageVerify`；JaCoCo 排除按【编译类名】匹配（`*Screen*` 命中的是 `XxxScreenKt.class`），新建顶层文件若不落排除模式就要配单测
+- **覆盖率门禁同理必跑**：CI 有 `coverageVerify` 硬门禁（22 个有阈值模块的 LINE ≥ `coverageThresholds` 阈值；阈值已按 #261 后的**真实**覆盖率棘轮到实测值，#263）。新增/删除生产代码后必须跑 `coverageVerify`。**无 exec 数据不再静默 SKIP**——声明了阈值的模块若没有单测执行数据，任务**硬失败**（#260）。JaCoCo 排除按【编译类名】匹配（`*EditorViewKt*` 精确到 Composable 编译产物，逻辑 ViewModel 不再被误伤，#247）；`MarkdownEditorViewModel` 等有单测的逻辑类必须留在分母内
+- **Robolectric 的覆盖率是真数据（#261）**：JaCoCo agent 默认 `inclnolocationclasses=false` 会跳过 Robolectric `SandboxClassLoader` 定义的无 CodeSource 应用类 → 覆盖率假 0。修复 = `includeNoLocationClasses=true` + `includes=com/yumiru11/*`（`build.gradle.kts` 的 `configureRobolectricCoverage`）。**「必须纯 JVM 可测才进覆盖率」的旧约束已不成立**
 - 构建输出**禁止用 grep/tail/head 过滤后反复重跑**——一次跑完看完整输出
 - **不要用 LSP**（本机 kotlin-ls 冷启动失败/超时）——验证一律以 Gradle 输出为准
 - `recordRoborazziDebug` 本机极慢（1000s+ 曾卡死）——**默认禁止跑**；截图相关任务需先问用户
@@ -129,8 +133,8 @@ feature/                   auth, home, repo, issue, pullrequest, search, editor,
 
 - 分支命名：`feature/tX-<kebab>`（如 `feature/t12-repo-management`）
 - **提交信息 = Conventional Commits**：`type(scope): description`（type: feat/fix/refactor/chore/docs/test/perf）
-- **PR 合并策略**：默认 **squash**（用户偏好线性历史；2026-09-12 修复波 26 张全 squash）；确需保留多提交历史的复杂修复波可用 merge commit。PR body 写 `Fixes #N` 自动关票
-- **分支保护**：必需检查只有 **`Quality Gate`**；截图 job 名为 **`Screenshots (emulator + adb)`** 且**非必需**（红榜要读但不挡合并）。`strict=true` → PR 落后 main（BEHIND）时 `gh pr merge` 会拒，改用 REST：`gh api -X PUT repos/yumiru11/AppDev/pulls/<n>/merge -f merge_method=squash`
+- **PR 合并策略**：默认 **squash**（用户偏好线性历史；2026-09-12 修复波 35 张全 squash）；确需保留多提交历史的复杂修复波可用 merge commit。PR body 写 `Fixes #N` 自动关票
+- **分支保护**：必需检查**只有 `Quality Gate`**（`required_status_checks.contexts = [\"Quality Gate\"]`，`strict=true`）；截图 job 名为 **`Screenshots (emulator + adb)`** 且**非必需**（红榜要读但不挡合并）。`strict=true` → PR 落后 main（BEHIND）时 `gh pr merge` 会拒，改用 REST：`gh api -X PUT repos/yumiru11/AppDev/pulls/<n>/merge -f merge_method=squash`（**docs-only PR 无 CI 检查，均走 REST 合并**）
 - **铁律：不提交 main、不 push main 之外的分支**；worktree 并行时子代理 prompt 必须带 WORKDIR
 - 参考仓库（~/dev/）：`rikkahub`（原生 Markdown 参考，**AGPL-3.0 只参考思路零复制**）、`PiliPlus`（卡片风格）、`XMSLEEP`（MD3）、`gh4a`（WebView markdown + Trending 数据源）
 
