@@ -414,11 +414,6 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 // *Composer.kt：编辑/预览装配层（MarkdownComposer 等纯 Composable）。
                 // "Composer" 是 Compose 专有词（runtime 的 Composer），不会有同名逻辑类。
                 Regex("""(^|/)[^/]*Composer[^/]*\.kt$"""),
-                // MainActivity.kt：单 Activity 装配层（setContent + 依赖注入接线 + 启动屏安装）。
-                // 里面没有可断言的逻辑分支，装的是"谁来画界面"这件事本身。
-                // 实测（PR #196）：加一行 installSplashScreen() 就被 diff 门禁判成"未覆盖新增行"。
-                Regex("""(^|/)MainActivity\.kt$"""),
-                // app 模块根包下的主题/背景装配层（#167 / UI04）。
                 // 这两处是**纯 Compose 装配**：AppThemeHost 只做"偏好 Flow → CompositionLocal"
                 // 的接线，AppBackground 只做"图 + 蒙版 + 内容"的三层堆叠。
                 // 逻辑部分已抽成可测纯函数（BackgroundScrim 有 5 例 JVM 断言；色板/动效换算在
@@ -427,6 +422,13 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 // 且 Robolectric 沙箱加载的类不产 JaCoCo 数据（#181 结论），补测试也解决不了。
                 Regex("""(^|/)AppThemeHost\.kt$"""),
                 Regex("""(^|/)AppBackground\.kt$"""),
+                // MainActivity.kt：单 Activity 入口 = 根级 Compose 装配层（T23 接线修复暴露）。
+                // 文件内容是 setContent + AppNavHost 的 20 个 screen lambda 装配、深链/OAuth
+                // intent 分流与 locale 切换，无独立可单测逻辑；:app 本就**没有**覆盖率阈值
+                // （见 coverageThresholds 注释「app / feature/auth：豁免（纯 UI 装配）」），
+                // 逻辑模块的门禁不受影响。不排除的真实后果（实测 PR 前）：改 2 个 lambda 接线
+                // 新增 24 行里有 13 行可执行、仅 7 行被覆盖 → 53.8% < 80%，CI diff 门禁必红。
+                Regex("""(^|/)MainActivity\.kt$"""),
                 // SystemBarContrast.kt（PR #215）：单个 `Window.disableNavigationBarContrastScrim()`
                 // 扩展函数，只有「取 API 版本判断 + 一行 setter」，**没有可断言的逻辑分支**；
                 // 它已由 `MainActivityNavBarContrastTest` 的 4 例覆盖行为契约（对其调用的断言走的是

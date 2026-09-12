@@ -5,9 +5,36 @@
 > 关联：`docs/ui-design.md`（§4 动效 / §5 图标 / §6 毛玻璃 / §7 主题）、`docs/ui-audit-2026-08-21.md` §4、`docs/adr/0004`、`0006`、`0007`
 
 **证据分级**（本文件全程使用）：
-- 🟢 **字节码实测** — 从 `dl.google.com` 下载对应版本 AAR，`javap` 读取真实 public/internal 与注解。**这是唯一不会骗人的证据。**
+- 🟢 **字节码实测** — 从 `dl.google.com` 下载对应版本 AAR，`javap` 读取真实 public/internal 与注解。~~**这是唯一不会骗人的证据。**~~
 - 🔵 **官方文档** — 带链接的官方页面原文。
 - ⚪ **本地文件** — 本仓库代码/配置。
+
+> ## 🔴 勘误（2026-09-11 实操后补，**优先于本文件其余内容**）
+>
+> **本报告 §1.1「但 `MotionScheme` 的物理动效体系在 1.4.0 上就能用 —— 因为 `MotionScheme` 是公开接口，项目可以自己实现它」这条结论是错的，已被实测证伪。不要据此排期。**
+>
+> **错在哪（方法学）**：本报告用 `javap`（JVM 字节码可见性）判断可访问性，但 Kotlin 库的可见性由 **Kotlin `@Metadata`** 决定 —— 一个成员可以是 JVM `public` 而 Kotlin `internal`。`javap` **看不到**这一层。上面「🟢 字节码实测是唯一不会骗人的证据」这句话因此是**过度自信的**：字节码能证伪「不存在」，**不能**证明「可从 Kotlin 使用」。
+>
+> **正确方法（本项目此后一律沿用）**：判断 Kotlin 库成员可用性，必须用**真实 Kotlin 编译探针**去引用它 —— 在 `src/main/kotlin/` 放一个 `probe.kt` 引用目标符号、跑 `compileDebugKotlin`、读错误原文，然后删掉探针。零成本、结论确定。
+>
+> **实测证据**（material3 1.4.0，`core:designsystem` 内 Kotlin 探针）：
+> ```
+> e: probe.kt:1:35 Cannot access 'interface MotionScheme : Any': it is internal in file.
+> e: probe.kt:2:42 Cannot access 'object ExpressiveMotionTokens : Any': it is internal in file.
+> e: AppTheme.kt:89:9 Cannot access 'fun MaterialTheme(colorScheme:…, motionScheme:…, …)': it is internal in file.
+> ```
+> 即 `MotionScheme`（接口与 Companion 工厂）、`ExpressiveMotionTokens`、
+> `MaterialTheme(colorScheme, motionScheme, …)` 重载**在 Kotlin 层面全是 `internal`**。
+>
+> **修正后的结论**：**Expressive 的「动效物理」与「组件」一样，都被 material3 ≥ 1.5.0-alpha19
+> 的 `compileSdk 37` + `AGP 9.1.0` 门槛挡住**。本报告 §1.2 的「最该做的第 1 件事（零依赖变更
+> 接入 Expressive 弹簧物理）」**不成立**；4.2 节（路径 1/路径 2 分叉）随之简化：
+> **只有「先做 AGP 9 迁移，再上 material3 1.5.0-alpha」一条路**，「pin 1.4.0 白拿弹簧」不存在。
+>
+> **这不改变 §1.1 里「硬墙」那半句** —— 那是本报告最有价值的发现，且已被另一次实测加强：
+> AGP 9 迁移本身在配置阶段是可行的（AGP 9.1.1 + Gradle 9.3.1 + compileSdk 37 +
+> Hilt 2.59.2 + KSP 2.3.12 → `./gradlew help` BUILD SUCCESSFUL），
+> 详见 `docs/agents/agp9-feasibility-2026-09-11.md`。
 
 > ⚠️ **方法论警告（本调研最重要的元结论）**：`developer.android.com` 的 API reference 在 **1.5.0-alpha 线**上的 "Added in X" 标签**不可信**。文档称 `MotionScheme.expressive()` 与 `LinearWavyProgressIndicator` 均 "Added in 1.5.0-alpha27"，但字节码实测显示它们在 **1.5.0-alpha01 就已 public**。凡涉及 alpha 线的版本结论，本报告一律以字节码为准，文档仅作旁证。
 
@@ -17,15 +44,18 @@
 
 ### 1.1 一句话结论
 
-**M3 Expressive 的「组件」和「动效方案」在 dependency 层面被一道硬墙挡住：material3 ≥ 1.5.0-alpha19 强制要求 `compileSdk 37` + `AGP 9.1.0`，与本项目锁定的 `compileSdk 36` + `AGP 8.7.3` 直接冲突。但 `MotionScheme` 的物理动效体系在 1.4.0 上就能用——因为 `MotionScheme` 是公开接口，项目可以自己实现它。**
+**M3 Expressive 的「组件」和「动效方案」在 dependency 层面被一道硬墙挡住：material3 ≥ 1.5.0-alpha19 强制要求 `compileSdk 37` + `AGP 9.1.0`，与本项目锁定的 `compileSdk 36` + `AGP 8.7.3` 直接冲突。~~但 `MotionScheme` 的物理动效体系在 1.4.0 上就能用——因为 `MotionScheme` 是公开接口，项目可以自己实现它。~~（**后半句已证伪，见文首勘误**：`MotionScheme` 在 Kotlin 层面是 `internal`，1.4.0 上拿不到。）**
 
 ### 1.2 最该做的 3 件事
 
+> 🔴 **本节第 1 行已被证伪，见文首勘误。**
+
 | 优先级 | 事项 | 成本 | 依据 |
 |---|---|---|---|
-| **P0** | **用自实现 `MotionScheme` 在 material3 1.4.0 上直接接入 Expressive 动效物理**（§4）。零依赖变更、零工具链变更 | ~1 票（约 150 行含单测） | 🟢 1.4.0 的 `MaterialTheme(colorScheme, motionScheme, shapes, typography, …)` 重载与 `MaterialExpressiveTheme` **均 public 且无 `@ExperimentalMaterial3ExpressiveApi` 门控**；`MotionScheme` 接口 6 个方法全 public 无门控；官方 spring 数值已公布 |
+| ~~**P0**~~ **✗ 不成立** | ~~用自实现 `MotionScheme` 在 material3 1.4.0 上接入 Expressive 动效物理（§4）~~ —— **`MotionScheme` / `ExpressiveMotionTokens` / `MaterialTheme(…, motionScheme, …)` 在 Kotlin 层面全是 `internal`，1.4.0 上无法引用（真实 Kotlin 探针实测）** | — | 🔴 见文首勘误 |
+| **P0（新的）** | **AGP 9.1.1 + Gradle 9.3.1 + compileSdk 37 迁移** —— 它同时是 Expressive 动效物理、Expressive 组件、Compose lint 15 项恢复、Hilt ≥ 2.59.2、KSP ≥ 2.3.8 的**共同前置**。配置阶段已验证可行 | 见 `docs/agents/agp9-feasibility-2026-09-11.md` | 🟢 已实测 `./gradlew help` BUILD SUCCESSFUL |
 | **P1** | **不升级 material3，先吃掉与 Expressive 无关的 UI 债**（提案 #10/#11/#12 等，§5）。这些用 1.4.0 现成 API 即可，且与依赖升级解耦 | 3 票 | ⚪ `dropShadow`/`innerShadow`(Foundation 1.9+)、`Brush` 渐变、`SizeTransform` 在 1.11.4 上全部可用 |
-| **P2** | **立一张「工具链升级可行性」调研票**（compileSdk 36→37 / AGP 8.7.3→9.1.0 / KSP / Roborazzi / Lint 全链路）。这是**所有 Expressive 组件的唯一前置**，且升级后 1.5.0 stable 也照样需要它 | 1 票（纯调研，不改码） | 🟢 1.5.0-alpha19~alpha28 的 AAR metadata 全部为 `minCompileSdk=37` / `minAndroidGradlePluginVersion=9.1.0` |
+| **P2** | 立「工具链升级可行性」票 —— **与上面新的 P0 是同一件事**，不再是「纯调研」 | — | — |
 
 ### 1.3 必须的版本升级结论
 
