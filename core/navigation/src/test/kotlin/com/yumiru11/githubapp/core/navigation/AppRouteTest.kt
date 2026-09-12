@@ -142,34 +142,79 @@ class AppRouteTest {
     }
 
     @Test
-    fun fromParsedUrl_issueRef_returnsNull() {
-        // IssueRef 无 owner/repo 语境，无法映射到具体路由
+    fun fromParsedUrl_issueRefWithoutContext_returnsNull() {
+        // `#123` 无 owner/repo 语境：fromParsedUrl 是纯函数、无屏幕语境，单靠引用无法定位仓库。
+        // 显式返回 null 由调用方兜底（README 纯锚点先被 bridge 忽略；深链见 MainActivity 落浏览器）
         assertNull(
             AppRoute.fromParsedUrl(ParsedUrl.IssueRef(null, null, 123)),
         )
     }
 
     @Test
-    fun fromParsedUrl_release_returnsNull() {
-        // Release 不在路由表内
-        assertNull(
+    fun fromParsedUrl_issueRefWithContext_buildsIssueRoute() {
+        // 引用自带 owner/repo 语境时可直接定位 Issue 详情
+        assertEquals(
+            AppRoute.Issue("owner", "repo", 123),
+            AppRoute.fromParsedUrl(ParsedUrl.IssueRef("owner", "repo", 123)),
+        )
+    }
+
+    @Test
+    fun fromParsedUrl_releaseWithoutTag_landsOnReleasesList() {
+        // /releases 无 tag：落 Releases 分区但不展开详情
+        assertEquals(
+            AppRoute.Repo("owner", "repo", showReleases = true),
             AppRoute.fromParsedUrl(ParsedUrl.Release("owner", "repo", null)),
         )
     }
 
     @Test
-    fun fromParsedUrl_tree_returnsNull() {
-        // Tree 不在路由表内
-        assertNull(
-            AppRoute.fromParsedUrl(ParsedUrl.Tree("owner", "repo", "main", "")),
+    fun fromParsedUrl_releaseWithTag_carriesTagForExpansion() {
+        // /releases/tag/{tag}：落 Releases 分区并携带 tag 供分区展开
+        assertEquals(
+            AppRoute.Repo("owner", "repo", showReleases = true, releaseTag = "v1.2.0"),
+            AppRoute.fromParsedUrl(ParsedUrl.Release("owner", "repo", "v1.2.0")),
         )
     }
 
     @Test
-    fun fromParsedUrl_search_returnsNull() {
-        // Search 无参数，无对应路由
-        assertNull(
-            AppRoute.fromParsedUrl(ParsedUrl.Search("query")),
+    fun fromParsedUrl_tree_buildsRepoRouteInFilesView() {
+        // /tree/{ref}/{path}：复用仓库详情路由，初始落「文件」分区并自动展开到 path
+        assertEquals(
+            AppRoute.Repo(
+                owner = "owner",
+                repo = "repo",
+                ref = "main",
+                showFiles = true,
+                treePath = "src/main",
+            ),
+            AppRoute.fromParsedUrl(ParsedUrl.Tree("owner", "repo", "main", "src/main")),
+        )
+    }
+
+    @Test
+    fun fromParsedUrl_treeWithoutPath_landsOnFilesRoot() {
+        // /tree/{ref} 只有分支：仍要直接看到文件浏览（treePath 空 = 只到根树，不展开）
+        assertEquals(
+            AppRoute.Repo("owner", "repo", "develop", showFiles = true),
+            AppRoute.fromParsedUrl(ParsedUrl.Tree("owner", "repo", "develop", "")),
+        )
+    }
+
+    @Test
+    fun fromParsedUrl_search_carriesQuery() {
+        assertEquals(
+            AppRoute.Search("kotlin coroutines"),
+            AppRoute.fromParsedUrl(ParsedUrl.Search("kotlin coroutines")),
+        )
+    }
+
+    @Test
+    fun fromParsedUrl_searchWithEmptyQuery_navigatesToSearchEntry() {
+        // `github.com/search`（无 q）：普通搜索入口，用户自行输入
+        assertEquals(
+            AppRoute.Search(),
+            AppRoute.fromParsedUrl(ParsedUrl.Search("")),
         )
     }
 }

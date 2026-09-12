@@ -277,11 +277,16 @@ class MainActivity : ComponentActivity() {
                                         navController = navController,
                                     )
                                 },
-                                repoDetailScreen = { owner, repo, ref ->
+                                repoDetailScreen = { owner, repo, ref, showFiles, treePath, showReleases, releaseTag ->
                                     RepoDetailScreen(
                                         owner = owner,
                                         repo = repo,
                                         initialRef = ref.ifBlank { null },
+                                        // TREE/RELEASE 深链初始视图（github.com/…/tree/… 与 /releases/tag/…）
+                                        initialShowFiles = showFiles,
+                                        initialTreePath = treePath,
+                                        initialShowReleases = showReleases,
+                                        initialReleaseTag = releaseTag,
                                         onBackClick = { navController.popBackStack() },
                                         // T23：文件 Tab 分支 Chip → 分支管理页（带当前分支高亮）
                                         onBranchesClick = { o, r, currentRef ->
@@ -488,8 +493,10 @@ class MainActivity : ComponentActivity() {
                 if (parsed is ParsedUrl.External) {
                     // External 深链：用 Chrome Custom Tabs 在应用内打开原始 url
                     openExternalBrowser(context, parsed.url)
-                } else {
-                    navigateToParsedUrl(navController, parsed)
+                } else if (!navigateToParsedUrl(navController, parsed)) {
+                    // 解析成功但无应用内路由（如无仓库语境的 IssueRef）：原始 URL 落浏览器，
+                    // 不留「点了没反应」的静默死路（fromParsedUrl 的 null 契约见 AppRoute）
+                    openExternalBrowser(context, uri.toString())
                 }
                 pendingDeepLink.value = null // 消费后清空，避免重复导航
             }

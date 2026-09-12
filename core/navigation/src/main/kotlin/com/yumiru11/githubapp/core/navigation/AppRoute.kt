@@ -179,11 +179,27 @@ sealed interface AppRoute {
 
     companion object {
         /**
-         * 将 [ParsedUrl] 映射为类型安全 route 对象。
+         * 将 [ParsedUrl] 映射为类型安全 route 对象（spec-audit §10 P2「链接落到浏览器」修复）。
          *
-         * 仅映射有明确路由归属的类型；[ParsedUrl.External] 及无 owner/repo 语境的
-         * 类型（如 [ParsedUrl.IssueRef]、[ParsedUrl.Release]、[ParsedUrl.Tree]、
-         * [ParsedUrl.Search]）返回 null，由调用方决定兜底行为。
+         * 映射表：
+         * - [ParsedUrl.Tree]    → [Repo]（showFiles=true + treePath，ref 沿用 URL 分支）
+         * - [ParsedUrl.Release] → [Repo]（showReleases=true + releaseTag，tag 可空 = 只看列表）
+         * - [ParsedUrl.Search]  → [Search]（query 原样透传）
+         * - [ParsedUrl.IssueRef] 带 owner/repo 语境 → [Issue]；无语境 → null（见下）
+         * - 其余有明确归属的类型 → 同名 route（[ParsedUrl.Repo]/[ParsedUrl.Issue]/
+         *   [ParsedUrl.IssueList]/[ParsedUrl.PullRequest]/[ParsedUrl.Commit]/[ParsedUrl.Discussion]/
+         *   [ParsedUrl.Blob]/[ParsedUrl.User]）
+         *
+         * 返回 null = **显式**「无应用内路由」，调用方负责兜底（外部浏览器 / 忽略），有三类：
+         * - [ParsedUrl.External]：非 GitHub 或无法识别，本身就是外链；
+         * - [ParsedUrl.IssueRef] 无 owner/repo（`#123`）：本函数是纯函数、无屏幕语境，单靠
+         *   引用无法定位仓库。README 内的纯锚点由 WebView bridge 先行忽略（`#` 前缀），
+         *   深链兜底见 MainActivity（原始 URL 落浏览器）；
+         * - [ParsedUrl.Commit] 无 owner/repo（裸 sha）：同理无法定位仓库。
+         *
+         * [ParsedUrl.Discussion] 保持映射（应用无 Discussions 屏）：目的地不再挂占位屏，
+         * 而是在 AppNavHost 内显式转外部浏览器 —— 占位屏是静默死路，浏览器里的
+         * Discussions 页面才是完整可用内容。
          */
         fun fromParsedUrl(parsed: ParsedUrl): AppRoute? =
             when (parsed) {
@@ -219,16 +235,47 @@ sealed interface AppRoute {
                     Blob(parsed.owner, parsed.repo, parsed.ref, parsed.path)
                 }
 
+                is ParsedUrl.Tree -> {
+                    // /tree/{ref}/{path} 即仓库详情的「文件」分区视图：复用同一 destination，
+                    // 由初始视图提示参数落位（AppRoute.Repo 的 showFiles/treePath 注释）
+                    Repo(
+                        owner = parsed.owner,
+                        repo = parsed.repo,
+                        ref = parsed.ref,
+                        showFiles = true,
+                        treePath = parsed.path,
+                    )
+                }
+
+                is ParsedUrl.Release -> {
+                    // /releases 或 /releases/tag/{tag} → 仓库详情的 Releases 分区；
+                    // tag 为空 = 只落列表（不展开详情）
+                    Repo(
+                        owner = parsed.owner,
+                        repo = parsed.repo,
+                        showReleases = true,
+                        releaseTag = parsed.tag.orEmpty(),
+                    )
+                }
+
+                is ParsedUrl.Search -> {
+                    Search(parsed.query)
+                }
+
+                is ParsedUrl.IssueRef -> {
+                    // 带 owner/repo 语境的引用可直接定位；无语境（`#123`）显式返回 null
+                    if (parsed.owner != null && parsed.repo != null) {
+                        Issue(parsed.owner, parsed.repo, parsed.number)
+                    } else {
+                        null
+                    }
+                }
+
                 is ParsedUrl.User -> {
                     User(parsed.login)
                 }
 
-                is ParsedUrl.External,
-                is ParsedUrl.IssueRef,
-                is ParsedUrl.Release,
-                is ParsedUrl.Tree,
-                is ParsedUrl.Search,
-                -> {
+                is ParsedUrl.External -> {
                     null
                 }
             }
