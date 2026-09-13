@@ -44,11 +44,9 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
@@ -81,7 +79,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
+import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.AppSegmentedButton
 import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
@@ -660,21 +660,21 @@ private fun FilterAndSortRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             NotificationFilter.entries.forEach { entry ->
-                FilterChip(
+                AppFilterChip(
                     selected = entry == selected,
                     onClick = { onFilterSelected(entry) },
-                    label = { Text(text = filterLabel(entry)) },
+                    label = filterLabel(entry),
                 )
             }
         }
         Spacer(modifier = Modifier.width(8.dp))
         SingleChoiceSegmentedButtonRow(modifier = Modifier.semantics { contentDescription = sortDescription }) {
             NotificationSortOrder.entries.forEachIndexed { index, entry ->
-                SegmentedButton(
+                AppSegmentedButton(
                     selected = entry == sortOrder,
                     onClick = { onSortOrderSelected(entry) },
                     shape = SegmentedButtonDefaults.itemShape(index = index, count = NotificationSortOrder.entries.size),
-                    label = { Text(text = sortOrderLabel(entry)) },
+                    label = sortOrderLabel(entry),
                 )
             }
         }

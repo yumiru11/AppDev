@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设计系统画廊（debug-only，ADR-0010 决策 10 / implementation-plan §7）的演示文案。
+
+  只进 debug 变体，不进 release 产物；en/zh-rCN 成对（MissingTranslation lint 门禁）。
+  颜色角色等**开发者 token 名**用 translatable="false"：它们是标识符不是用户文案，
+  不参与翻译，也不需要 zh 对照。
+-->
+<resources>
+    <!-- 分节标题 -->
+    <string name="gallery_section_cards">Cards</string>
+    <string name="gallery_section_card_group">Card group</string>
+    <string name="gallery_section_filter_chips">Filter chips</string>
+    <string name="gallery_section_assist_chips">Assist chips</string>
+    <string name="gallery_section_segmented_buttons">Segmented buttons</string>
+    <string name="gallery_section_dialog">Dialog</string>
+    <string name="gallery_section_empty_state">Empty state</string>
+    <string name="gallery_section_error_state">Error state</string>
+    <string name="gallery_section_loading_state">Loading state</string>
+    <string name="gallery_section_state_chips">State chips</string>
+    <string name="gallery_section_long_bar_action">Long bar action</string>
+    <string name="gallery_section_color_roles">Color roles</string>
+
+    <!-- Cards -->
+    <string name="gallery_cards_default">Default card</string>
+    <string name="gallery_cards_clickable">Clickable card</string>
+    <string name="gallery_cards_variant">Surface variant card</string>
+
+    <!-- Card group -->
+    <string name="gallery_card_group_first">Grouped item one</string>
+    <string name="gallery_card_group_second">Grouped item two</string>
+    <string name="gallery_card_group_third">Grouped item three</string>
+
+    <!-- Filter chips -->
+    <string name="gallery_filter_chip">Filter</string>
+    <string name="gallery_filter_chip_selected">Selected</string>
+    <string name="gallery_filter_chip_disabled">Disabled</string>
+    <string name="gallery_filter_chip_icon">With icon</string>
+
+    <!-- Assist chips -->
+    <string name="gallery_assist_chip">Assist</string>
+    <string name="gallery_assist_chip_disabled">Assist (disabled)</string>
+
+    <!-- Segmented buttons -->
+    <string name="gallery_segmented_one">One</string>
+    <string name="gallery_segmented_two">Two</string>
+    <string name="gallery_segmented_three">Three</string>
+
+    <!-- Dialog -->
+    <string name="gallery_dialog_title">Dialog title</string>
+    <string name="gallery_dialog_text">Dialog body text used to verify the container rendering.</string>
+    <string name="gallery_dialog_confirm">Confirm</string>
+    <string name="gallery_dialog_dismiss">Dismiss</string>
+
+    <!-- Empty / error / loading states -->
+    <string name="gallery_empty_title">Nothing here</string>
+    <string name="gallery_empty_message">Create your first repository to get started.</string>
+    <string name="gallery_empty_action">Create repository</string>
+    <string name="gallery_error_title">Failed to load</string>
+    <string name="gallery_error_message">Check your connection and try again.</string>
+    <string name="gallery_error_action">Retry</string>
+    <string name="gallery_loading_label">Loading</string>
+
+    <!-- State chips -->
+    <string name="gallery_state_open">Open</string>
+    <string name="gallery_state_closed">Closed</string>
+    <string name="gallery_state_merged">Merged</string>
+    <string name="gallery_state_draft">Draft</string>
+
+    <!-- Long bar action -->
+    <string name="gallery_long_bar_enabled">New issue</string>
+    <string name="gallery_long_bar_disabled">New repository</string>
+
+    <!-- 颜色角色（开发者 token 名，不翻译） -->
+    <string name="gallery_color_primary" translatable="false">primary</string>
+    <string name="gallery_color_secondary" translatable="false">secondary</string>
+    <string name="gallery_color_tertiary" translatable="false">tertiary</string>
+    <string name="gallery_color_error" translatable="false">error</string>
+    <string name="gallery_color_success" translatable="false">success</string>
+    <string name="gallery_color_warning" translatable="false">warning</string>
+</resources>

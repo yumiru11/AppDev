@@ -43,7 +43,6 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -111,6 +110,7 @@ import com.composables.icons.materialsymbols.rounded.Visibility
 import com.composables.icons.materialsymbols.rounded.Visibility_off
 import com.yumiru11.githubapp.core.data.model.Release
 import com.yumiru11.githubapp.core.data.model.Repository
+import com.yumiru11.githubapp.core.designsystem.component.AppChip
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
@@ -879,8 +879,9 @@ private fun RepoHeader(
  * Topics chip 行（L06）。
  *
  * 容器色复用 designsystem 的 [labelChipContainerColor] / [labelChipContentColor]
- * （labelColor 与 surface 按 55/45 混合 → 低饱和底 + 可控对比度）；组件本体用 M3
- * [AssistChip]——designsystem 只提供颜色令牌、没有现成 LabelChip 组件（issue #85 现状）。
+ * （labelColor 与 surface 按 55/45 混合 → 低饱和底 + 可控对比度）；组件本体用
+ * [AppChip]（design system Batch 1 的 assist 语义薄包装，标签样式由调用方保留）——
+ * designsystem 只提供颜色令牌、没有现成 LabelChip 组件（issue #85 现状）。
  * 点击 → 搜索页 query=`topic:xxx`（宿主接线）。
  */
 @Composable
@@ -902,7 +903,7 @@ private fun TopicsRow(
                     surface = surface,
                 )
             val description = stringResource(R.string.repo_topic_search_cd, topic)
-            AssistChip(
+            AppChip(
                 onClick = { onTopicClick(topic) },
                 label = {
                     Text(

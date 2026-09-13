@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设计系统画廊中文文案（debug-only；与 values/strings.xml 的 en 键一一对应）。
+  颜色角色 token 名（primary/secondary/…）在 en 侧标记 translatable="false"，此处不需要。
+-->
+<resources>
+    <!-- 分节标题 -->
+    <string name="gallery_section_cards">卡片</string>
+    <string name="gallery_section_card_group">分组卡片</string>
+    <string name="gallery_section_filter_chips">筛选 chip</string>
+    <string name="gallery_section_assist_chips">辅助 chip</string>
+    <string name="gallery_section_segmented_buttons">分段按钮</string>
+    <string name="gallery_section_dialog">对话框</string>
+    <string name="gallery_section_empty_state">空态</string>
+    <string name="gallery_section_error_state">错误态</string>
+    <string name="gallery_section_loading_state">加载态</string>
+    <string name="gallery_section_state_chips">状态徽标</string>
+    <string name="gallery_section_long_bar_action">长条按钮</string>
+    <string name="gallery_section_color_roles">颜色角色</string>
+
+    <!-- Cards -->
+    <string name="gallery_cards_default">默认卡片</string>
+    <string name="gallery_cards_clickable">可点击卡片</string>
+    <string name="gallery_cards_variant">surfaceVariant 卡片</string>
+
+    <!-- Card group -->
+    <string name="gallery_card_group_first">分组条目一</string>
+    <string name="gallery_card_group_second">分组条目二</string>
+    <string name="gallery_card_group_third">分组条目三</string>
+
+    <!-- Filter chips -->
+    <string name="gallery_filter_chip">筛选</string>
+    <string name="gallery_filter_chip_selected">已选中</string>
+    <string name="gallery_filter_chip_disabled">已禁用</string>
+    <string name="gallery_filter_chip_icon">带图标</string>
+
+    <!-- Assist chips -->
+    <string name="gallery_assist_chip">辅助</string>
+    <string name="gallery_assist_chip_disabled">辅助（禁用）</string>
+
+    <!-- Segmented buttons -->
+    <string name="gallery_segmented_one">一</string>
+    <string name="gallery_segmented_two">二</string>
+    <string name="gallery_segmented_three">三</string>
+
+    <!-- Dialog -->
+    <string name="gallery_dialog_title">对话框标题</string>
+    <string name="gallery_dialog_text">对话框正文，用于验证容器渲染。</string>
+    <string name="gallery_dialog_confirm">确定</string>
+    <string name="gallery_dialog_dismiss">取消</string>
+
+    <!-- Empty / error / loading states -->
+    <string name="gallery_empty_title">暂无内容</string>
+    <string name="gallery_empty_message">创建第一个仓库开始使用。</string>
+    <string name="gallery_empty_action">创建仓库</string>
+    <string name="gallery_error_title">加载失败</string>
+    <string name="gallery_error_message">请检查网络后重试。</string>
+    <string name="gallery_error_action">重试</string>
+    <string name="gallery_loading_label">加载中</string>
+
+    <!-- State chips -->
+    <string name="gallery_state_open">开启</string>
+    <string name="gallery_state_closed">已关闭</string>
+    <string name="gallery_state_merged">已合并</string>
+    <string name="gallery_state_draft">草稿</string>
+
+    <!-- Long bar action -->
+    <string name="gallery_long_bar_enabled">新建 Issue</string>
+    <string name="gallery_long_bar_disabled">新建仓库</string>
+</resources>
