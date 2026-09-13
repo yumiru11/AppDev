@@ -25,7 +25,24 @@ object AppDimens {
     val cornerExtraLarge: Dp = 28.dp
 
     // Spacing
-    val contentPadding: Dp = 16.dp
+
+    /**
+     * 间距 scale（设计系统 Batch 3，`implementation-plan.md` §2 决策 7）：
+     * xs=4 / s=8 / m=12 / l=16 / xl=24 / xxl=32。
+     *
+     * 全应用结构间距（padding / gap / spacer）一律优先消费本 scale；新代码不再写裸
+     * 间距字面量。既有调用点可继续用 [contentPadding] 等旧名——它们是本 scale 的别名。
+     *
+     * 用法：`Modifier.padding(AppDimens.spacing.l)`、
+     * `Arrangement.spacedBy(AppDimens.spacing.s)`。
+     */
+    val spacing: SpacingScale = SpacingScale()
+
+    /**
+     * 内容通行内边距（16dp）——旧名别名，等价 `spacing.l`（`implementation-plan.md` §9）：
+     * 语义与数值均不变，既有调用点零改动。
+     */
+    val contentPadding: Dp = spacing.l
 
     /** 最小触点（M3 无障碍基线；#87 SeedColorRow 色块等小控件的触区下限） */
     val minTouchTarget: Dp = 48.dp

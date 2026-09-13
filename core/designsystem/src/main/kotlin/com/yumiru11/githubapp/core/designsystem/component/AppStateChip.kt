@@ -22,6 +22,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.theme.extendedColors
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 
 /**
  * GitHub 领域状态（#84 状态色语义表）。
@@ -170,7 +171,7 @@ fun AppStateChip(
         color = colors.container,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = AppDimens.spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(

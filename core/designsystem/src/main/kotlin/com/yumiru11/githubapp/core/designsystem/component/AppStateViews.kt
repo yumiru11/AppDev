@@ -119,7 +119,7 @@ fun AppLoadingState(
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.m),
     ) {
         LoadingIndicator()
         if (label != null) {
@@ -150,7 +150,7 @@ private fun AppMessageState(
                 .fillMaxWidth()
                 .padding(AppDimens.contentPadding),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
         Icon(
             imageVector = icon,

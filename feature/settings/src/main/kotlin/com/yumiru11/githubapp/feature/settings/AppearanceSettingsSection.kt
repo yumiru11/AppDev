@@ -261,7 +261,7 @@ private fun BackgroundImageRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = AppDimens.contentPadding, vertical = 8.dp),
+                .padding(horizontal = AppDimens.contentPadding, vertical = AppDimens.spacing.s),
     ) {
         Text(
             text = stringResource(R.string.settings_background),
@@ -277,8 +277,8 @@ private fun BackgroundImageRow(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
+        Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
             FilledTonalButton(
                 onClick = {
                     picker.launch(
@@ -316,7 +316,7 @@ private fun BackgroundOpacitySlider(
     opacity: Float,
     onOpacityChange: (Float) -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = AppDimens.spacing.s)) {
         Text(
             text = stringResource(R.string.settings_background_opacity, (opacity * 100).roundToInt()),
             style = MaterialTheme.typography.labelLarge,
@@ -344,7 +344,7 @@ private fun ThemeModeRow(
         )
     val currentValue = options.first { it.first == uiState.themeMode }.second
     SettingRow(title = stringResource(R.string.settings_theme_mode), valueText = currentValue) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
             options.forEach { (mode, label) ->
                 AppFilterChip(
                     selected = uiState.themeMode == mode,
@@ -373,7 +373,7 @@ private fun SeedColorRow(
             ?.let { (_, nameRes) -> stringResource(nameRes) }
     SettingRow(title = stringResource(R.string.settings_seed_color), valueText = selectedName) {
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.xs),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             SEED_COLORS.forEach { (color, nameRes) ->
@@ -453,7 +453,7 @@ internal fun CodeFontRow(
         )
     val currentName = options.first { (font, _) -> font == selected }.second
     SettingRow(title = stringResource(R.string.settings_code_font), valueText = currentName) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
             options.forEach { (font, label) ->
                 AppFilterChip(
                     selected = selected == font,
@@ -488,7 +488,7 @@ internal fun IconStyleRow(
         )
     val currentName = stringResource(options.first { (style, _) -> style == selected }.second)
     SettingRow(title = stringResource(R.string.settings_icon_style), valueText = currentName) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
             options.forEach { (style, labelRes) ->
                 IconStylePreviewCard(
                     style = style,
@@ -540,7 +540,7 @@ private fun IconStylePreviewCard(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 12.dp),
+                    .padding(vertical = AppDimens.spacing.m),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             AppIcon(
@@ -549,7 +549,7 @@ private fun IconStylePreviewCard(
                 style = style,
                 tint = contentColor,
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
@@ -585,7 +585,7 @@ private fun CornerScaleRow(
                     text = stringResource(R.string.settings_corner_scale),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(AppDimens.spacing.l),
                 )
             }
         }
@@ -682,8 +682,8 @@ internal fun SwitchSettingRow(
                 .padding(
                     start = if (indented) AppDimens.contentPadding * 2 else AppDimens.contentPadding,
                     end = AppDimens.contentPadding,
-                    top = 8.dp,
-                    bottom = 8.dp,
+                    top = AppDimens.spacing.s,
+                    bottom = AppDimens.spacing.s,
                 ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -702,7 +702,7 @@ internal fun SwitchSettingRow(
                 )
             }
         }
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.l))
         // 先落到局部名并显式 `this.`：semantics 作用域里 contentDescription 是接收者上的
         // 只写扩展属性，与形参同名时裸写会解析到形参（val）→ 编译报「val cannot be reassigned」
         val switchContentDescription = contentDescription
@@ -734,7 +734,7 @@ internal fun SettingRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
     ) {
         Text(
             text = title,
@@ -748,7 +748,7 @@ internal fun SettingRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
         content()
     }
 }

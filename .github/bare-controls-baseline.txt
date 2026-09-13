@@ -1,0 +1,16 @@
+# 裸控件基准（设计系统 Batch 3，docs/design-system/implementation-plan.md §5.1/§5.4）
+#
+# 口径：词边界 \b<Name>(，排除 */build/、*/src/test/、*Test.kt 与白名单目录
+# （core/designsystem/、core/ui/、prototype/）。计数只许持平或下降；
+# 放宽/删除条目必须改本文件并在 PR 说明理由。
+#
+# 初值 = Batch 1（#273）/Batch 2（#274）合入后在 main@354766b 的实测值。
+# 计划原初值 19/20/16/14/6/2 中 Card/FilterChip/AlertDialog 的下降来自 Batch 1
+# 已完成的迁移（4×Card、4×FilterChip、1×AlertDialog）。
+# 六类清零仍是波级目标（§6.3）；全部迁完后把本文件下调到 0。
+Card=15
+Scaffold=20
+FilterChip=12
+AlertDialog=13
+ModalBottomSheet=6
+SnackbarHost=2

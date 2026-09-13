@@ -58,6 +58,14 @@ jobs:
         # GNU sed（ubuntu）与 BSD sed（macos）的 -i 语法不兼容——python 跨平台
         run: python3 -c "import re; p='gradle.properties'; s=open(p).read(); open(p,'w').write(re.sub(r'(?m)^org\.gradle\.java\.home.*\n?', '', s))"
 
+      # ── 裸控件门禁（设计系统 Batch 3，implementation-plan.md §5）──────────────
+      # 六类裸 M3 控件（词边界 Card/Scaffold/FilterChip/AlertDialog/ModalBottomSheet/
+      # SnackbarHost）的计数不得超过 .github/bare-controls-baseline.txt 的基准——只许
+      # 持平或下降。纯静态 bash，秒级失败（放在 Gradle 步骤之前）。
+      # 红→绿实证（临时注入裸 Card( → exit 1，撤销 → exit 0）与基准口径见 Batch 3 PR body。
+      - name: Forbid new bare controls (design system)
+        run: bash .github/scripts/forbid-bare-controls.sh
+
       # 开发机有全局 ~/.gradle/init.d/mirror.gradle（阿里云优先，本机 Google Maven 不可达）；
       # GitHub runner 直连官方源即可（阿里云在 CI 上 502，2026-08-12 实测），不再注入镜像
       # 注：seed-plugins.sh 仍保留（runner 插件 marker 解析的 curl 兜底，走官方源）

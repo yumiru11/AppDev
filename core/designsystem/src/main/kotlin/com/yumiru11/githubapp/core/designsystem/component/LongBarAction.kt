@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 
 /**
  * LongBarAction 长条按钮（#89，ui-design.md §2.2/§3.1）。
@@ -54,8 +55,8 @@ fun LongBarAction(
         Row(
             modifier =
                 Modifier
-                    .heightIn(min = 48.dp)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .heightIn(min = AppDimens.minTouchTarget)
+                    .padding(horizontal = AppDimens.spacing.l, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -63,7 +64,7 @@ fun LongBarAction(
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.m))
             Text(
                 text = text,
                 style = MaterialTheme.typography.labelLarge,
