@@ -1,7 +1,10 @@
+@file:Suppress("LargeClass") // README 渲染/文件树/文件读写/分支/UI-6 行级修改时间映射聚在同一仓库类测试（文件内按主题分段），拆分反损可读性（RepoFilesViewModelTest 同款先例）
+
 package com.yumiru11.githubapp.feature.repo
 
 import com.yumiru11.githubapp.core.database.dao.CachedReadmeDao
 import com.yumiru11.githubapp.core.database.entity.CachedReadmeEntity
+import com.yumiru11.githubapp.core.githubrest.api.CommitApi
 import com.yumiru11.githubapp.core.githubrest.api.ContentApi
 import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
 import com.yumiru11.githubapp.core.githubrest.api.GitTreeApi
@@ -9,6 +12,9 @@ import com.yumiru11.githubapp.core.githubrest.api.ReadmeApi
 import com.yumiru11.githubapp.core.githubrest.api.RepositoryApi
 import com.yumiru11.githubapp.core.githubrest.model.BranchCommitDto
 import com.yumiru11.githubapp.core.githubrest.model.BranchDto
+import com.yumiru11.githubapp.core.githubrest.model.CommitAuthorDto
+import com.yumiru11.githubapp.core.githubrest.model.CommitInfoDto
+import com.yumiru11.githubapp.core.githubrest.model.CommitListItemDto
 import com.yumiru11.githubapp.core.githubrest.model.ContentWriteResponseDto
 import com.yumiru11.githubapp.core.githubrest.model.FileContentDto
 import com.yumiru11.githubapp.core.githubrest.model.GitRefCreateRequest
@@ -48,6 +54,7 @@ class RepoRepositoryTest {
     private val gitTreeApi = mockk<GitTreeApi>()
     private val contentApi = mockk<ContentApi>()
     private val gitRefApi = mockk<GitRefApi>()
+    private val commitApi = mockk<CommitApi>()
 
     private val repository =
         RepoRepository(
@@ -57,6 +64,7 @@ class RepoRepositoryTest {
             gitTreeApi = gitTreeApi,
             contentApi = contentApi,
             gitRefApi = gitRefApi,
+            commitApi = commitApi,
         )
 
     private fun readmeDto(
@@ -746,4 +754,65 @@ class RepoRepositoryTest {
         code: Int,
         body: String,
     ): HttpException = HttpException(Response.error<Any>(code, body.toResponseBody("application/json".toMediaType())))
+
+    // ── UI-6 文件树「修改时间」列：路径 → 末次提交时间映射 ─────────────────────
+
+    @Test
+    fun getLastCommitDate_committerDatePresent_mapsCommitterDate() =
+        runTest {
+            coEvery {
+                commitApi.listCommits("yumiru11", "AppDev", sha = "main", path = "feature/repo", perPage = 1)
+            } returns
+                listOf(
+                    CommitListItemDto(
+                        sha = "5bf6aae74a297a8e54b5c30553ef8ff718d5db99",
+                        commit =
+                            CommitInfoDto(
+                                committer = CommitAuthorDto(name = "GitHub", date = "2026-09-13T09:34:34Z"),
+                                author = CommitAuthorDto(name = "yumiru11", date = "2026-09-12T00:00:00Z"),
+                            ),
+                    ),
+                )
+
+            val result = repository.getLastCommitDate("yumiru11", "AppDev", "main", "feature/repo")
+
+            assertEquals("2026-09-13T09:34:34Z", result.getOrNull())
+        }
+
+    @Test
+    fun getLastCommitDate_committerMissing_fallsBackToAuthorDate() =
+        runTest {
+            coEvery { commitApi.listCommits(any(), any(), any(), any(), any()) } returns
+                listOf(
+                    CommitListItemDto(
+                        sha = "s",
+                        commit = CommitInfoDto(author = CommitAuthorDto(name = "A", date = "2026-09-01T10:00:00Z")),
+                    ),
+                )
+
+            val result = repository.getLastCommitDate("octocat", "Hello-World", "main", "README.md")
+
+            assertEquals("2026-09-01T10:00:00Z", result.getOrNull())
+        }
+
+    @Test
+    fun getLastCommitDate_emptyCommitList_returnsNullDate() =
+        runTest {
+            coEvery { commitApi.listCommits(any(), any(), any(), any(), any()) } returns emptyList()
+
+            val result = repository.getLastCommitDate("octocat", "Hello-World", "main", "gone")
+
+            assertTrue(result.isSuccess)
+            assertNull(result.getOrNull())
+        }
+
+    @Test
+    fun getLastCommitDate_networkFailure_returnsFailure() =
+        runTest {
+            coEvery { commitApi.listCommits(any(), any(), any(), any(), any()) } throws IOException("down")
+
+            val result = repository.getLastCommitDate("octocat", "Hello-World", "main", "app")
+
+            assertTrue(result.isFailure)
+        }
 }

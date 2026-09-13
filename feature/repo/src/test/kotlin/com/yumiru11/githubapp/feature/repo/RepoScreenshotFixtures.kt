@@ -81,6 +81,15 @@ internal fun repoFilesScreenshotState(): RepoFilesUiState =
         fileState = FileViewState.Idle,
         editState = FileEditState.Idle,
         currentRef = "main",
+        // UI-6：修改时间列（相对时间，运行时生成——夹具禁写绝对时间戳，#246）
+        lastCommitDates =
+            mapOf(
+                "app" to repoScreenshotIsoDaysAgo(3),
+                "core" to repoScreenshotIsoDaysAgo(12),
+                "docs" to repoScreenshotIsoDaysAgo(1),
+                "README.md" to repoScreenshotIsoDaysAgo(8),
+                "settings.gradle.kts" to repoScreenshotIsoDaysAgo(21),
+            ),
         isFindOpen = false,
         findState = FileFindState(),
     )
