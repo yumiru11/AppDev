@@ -19,6 +19,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.compose.components.markdownComponents
@@ -30,6 +31,7 @@ import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.markdownExtendedSpans
+import com.mikepenz.markdown.model.markdownPadding
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.yumiru11.githubapp.core.markdown.native.rememberMarkdownInlineSemantics
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
@@ -41,6 +43,9 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
  * 基于 mikepenz multiplatform-markdown-renderer 0.38.1 + KotlinTextMate 高亮。
  * 视觉策略与 [EnhancedMarkdownViewer] 对齐（WebView github-markdown-css 观感）：
  * 行内代码主题色+圆角、代码块卡片背景、列表缩进、任务列表 checkbox、主题色引用块左条。
+ * 阅读密度（段间距 / 行高 / 每层缩进）来自 [MarkdownDensity.current]，与 WebView 通道
+ * （`--md-reading-*` CSS 变量）同一事实来源；左右间距由调用方的容器 padding 承担
+ * （本组件不内置水平 padding，短文本卡片场景由宿主决定）。
  *
  * @param markdown Markdown 原文
  * @param onInternalLink 链接点击回调；Internal 类型（Repo/Issue/PR 等）由上层路由处理，
@@ -51,6 +56,7 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
  *   使用——Lazy 列表 item 测量约束为无限高，内嵌 verticalScroll 会崩
  *   「Vertically scrollable component was measured with an infinity maximum height
  *   constraints」，RoadWeaver 崩溃根因 2026-08-17）
+ * @param density 阅读密度令牌；默认 [MarkdownDensity.current]（测试/对比可显式传入）
  */
 @Composable
 fun MarkdownViewer(
@@ -59,6 +65,7 @@ fun MarkdownViewer(
     baseRepoUrl: String? = null,
     modifier: Modifier = Modifier,
     scrollable: Boolean = true,
+    density: MarkdownDensityTokens = MarkdownDensity.current,
 ) {
     val darkTheme = isSystemInDarkTheme()
     val state = rememberMarkdownState(markdown, immediate = true)
@@ -98,14 +105,14 @@ fun MarkdownViewer(
             h4 = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium, color = scheme.onSurface),
             h5 = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, color = scheme.onSurface),
             h6 = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, color = scheme.onSurfaceVariant),
-            text = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
+            text = density.bodyTextStyle(scheme.onSurface),
             code = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 14.sp, lineHeight = 20.sp, color = scheme.onSurface),
             inlineCode = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 14.sp, lineHeight = 20.sp, color = scheme.primary),
-            quote = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
-            paragraph = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
-            ordered = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
-            bullet = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
-            list = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
+            quote = density.bodyTextStyle(scheme.onSurface),
+            paragraph = density.bodyTextStyle(scheme.onSurface),
+            ordered = density.bodyTextStyle(scheme.onSurface),
+            bullet = density.bodyTextStyle(scheme.onSurface),
+            list = density.bodyTextStyle(scheme.onSurface),
             textLink =
                 TextLinkStyles(
                     style =
@@ -122,6 +129,13 @@ fun MarkdownViewer(
             annotator = inlineSemantics,
             colors = colors,
             typography = typography,
+            padding =
+                markdownPadding(
+                    block = density.paragraphGap,
+                    listItemTop = 8.dp,
+                    listItemBottom = 8.dp,
+                    listIndent = density.indentPerLevel,
+                ),
             extendedSpans =
                 markdownExtendedSpans {
                     remember {
@@ -146,8 +160,8 @@ fun MarkdownViewer(
                         }
                     },
                     blockQuote = { model -> GitHubAlertOrQuote(model) },
-                    unorderedList = { model -> EnhancedUnorderedList(model) },
-                    orderedList = { model -> EnhancedOrderedList(model) },
+                    unorderedList = { model -> EnhancedUnorderedList(model, density.indentPerLevel) },
+                    orderedList = { model -> EnhancedOrderedList(model, density.indentPerLevel) },
                     checkbox = { model -> MarkdownCheckBox(model.content, model.node, model.typography.text) },
                 ),
             modifier = if (scrollable) modifier.verticalScroll(rememberScrollState()) else modifier,

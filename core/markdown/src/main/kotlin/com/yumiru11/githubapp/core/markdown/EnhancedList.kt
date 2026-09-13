@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mikepenz.markdown.compose.LocalMarkdownComponents
 import com.mikepenz.markdown.compose.MarkdownElement
@@ -28,13 +29,18 @@ import org.intellij.markdown.flavours.gfm.GFMTokenTypes
  *
  * 结构（每项 = Column）：第一行 Row(marker + 段落)，嵌套列表换行缩进到下一行
  * （2026-08-16 真机验证：先前把嵌套列表塞进父 Row 导致「竖着连在文本后面」）。
+ *
+ * 缩进来源：`MarkdownDensity.current.indentPerLevel`（每层 24dp，开发：MarkdownDensityTokens）。
+ * 嵌套列表**不再**额外包一层 `padding(start)` —— 嵌套的列表组件自身已按令牌缩进，
+ * 否则每层实际缩进会是令牌的两倍（旧实现 20dp 常量 → 每层实际 40dp）。
  */
-private const val LIST_INDENT_DP = 20
-
 @Composable
-fun EnhancedUnorderedList(model: MarkdownComponentModel) {
+fun EnhancedUnorderedList(
+    model: MarkdownComponentModel,
+    indent: Dp = MarkdownDensity.current.indentPerLevel,
+) {
     val components = LocalMarkdownComponents.current
-    Column(Modifier.padding(start = LIST_INDENT_DP.dp)) {
+    Column(Modifier.padding(start = indent)) {
         model.node.children
             .filter { it.type == MarkdownElementTypes.LIST_ITEM }
             .forEach { item ->
@@ -49,10 +55,13 @@ fun EnhancedUnorderedList(model: MarkdownComponentModel) {
 }
 
 @Composable
-fun EnhancedOrderedList(model: MarkdownComponentModel) {
+fun EnhancedOrderedList(
+    model: MarkdownComponentModel,
+    indent: Dp = MarkdownDensity.current.indentPerLevel,
+) {
     val components = LocalMarkdownComponents.current
     var counter = 0
-    Column(Modifier.padding(start = LIST_INDENT_DP.dp)) {
+    Column(Modifier.padding(start = indent)) {
         model.node.children
             .filter { it.type == MarkdownElementTypes.LIST_ITEM }
             .forEach { item ->
@@ -137,11 +146,9 @@ private fun ListItemColumn(
                 MarkdownElement(block, components, model.content, includeSpacer = false)
             }
         }
-        // 嵌套列表：换行 + 缩进（不是塞进父 Row）
+        // 嵌套列表：换行（缩进由嵌套列表组件自身按 MarkdownDensity 令牌执行，不在此重复加）
         nestedLists.forEach { nested ->
-            Box(Modifier.padding(start = LIST_INDENT_DP.dp)) {
-                MarkdownElement(nested, components, model.content, includeSpacer = false)
-            }
+            MarkdownElement(nested, components, model.content, includeSpacer = false)
         }
     }
 }
