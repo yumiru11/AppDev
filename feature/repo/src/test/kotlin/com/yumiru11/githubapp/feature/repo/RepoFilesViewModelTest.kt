@@ -11,6 +11,8 @@ import com.yumiru11.githubapp.core.datastore.draft.DraftKey
 import com.yumiru11.githubapp.core.datastore.draft.DraftRepository
 import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
 import com.yumiru11.githubapp.core.editor.FileFindState
+import com.yumiru11.githubapp.core.editor.LineEnding
+import com.yumiru11.githubapp.core.editor.TextFileFormat
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -524,11 +526,12 @@ class RepoFilesViewModelTest {
         sha: String? = "blob-old",
         kind: FileKind = FileKind.CODE,
         drafts: DraftAutoSaver = draftSaver(RecordingDraftRepository()),
+        format: TextFileFormat = TextFileFormat.DEFAULT,
     ): RepoFilesViewModel {
         coEvery { repoRepository.getTree(any(), any(), any()) } returns
             Result.success(listOf(treeNode("Main.kt", "Main.kt")))
         coEvery { repoRepository.getFileContent(any(), any(), any(), any(), any()) } returns
-            Result.success(FileContentData("Main.kt", "Main.kt", 4L, kind, text, sha))
+            Result.success(FileContentData("Main.kt", "Main.kt", 4L, kind, text, sha, format))
         val vm = viewModel(repoRepository, drafts)
         vm.loadRootTree("main")
         vm.openFile(treeNode("Main.kt", "Main.kt"), "main")
@@ -648,6 +651,59 @@ class RepoFilesViewModelTest {
 
             coVerify {
                 repoRepository.updateFileContent("octocat", "Hello-World", "docs/new.md", "hello", null, "add new", "main")
+            }
+        }
+
+    @Test
+    fun commitEdit_crlfFile_forwardsOriginalFormatToRepository() =
+        runTest {
+            // EDITOR-1：保存按打开时探测到的格式还原行尾（CRLF 文件不被静默转 LF）
+            val crlf = TextFileFormat(lineEnding = LineEnding.CRLF)
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("Main.kt", "Main.kt")))
+                    coEvery { getFileContent(any(), any(), any(), any(), any()) } returns
+                        Result.success(FileContentData("Main.kt", "Main.kt", 4L, FileKind.CODE, "code", "blob-old", crlf))
+                    coEvery { updateFileContent(any(), any(), any(), any(), any(), any(), any(), any()) } returns
+                        Result.success(FileCommitResult.Success("c1", "b1"))
+                }
+            val vm = editingSetup(repoRepository, format = crlf)
+
+            vm.commitEdit(message = "fix", newBranchName = null, newFilePath = null)
+
+            coVerify {
+                repoRepository.updateFileContent("octocat", "Hello-World", "Main.kt", "code", "blob-old", "fix", "main", crlf)
+            }
+        }
+
+    @Test
+    fun commitEdit_newFile_usesDefaultFormat() =
+        runTest {
+            // EDITOR-1：新建文件无原始格式 → 默认 UTF-8 + LF
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("Main.kt", "Main.kt")))
+                    coEvery { updateFileContent(any(), any(), any(), any(), any(), any(), any(), any()) } returns
+                        Result.success(FileCommitResult.Success("c1", "b1"))
+                }
+            val vm = viewModel(repoRepository)
+            vm.loadRootTree("main")
+            vm.startNewFile()
+            vm.onEditorTextChanged("hello")
+
+            vm.commitEdit(message = "add new", newBranchName = null, newFilePath = "docs/new.md")
+
+            coVerify {
+                repoRepository.updateFileContent(
+                    "octocat",
+                    "Hello-World",
+                    "docs/new.md",
+                    "hello",
+                    null,
+                    "add new",
+                    "main",
+                    TextFileFormat.DEFAULT,
+                )
             }
         }
 

@@ -8,6 +8,8 @@ import android.util.Log
 import com.yumiru11.githubapp.core.`data`.model.Repository
 import com.yumiru11.githubapp.core.database.dao.CachedReadmeDao
 import com.yumiru11.githubapp.core.database.entity.CachedReadmeEntity
+import com.yumiru11.githubapp.core.editor.TextFileCodec
+import com.yumiru11.githubapp.core.editor.TextFileFormat
 import com.yumiru11.githubapp.core.githubrest.api.CommitApi
 import com.yumiru11.githubapp.core.githubrest.api.ContentApi
 import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
@@ -181,15 +183,18 @@ class RepoRepository
                 val dto = contentApi.getFileContent(owner, repo, path, ref)
                 val bytes = dto.decodeBytes()
                 val kind = FileClassifier.classify(dto.name, dto.size, bytes)
-                val text = if (kind == FileKind.CODE || kind == FileKind.MARKDOWN) bytes?.decodeToString().orEmpty() else null
+                // EDITOR-1：文本文件按 BOM/合法性探测字符集与行尾；编辑器一律拿 LF 文本，
+                // 原始格式随 [FileContentData.textFormat] 传给保存路径（绝不静默转 LF）。
+                val decoded = if (kind == FileKind.CODE || kind == FileKind.MARKDOWN) bytes?.let(TextFileCodec::decode) else null
                 val data =
                     FileContentData(
                         fileName = dto.name,
                         path = dto.path,
                         size = dto.size,
                         kind = kind,
-                        text = text,
+                        text = if (decoded == null) null else decoded.text,
                         sha = dto.sha,
+                        textFormat = decoded?.format ?: TextFileFormat.DEFAULT,
                     )
                 // 只有响应 sha 与调用方 revision 一致才缓存：分支已移动时响应 sha 不同，
                 // 按旧 revision 缓存会把「不是该 revision 的内容」挂在旧 key 下。
@@ -448,11 +453,15 @@ class RepoRepository
         /**
          * 更新/创建文件（T22，plan.md §7.4）。
          *
-         * @param text 新文件全文（UTF-8；客户端层 base64 编码后 PUT）
+         * EDITOR-1：文本按 [format] 还原行尾/字符集/BOM 后编码（**绝不**把 CRLF 文件写成 LF），
+         * base64 后 PUT；新建文件用默认格式（UTF-8 + LF）。
+         *
+         * @param text 新文件全文（编辑器产出，LF 行尾）
          * @param sha 被替换文件 blob SHA；null = 新建文件（无 sha 校验）
          * @param message 提交信息（必填）
          * @param branch 目标分支名；null = 当前查看分支。**分支必须已存在**——新建分支场景
          *   需先调 [createBranch]（Contents API 对不存在的 ref 返回 404，不会自动建分支）
+         * @param format 打开时探测到的文件格式（[FileContentData.textFormat]；新建文件取默认值）
          * @return Success（新 blob/commit SHA）或 Conflict（409：远端最新 blob SHA，绝不静默覆盖）
          */
         suspend fun updateFileContent(
@@ -463,6 +472,7 @@ class RepoRepository
             sha: String?,
             message: String,
             branch: String?,
+            format: TextFileFormat = TextFileFormat.DEFAULT,
         ): Result<FileCommitResult> =
             runCatching {
                 val dto =
@@ -472,7 +482,7 @@ class RepoRepository
                         path,
                         FileWriteRequest(
                             message = message,
-                            content = Base64.getEncoder().encodeToString(text.toByteArray()),
+                            content = Base64.getEncoder().encodeToString(TextFileCodec.encode(text, format)),
                             sha = sha,
                             branch = branch,
                         ),

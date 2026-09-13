@@ -39,6 +39,7 @@ import org.eclipse.tm4e.core.registry.IThemeSource
  * @param editable 是否可编辑（false = 只读浏览，T11 默认行为）
  * @param codeFont 代码字体（默认跟随设置页偏好 [LocalCodeEditorPreferences]）
  * @param lineNumbers 是否显示行号（默认跟随设置页偏好 [LocalCodeEditorPreferences]）
+ * @param softWrap 软换行（EDITOR-1；默认跟随偏好，关 = 横向滚动）
  * @param onEditorReady 编辑器控制句柄就绪回调（搜索/跳转行/撤销重做等外部控制用）
  * @param onTextChanged 文本变更回调（编辑模式同步宿主状态；[CodeEditorController.onTextChanged]）
  */
@@ -50,6 +51,7 @@ fun CodeEditorView(
     editable: Boolean = false,
     codeFont: CodeFont = LocalCodeEditorPreferences.current.codeFont,
     lineNumbers: Boolean = LocalCodeEditorPreferences.current.lineNumbers,
+    softWrap: Boolean = LocalCodeEditorPreferences.current.codeSoftWrap,
     onEditorReady: (CodeEditorController) -> Unit = {},
     onTextChanged: (String) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -82,18 +84,17 @@ fun CodeEditorView(
         factory = { ctx ->
             CodeEditor(ctx).apply {
                 setEditable(editable)
-                isWordwrap = false
                 setTabWidth(4)
                 setTextSize(EDITOR_TEXT_SIZE_SP)
                 setUndoEnabled(editable)
-                // 首帧就按偏好建视图：否则会先画一次默认字体/行号再被 update 纠正（可见闪动）
-                applyCodeEditorPreferences(codeFont = codeFont, lineNumbers = lineNumbers)
+                // 首帧就按偏好建视图：否则会先画一次默认字体/行号/换行再被 update 纠正（可见闪动）
+                applyCodeEditorPreferences(codeFont = codeFont, lineNumbers = lineNumbers, softWrap = softWrap)
             }
         },
         update = { editor ->
             // 偏好同步（T24）：AndroidView 的 update 每次重组都会跑，设置页改动 → 偏好重组 →
             // 此处即时下发到**已存在**的编辑器实例（helper 幂等：值没变不写，避免无谓重排）。
-            editor.applyCodeEditorPreferences(codeFont = codeFont, lineNumbers = lineNumbers)
+            editor.applyCodeEditorPreferences(codeFont = codeFont, lineNumbers = lineNumbers, softWrap = softWrap)
             if (editor.text.toString() != content) {
                 editor.setText(content)
                 // 内容被外部整体替换（切换文件 / 冲突重载）：结束查找会话。
@@ -129,7 +130,7 @@ fun CodeEditorView(
 }
 
 /**
- * 把代码字体与行号两项偏好同步到已存在的 Sora 实例（幂等）。
+ * 把代码字体、行号与软换行三项偏好同步到已存在的 Sora 实例（幂等）。
  *
  * **为什么这个胶水函数住在 `*EditorView*` 文件里**：它要真实 `Typeface` 与真实 `CodeEditor`
  * 实例，属本仓排除口径中的「Sora 视图/胶水层，单测不可达」——JaCoCo 不记录 Robolectric 覆盖
@@ -146,6 +147,8 @@ fun CodeEditorView(
  *   默认」时行号槽留在等宽字体上，该缺陷由 `CodeFontTypefaceTest` 抓出并留作回归防线
  * - `setLineNumberEnabled(boolean)`：非软换行时只 `invalidate()`，而 `measureLineNumber()` 与
  *   `EditorRenderer.drawView()` 每次都读 `isLineNumberEnabled()` ⇒ 当帧生效，无需重建视图
+ * - `setWordwrap(boolean)` → `setWordwrap(boolean, true)`：写 `wordwrap` 字段 → `requestLayoutIfNeeded()`
+ *   + `createLayout()` + `invalidateRenderNodes()` + `invalidate()` ⇒ 换行开关当帧生效（EDITOR-1）
  *
  * 幂等是性能刚需：调用点在 `AndroidView.update`（每次重组都会跑），无条件 `setTypefaceText`
  * 会每次触发 `createLayout()`，滚动位置与光标被反复重排（大文件上肉眼可见地卡）。
@@ -156,6 +159,7 @@ fun CodeEditorView(
 internal fun CodeEditor.applyCodeEditorPreferences(
     codeFont: CodeFont,
     lineNumbers: Boolean,
+    softWrap: Boolean,
 ) {
     val typeface = codeFontFamily(codeFont).typeface()
     if (typefaceText != typeface || typefaceLineNumber != typeface) {
@@ -165,6 +169,10 @@ internal fun CodeEditor.applyCodeEditorPreferences(
     }
     if (isLineNumberEnabled != lineNumbers) {
         setLineNumberEnabled(lineNumbers)
+    }
+    if (isWordwrap != softWrap) {
+        // 幂等同样是性能刚需：setWordwrap 会 requestLayout + createLayout + 重绘节点
+        setWordwrap(softWrap)
     }
 }
 

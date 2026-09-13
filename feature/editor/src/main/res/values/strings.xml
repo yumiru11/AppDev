@@ -5,4 +5,7 @@
     <string name="editor_back">Back</string>
     <string name="editor_undo">Undo</string>
     <string name="editor_redo">Redo</string>
+    <!-- EDITOR-1 软换行开关（contentDescription 随状态切换） -->
+    <string name="editor_soft_wrap_on">Soft wrap: on</string>
+    <string name="editor_soft_wrap_off">Soft wrap: off</string>
 </resources>

@@ -5,6 +5,8 @@ import androidx.paging.PagingData
 import com.yumiru11.githubapp.core.data.model.Repository
 import com.yumiru11.githubapp.core.datastore.model.RepoLayoutMode
 import com.yumiru11.githubapp.core.editor.FileFindState
+import com.yumiru11.githubapp.core.editor.LineEnding
+import com.yumiru11.githubapp.core.editor.TextFileFormat
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -108,13 +110,18 @@ internal fun repoFilesScreenshotViewModel(): RepoFilesViewModel =
         every { editEvents } returns emptyFlow()
     }
 
-/** 文件查看器内容：未知扩展名（grammar = null 纯文本），规避 TextMate 语法资产加载路径（FileEdit 先例）。 */
+/**
+ * 文件查看器内容：未知扩展名（grammar = null 纯文本），规避 TextMate 语法资产加载路径（FileEdit 先例）。
+ *
+ * textFormat 显式取 CRLF：状态行帧要能看见「CRLF · UTF-8」的原始格式（EDITOR-1 验收锚点）。
+ */
 internal fun fileViewerContentData(): FileContentData =
     FileContentData(
         fileName = "notes.txt",
         path = "docs/notes.txt",
         size = 1_024L,
         kind = FileKind.CODE,
+        textFormat = TextFileFormat(lineEnding = LineEnding.CRLF),
         text =
             "AppDev screenshot expansion\n" +
                 "\n" +

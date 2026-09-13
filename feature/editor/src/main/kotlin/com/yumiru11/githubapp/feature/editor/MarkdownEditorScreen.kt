@@ -43,7 +43,10 @@ import com.composables.icons.materialsymbols.rounded.Image
 import com.composables.icons.materialsymbols.rounded.Link
 import com.composables.icons.materialsymbols.rounded.Redo
 import com.composables.icons.materialsymbols.rounded.Undo
+import com.composables.icons.materialsymbols.rounded.Wrap_text
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferences
+import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferencesWriter
 import com.yumiru11.githubapp.core.editor.DEFAULT_MARKDOWN_EMOJIS
 import com.yumiru11.githubapp.core.editor.MarkdownComposer
 import com.yumiru11.githubapp.core.editor.MarkdownEditorView
@@ -60,7 +63,7 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
  *   + Sora 编辑器（Markdown TextMate 语法 + M3 主题 + @mention/emoji 自动补全）
  * - 预览 Tab：与展示共用主渲染管线（[WebViewMarkdownRenderer] + 离线 GFM，
  *   同 README/Issue 正文——Task B 后主渲染），保证 WYSIWYG 一致性
- * - 顶栏：返回 + 撤销/重做
+ * - 顶栏：返回 + 软换行开关（EDITOR-1）+ 撤销/重做
  *
  * @param initialContent 初始文档内容（入口传入，如文件查看器编辑入口）
  * @param onClose 返回回调
@@ -100,6 +103,24 @@ fun MarkdownEditorScreen(
                     }
                 },
                 actions = {
+                    // EDITOR-1：软换行开关（Markdown 编辑器偏好；写回 DataStore 后全局即时生效）
+                    val markdownSoftWrap = LocalCodeEditorPreferences.current.markdownSoftWrap
+                    val softWrapWriter = LocalCodeEditorPreferencesWriter.current
+                    IconButton(onClick = { softWrapWriter?.setMarkdownSoftWrap(!markdownSoftWrap) }) {
+                        Icon(
+                            imageVector = MaterialSymbols.Rounded.Wrap_text,
+                            contentDescription =
+                                stringResource(
+                                    if (markdownSoftWrap) R.string.editor_soft_wrap_on else R.string.editor_soft_wrap_off,
+                                ),
+                            tint =
+                                if (markdownSoftWrap) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                        )
+                    }
                     IconButton(onClick = { viewModel.undo() }) {
                         Icon(
                             imageVector = MaterialSymbols.Rounded.Undo,

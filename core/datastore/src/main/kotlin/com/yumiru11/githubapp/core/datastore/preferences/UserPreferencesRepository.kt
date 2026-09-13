@@ -91,6 +91,17 @@ interface UserPreferencesRepository {
     val codeLineNumbers: Flow<Boolean>
 
     /**
+     * 代码视图软换行（EDITOR-1 换行开关；默认关闭 = 横向滚动，与既有只读浏览行为一致）。
+     * 开关在文件查看器 / 文件编辑页工具栏，写入即持久化（下次打开任何代码文件沿用）。
+     */
+    val codeEditorSoftWrap: Flow<Boolean>
+
+    /**
+     * Markdown 编辑器软换行（EDITOR-1 换行开关；默认开启 = 长行阅读友好）。
+     */
+    val markdownEditorSoftWrap: Flow<Boolean>
+
+    /**
      * 仓库列表布局（#166 / UI01，ui-design §3.2）：网格 / 通栏可切换，默认 [RepoLayoutMode.LIST]。
      * 用户切换后持久化——「切了又弹回去」是列表页最常见的体验投诉。
      */
@@ -148,6 +159,12 @@ interface UserPreferencesRepository {
     suspend fun setCodeFont(font: CodeFont)
 
     suspend fun setCodeLineNumbers(enabled: Boolean)
+
+    /** 写回代码视图软换行偏好（EDITOR-1） */
+    suspend fun setCodeEditorSoftWrap(enabled: Boolean)
+
+    /** 写回 Markdown 编辑器软换行偏好（EDITOR-1） */
+    suspend fun setMarkdownEditorSoftWrap(enabled: Boolean)
 
     suspend fun setRepoLayout(mode: RepoLayoutMode)
 

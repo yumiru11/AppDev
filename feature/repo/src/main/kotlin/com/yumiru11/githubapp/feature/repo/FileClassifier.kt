@@ -1,5 +1,7 @@
 package com.yumiru11.githubapp.feature.repo
 
+import com.yumiru11.githubapp.core.editor.TextFileFormat
+
 /**
  * 文件查看分类（T11 验收：大文件/二进制有明确提示而非卡死）。
  */
@@ -20,7 +22,10 @@ enum class FileKind {
 /**
  * 文件内容查看结果（RepoRepository 产出，VM 状态消费）。
  *
- * @param text 解码文本（CODE/MARKDOWN 非空；BINARY/TOO_LARGE 为 null）
+ * @param text 解码文本（CODE/MARKDOWN 非空；BINARY/TOO_LARGE 为 null）。
+ *   **行尾已归一为 LF**——原始行尾/字符集/BOM 记在 [textFormat]，保存时按快照还原
+ *   （EDITOR-1 CRLF/编码策略，见 `TextFileFormat` KDoc）。
+ * @param textFormat 打开时探测到的文件格式（EDITOR-1；非文本文件为默认 UTF-8 + LF）
  */
 data class FileContentData(
     val fileName: String,
@@ -30,6 +35,7 @@ data class FileContentData(
     val text: String? = null,
     /** 文件 blob SHA（T22 编辑提交必需：PUT sha 校验 / DELETE sha 必填）。 */
     val sha: String? = null,
+    val textFormat: TextFileFormat = TextFileFormat.DEFAULT,
 )
 
 /**

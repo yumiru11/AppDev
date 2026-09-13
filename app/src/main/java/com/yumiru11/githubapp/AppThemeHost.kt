@@ -4,6 +4,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yumiru11.githubapp.core.datastore.model.CodeFont
@@ -13,13 +15,16 @@ import com.yumiru11.githubapp.core.datastore.model.resolveEffectiveThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.designsystem.token.CodeEditorPreferences
+import com.yumiru11.githubapp.core.designsystem.token.CodeEditorPreferencesWriter
 import com.yumiru11.githubapp.core.designsystem.token.GlassSettings
 import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferences
+import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferencesWriter
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import com.yumiru11.githubapp.core.designsystem.token.LocalIconStyle
 import com.yumiru11.githubapp.core.designsystem.token.LocalStaggerEnabled
 import com.yumiru11.githubapp.core.designsystem.token.rememberSystemMotionScale
 import com.yumiru11.githubapp.core.designsystem.token.resolveEffectiveMotionScale
+import kotlinx.coroutines.launch
 
 /**
  * 主题宿主：把 [UserPreferencesRepository] 持久化的偏好接到
@@ -34,6 +39,9 @@ import com.yumiru11.githubapp.core.designsystem.token.resolveEffectiveMotionScal
  * - #168 / UI12：iconStyle 经 [LocalIconStyle] 下发，AppIcon 据此选 Material Symbols 变体
  * - T24 死设置收口：codeFont / codeLineNumbers 经 [LocalCodeEditorPreferences] 下发，
  *   `core:editor` 的代码视图与 Markdown 编辑器据此设置 Sora 的 typeface 与行号开关
+ * - EDITOR-1：软换行开关（`codeEditorSoftWrap` / `markdownEditorSoftWrap`）同样经
+ *   [LocalCodeEditorPreferences] 下发；写入端 [LocalCodeEditorPreferencesWriter] 由本宿主提供，
+ *   编辑器的换行按钮据此把选择写回 `UserPreferencesRepository`（读写同一数据源）
  * - 单一测试缝：装配行为在 AppThemeHostTest 用假仓库验证（色板选择/重组）
  *
  * @param repository 用户偏好仓库（Hilt 注入的单例）
@@ -82,6 +90,11 @@ fun AppThemeHost(
     // LocalCodeEditorPreferences → 代码视图 / Markdown 编辑器即时改 Sora 字体与行号。
     val codeFont by repository.codeFont.collectAsStateWithLifecycle(initialValue = CodeFont.MONO)
     val codeLineNumbers by repository.codeLineNumbers.collectAsStateWithLifecycle(initialValue = true)
+    // EDITOR-1：软换行开关（编辑器工具栏 → DataStore → 消费点即时生效，同一读路径）
+    val codeSoftWrap by repository.codeEditorSoftWrap.collectAsStateWithLifecycle(initialValue = false)
+    val markdownSoftWrap by repository.markdownEditorSoftWrap.collectAsStateWithLifecycle(initialValue = true)
+    // 写入端：换行按钮 → repository（不在 feature 层各持一份状态；Markdown 编辑页无 Hilt 注入点）
+    val editorPreferencesWriter = rememberEditorPreferencesWriter(repository)
     val glassSettings =
         GlassSettings(
             masterEnabled = blurEnabled,
@@ -108,7 +121,14 @@ fun AppThemeHost(
         LocalGlassSettings provides glassSettings,
         LocalStaggerEnabled provides staggerEnabled,
         LocalIconStyle provides iconStyle,
-        LocalCodeEditorPreferences provides CodeEditorPreferences(codeFont = codeFont, lineNumbers = codeLineNumbers),
+        LocalCodeEditorPreferences provides
+            CodeEditorPreferences(
+                codeFont = codeFont,
+                lineNumbers = codeLineNumbers,
+                codeSoftWrap = codeSoftWrap,
+                markdownSoftWrap = markdownSoftWrap,
+            ),
+        LocalCodeEditorPreferencesWriter provides editorPreferencesWriter,
     ) {
         AppTheme(
             themeMode = effectiveMode,
@@ -127,6 +147,29 @@ fun AppThemeHost(
                 enabled = !oledEnabled && !highContrastEnabled,
                 content = content,
             )
+        }
+    }
+}
+
+/**
+ * 编辑器偏好写入端（EDITOR-1）：把换行开关的点击写回 `UserPreferencesRepository`
+ * （与读路径同一数据源，避免第二份状态）。
+ *
+ * 独立成函数而不是内联在 [AppThemeHost] 里：宿主组合体已接近 detekt 的
+ * `LongMethod` 阈值，且该写入端与主题装配无耦合。
+ */
+@Composable
+private fun rememberEditorPreferencesWriter(repository: UserPreferencesRepository): CodeEditorPreferencesWriter {
+    val scope = rememberCoroutineScope()
+    return remember(repository, scope) {
+        object : CodeEditorPreferencesWriter {
+            override fun setCodeSoftWrap(enabled: Boolean) {
+                scope.launch { repository.setCodeEditorSoftWrap(enabled) }
+            }
+
+            override fun setMarkdownSoftWrap(enabled: Boolean) {
+                scope.launch { repository.setMarkdownEditorSoftWrap(enabled) }
+            }
         }
     }
 }

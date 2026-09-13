@@ -79,6 +79,12 @@ class DefaultUserPreferencesRepository
         override val codeLineNumbers: Flow<Boolean> =
             dataStore.data.map { it[KEY_CODE_LINE_NUMBERS] ?: true }
 
+        override val codeEditorSoftWrap: Flow<Boolean> =
+            dataStore.data.map { it[KEY_CODE_EDITOR_SOFT_WRAP] ?: false }
+
+        override val markdownEditorSoftWrap: Flow<Boolean> =
+            dataStore.data.map { it[KEY_MARKDOWN_EDITOR_SOFT_WRAP] ?: true }
+
         override val repoLayout: Flow<RepoLayoutMode> =
             dataStore.data.map { prefs ->
                 prefs[KEY_REPO_LAYOUT]
@@ -165,6 +171,14 @@ class DefaultUserPreferencesRepository
             dataStore.edit { it[KEY_CODE_LINE_NUMBERS] = enabled }
         }
 
+        override suspend fun setCodeEditorSoftWrap(enabled: Boolean) {
+            dataStore.edit { it[KEY_CODE_EDITOR_SOFT_WRAP] = enabled }
+        }
+
+        override suspend fun setMarkdownEditorSoftWrap(enabled: Boolean) {
+            dataStore.edit { it[KEY_MARKDOWN_EDITOR_SOFT_WRAP] = enabled }
+        }
+
         override suspend fun setRepoLayout(mode: RepoLayoutMode) {
             dataStore.edit { it[KEY_REPO_LAYOUT] = mode.name }
         }
@@ -216,6 +230,8 @@ class DefaultUserPreferencesRepository
             val KEY_ICON_STYLE = stringPreferencesKey("icon_style")
             val KEY_CODE_FONT = stringPreferencesKey("code_font")
             val KEY_CODE_LINE_NUMBERS = booleanPreferencesKey("code_line_numbers")
+            val KEY_CODE_EDITOR_SOFT_WRAP = booleanPreferencesKey("code_editor_soft_wrap")
+            val KEY_MARKDOWN_EDITOR_SOFT_WRAP = booleanPreferencesKey("markdown_editor_soft_wrap")
             val KEY_REPO_LAYOUT = stringPreferencesKey("repo_layout")
             val KEY_STAGGER_ENABLED = booleanPreferencesKey("stagger_enabled")
             val KEY_BACKGROUND_IMAGE_URI = stringPreferencesKey("background_image_uri")

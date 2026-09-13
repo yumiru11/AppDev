@@ -211,22 +211,21 @@ fun FileViewerScreen(
                             }
 
                             FileKind.CODE -> {
-                                CodeEditorView(
-                                    content = data.text.orEmpty(),
-                                    grammarFileName = CodeLanguageDetector.grammarForFile(data.fileName),
-                                    themeTokens = editorTokens,
-                                    onEditorReady = { controller ->
-                                        editor = controller
-                                        // 权威结果回灌（查询词异步生效）；首次结果无选中项时补跳到首处匹配
-                                        controller.onFindResult = { result ->
-                                            viewModel.onFindResults(result)
-                                            if (result.hasMatches && result.currentMatchIndex == FileFindState.NO_MATCH) {
-                                                viewModel.onFindResults(controller.findNext())
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxSize(),
-                                )
+                                Column(modifier = Modifier.fillMaxSize()) {
+                                    CodeEditorView(
+                                        content = data.text.orEmpty(),
+                                        grammarFileName = CodeLanguageDetector.grammarForFile(data.fileName),
+                                        themeTokens = editorTokens,
+                                        onEditorReady = { controller ->
+                                            editor = controller
+                                            // 权威结果回灌（查询词异步生效）；首次结果无选中项时补跳到首处匹配
+                                            bindFindResults(viewModel, controller)
+                                        },
+                                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                                    )
+                                    // EDITOR-1 状态行：打开时探测的原始格式（保存按它还原）
+                                    TextFormatIndicator(data.textFormat)
+                                }
                             }
                         }
                     }
@@ -312,13 +311,19 @@ private fun FileViewerTools(
         horizontalAlignment = Alignment.End,
     ) {
         if (isFindOpen) {
-            FileFindPanel(
+            // 查看器只读：面板不含替换行（替换在文件编辑页，见 FileEditScreen）
+            FileFindReplaceBar(
                 state = findState,
+                replaceQuery = "",
+                showReplace = false,
                 focusRequester = focusRequester,
                 onQueryChange = { query ->
                     viewModel.onFindQueryChanged(query)
                     editor?.findText(query)
                 },
+                onReplaceQueryChange = {},
+                onReplace = {},
+                onReplaceAll = {},
                 onPrevious = {
                     viewModel.onFindPrevious()
                     editor?.let { viewModel.onFindResults(it.findPrevious()) }
@@ -366,105 +371,11 @@ private fun FileViewerToolRail(
                     contentDescription = stringResource(R.string.repo_file_jump_to_line),
                 )
             }
+            // EDITOR-1：软换行开关（偏好经 LocalCodeEditorPreferences 读写）
+            SoftWrapToggleButton()
         }
     }
 }
-
-/**
- * 查找面板：查询框 + 上一处/下一处 + 「第 n / 共 m 项」计数 + 关闭。
- *
- * 颜色全取 M3 令牌（surfaceContainerHigh / onSurfaceVariant / 透明容器）；文案全走
- * stringResource（en + zh-rCN）；无匹配时上/下一处禁用（[FileFindState.hasMatches]）。
- */
-@Composable
-private fun FileFindPanel(
-    state: FileFindState,
-    focusRequester: FocusRequester,
-    onQueryChange: (String) -> Unit,
-    onPrevious: () -> Unit,
-    onNext: () -> Unit,
-    onClose: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.widthIn(min = 280.dp, max = 320.dp),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 3.dp,
-        shadowElevation = 6.dp,
-    ) {
-        Column(modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = MaterialSymbols.Rounded.Search,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
-                TextField(
-                    value = state.query,
-                    onValueChange = onQueryChange,
-                    modifier = Modifier.weight(1f).padding(start = 8.dp).focusRequester(focusRequester),
-                    placeholder = { Text(text = stringResource(R.string.repo_file_find_hint)) },
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.large,
-                    colors =
-                        TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                        ),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    // 键盘「搜索」键 = 下一处（无匹配时为空操作，状态机原样返回）
-                    keyboardActions = KeyboardActions(onSearch = { onNext() }),
-                )
-                IconButton(onClick = onClose) {
-                    Icon(
-                        imageVector = MaterialSymbols.Rounded.Close,
-                        contentDescription = stringResource(R.string.repo_file_find_close),
-                    )
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onPrevious, enabled = state.hasMatches) {
-                    Icon(
-                        imageVector = MaterialSymbols.Rounded.Keyboard_arrow_up,
-                        contentDescription = stringResource(R.string.repo_file_find_previous),
-                    )
-                }
-                IconButton(onClick = onNext, enabled = state.hasMatches) {
-                    Icon(
-                        imageVector = MaterialSymbols.Rounded.Keyboard_arrow_down,
-                        contentDescription = stringResource(R.string.repo_file_find_next),
-                    )
-                }
-                Text(
-                    text = findCounterText(state),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    modifier = Modifier.padding(start = 4.dp, end = 12.dp),
-                )
-            }
-        }
-    }
-}
-
-/**
- * 计数文案：「第 n / 共 m 项」/「无匹配结果」。
- *
- * 查询词为空或结果未回灌（[FileFindState.isSearching]）时留空——新查询词生效是异步的，
- * 立刻显示「无匹配」会闪一帧假阴性。
- */
-@Composable
-private fun findCounterText(state: FileFindState): String =
-    when {
-        !state.hasQuery || state.isSearching -> ""
-        state.hasMatches -> stringResource(R.string.repo_file_find_counter, state.matchOrdinal, state.matchCount)
-        else -> stringResource(R.string.repo_file_find_no_results)
-    }
 
 /** T22：进入可提交文件编辑（CODE/MARKDOWN 文本文件）。 */
 @Composable

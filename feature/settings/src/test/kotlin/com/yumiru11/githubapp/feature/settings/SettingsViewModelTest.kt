@@ -539,6 +539,8 @@ private class FakeUserPreferencesRepository(
     private val iconStyleFlow = MutableStateFlow(IconStyle.ROUNDED)
     val codeFontFlow = MutableStateFlow(CodeFont.MONO)
     val codeLineNumbersFlow = MutableStateFlow(true)
+    private val codeEditorSoftWrapFlow = MutableStateFlow(false)
+    private val markdownEditorSoftWrapFlow = MutableStateFlow(true)
 
     override val themeMode: Flow<ThemeMode> = themeModeFlow
 
@@ -571,6 +573,10 @@ private class FakeUserPreferencesRepository(
     override val codeFont: Flow<CodeFont> = codeFontFlow
 
     override val codeLineNumbers: Flow<Boolean> = codeLineNumbersFlow
+
+    override val codeEditorSoftWrap: Flow<Boolean> = codeEditorSoftWrapFlow
+
+    override val markdownEditorSoftWrap: Flow<Boolean> = markdownEditorSoftWrapFlow
 
     override val repoLayout: Flow<RepoLayoutMode> = MutableStateFlow(RepoLayoutMode.LIST)
 
@@ -648,6 +654,14 @@ private class FakeUserPreferencesRepository(
 
     override suspend fun setCodeLineNumbers(enabled: Boolean) {
         codeLineNumbersFlow.value = enabled
+    }
+
+    override suspend fun setCodeEditorSoftWrap(enabled: Boolean) {
+        codeEditorSoftWrapFlow.value = enabled
+    }
+
+    override suspend fun setMarkdownEditorSoftWrap(enabled: Boolean) {
+        markdownEditorSoftWrapFlow.value = enabled
     }
 
     override suspend fun setStaggerEnabled(enabled: Boolean) {

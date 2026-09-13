@@ -10,11 +10,12 @@ import io.github.rosemoe.sora.widget.EditorSearcher
 /**
  * 代码编辑器控制句柄（core:editor 对外暴露的窄接口，隔离 Sora 类型）。
  *
- * feature 层只经此句柄控制编辑器（查找/跳转行/撤销重做/文本读写），不直接接触 Sora API——
+ * feature 层只经此句柄控制编辑器（查找/替换/跳转行/撤销重做/文本读写），不直接接触 Sora API——
  * 保证 core:editor 是唯一持有 Sora 依赖的模块（plan.md §10.1）。
  *
  * T22 扩展编辑能力（只读浏览场景下写方法无副作用）：文本监听 / 读写 / 撤销重做。
  * #166（UI14）扩展文件内查找：查询高亮 / 上下一处 / 清除（状态机见 [FileFindState]）。
+ * EDITOR-1 扩展替换：单处替换 / 全部替换（单步撤销，见 [replaceAll]）。
  */
 class CodeEditorController
     internal constructor(
@@ -117,6 +118,70 @@ class CodeEditorController
         fun findPrevious(): FileFindState {
             if (editor.searcher.hasQuery()) editor.searcher.gotoPrevious()
             return currentFindState()
+        }
+
+        /**
+         * 替换「当前」匹配（EDITOR-1 replace-one）。
+         *
+         * 目标选择见 [LiteralSearch.selectMatch]：优先与当前选区完全重合的匹配（用户在查找面板
+         * 里跳到的那一处），否则取光标之后的首个匹配，再否则回绕到首个（与查找面板的环形跳转
+         * 语义一致）。替换后光标落到替换文本末尾；全文变化触发 Sora 重扫 → [onFindResult]
+         * 回灌新的计数。
+         *
+         * @return 是否真的替换了一处（只读 / 无查询词 / 无匹配时为 false，编辑器不变）
+         */
+        fun replaceCurrent(replacement: String): Boolean {
+            // 用原始 editable 标记（getEditable）而非 isEditable()：后者还要求 !layoutBusy && !isFormatting()，
+            // 在无真实布局的环境（Robolectric 测试）恒为 false，会把可替换误判成只读
+            if (!editor.editable || findQuery.isEmpty()) return false
+            val text = editor.text.toString()
+            val match =
+                LiteralSearch.selectMatch(
+                    LiteralSearch.findAll(text, findQuery, FIND_SEARCH_OPTIONS.caseInsensitive),
+                    editor.cursor.getLeft(),
+                    editor.cursor.getRight(),
+                ) ?: return false
+            replaceWholeText(
+                newText = LiteralSearch.replaceOne(text, match, replacement),
+                caretOffset = match.start + replacement.length,
+            )
+            return true
+        }
+
+        /**
+         * 替换全部匹配（EDITOR-1 replace-all）。
+         *
+         * 「撤销必须一步」的保证：全部替换先在纯逻辑层算成一份新全文（[LiteralSearch.replaceAll]），
+         * 再经**单次** `Content.replace(...)` 写回——Sora 撤销栈按 Content 变更动作记账，单次
+         * replace 即单步撤销（Sora 自带 `replaceAll` 亦走同款整文替换路径，见其
+         * `lambda$replaceAll$1` 字节码；本实现额外给出替换处数并避免库内 ProgressDialog）。
+         *
+         * @return 实际替换处数（0 = 只读 / 无查询词 / 无匹配，编辑器不变）
+         */
+        fun replaceAll(replacement: String): Int {
+            // 用原始 editable 标记（getEditable）而非 isEditable()：后者还要求 !layoutBusy && !isFormatting()，
+            // 在无真实布局的环境（Robolectric 测试）恒为 false，会把可替换误判成只读
+            if (!editor.editable || findQuery.isEmpty()) return 0
+            val text = editor.text.toString()
+            val plan = LiteralSearch.replaceAll(text, findQuery, replacement, FIND_SEARCH_OPTIONS.caseInsensitive)
+            if (plan.count == 0) return 0
+            replaceWholeText(newText = plan.text, caretOffset = editor.cursor.getLeft())
+            return plan.count
+        }
+
+        /**
+         * 整文替换（一次 `Content.replace` = 撤销栈里一个动作）+ 光标收敛到目标字符偏移。
+         *
+         * @param caretOffset 替换后光标目标字符偏移（越界按新全文长度收敛）
+         */
+        private fun replaceWholeText(
+            newText: String,
+            caretOffset: Int,
+        ) {
+            val content = editor.text
+            content.replace(0, 0, content.lineCount - 1, content.getColumnCount(content.lineCount - 1), newText)
+            val position = content.indexer.getCharPosition(caretOffset.coerceIn(0, newText.length))
+            editor.setSelection(position.line, position.column)
         }
 
         /**
