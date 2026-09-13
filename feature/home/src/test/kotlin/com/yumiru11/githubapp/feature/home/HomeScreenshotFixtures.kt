@@ -1,5 +1,7 @@
 package com.yumiru11.githubapp.feature.home
 
+import androidx.paging.LoadState
+import androidx.paging.LoadStates
 import androidx.paging.PagingData
 import com.yumiru11.githubapp.feature.home.model.FeedEventType
 import com.yumiru11.githubapp.feature.home.model.FeedItem
@@ -102,6 +104,36 @@ internal fun homeTrendingItems(): List<TrendItem> =
             url = "https://github.com/rikkahub/rikkahub",
         ),
     )
+
+/**
+ * feed **首载**（refresh 挂起、0 条）的 PagingData —— UI-7 骨架屏状态的输入。
+ *
+ * `PagingData.from(emptyList(), sourceLoadStates = …)` 把 refresh 显式置为 [LoadState.Loading]：
+ * 与真实首载（首屏数据尚未到达时 `LazyPagingItems` 的加载态）等价，且不引入挂起协程
+ * （截图/UI 测试都不需要等一个永不返回的 PagingSource）。
+ *
+ * ⚠️ 若将来该构造不再产出 `refresh=Loading`，骨架屏截图会静默退化成空态——
+ * `HomeScreenFeedSkeletonTest` 的语义断言是这一形态的红线。
+ */
+internal fun homeFirstLoadPagingData(): PagingData<FeedItem> =
+    PagingData.from(
+        emptyList<FeedItem>(),
+        LoadStates(
+            refresh = LoadState.Loading,
+            prepend = LoadState.NotLoading(endOfPaginationReached = false),
+            append = LoadState.NotLoading(endOfPaginationReached = false),
+        ),
+    )
+
+/** feed 首载骨架屏 ViewModel 桩：Success + 首载挂起（0 条，refresh=Loading）。 */
+internal fun homeFirstLoadScreenshotViewModel(): HomeViewModel =
+    mockk(relaxed = true) {
+        every { uiState } returns
+            MutableStateFlow(
+                HomeUiState.Success(feed = flowOf(homeFirstLoadPagingData())),
+            )
+        every { trending } returns MutableStateFlow(emptyList())
+    }
 
 /** 首页 ViewModel 桩：Success（feed 三条 + trending 两条），retry 走 relaxed 空实现。 */
 internal fun homeScreenshotViewModel(): HomeViewModel =
