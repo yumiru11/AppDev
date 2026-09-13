@@ -50,7 +50,6 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -59,16 +58,13 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -96,7 +92,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.datastore.draft.DraftText
+import com.yumiru11.githubapp.core.designsystem.component.AppBottomSheet
 import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.AppDialog
+import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
+import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
@@ -178,7 +178,7 @@ fun IssueDetailScreen(
         }
     }
 
-    Scaffold(
+    AppScaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
@@ -333,7 +333,7 @@ fun IssueDetailScreen(
     // 删除评论确认
     deletingComment?.let { comment ->
         if (state?.canEditComment(comment) == true) {
-            AlertDialog(
+            AppDialog(
                 onDismissRequest = { deletingComment = null },
                 title = { Text(text = stringResource(R.string.issue_delete_comment_title)) },
                 text = { Text(text = stringResource(R.string.issue_delete_comment_message)) },
@@ -965,7 +965,7 @@ private fun IssueMetaEditSheet(
     onSave: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
+    AppBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）
@@ -1025,22 +1025,12 @@ private fun IssueMetaEditSheet(
                                 ) {
                                     state.labels.forEach { label ->
                                         val selected = label.name in state.selectedLabels
-                                        FilterChip(
+                                        AppFilterChip(
                                             selected = selected,
                                             onClick = { onToggleLabel(label.name) },
-                                            label = { Text(text = label.name) },
-                                            leadingIcon =
-                                                if (selected) {
-                                                    {
-                                                        Icon(
-                                                            imageVector = Icons.Filled.Check,
-                                                            contentDescription = null,
-                                                            modifier = Modifier.size(16.dp),
-                                                        )
-                                                    }
-                                                } else {
-                                                    null
-                                                },
+                                            label = label.name,
+                                            leadingIcon = if (selected) Icons.Filled.Check else null,
+                                            leadingIconSize = 16.dp,
                                         )
                                     }
                                 }
@@ -1212,7 +1202,7 @@ private fun CommentInputSheet(
     val editorTokens = rememberM3EditorThemeTokens()
     val previewPlaceholder = stringResource(R.string.issue_comment_preview_empty)
 
-    ModalBottomSheet(
+    AppBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）
@@ -1285,7 +1275,7 @@ private fun EditIssueDialog(
 ) {
     var title by remember { mutableStateOf(issue.title) }
     val body by draft.text.collectAsStateWithLifecycle()
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.issue_edit_title)) },
         text = {
@@ -1330,7 +1320,7 @@ private fun EditCommentDialog(
     onSubmit: (String) -> Unit,
 ) {
     val body by draft.text.collectAsStateWithLifecycle()
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.issue_edit_comment_title)) },
         text = {

@@ -11,6 +11,8 @@
     <string name="gallery_section_assist_chips">辅助 chip</string>
     <string name="gallery_section_segmented_buttons">分段按钮</string>
     <string name="gallery_section_dialog">对话框</string>
+    <string name="gallery_section_bottom_sheet">底部弹层</string>
+    <string name="gallery_section_scaffold">页面脚手架</string>
     <string name="gallery_section_empty_state">空态</string>
     <string name="gallery_section_error_state">错误态</string>
     <string name="gallery_section_loading_state">加载态</string>
@@ -48,6 +50,14 @@
     <string name="gallery_dialog_text">对话框正文，用于验证容器渲染。</string>
     <string name="gallery_dialog_confirm">确定</string>
     <string name="gallery_dialog_dismiss">取消</string>
+
+    <!-- Bottom sheet -->
+    <string name="gallery_bottom_sheet_title">底部弹层标题</string>
+    <string name="gallery_bottom_sheet_body">底部弹层正文，用于验证弹层容器渲染。</string>
+
+    <!-- Scaffold -->
+    <string name="gallery_scaffold_top_bar">脚手架顶栏</string>
+    <string name="gallery_scaffold_content">脚手架内容</string>
 
     <!-- Empty / error / loading states -->
     <string name="gallery_empty_title">暂无内容</string>

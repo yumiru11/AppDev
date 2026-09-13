@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -43,10 +42,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryScrollableTabRow
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -75,7 +72,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.datastore.draft.DraftText
+import com.yumiru11.githubapp.core.designsystem.component.AppBottomSheet
 import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.AppDialog
+import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
@@ -220,7 +220,7 @@ fun PullRequestDetailScreen(
     var showCloseConfirm by remember { mutableStateOf(false) }
     val successState = uiState as? PullRequestDetailUiState.Success
 
-    Scaffold(
+    AppScaffold(
         modifier = modifier.fillMaxSize(),
         snackbarHost = { AppSnackbarHost(snackbarHostState) },
         topBar = {
@@ -363,7 +363,7 @@ fun PullRequestDetailScreen(
 
             // 删除会话评论确认（#166）
             deletingComment?.let { comment ->
-                AlertDialog(
+                AppDialog(
                     onDismissRequest = { deletingComment = null },
                     title = { Text(text = stringResource(R.string.pull_request_comment_delete_title)) },
                     text = { Text(text = stringResource(R.string.pull_request_comment_delete_message)) },
@@ -435,7 +435,7 @@ fun PullRequestDetailScreen(
 
             // #163 L03：关闭 PR 二次确认
             if (showCloseConfirm) {
-                AlertDialog(
+                AppDialog(
                     onDismissRequest = { showCloseConfirm = false },
                     title = { Text(text = stringResource(R.string.pull_request_close_confirm_title)) },
                     text = { Text(text = stringResource(R.string.pull_request_close_confirm_message)) },
@@ -584,7 +584,7 @@ private fun EditPullRequestDialog(
 ) {
     var title by remember { mutableStateOf(pullRequest.title) }
     val body by draft.text.collectAsStateWithLifecycle()
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.pull_request_edit_title)) },
         text = {
@@ -1130,7 +1130,7 @@ private fun CommentBottomSheet(
     onSubmit: (String) -> Unit,
     sheetState: SheetState,
 ) {
-    ModalBottomSheet(
+    AppBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）
@@ -1193,7 +1193,7 @@ private fun EditCommentDialog(
     onSave: (String) -> Unit,
 ) {
     val body by draft.text.collectAsStateWithLifecycle()
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.pull_request_comment_edit_title)) },
         text = {

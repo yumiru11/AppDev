@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.designsystem.component.AppBottomSheet
 import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.ui.appTransientEnterAlpha
@@ -51,7 +51,7 @@ internal fun LineCommentSheet(
     onToggleResolve: (ReviewThread) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ModalBottomSheet(
+    AppBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）

@@ -31,7 +31,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryScrollableTabRow
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -66,6 +65,7 @@ import com.yumiru11.githubapp.core.data.model.User
 import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
+import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
@@ -114,7 +114,7 @@ fun SearchScreen(
     val results = (uiState as? SearchUiState.Success) ?: lastResults
     val isSearching = uiState is SearchUiState.Loading || resultsRefreshing
 
-    Scaffold(
+    AppScaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             SearchTopBar(

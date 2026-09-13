@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -55,6 +54,7 @@ import com.yumiru11.githubapp.core.navigation.AppRoute
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppNavHost
+import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 import com.yumiru11.githubapp.core.ui.MainTab
 import com.yumiru11.githubapp.core.ui.MainTabPager
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
@@ -664,7 +664,7 @@ internal fun BlobRoute(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        SnackbarHost(
+        AppSnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding(),
         )

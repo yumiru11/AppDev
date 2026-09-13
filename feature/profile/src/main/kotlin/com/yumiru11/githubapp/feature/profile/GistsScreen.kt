@@ -23,7 +23,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -42,6 +41,7 @@ import androidx.paging.compose.itemKey
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.profile.model.GistItem
@@ -65,7 +65,7 @@ fun GistsScreen(
 ) {
     val gists = viewModel.gists.collectAsLazyPagingItems()
 
-    Scaffold(
+    AppScaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(

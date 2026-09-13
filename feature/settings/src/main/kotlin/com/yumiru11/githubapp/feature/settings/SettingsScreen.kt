@@ -16,7 +16,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -29,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yumiru11.githubapp.core.datastore.model.resolveEffectiveThemeMode
+import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.designsystem.token.rememberSystemMotionScale
@@ -82,7 +82,7 @@ fun SettingsScreen(
             cornerScale = uiState.cornerScale,
             motionScale = effectiveMotionScale,
         ) {
-            Scaffold(
+            AppScaffold(
                 topBar = { SettingsTopBar(onBackClick = onBackClick) },
                 modifier = modifier,
             ) { paddingValues ->

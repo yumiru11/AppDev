@@ -16,9 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,6 +30,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.component.AppBottomSheet
+import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
 import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
 import com.yumiru11.githubapp.core.ui.appTransientEnterAlpha
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewConclusion
@@ -75,7 +75,7 @@ internal fun ReviewSheet(
     modifier: Modifier = Modifier,
 ) {
     var conclusion by remember { mutableStateOf<ReviewConclusion?>(null) }
-    ModalBottomSheet(
+    AppBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         // #167 / UI17：BottomSheet 进出内容走 AppMotion 令牌（§4.1 表定 500ms）
@@ -100,22 +100,22 @@ internal fun ReviewSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                 ) {
-                    FilterChip(
+                    AppFilterChip(
                         selected = conclusion == ReviewConclusion.APPROVE,
                         onClick = { conclusion = ReviewConclusion.APPROVE },
                         enabled = canApprove,
-                        label = { Text(text = stringResource(R.string.pull_request_review_approve)) },
+                        label = stringResource(R.string.pull_request_review_approve),
                     )
-                    FilterChip(
+                    AppFilterChip(
                         selected = conclusion == ReviewConclusion.REQUEST_CHANGES,
                         onClick = { conclusion = ReviewConclusion.REQUEST_CHANGES },
                         enabled = canApprove,
-                        label = { Text(text = stringResource(R.string.pull_request_review_request_changes)) },
+                        label = stringResource(R.string.pull_request_review_request_changes),
                     )
-                    FilterChip(
+                    AppFilterChip(
                         selected = conclusion == ReviewConclusion.COMMENT,
                         onClick = { conclusion = ReviewConclusion.COMMENT },
-                        label = { Text(text = stringResource(R.string.pull_request_review_comment_option)) },
+                        label = stringResource(R.string.pull_request_review_comment_option),
                     )
                 }
                 Spacer(modifier = Modifier.height(16.dp))

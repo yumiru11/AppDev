@@ -4,13 +4,16 @@
 # （core/designsystem/、core/ui/、prototype/）。计数只许持平或下降；
 # 放宽/删除条目必须改本文件并在 PR 说明理由。
 #
-# 初值 = Batch 1（#273）/Batch 2（#274）合入后在 main@354766b 的实测值。
-# 计划原初值 19/20/16/14/6/2 中 Card/FilterChip/AlertDialog 的下降来自 Batch 1
-# 已完成的迁移（4×Card、4×FilterChip、1×AlertDialog）。
-# 六类清零仍是波级目标（§6.3）；全部迁完后把本文件下调到 0。
-Card=15
-Scaffold=20
-FilterChip=12
-AlertDialog=13
-ModalBottomSheet=6
-SnackbarHost=2
+# Batch 3 初值 = Batch 1（#273）/Batch 2（#274）合入后在 main@354766b 的实测值：
+# Card=15, Scaffold=20, FilterChip=12, AlertDialog=13, ModalBottomSheet=6, SnackbarHost=2。
+#
+# Batch 4（新建 AppScaffold/AppBottomSheet + 68 处全部迁移）后**六类全零**（计划 §6.3 波级
+# DoD）：Card / Scaffold / FilterChip / AlertDialog / ModalBottomSheet / SnackbarHost 全部
+# 归零，本文件随之棘轮到 0 —— 任何一处裸控件回流都会立即判红。
+# 复核命令：bash .github/scripts/forbid-bare-controls.sh
+Card=0
+Scaffold=0
+FilterChip=0
+AlertDialog=0
+ModalBottomSheet=0
+SnackbarHost=0

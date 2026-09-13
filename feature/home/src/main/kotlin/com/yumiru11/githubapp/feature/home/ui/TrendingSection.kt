@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.feature.home.R
 import com.yumiru11.githubapp.feature.home.model.TrendItem
@@ -78,7 +78,7 @@ private fun TrendingRow(
     item: TrendItem,
     onClick: () -> Unit,
 ) {
-    Card(
+    AppCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),

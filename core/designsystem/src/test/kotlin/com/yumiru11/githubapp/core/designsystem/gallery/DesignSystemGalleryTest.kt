@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
 import com.yumiru11.githubapp.core.designsystem.R
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,7 +35,7 @@ class DesignSystemGalleryTest {
     @Test
     fun designSystemGallery_allSections_rendersEverySectionTitle() {
         composeRule.setContent { DesignSystemGallery() }
-        // 12 个分节纵向排列，多数标题在首屏外 —— 用 assertExists（组合已发生）而非可见性断言
+        // 14 个分节纵向排列，多数标题在首屏外 —— 用 assertExists（组合已发生）而非可见性断言
         GallerySection.entries.forEach { section ->
             composeRule.onNodeWithText(text(sectionTitleRes(section))).assertExists()
         }
@@ -54,19 +55,16 @@ class DesignSystemGalleryTest {
         composeRule.onNodeWithText(text(R.string.gallery_dialog_title)).assertExists()
     }
 
-    private fun sectionTitleRes(section: GallerySection): Int =
-        when (section) {
-            GallerySection.CARDS -> R.string.gallery_section_cards
-            GallerySection.CARD_GROUP -> R.string.gallery_section_card_group
-            GallerySection.FILTER_CHIPS -> R.string.gallery_section_filter_chips
-            GallerySection.ASSIST_CHIPS -> R.string.gallery_section_assist_chips
-            GallerySection.SEGMENTED_BUTTONS -> R.string.gallery_section_segmented_buttons
-            GallerySection.DIALOG -> R.string.gallery_section_dialog
-            GallerySection.EMPTY_STATE -> R.string.gallery_section_empty_state
-            GallerySection.ERROR_STATE -> R.string.gallery_section_error_state
-            GallerySection.LOADING_STATE -> R.string.gallery_section_loading_state
-            GallerySection.STATE_CHIPS -> R.string.gallery_section_state_chips
-            GallerySection.LONG_BAR_ACTION -> R.string.gallery_section_long_bar_action
-            GallerySection.COLOR_ROLES -> R.string.gallery_section_color_roles
-        }
+    private fun sectionTitleRes(section: GallerySection): Int = section.titleRes
+
+    /**
+     * 分节→内容映射的**穷举守卫**：映射表替代了原先的穷举 `when`，此处必须与枚举条目一一对应。
+     *
+     * 红→绿形态：新增一个 [GallerySection] 却不往 [GALLERY_SECTION_CONTENT] 加条目时，
+     * 本断言必红（`entries.toSet() != keys`）——不是恒真守卫。
+     */
+    @Test
+    fun gallerySectionContentMap_coversEveryEntry() {
+        assertEquals(GallerySection.entries.toSet(), GALLERY_SECTION_CONTENT.keys)
+    }
 }

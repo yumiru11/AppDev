@@ -15,15 +15,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -44,8 +41,11 @@ import androidx.paging.PagingData
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
+import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
+import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
+import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.feature.issue.model.Issue
@@ -77,7 +77,7 @@ fun IssueListScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val filter by viewModel.filter.collectAsStateWithLifecycle()
 
-    Scaffold(
+    AppScaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
@@ -166,15 +166,15 @@ private fun FilterRow(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FilterChip(
+        AppFilterChip(
             selected = filter == IssueFilter.OPEN,
             onClick = { onFilterSelected(IssueFilter.OPEN) },
-            label = { Text(text = stringResource(R.string.issue_filter_open)) },
+            label = stringResource(R.string.issue_filter_open),
         )
-        FilterChip(
+        AppFilterChip(
             selected = filter == IssueFilter.CLOSED,
             onClick = { onFilterSelected(IssueFilter.CLOSED) },
-            label = { Text(text = stringResource(R.string.issue_filter_closed)) },
+            label = stringResource(R.string.issue_filter_closed),
         )
     }
 }
@@ -267,7 +267,7 @@ private fun IssueRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    AppCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         colors =

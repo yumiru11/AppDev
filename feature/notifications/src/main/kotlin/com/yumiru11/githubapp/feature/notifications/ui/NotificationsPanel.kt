@@ -41,7 +41,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -77,6 +76,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
@@ -550,7 +550,7 @@ internal fun NotificationCard(
     val unreadDescription = stringResource(R.string.notification_state_unread)
     val readDescription = stringResource(R.string.notification_state_read)
 
-    Card(
+    AppCard(
         onClick = onClick,
         modifier =
             modifier

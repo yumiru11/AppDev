@@ -44,7 +44,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -82,6 +81,7 @@ import com.yumiru11.githubapp.core.datastore.model.RepoLayoutMode
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
@@ -162,7 +162,7 @@ fun ReposScreen(
     val useHazeSource = GlassRenderPolicy.shouldAttachHazeSource(blurEnabled)
 
     CompositionLocalProvider(LocalHazeState provides hazeState) {
-        Scaffold(
+        AppScaffold(
             modifier = modifier,
             contentWindowInsets = WindowInsets(0.dp),
             snackbarHost = { AppSnackbarHost(snackbarHostState) },

@@ -42,17 +42,14 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
@@ -60,8 +57,6 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Tab
@@ -110,7 +105,11 @@ import com.composables.icons.materialsymbols.rounded.Visibility
 import com.composables.icons.materialsymbols.rounded.Visibility_off
 import com.yumiru11.githubapp.core.data.model.Release
 import com.yumiru11.githubapp.core.data.model.Repository
+import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppChip
+import com.yumiru11.githubapp.core.designsystem.component.AppDialog
+import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
+import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
@@ -120,6 +119,7 @@ import com.yumiru11.githubapp.core.markdown.webview.MermaidRenderLog
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppImageOverlay
+import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 import com.yumiru11.githubapp.core.ui.LocalRepoDetailActions
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
 import com.yumiru11.githubapp.core.ui.sharedTransitionElement
@@ -191,7 +191,7 @@ fun RepoDetailScreen(
     val canDeleteRepo = (uiState as? RepoDetailUiState.Success)?.canDeleteRepo == true
     val deleteInProgress = (uiState as? RepoDetailUiState.Success)?.pendingAction == RepoAction.DELETE
 
-    Scaffold(
+    AppScaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
             RepoTopBar(
@@ -202,7 +202,7 @@ fun RepoDetailScreen(
                 onDeleteClick = { showDeleteDialog = true },
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { AppSnackbarHost(snackbarHostState) },
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val state = uiState) {
@@ -376,7 +376,7 @@ private fun DeleteRepoDialog(
     onDismiss: () -> Unit,
 ) {
     var typed by rememberSaveable { mutableStateOf("") }
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.repo_delete_title)) },
         text = {
@@ -806,7 +806,7 @@ private fun RepoHeader(
     onTopicClick: (String) -> Unit = {},
 ) {
     val repo = state.repo
-    Card(
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
         colors =
             CardDefaults.cardColors(
@@ -1201,15 +1201,15 @@ private fun ReleasesSection(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
+                AppFilterChip(
                     selected = subTab == 0,
                     onClick = { subTab = 0 },
-                    label = { Text(text = stringResource(R.string.repo_subtab_releases)) },
+                    label = stringResource(R.string.repo_subtab_releases),
                 )
-                FilterChip(
+                AppFilterChip(
                     selected = subTab == 1,
                     onClick = { subTab = 1 },
-                    label = { Text(text = stringResource(R.string.repo_subtab_tags)) },
+                    label = stringResource(R.string.repo_subtab_tags),
                 )
             }
             // L05：写权限才显示「新建 Release」（permissions 缺失 → 保守隐藏）
@@ -1287,7 +1287,7 @@ private fun ReleaseCard(
     release: Release,
     onClick: () -> Unit,
 ) {
-    Card(
+    AppCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         colors =
@@ -1391,7 +1391,7 @@ private fun TagsList(
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(state.tags, key = { it.name }) { tag ->
-                        Card(
+                        AppCard(
                             modifier = Modifier.fillMaxWidth(),
                             colors =
                                 CardDefaults.cardColors(
@@ -1623,7 +1623,7 @@ private fun ReleaseAssetsSection(
             EmptyHint(text = stringResource(R.string.repo_release_assets_empty))
         } else {
             assets.forEach { asset ->
-                Card(
+                AppCard(
                     onClick = { asset.downloadUrl?.let(actions.onOpenExternal) },
                     // 无直链（异常数据）时不可点，避免"点了没反应"
                     enabled = asset.downloadUrl != null,
@@ -1703,7 +1703,7 @@ private const val DEFAULT_ASSET_NAME = "asset"
 
 @Composable
 internal fun EmptyHint(text: String) {
-    Card(
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
         colors =
             CardDefaults.cardColors(
@@ -1743,7 +1743,7 @@ private fun ReadmeSection(
         }
 
         is ReadmeState.Empty -> {
-            Card(
+            AppCard(
                 modifier = Modifier.fillMaxWidth(),
                 colors =
                     CardDefaults.cardColors(
