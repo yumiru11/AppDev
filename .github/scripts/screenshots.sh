@@ -186,10 +186,68 @@ fi
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/mermaid-js/mermaid" -p "$PKG" >/dev/null
 capture_frame readme-webview critical 5 \
   act:"$PKG" exact:"README" opt:log:"ReadmeRender.*renderMode=" opt:text:"Mermaid"
-# mermaid 代码块路径（同一屏滚到正文中部）：README tab 仍须选中
-retry_input swipe 540 1800 540 600 400
-capture_frame readme-mermaid critical 2 \
-  act:"$PKG" exact:"README" opt:text:"Mermaid"
+
+# ══════════════════════════════════════════════════════════════════════
+# [临时诊断段 · 本轮 CI 校准用，结论落地后删除]
+# 待答问题：① WebView 文本是否进 uiautomator dump（决定最终探针能否用文本判据）
+#          ② 视口内短滑的单次位移（校准滚动次数）③ 硬件键翻页是否可用
+# ══════════════════════════════════════════════════════════════════════
+if dump_ui 2>/dev/null; then
+  cp -f /tmp/ui.xml "$OUT/diag-ui-top.xml"
+  echo "::notice::diag(top) text hits: $(grep -oE 'Flowchart|Examples|Table of content|Sequence diagram|About|Mermaid' /tmp/ui.xml | sort | uniq -c | tr '\n' ' ')"
+fi
+
+# ── 4-6. README 图表区（readme-mermaid）────────────────────────────────────
+# 帧目的：README 正文**滚到图表区**——同时给出两个机器证据：① 正文可滚动（WebView
+# 内滚动链路可用）② mermaid 代码块/渲染图确实出现在正文里（离线 mermaid 渲染的
+# 端到端锚点）。
+#
+# 旧实现为什么拍假帧（CI 34740229533、34741143272 实证：readme-mermaid 与
+# readme-webview 逐字节相同，md5 d5afb68c / c241871a；8 轮里坏 2 轮）：
+#   1. 单次 `swipe 540 1800 → 540 600` 的起点距 WebView 顶边（首屏 ~1620px）只有
+#      ~180px，手势绝大部分落在仓库头/Tab 上——有效位移 ≈ 手势在 WebView 内的部分
+#      （~180px），就算「成功」也只滚到 README hero 图，永远到不了图表区；
+#   2. 滚动位置只稳定 ~2-3s：滑动触发重组 → WebView 重载 → 弹回顶部（logcat 实证）。
+#      是否拍到全看时序 → 偶发 DUPLICATE（同一实现时好时坏）。
+# 新实现三条硬约束：
+#   1. **视口内短滑**：起点 2150 / 终点 1750 全程留在 WebView 视口内（仓库头展开时
+#      WebView 约 1620→2400，收起后上移；两种状态都覆盖）→ 位移可预期、可累加；
+#   2. **滑动与截图之间不插 uiautomator dump**：取帧走 capture_frame 的 `settle=now`
+#      路径（先截图后断言），dump 的 5-10s 挪到截图之后（窗口冲突见该函数头注释）；
+#   3. **先验证再定格**：滑动后用临时帧验证「像素确实变了」；没变（页面被重置回顶部）
+#      就缩小步长重试，避免把一次失败的滑动直接烧成 DUPLICATE 坏帧。
+readme_mermaid_swipe() {
+  local n="$1" i
+  for ((i = 0; i < n; i++)); do
+    retry_input swipe 540 2150 540 1750 550
+    sleep 0.15
+  done
+}
+
+# 短滑次数：CI 实测校准值（图表区在正文顶部以下约「N × 单次短滑位移」处）
+mermaid_swipes=10
+for mermaid_attempt in 1 2 3; do
+  readme_mermaid_swipe "$mermaid_swipes"
+  adb exec-out screencap -p > /tmp/readme-mermaid-verify.png
+  if ! cmp -s /tmp/readme-mermaid-verify.png "$OUT/readme-webview.png"; then break; fi
+  echo "::notice::readme-mermaid 第 $mermaid_attempt 次短滑未生效（验证帧与 README 顶部同像素）——页面可能已被重载重置，缩小步长重试"
+  mermaid_swipes=4
+done
+capture_frame readme-mermaid critical now act:"$PKG" exact:"README"
+
+# ── [临时诊断段 2 · 结论落地后删除] 量单次短滑位移 + 硬件键翻页是否可用 ──────
+for diag_batch in 1 2 3 4 5; do
+  readme_mermaid_swipe 2
+  adb exec-out screencap -p > "$OUT/diag-scroll-$(printf '%02d' $((diag_batch * 2))).png"
+done
+adb shell input keyevent 93 >/dev/null 2>&1 || true
+sleep 1
+adb exec-out screencap -p > "$OUT/diag-pagedown.png"
+if dump_ui 2>/dev/null; then
+  cp -f /tmp/ui.xml "$OUT/diag-ui-scrolled.xml"
+  echo "::notice::diag(scrolled) text hits: $(grep -oE 'Flowchart|Examples|Table of content|Sequence diagram|About|Mermaid' /tmp/ui.xml | sort | uniq -c | tr '\n' ' ')"
+fi
+# ══════════════════════════════════════════════════════════════════════
 
 # ══════════════════════════════════════════════════════════════════════
 # 5.5-5.6 Issue 详情 → 评论列表（原生短文本渲染）
