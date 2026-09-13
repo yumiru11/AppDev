@@ -19,6 +19,22 @@ data class CommitDetailDto(
 )
 
 /**
+ * 提交列表条目 DTO（GET /repos/{owner}/{repo}/commits?sha=&path=，UI-6 文件树「修改时间」列）。
+ *
+ * 列表响应比单提交详情瘦得多（无 stats/files/patch），只需 sha + commit 元信息
+ * （[CommitInfoDto] 复用：committer 优先、author 兜底取 date）。
+ */
+@Serializable
+data class CommitListItemDto(
+    val sha: String = "",
+    val commit: CommitInfoDto? = null,
+) {
+    /** 提交时间（committer 优先，author 兜底；ISO-8601，可能为 null）。 */
+    val commitDate: String?
+        get() = commit?.committer?.date ?: commit?.author?.date
+}
+
+/**
  * 提交元信息（commit 对象：message / author / committer）。
  *
  * author/committer 复用既有 [CommitAuthorDto]（PullRequestDto.kt，同为 git 身份三元组）。

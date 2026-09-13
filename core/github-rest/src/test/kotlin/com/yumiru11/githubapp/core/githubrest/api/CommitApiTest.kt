@@ -2,8 +2,11 @@ package com.yumiru11.githubapp.core.githubrest.api
 
 import com.yumiru11.githubapp.core.githubrest.auth.GuestTokenProvider
 import com.yumiru11.githubapp.core.githubrest.http.InMemoryEtagStore
+import com.yumiru11.githubapp.core.githubrest.model.CommitAuthorDto
 import com.yumiru11.githubapp.core.githubrest.model.CommitDetailDto
 import com.yumiru11.githubapp.core.githubrest.model.CommitFileDto
+import com.yumiru11.githubapp.core.githubrest.model.CommitInfoDto
+import com.yumiru11.githubapp.core.githubrest.model.CommitListItemDto
 import kotlinx.coroutines.test.runTest
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -192,5 +195,87 @@ class CommitApiTest {
 
         assertEquals("s", dto.sha)
         assertEquals(1, dto.files[0].additions)
+    }
+
+    /**
+     * 文件树「修改时间」列（UI-6）：`GET /commits?sha=&path=&per_page=1` 的查询参数与
+     * 列表项解析（lean 响应：无 stats/files 也能解出 sha 与 commit.date）。
+     */
+    @Test
+    fun listCommits_pathFilteredResponse_passesShaPathAndParsesCommitDate() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        [
+                          {
+                            "sha": "5bf6aae74a297a8e54b5c30553ef8ff718d5db99",
+                            "commit": {
+                              "message": "feat: mermaid",
+                              "author": { "name": "A", "date": "2026-09-01T10:00:00Z" },
+                              "committer": { "name": "GitHub", "date": "2026-09-13T09:34:34Z" }
+                            },
+                            "parents": [{ "sha": "p1" }]
+                          }
+                        ]
+                        """.trimIndent(),
+                    ).addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val commits = api.listCommits("yumiru11", "AppDev", sha = "main", path = "feature/repo", perPage = 1)
+
+            assertEquals(1, commits.size)
+            assertEquals("5bf6aae74a297a8e54b5c30553ef8ff718d5db99", commits[0].sha)
+            assertEquals("2026-09-13T09:34:34Z", commits[0].commitDate)
+
+            val request = server.takeRequest()
+            assertEquals("GET", request.method)
+            assertEquals("/repos/yumiru11/AppDev/commits", request.url.encodedPath)
+            assertEquals("main", request.url.queryParameter("sha"))
+            assertEquals("feature/repo", request.url.queryParameter("path"))
+            assertEquals("1", request.url.queryParameter("per_page"))
+        }
+
+    @Test
+    fun listCommits_emptyResponse_returnsEmptyList() =
+        runTest {
+            server.enqueue(
+                MockResponse
+                    .Builder()
+                    .body("[]")
+                    .addHeader("Content-Type", "application/json")
+                    .build(),
+            )
+
+            val commits = api.listCommits("octocat", "Hello-World", sha = "main", path = "gone", perPage = 1)
+
+            assertTrue(commits.isEmpty())
+        }
+
+    /** commitDate 映射：committer 优先、author 兜底、全缺为 null。 */
+    @Test
+    fun commitListItemDto_commitDate_prefersCommitterThenAuthor() {
+        val both =
+            CommitListItemDto(
+                sha = "s",
+                commit =
+                    CommitInfoDto(
+                        committer = CommitAuthorDto(name = "c", date = "2026-09-13T00:00:00Z"),
+                        author = CommitAuthorDto(name = "a", date = "2026-09-01T00:00:00Z"),
+                    ),
+            )
+        assertEquals("2026-09-13T00:00:00Z", both.commitDate)
+
+        val authorOnly =
+            CommitListItemDto(
+                sha = "s",
+                commit = CommitInfoDto(author = CommitAuthorDto(name = "a", date = "2026-09-01T00:00:00Z")),
+            )
+        assertEquals("2026-09-01T00:00:00Z", authorOnly.commitDate)
+
+        assertNull(CommitListItemDto(sha = "s", commit = null).commitDate)
     }
 }

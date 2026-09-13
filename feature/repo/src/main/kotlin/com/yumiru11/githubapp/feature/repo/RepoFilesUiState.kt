@@ -14,6 +14,13 @@ data class RepoFilesUiState(
     val editState: FileEditState = FileEditState.Idle,
     /** 当前查看分支（T23：文件 Tab 分支 Chip 显示源；loadRootTree 时回写） */
     val currentRef: String? = null,
+    /**
+     * 文件树行的「修改时间」列（UI-6）：仓库内 path → 该路径末次提交的 ISO-8601 时间。
+     *
+     * 由 [RepoFilesViewModel.requestLastCommitDate] 惰性回填（行进入组合 ≈ 可见才查）；
+     * 未命中的行不出现 key（列留空，不以占位符充数）。换分支/重载树时整体清空。
+     */
+    val lastCommitDates: Map<String, String> = emptyMap(),
     /** 文件内查找面板是否展开（#166 / UI14；仅代码文件用） */
     val isFindOpen: Boolean = false,
     /** 文件内查找状态机（#166 / UI14；序号/计数的纯逻辑在 core:editor，测试见 FileFindStateTest） */

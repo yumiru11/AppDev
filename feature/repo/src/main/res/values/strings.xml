@@ -4,6 +4,8 @@
     <string name="repo_readme_loading">Loading README…</string>
     <string name="repo_readme_error">Failed to load README</string>
     <string name="repo_readme_empty">No README</string>
+    <string name="repo_readme_empty_message">This repository doesn\'t have a README file yet.</string>
+    <string name="repo_readme_empty_action">View files</string>
     <string name="repo_readme_section">README</string>
     <string name="repo_stars">%d stars</string>
     <string name="repo_forks">%d forks</string>

@@ -1,7 +1,7 @@
 @file:Suppress("TooGenericExceptionCaught", "TooManyFunctions")
 // - TooGenericExceptionCaught：网络/IO 错误统一兜底（同 RepoDetailViewModel 先例）
-// - TooManyFunctions（25 ≥ 20）：本类是「仓库」分区**唯一状态层**（树/目录/文件/编辑提交/文件内
-//   查找），查找的 6 个方法均为对 core:editor 状态机的薄转发（一行 update），拆类反而把
+// - TooManyFunctions（26 ≥ 20）：本类是「仓库」分区**唯一状态层**（树/目录/文件/编辑提交/文件内
+//   查找 + 行级修改时间），查找的 6 个方法均为对 core:editor 状态机的薄转发（一行 update），拆类反而把
 //   同一屏幕的状态源切成两处（IssueDetailScreen 同款装配豁免先例）
 
 package com.yumiru11.githubapp.feature.repo
@@ -72,6 +72,17 @@ class RepoFilesViewModel
         private var loadedRef: String? = null
 
         /**
+         * 行级「修改时间」会话缓存（key = ref + '\u0000' + path；null = 该路径无提交或查询失败）。
+         *
+         * 与 [RepoFilesUiState.lastCommitDates] 的区别：后者只装成功值（UI 只渲染非空），
+         * 本缓存连失败一起记 —— 列是装饰性元数据，在游客 60 req/h 配额下不能被重试打爆。
+         */
+        private val lastCommitDateCache = mutableMapOf<String, String?>()
+
+        /** 正在查询的 (ref,path)（防同一行的重复并请求）。 */
+        private val lastCommitDateInFlight = mutableSetOf<String>()
+
+        /**
          * 当前编辑会话的草稿上下文（进入编辑态时确定，离开编辑/提交成功后清空）。
          *
          * @param key 草稿键（文件 = owner/repo/ref/path；新建文件 = owner/repo/ref）
@@ -88,8 +99,11 @@ class RepoFilesViewModel
         fun loadRootTree(ref: String) {
             if (loadedRef == ref && _uiState.value.treeState is TreeState.Loaded) return
             loadedRef = ref
+            // 换分支/重载必须先清行级时间缓存：旧分支的末次提交时间不能带到新分支的同一 path 上
+            lastCommitDateCache.clear()
+            lastCommitDateInFlight.clear()
             // T23：分支 Chip 显示当前查看分支（分支切换返回后经此回写）
-            _uiState.update { it.copy(currentRef = ref) }
+            _uiState.update { it.copy(currentRef = ref, lastCommitDates = emptyMap()) }
             viewModelScope.launch {
                 _uiState.update { it.copy(treeState = TreeState.Loading) }
                 repoRepository.getTree(owner, repo, ref).fold(
@@ -179,6 +193,34 @@ class RepoFilesViewModel
                 )
             }
         }
+
+        /**
+         * 文件树行**进入组合（≈ 滚到可见）**时请求该行的修改时间（UI-6）。
+         *
+         * 惰性 + 会话缓存：同 (ref, path) 只查一次（含失败，见 [lastCommitDateCache]），
+         * 失败/无提交的行走留空而不是重试风暴——列是装饰性元数据，不能让它在游客
+         * 60 req/h 配额下把浏览打挂着。换分支/重载时缓存由 [loadRootTree] 整体作废。
+         */
+        fun requestLastCommitDate(path: String) {
+            val ref = loadedRef ?: return
+            val key = lastCommitKey(ref, path)
+            if (key in lastCommitDateCache || !lastCommitDateInFlight.add(key)) return
+            viewModelScope.launch {
+                val date = repoRepository.getLastCommitDate(owner, repo, ref, path).getOrNull()
+                lastCommitDateInFlight.remove(key)
+                // 查询期间用户换了分支/重载了树：旧 ref 的结果不能再落到当前 UI
+                if (loadedRef != ref) return@launch
+                lastCommitDateCache[key] = date
+                if (date != null) {
+                    _uiState.update { it.copy(lastCommitDates = it.lastCommitDates + (path to date)) }
+                }
+            }
+        }
+
+        private fun lastCommitKey(
+            ref: String,
+            path: String,
+        ): String = "$ref\u0000$path"
 
         /** 在当前已加载的树里按完整路径找节点（未展开的子树不在状态里，自然找不到）。 */
         private fun findNode(path: String): GitTreeNode? {

@@ -1352,6 +1352,134 @@ class RepoFilesViewModelTest {
             assertEquals("remote", (vm.uiState.value.editState as FileEditState.Editing).text)
             assertNull(drafts.content(draftKey()))
         }
+
+    // ── UI-6 文件树「修改时间」列（惰性行查询 + 会讯缓存） ─────────────────────────
+
+    @Test
+    fun requestLastCommitDate_visibleRow_publishesDateToState() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("app", "app")))
+                    coEvery { getLastCommitDate("octocat", "Hello-World", "main", "app") } returns
+                        Result.success("2026-09-13T09:34:34Z")
+                }
+            val vm = viewModel(repoRepository)
+            vm.loadRootTree("main")
+
+            vm.requestLastCommitDate("app")
+
+            assertEquals(
+                mapOf("app" to "2026-09-13T09:34:34Z"),
+                vm.uiState.value.lastCommitDates,
+            )
+        }
+
+    @Test
+    fun requestLastCommitDate_samePathTwice_fetchesOnce() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("app", "app")))
+                    coEvery { getLastCommitDate(any(), any(), any(), any()) } returns
+                        Result.success("2026-09-13T09:34:34Z")
+                }
+            val vm = viewModel(repoRepository)
+            vm.loadRootTree("main")
+
+            vm.requestLastCommitDate("app")
+            vm.requestLastCommitDate("app")
+
+            // 会讯缓存：同 (ref, path) 不重复发请求（60 req/h 的游客配额下不能被列打爆）
+            coVerify(exactly = 1) { repoRepository.getLastCommitDate(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun requestLastCommitDate_failure_keepsColumnEmptyAndDoesNotRetry() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("app", "app")))
+                    coEvery { getLastCommitDate(any(), any(), any(), any()) } returns Result.failure(IOException("down"))
+                }
+            val vm = viewModel(repoRepository)
+            vm.loadRootTree("main")
+
+            vm.requestLastCommitDate("app")
+            vm.requestLastCommitDate("app")
+
+            assertTrue(
+                "失败不留脏数据（列留空）",
+                vm.uiState.value.lastCommitDates
+                    .isEmpty(),
+            )
+            coVerify(exactly = 1) { repoRepository.getLastCommitDate(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun requestLastCommitDate_beforeTreeLoaded_doesNothing() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getLastCommitDate(any(), any(), any(), any()) } returns Result.success("t")
+                }
+            val vm = viewModel(repoRepository)
+
+            vm.requestLastCommitDate("app")
+
+            assertEquals(emptyMap<String, String>(), vm.uiState.value.lastCommitDates)
+            coVerify(exactly = 0) { repoRepository.getLastCommitDate(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun loadRootTree_newRef_clearsPublishedDates() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree("octocat", "Hello-World", any()) } returns Result.success(listOf(treeNode("app", "app")))
+                    coEvery { getLastCommitDate(any(), any(), any(), any()) } returns
+                        Result.success("2026-09-13T09:34:34Z")
+                }
+            val vm = viewModel(repoRepository)
+            vm.loadRootTree("main")
+            vm.requestLastCommitDate("app")
+            assertEquals(1, vm.uiState.value.lastCommitDates.size)
+
+            vm.loadRootTree("dev")
+
+            // 换分支：旧分支的时间不得带到新分支的同一 path 上
+            assertTrue(
+                vm.uiState.value.lastCommitDates
+                    .isEmpty(),
+            )
+        }
+
+    @Test
+    fun requestLastCommitDate_refChangedWhileInFlight_dropsStaleResult() =
+        runTest {
+            val gate = CompletableDeferred<Unit>()
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree("octocat", "Hello-World", any()) } returns Result.success(listOf(treeNode("app", "app")))
+                    coEvery { getLastCommitDate(any(), any(), any(), any()) } coAnswers {
+                        gate.await()
+                        Result.success("2026-09-13T09:34:34Z")
+                    }
+                }
+            val vm = viewModel(repoRepository)
+            vm.loadRootTree("main")
+            vm.requestLastCommitDate("app")
+
+            // 请求在飞时用户切到另一分支（树重载清空状态）
+            vm.loadRootTree("dev")
+            gate.complete(Unit)
+
+            assertTrue(
+                "旧 ref 的在飞结果不得回写当前 UI",
+                vm.uiState.value.lastCommitDates
+                    .isEmpty(),
+            )
+        }
 }
 
 /** 内存 [DraftRepository]（可控读门闩 / IO 失败注入，供草稿恢复时序测试）。 */

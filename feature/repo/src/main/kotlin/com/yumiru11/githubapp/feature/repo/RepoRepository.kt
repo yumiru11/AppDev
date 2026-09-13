@@ -8,6 +8,7 @@ import android.util.Log
 import com.yumiru11.githubapp.core.`data`.model.Repository
 import com.yumiru11.githubapp.core.database.dao.CachedReadmeDao
 import com.yumiru11.githubapp.core.database.entity.CachedReadmeEntity
+import com.yumiru11.githubapp.core.githubrest.api.CommitApi
 import com.yumiru11.githubapp.core.githubrest.api.ContentApi
 import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
 import com.yumiru11.githubapp.core.githubrest.api.GitTreeApi
@@ -47,6 +48,7 @@ class RepoRepository
         private val gitTreeApi: GitTreeApi,
         private val contentApi: ContentApi,
         private val gitRefApi: GitRefApi,
+        private val commitApi: CommitApi,
     ) {
         /**
          * 文件内容缓存（key = `owner/repo/ref/path@blobSha`，LRU）。
@@ -112,6 +114,33 @@ class RepoRepository
             runCatching {
                 val response = gitTreeApi.getTree(owner, repo, treeSha)
                 FileTreeBuilder.buildChildNodes(response.tree, parentPath)
+            }
+
+        /**
+         * 获取「该路径最后一次提交」的时间（UI-6 文件树修改时间列）。
+         *
+         * GitHub 公开 API 没有 per-file mtime（tree/contents 响应只有 sha/size/mode），
+         * 唯一权威来源是提交列表按路径过滤后的首项（列表按时间倒序）——
+         * 文件精确匹配、目录匹配其下内容（与 GitHub 网页文件列表同语义）。
+         *
+         * 本方法只负责映射（committer 优先、author 兜底）；网络失败与「路径无提交」
+         * 统一由调用方按「列留空」处理（装饰性元数据，不阻塞树浏览）。
+         *
+         * @param ref 分支/Tag/SHA
+         * @param path 仓库内路径（文件或目录）
+         * @return ISO-8601 提交时间；路径无提交时 success(null)
+         */
+        suspend fun getLastCommitDate(
+            owner: String,
+            repo: String,
+            ref: String,
+            path: String,
+        ): Result<String?> =
+            runCatching {
+                commitApi
+                    .listCommits(owner, repo, sha = ref, path = path, perPage = LAST_COMMIT_QUERY_LIMIT)
+                    .firstOrNull()
+                    ?.commitDate
             }
 
         /**
@@ -544,3 +573,6 @@ internal fun parseConflictSha(e: Throwable): String? {
 }
 
 private val CONFLICT_SHA_REGEX = Regex("does not match ([0-9a-f]{40})")
+
+/** 每路径只取最后一次提交（UI-6 文件树修改时间列：列表倒序，per_page=1 即末次提交）。 */
+private const val LAST_COMMIT_QUERY_LIMIT = 1

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Icon
@@ -20,12 +21,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Folder
 import com.composables.icons.materialsymbols.rounded.Folder_open
 import com.composables.icons.materialsymbols.rounded.Text_snippet
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 
 /**
  * 文件树 Tab 内容（T11 验收第 1 条：浏览任意公共仓库目录结构，递归、按需加载子目录）。
@@ -40,6 +44,10 @@ fun FileTreeSection(
     initialRef: String? = null,
     /** TREE 深链：树就绪后自动展开到的仓库内目录路径（空 = 只到根树） */
     initialTreePath: String = "",
+    /** 行级修改时间（UI-6）：path → ISO-8601；已回填的行渲染相对时间列 */
+    lastCommitDates: Map<String, String> = emptyMap(),
+    /** 行进入组合（≈ 滚到可见）时回调（UI-6 惰性取修改时间；默认 no-op 供旧调用点/测试） */
+    onRowVisible: (String) -> Unit = {},
     viewModel: RepoFilesViewModel,
     modifier: Modifier = Modifier,
 ) {
@@ -81,6 +89,7 @@ fun FileTreeSection(
                 items(items = rows, key = { it.node.path }) { row ->
                     TreeRowItem(
                         row = row,
+                        lastModifiedIso = lastCommitDates[row.node.path],
                         onClick = {
                             if (row.node.isDirectory) {
                                 viewModel.toggleDirectory(row.node)
@@ -88,6 +97,7 @@ fun FileTreeSection(
                                 viewModel.openFile(row.node, ref)
                             }
                         },
+                        onVisible = { onRowVisible(row.node.path) },
                         // 展开/收起动画（#166 / UI20，ui-design §3.8）：
                         // 文件树是**扁平化行列表**（FileTreeBuilder.visibleRows），展开只是
                         // 让子行进入可见集合 —— 用 LazyColumn 的 animateItem 让新行淡入/位移、
@@ -104,15 +114,21 @@ fun FileTreeSection(
 @Composable
 private fun TreeRowItem(
     row: TreeRow,
+    lastModifiedIso: String?,
     onClick: () -> Unit,
+    onVisible: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // 行可见即惰性取修改时间（UI-6）：LazyColumn 只组合可见行，
+    // 所以此处就是「只查用户真看得到的行」的天然边界（同 path 会话缓存于 ViewModel）。
+    LaunchedEffect(row.node.path) { onVisible() }
+
     Row(
         modifier =
             modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = AppDimens.contentPadding, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Spacer(modifier = Modifier.width((row.depth * INDENT_PER_DEPTH_DP).dp))
@@ -131,13 +147,29 @@ private fun TreeRowItem(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp),
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.s))
         Text(
             text = row.node.name,
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            // 时间列右对齐：名字吃掉剩余宽度并在窄屏省略号截断（而不是把时间挤出屏幕）
+            modifier = Modifier.weight(1f),
         )
+        val lastModifiedText = lastModifiedIso?.let { relativeTimeText(it) }
+        if (lastModifiedText != null) {
+            Spacer(modifier = Modifier.width(AppDimens.spacing.s))
+            Text(
+                text = lastModifiedText,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.End,
+                // 窄屏保护：时间列封顶，超长相对文案（如 11 months ago）也不挤走文件名
+                modifier = Modifier.widthIn(max = LAST_MODIFIED_MAX_WIDTH),
+            )
+        }
     }
 }
 
@@ -145,3 +177,11 @@ private fun TreeRowItem(
 internal const val DEFAULT_REF = "HEAD"
 
 private const val INDENT_PER_DEPTH_DP = 16
+
+/**
+ * 修改时间列宽上限（UI-6）。
+ *
+ * 取 96dp：labelMedium 下最长的英文相对文案（如 "11 months ago"）≈ 85dp 内可显示，
+ * 再长（本地化/窄屏字号放大）走省略号；上限同时保证文件名在 320dp 宽屏上仍有宽度。
+ */
+private val LAST_MODIFIED_MAX_WIDTH = 96.dp

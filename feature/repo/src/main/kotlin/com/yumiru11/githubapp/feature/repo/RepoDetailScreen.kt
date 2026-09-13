@@ -108,10 +108,13 @@ import com.yumiru11.githubapp.core.data.model.Repository
 import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppChip
 import com.yumiru11.githubapp.core.designsystem.component.AppDialog
+import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
+import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
@@ -716,6 +719,8 @@ private fun RepoDetailContent(
                     readmeState = state.readmeState,
                     actions = actions,
                     onRetryReadme = onRetryReadme,
+                    // UI-4：无 README 空态的行动 = 切到「文件」分区（仓库有内容，只是没 README）
+                    onViewFiles = { tab = 1 },
                     baseRepoUrl = buildRepoUrl(state.repo),
                     onScrollChanged = { readmeScrollY = it },
                 )
@@ -791,6 +796,9 @@ private fun FilesTab(
                 defaultBranch = defaultBranch,
                 initialRef = initialRef,
                 initialTreePath = initialTreePath,
+                // UI-6：修改时间列（path → 末次提交时间）+ 行可见时的惰性查询回调
+                lastCommitDates = filesState.lastCommitDates,
+                onRowVisible = filesViewModel::requestLastCommitDate,
                 viewModel = filesViewModel,
             )
         }
@@ -1724,6 +1732,8 @@ private fun ReadmeSection(
     readmeState: ReadmeState,
     actions: RepoDetailActions,
     onRetryReadme: () -> Unit,
+    /** UI-4：空态行动（切到文件分区）；默认为空兼容旧调用点/预览 */
+    onViewFiles: () -> Unit = {},
     baseRepoUrl: String,
     /** #167 / UI10：把 WebView 内部滚动上报给上层，用于 README 下滑收起头部 */
     onScrollChanged: (Int) -> Unit = {},
@@ -1743,20 +1753,20 @@ private fun ReadmeSection(
         }
 
         is ReadmeState.Empty -> {
-            AppCard(
-                modifier = Modifier.fillMaxWidth(),
-                colors =
-                    CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
-            ) {
-                Text(
-                    text = stringResource(R.string.repo_readme_empty),
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            // UI-4：由裸 Card 文本换成设计系统空态（图标 + 标题 + 说明 + 行动）——
+            // 与仓库列表/通知等空态同源；图标纯装饰，信息由文本承载；行动切到文件分区
+            // （仓库可能有代码但没 README，「查看文件」比「重试」/「去浏览器」真有用）。
+            AppEmptyState(
+                icon = AppDevOcticons.File,
+                title = stringResource(R.string.repo_readme_empty),
+                message = stringResource(R.string.repo_readme_empty_message),
+                actionLabel = stringResource(R.string.repo_readme_empty_action),
+                onAction = onViewFiles,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = AppDimens.spacing.xl),
+            )
         }
 
         is ReadmeState.Loaded -> {

@@ -4,6 +4,8 @@
     <string name="repo_readme_loading">正在加载 README…</string>
     <string name="repo_readme_error">加载 README 失败</string>
     <string name="repo_readme_empty">无 README</string>
+    <string name="repo_readme_empty_message">此仓库还没有 README 文件。</string>
+    <string name="repo_readme_empty_action">查看文件</string>
     <string name="repo_readme_section">README</string>
     <string name="repo_stars">%d 星</string>
     <string name="repo_forks">%d 个 Fork</string>

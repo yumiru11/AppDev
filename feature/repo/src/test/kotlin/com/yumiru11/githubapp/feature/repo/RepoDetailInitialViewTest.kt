@@ -140,6 +140,8 @@ class RepoDetailInitialViewTest {
                     Result.success(
                         listOf(GitTreeNode(name = "src", path = "src", sha = "sha-src", isDirectory = true)),
                     )
+                // UI-6：行可见会惰性请求修改时间；本测试只验分区定位，时间列留空即可
+                coEvery { getLastCommitDate(any(), any(), any(), any()) } returns Result.success(null)
             }
         setScreen(
             viewModel = detailViewModel(successState()),
@@ -163,6 +165,8 @@ class RepoDetailInitialViewTest {
                     Result.success(
                         listOf(GitTreeNode(name = "Main.kt", path = "src/Main.kt", sha = "sha-main", isDirectory = false)),
                     )
+                // UI-6：行可见会惰性请求修改时间；本测试只验深链展开，时间列留空即可
+                coEvery { getLastCommitDate(any(), any(), any(), any()) } returns Result.success(null)
             }
         setScreen(
             viewModel = detailViewModel(successState()),
