@@ -1,6 +1,5 @@
 package com.yumiru11.githubapp.feature.settings
 
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -9,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import com.yumiru11.githubapp.core.designsystem.component.AppDialog
 
 /**
  * 关于对话框（T24「关于页」v1：对话框形态，含应用名/版本/简介）。
@@ -23,7 +23,7 @@ internal fun AboutDialog(onDismiss: () -> Unit) {
             }.getOrNull() ?: "?"
         }
 
-    AlertDialog(
+    AppDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.about_title)) },
         text = {

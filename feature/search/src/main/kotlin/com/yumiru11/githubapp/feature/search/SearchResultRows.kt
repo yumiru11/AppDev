@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +28,7 @@ import com.yumiru11.githubapp.core.data.model.Repository
 import com.yumiru11.githubapp.core.data.model.SearchCodeItem
 import com.yumiru11.githubapp.core.data.model.SearchIssue
 import com.yumiru11.githubapp.core.data.model.User
+import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.theme.extendedColors
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
@@ -44,7 +44,7 @@ internal fun RepositoryRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    AppCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         colors =
@@ -105,7 +105,7 @@ internal fun UserRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    AppCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         colors =
@@ -159,7 +159,7 @@ internal fun IssueRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    AppCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         colors =
@@ -218,7 +218,7 @@ internal fun CodeRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    AppCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         colors =

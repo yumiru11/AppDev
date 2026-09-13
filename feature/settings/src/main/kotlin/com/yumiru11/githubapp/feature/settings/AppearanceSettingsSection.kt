@@ -34,7 +34,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -58,6 +57,7 @@ import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
+import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
 import com.yumiru11.githubapp.core.designsystem.component.CardGroup
 import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
 import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
@@ -346,10 +346,10 @@ private fun ThemeModeRow(
     SettingRow(title = stringResource(R.string.settings_theme_mode), valueText = currentValue) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (mode, label) ->
-                FilterChip(
+                AppFilterChip(
                     selected = uiState.themeMode == mode,
                     onClick = { viewModel.setThemeMode(mode) },
-                    label = { Text(label) },
+                    label = label,
                 )
             }
         }
@@ -455,10 +455,10 @@ internal fun CodeFontRow(
     SettingRow(title = stringResource(R.string.settings_code_font), valueText = currentName) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (font, label) ->
-                FilterChip(
+                AppFilterChip(
                     selected = selected == font,
                     onClick = { onSelect(font) },
-                    label = { Text(label) },
+                    label = label,
                 )
             }
         }

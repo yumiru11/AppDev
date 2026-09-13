@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
 import com.yumiru11.githubapp.core.designsystem.component.CardGroup
 
 /**
@@ -106,10 +106,10 @@ private fun LanguageRow(
         Spacer(modifier = Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             options.forEach { (tag, label) ->
-                FilterChip(
+                AppFilterChip(
                     selected = languageTag == tag,
                     onClick = { onSelect(tag) },
-                    label = { Text(label) },
+                    label = label,
                 )
             }
         }
