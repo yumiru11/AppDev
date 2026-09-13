@@ -17,7 +17,7 @@
 # 用法：mermaid-render-verify.sh <api-level> <render|blocked>
 # 前置：模拟器已 boot（adb 可用）、debug APK 已就位（APK_PATH 可覆盖）。
 # 产物：artifacts/mermaid-verify/api-<n>/{assertions.txt,logcat.txt,mermaid-render.log,
-#       readme.png,readme-diagrams.png,ui.xml,webview-version.txt}
+#       readme.png,ui.xml,webview-version.txt}
 # ============================================================
 set -uo pipefail
 
@@ -121,15 +121,11 @@ else
 fi
 
 # ── 4. 取证：截图 / UI 层级 / logcat ─────────────────────────────────────────
-# readme.png = README 顶部；readme-diagrams.png = 正文/图表区（与 screenshots.sh 的
-# readme-mermaid 帧同款视口内短滑，不依赖长距离 fling）。API 33 的图表区应出现真图，
-# API 30 应出现原始代码块——截图与 logcat 行互相印证。
+# 截图取 README 顶部（截图仅作辅助；**渲染事实的判据是 logcat 的 MermaidRender 行**）。
+# 注意：不要在截图前做 input swipe 试图滚到图表区——2026-09-13 实测 swing 会被
+# WebView 误判为点击（README 里的 raw.githubusercontent 链接被点开、跳到系统 WebView
+# 浏览器，截图变废件）。图表区视觉证据改用本地真实 Chromium 探针（PR 证据层§1）。
 adb exec-out screencap -p > "$OUT/readme.png" 2>/dev/null || true
-retry_input swipe 540 1600 540 700 300
-sleep 2
-retry_input swipe 540 1600 540 700 300
-sleep 2
-adb exec-out screencap -p > "$OUT/readme-diagrams.png" 2>/dev/null || true
 [ -f /tmp/ui.xml ] && cp /tmp/ui.xml "$OUT/ui.xml"
 adb logcat -d > "$OUT/logcat.txt" 2>/dev/null || true
 grep -E "MermaidRender: engine=" "$OUT/logcat.txt" > "$OUT/mermaid-render.log" || true
