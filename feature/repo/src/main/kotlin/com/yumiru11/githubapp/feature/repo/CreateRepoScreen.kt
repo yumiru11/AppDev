@@ -41,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -65,15 +66,15 @@ fun CreateRepoScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
+    val resources = LocalResources.current
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             val message =
                 when (event) {
-                    CreateRepoEvent.NameTaken -> context.getString(R.string.repo_create_snackbar_name_taken)
-                    CreateRepoEvent.PermissionDenied -> context.getString(R.string.repo_create_snackbar_permission_denied)
-                    CreateRepoEvent.Failed -> context.getString(R.string.repo_create_snackbar_failed)
+                    CreateRepoEvent.NameTaken -> resources.getString(R.string.repo_create_snackbar_name_taken)
+                    CreateRepoEvent.PermissionDenied -> resources.getString(R.string.repo_create_snackbar_permission_denied)
+                    CreateRepoEvent.Failed -> resources.getString(R.string.repo_create_snackbar_failed)
                 }
             snackbarHostState.showSnackbar(message)
         }

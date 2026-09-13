@@ -93,30 +93,35 @@ private fun MatrixTopBar() {
 @Composable
 private fun ZhLocale(content: @Composable () -> Unit) {
     val base = LocalContext.current
+    // 基准（en）资源与配置从 Compose 局部读取：lint 32 的 LocalContextConfigurationRead /
+    // LocalContextGetResourceValueCall 禁止从 LocalContext.current.resources 读这两个值
+    // （配置变化不会失效 LocalContext 读取，会拿到 stale 值）。
+    val baseResources = LocalResources.current
+    val baseConfiguration = LocalConfiguration.current
     val localized =
-        remember(base) {
+        remember(base, baseConfiguration) {
             val config =
-                Configuration(base.resources.configuration).apply {
+                Configuration(baseConfiguration).apply {
                     setLocale(Locale.forLanguageTag("zh-CN"))
                     setLayoutDirection(Locale.forLanguageTag("zh-CN"))
                 }
             base.createConfigurationContext(config)
         }
+    check(
+        localized.resources.configuration.locales[0]
+            .language == "zh",
+    ) {
+        "zh 帧必须在 zh 资源上下文下拍摄（当前=${localized.resources.configuration.locales[0]}）"
+    }
+    // 文案确实来自 zh 资源（而不是 en fallback）——search_hint 是顶栏可见文案
+    check(localized.resources.getString(R.string.search_hint) != baseResources.getString(R.string.search_hint)) {
+        "search_hint 在 zh 与 en 下解析相同 —— zh 注入未生效"
+    }
     CompositionLocalProvider(
         LocalContext provides localized,
         LocalConfiguration provides localized.resources.configuration,
         LocalResources provides localized.resources,
     ) {
-        check(
-            localized.resources.configuration.locales[0]
-                .language == "zh",
-        ) {
-            "zh 帧必须在 zh 资源上下文下拍摄（当前=${localized.resources.configuration.locales[0]}）"
-        }
-        // 文案确实来自 zh 资源（而不是 en fallback）——search_hint 是顶栏可见文案
-        check(localized.resources.getString(R.string.search_hint) != base.getString(R.string.search_hint)) {
-            "search_hint 在 zh 与 en 下解析相同 —— zh 注入未生效"
-        }
         content()
     }
 }

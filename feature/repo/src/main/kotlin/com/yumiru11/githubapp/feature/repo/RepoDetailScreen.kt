@@ -89,6 +89,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -310,50 +311,50 @@ private fun RepoEventSnackbar(
     snackbarHostState: SnackbarHostState,
     onDeleted: () -> Unit = {},
 ) {
-    val context = LocalContext.current
+    val resources = LocalResources.current
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             val message =
                 when (event) {
                     RepoEvent.Forked -> {
-                        context.getString(R.string.repo_snackbar_forked)
+                        resources.getString(R.string.repo_snackbar_forked)
                     }
 
                     RepoEvent.ForkPermissionDenied -> {
-                        context.getString(R.string.repo_snackbar_fork_permission_denied)
+                        resources.getString(R.string.repo_snackbar_fork_permission_denied)
                     }
 
                     RepoEvent.ForkAlreadyExists -> {
-                        context.getString(R.string.repo_snackbar_fork_already_exists)
+                        resources.getString(R.string.repo_snackbar_fork_already_exists)
                     }
 
                     RepoEvent.ForkFailed -> {
-                        context.getString(R.string.repo_snackbar_fork_failed)
+                        resources.getString(R.string.repo_snackbar_fork_failed)
                     }
 
                     RepoEvent.ToggleFailed -> {
-                        context.getString(R.string.repo_snackbar_toggle_failed)
+                        resources.getString(R.string.repo_snackbar_toggle_failed)
                     }
 
                     RepoEvent.RepositoryDeleted -> {
                         onDeleted()
-                        context.getString(R.string.repo_delete_snackbar_deleted)
+                        resources.getString(R.string.repo_delete_snackbar_deleted)
                     }
 
                     RepoEvent.RepositoryDeleteForbidden -> {
-                        context.getString(R.string.repo_delete_snackbar_forbidden)
+                        resources.getString(R.string.repo_delete_snackbar_forbidden)
                     }
 
                     RepoEvent.RepositoryDeleteFailed -> {
-                        context.getString(R.string.repo_delete_snackbar_failed)
+                        resources.getString(R.string.repo_delete_snackbar_failed)
                     }
 
                     is RepoEvent.AssetUploaded -> {
-                        context.getString(R.string.repo_release_asset_uploaded, event.name)
+                        resources.getString(R.string.repo_release_asset_uploaded, event.name)
                     }
 
                     RepoEvent.AssetUploadFailed -> {
-                        context.getString(R.string.repo_release_asset_upload_failed)
+                        resources.getString(R.string.repo_release_asset_upload_failed)
                     }
                 }
             snackbarHostState.showSnackbar(message)
@@ -420,38 +421,40 @@ fun FileEditEventSnackbar(
     viewModel: RepoFilesViewModel,
     snackbarHostState: SnackbarHostState,
 ) {
+    // copyToClipboard / editErrorText 仍需 Context；资源读取走 LocalResources（Compose 感知配置变化）
     val context = LocalContext.current
+    val resources = LocalResources.current
     LaunchedEffect(viewModel) {
         viewModel.editEvents.collect { event ->
             when (event) {
                 is FileEditEvent.Committed -> {
                     val message =
                         if (event.isNewBranch) {
-                            context.getString(
+                            resources.getString(
                                 R.string.repo_file_snackbar_committed_new_branch,
                                 event.path,
                                 event.branch.orEmpty(),
                             )
                         } else {
-                            context.getString(R.string.repo_file_snackbar_committed, event.path)
+                            resources.getString(R.string.repo_file_snackbar_committed, event.path)
                         }
                     snackbarHostState.showSnackbar(message)
                 }
 
                 is FileEditEvent.Deleted -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.repo_file_snackbar_deleted, event.path))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.repo_file_snackbar_deleted, event.path))
                 }
 
                 is FileEditEvent.KeepLocal -> {
                     copyToClipboard(context, event.text, CLIP_LABEL_FILE_EDIT)
-                    snackbarHostState.showSnackbar(context.getString(R.string.repo_file_snackbar_keep_local))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.repo_file_snackbar_keep_local))
                 }
 
                 is FileEditEvent.DraftRestored -> {
                     val result =
                         snackbarHostState.showSnackbar(
-                            message = context.getString(R.string.repo_file_snackbar_draft_restored),
-                            actionLabel = context.getString(R.string.repo_file_snackbar_draft_discard),
+                            message = resources.getString(R.string.repo_file_snackbar_draft_restored),
+                            actionLabel = resources.getString(R.string.repo_file_snackbar_draft_discard),
                         )
                     if (result == SnackbarResult.ActionPerformed) {
                         viewModel.discardRestoredDraft()

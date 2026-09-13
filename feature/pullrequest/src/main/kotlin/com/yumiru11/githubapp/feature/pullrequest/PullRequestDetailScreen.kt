@@ -67,6 +67,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -125,7 +126,7 @@ fun PullRequestDetailScreen(
     val reviewDraftText by viewModel.reviewDraft.text.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val resources = LocalResources.current
     // 会话评论 Sheet 开关声明在事件收集之前：CommentPosted 事件要在这里把它关掉
     var showCommentSheet by remember { mutableStateOf(false) }
     // #166：正在编辑/待删除的会话评论（null = 无对话框）
@@ -136,73 +137,73 @@ fun PullRequestDetailScreen(
         viewModel.events.collect { event ->
             when (event) {
                 PullRequestDetailEvent.CommentFailed -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_line_comment_failed))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_line_comment_failed))
                 }
 
                 // 会话评论发布成功（#166）：关掉 Sheet 让用户看到时间线里的新评论
                 PullRequestDetailEvent.CommentPosted -> {
                     showCommentSheet = false
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_comment_posted))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_comment_posted))
                 }
 
                 PullRequestDetailEvent.CommentUpdated -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_comment_updated))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_comment_updated))
                 }
 
                 PullRequestDetailEvent.CommentDeleted -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_comment_deleted))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_comment_deleted))
                 }
 
                 PullRequestDetailEvent.ReviewFailed -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_review_failed))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_review_failed))
                 }
 
                 PullRequestDetailEvent.MergeSucceeded -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_merge_succeeded))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_merge_succeeded))
                 }
 
                 PullRequestDetailEvent.MergeFailed -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_merge_failed))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_merge_failed))
                 }
 
                 PullRequestDetailEvent.UpdateBranchSucceeded -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_update_branch_succeeded))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_update_branch_succeeded))
                 }
 
                 PullRequestDetailEvent.UpdateBranchFailed -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_update_branch_failed))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_update_branch_failed))
                 }
 
                 PullRequestDetailEvent.DeleteBranchSucceeded -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_delete_branch_succeeded))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_delete_branch_succeeded))
                 }
 
                 PullRequestDetailEvent.DeleteBranchFailed -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_delete_branch_failed))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_delete_branch_failed))
                 }
 
                 PullRequestDetailEvent.EditSucceeded -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_edit_succeeded))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_edit_succeeded))
                 }
 
                 PullRequestDetailEvent.EditFailed -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_edit_failed))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_edit_failed))
                 }
 
                 PullRequestDetailEvent.CloseSucceeded -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_close_succeeded))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_close_succeeded))
                 }
 
                 PullRequestDetailEvent.CloseFailed -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_close_failed))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_close_failed))
                 }
 
                 PullRequestDetailEvent.ReopenSucceeded -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_reopen_succeeded))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_reopen_succeeded))
                 }
 
                 PullRequestDetailEvent.ReopenFailed -> {
-                    snackbarHostState.showSnackbar(context.getString(R.string.pull_request_reopen_failed))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_reopen_failed))
                 }
             }
         }
@@ -504,6 +505,7 @@ private fun PullRequestMoreMenu(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
         IconButton(onClick = { expanded = true }) {
@@ -533,7 +535,7 @@ private fun PullRequestMoreMenu(
                     onClick = {
                         expanded = false
                         copyLink(context, url)
-                        scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.pull_request_link_copied)) }
+                        scope.launch { snackbarHostState.showSnackbar(resources.getString(R.string.pull_request_link_copied)) }
                     },
                 )
             }

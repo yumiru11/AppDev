@@ -63,40 +63,20 @@ android {
         abortOnError = true
         checkReleaseBuilds = false
 
-        // ── Compose/Lifecycle 库内 lint 检测器禁用（#170 / Q01+Q02 复核结论）─────────
+        // ── #170 关闭记录（AGP 9.1.1，2026-09-13）───────────────────────────────
         //
-        // 根因（2026-09-10 实测，不是"AGP 太旧"这么笼统）：
-        //   Compose BOM 2026.06.01 带的 compose-ui lint jar（UiIssueRegistry）编译时链接了
-        //   Kotlin Analysis API 的 KaCompoundAccessCall#getCompoundOperation()，而 lint 自带的
-        //   Kotlin 分析 API 版本更老 → 注册期直接判为
-        //   "Library lint checks reference invalid APIs; these checks will be skipped!"，
-        //   整包 15 项检查（SuspiciousModifierThen/UnnecessaryComposedModifier/…）**不参与分析**。
-        //   Lifecycle AAR 的 StateFlowValueCalledInComposition 同源（IncompatibleClassChangeError）。
+        // 历史（AGP 8.7.3 时代）：compose-ui lint jar（UiIssueRegistry）链接了比 lint 自带的
+        //   Kotlin Analysis API 更新的 KaCompoundAccessCall#getCompoundOperation()，注册期被
+        //   判为 "Library lint checks reference invalid APIs; these checks will be skipped!"，
+        //   整包 15 项检查不参与分析 → 本块曾用 15 条 disable += 显式列出这些"本来就没在跑"的 id。
         //
-        // 已排除的解法：AGP 8.13.2 + Gradle 8.14.3 实测**不能**修（lint 31.13 仍缺该 API，
-        //   报告里的 ObsoleteLintCustomCheck 与禁用项一字不差）。真正的修法是升到 **AGP 9.x**
-        //   （lint 32.x 才带上 Kotlin 2.3 时代的 Analysis API），但那是 KSP/Hilt/Apollo/Room
-        //   全线迁移，不属于本票范围 → 已作为后续项记录在 PR 描述与 issue #170。
+        // 现状：AGP 9.1.1 内置 lint 32.1.1（带 Kotlin 2.3 时代的 Analysis API），
+        //   Compose/Lifecycle 检测器全部恢复加载，15 条 disable 已全部删除——
+        //   包括原先因崩溃被额外禁用、现已能正常运行的检测器。
         //
-        // 因此这里的 disable 不是"眼不见为净"：这些 id 对应的检查**本来就没在跑**，显式列出
-        //   只是让 intent 可见 + 避免 lint 报 UnknownIssueId。真正防退化的是 CI 的
-        //   "Lint detector coverage" 步骤：它断言**只有** Compose 那一个 registry 被跳过，
-        //   新增任何被跳过的 registry 都会让 job 变红。
-        disable += "AutoboxingStateCreation"
-        disable += "AutoboxingStateValueProperty"
-        disable += "ComposableLambdaParameterNaming"
-        disable += "ComposableNaming"
-        disable += "CompositionLocalNaming"
-        disable += "FlowOperatorInvokedInComposition"
-        disable += "FrequentlyChangingValue"
-        disable += "MutableCollectionMutableState"
-        disable += "OpaqueUnitKey"
-        disable += "ProduceStateDoesNotAssignValue"
-        disable += "RememberInComposition"
-        disable += "UnrememberedAnimatable"
-        disable += "UnrememberedMutableState"
-        disable += "NullSafeMutableLiveData"
-        disable += "StateFlowValueCalledInComposition"
+        // 防退化：CI "Lint detector coverage guard" 断言（a）被跳过的 registry 数 = 0，
+        //   （b）app/约定插件里 disable 数为 0 —— 新增任何一个都会让 job 变红。
+        //   ⚠️ 不要为绕过新暴露的违规而 re-disable：修代码，或在 PR 里带数据说明。
     }
 
     // 签名：仅当环境变量/Gradle 属性提供 keystore 时启用（CI release 流程），
@@ -255,19 +235,9 @@ dependencies {
 // 旧值 false 让「过滤无匹配」静默通过——konsist 包被改名/删除、过滤模式写错时，
 // konsistCheck 绿灯但一个架构护栏都没跑（残余审计 G-08 / P2-8）。
 
-// 禁用 AAR metadata 检查：mikepenz markdown-renderer 0.43.0 要求 compileSdk 37，
-// 但 android-37 平台尚未发布，compileSdk 36 编译无问题（API 兼容）
-afterEvaluate {
-    tasks
-        .matching {
-            it.name.contains(
-                "AarMetadata",
-                ignoreCase = true,
-            ) || it.name.contains("aarMetadata", ignoreCase = true)
-        }.configureEach {
-            enabled = false
-        }
-}
+// 历史：此处曾有一段 afterEvaluate { tasks.matching("*AarMetadata*") { enabled = false } }，
+// 理由是 mikepenz markdown-renderer 要求 compileSdk 37 而当时还在 36。AGP 9 迁移后
+// compileSdk 已是 37（android-37.0 平台已安装），禁用理由消失 → 恢复 AAR metadata 检查。
 tasks.register<Test>("konsistCheck") {
     description = "Runs Konsist architecture tests (filtered from :app unit tests)."
     group = "verification"

@@ -86,14 +86,15 @@ jobs:
       - name: Android Lint (all modules)
         run: ./gradlew lintDebug --continue --no-daemon
 
-      # ── Lint 覆盖面守卫（#170 / Q01+Q02）─────────────────────────────────────
-      # Q01 的根因是 compose-ui 的 lint jar 链接了比 lint 自带的更新的 Kotlin Analysis API，
-      # 导致整个 UiIssueRegistry 被跳过（15 项检查不参与分析）。解除条件是升 AGP 9.x；
-      # AGP 8.13.2 实测无效。在升级之前，至少要让"覆盖面退化"这件事**可见且只能变小**：
-      #   ① 只允许 UiIssueRegistry 一个 registry 被跳过，多一个就红；
-      #   ② disables 里不允许出现 lint 不认识的 issue id（Q02 清掉了 2 个）。
-      # 2026-09-12：lint 扩到全模块后，守卫同步从「只看 :app 报告」改为汇总所有模块报告 ——
-      # 只查 app 的话，新纳入模块里出现新的被跳过 registry / 未知 id 会全部漏检。
+      # ── Lint 覆盖面守卫（#170，AGP 9.1.1 收口）────────────────────────────────
+      # 历史：AGP 8.7.3 时代 compose-ui 的 lint jar 链接了比 lint 自带更新的 Kotlin
+      # Analysis API，整个 UiIssueRegistry 被跳过（15 项检查不参与分析），当时守卫只能
+      # 「只允许 UiIssueRegistry 一个 registry 被跳过」。
+      # 现状：AGP 9.1.1 内置 lint 32.1.1 → 检测器全部恢复加载，15 条 disable 已全部删除。
+      # 守卫随之升级为三条硬断言：
+      #   ① 被跳过的 lint registry 数 = 0（任何跳过都是覆盖面静默退化）；
+      #   ② 全模块报告 UnknownIssueId = 0（没有 disable 就不该出现未知 id）；
+      #   ③ lint 配置里的 `disable +=` 计数 = 0（禁止用 re-disable 绕过新暴露的违规）。
       - name: Lint detector coverage guard
         run: |
           mapfile -t REPORTS < <(find . -path '*/build/reports/lint-results-debug.txt' -not -path './buildSrc/*' | sort)
@@ -107,52 +108,30 @@ jobs:
           SKIPPED=$(grep -h -o 'Lint found an issue registry ([^)]*)' "${REPORTS[@]}" | sed 's/.*(//;s/)//' | sort -u || true)
           echo "被跳过的 lint registry:"
           echo "${SKIPPED:-（无）}"
-          UNKNOWN=$(printf '%s\n' "$SKIPPED" | grep -v '^$' | grep -v '^androidx\.compose\.ui\.lint\.UiIssueRegistry$' || true)
-          if [ -n "$UNKNOWN" ]; then
-            echo "::error::出现新的被跳过 lint registry（lint 覆盖面静默退化）：$UNKNOWN"
+          if [ -n "$SKIPPED" ]; then
+            echo "::error::出现被跳过的 lint registry（lint 覆盖面静默退化）：$SKIPPED"
             exit 1
           fi
+          echo "被跳过的 lint registry 数 = 0"
 
-          UNKNOWN_IDS=$(grep -h 'Unknown issue id' "${REPORTS[@]}" | wc -l || true)
-          echo "UnknownIssueId 告警总数: $UNKNOWN_IDS"
+          UNKNOWN_IDS=$(grep -h 'Unknown issue id' "${REPORTS[@]}" | sort -u || true)
+          if [ -n "$UNKNOWN_IDS" ]; then
+            echo "::error::lint 报告出现 UnknownIssueId（disable 列表残留或写错 id）："
+            printf '%s\n' "$UNKNOWN_IDS"
+            exit 1
+          fi
+          echo "UnknownIssueId = 0"
 
-          # ── UnknownIssueId（Q02 型「假 disable」）─────────────────────────────
-          # 全模块 lint 后，没有 Compose registry 的 core 模块会把共享 disable 列表里的
-          # Compose/Lifecycle id 报成 UnknownIssueId（预期噪音）。因此分两层：
-          #   ① 解析器模块必须 0 unknown：`:app`（application 插件）与 `:feature:editor`
-          #      （library 插件 + 完整 Compose/Lifecycle 依赖）—— 共享 disable 列表里的每个
-          #      id 都必须在这两处被识别，否则就是 lint 不认识的「假 disable」
-          #      （Q02：ComposableCoroutineCreation / UnrememberedState 曾静默失效）。
-          #   ② 其余报告里的 unknown id，只允许是 app/约定插件 `disable +=` 声明过的 id
-          #      （防模块级 build 文件写错 id；外星 id 直接红）。
-          for RESOLVER in app feature/editor; do
-            R="$(printf '%s\n' "${REPORTS[@]}" | grep "^\\./$RESOLVER/build/reports/lint-results-debug.txt$" || true)"
-            if [ -z "$R" ]; then
-              echo "::error::解析器模块 :$RESOLVER 的 lint 报告缺失 —— 无法证明 disable 列表有效"
-              exit 1
-            fi
-            N=$(grep -c 'Unknown issue id' "$R" || true)
-            if [ "$N" != "0" ]; then
-              echo "::error::$RESOLVER 出现 $N 条 UnknownIssueId（disable 列表里有 lint 不认识的 id）"
-              grep -o 'Unknown issue id "[^"]*"' "$R" | sort -u
-              exit 1
-            fi
-          done
-          echo "解析器模块（:app / :feature:editor）UnknownIssueId = 0，disable 列表全部可解析"
-
-          DECLARED=$(grep -h -o 'disable += "[^"]*"' \
+          DISABLES=$(grep -h -o 'disable += "[^"]*"' \
             app/build.gradle.kts \
             buildSrc/src/main/kotlin/appdev.android.application.gradle.kts \
-            buildSrc/src/main/kotlin/appdev.android.library.gradle.kts \
-            | sed 's/.*disable += "//;s/"$//' | sort -u)
-          UNKNOWN_IDS_UNIQUE=$(grep -h -o 'Unknown issue id "[^"]*"' "${REPORTS[@]}" \
-            | sed 's/Unknown issue id "//;s/"$//' | sort -u || true)
-          ALIENS=$(comm -23 <(printf '%s\n' "$UNKNOWN_IDS_UNIQUE" | grep -v '^$' || true) <(printf '%s\n' "$DECLARED") || true)
-          if [ -n "$ALIENS" ]; then
-            echo "::error::出现未在任何 disable 列表中声明的 UnknownIssueId：$ALIENS"
+            buildSrc/src/main/kotlin/appdev.android.library.gradle.kts || true)
+          if [ -n "$DISABLES" ]; then
+            echo "::error::lint 配置重新出现 disable（#170 已关闭，禁止 re-disable）："
+            printf '%s\n' "$DISABLES"
             exit 1
           fi
-          echo "其余报告的 UnknownIssueId 均来自已声明的 disable 列表"
+          echo "lint disable 数 = 0（app + 两个约定插件）"
 
       # ── i18n lint 规则的运行期证明（防退化第二道防线）──────────────────────────
       # 第一道防线是 buildSrc/src/main/kotlin/AppDevI18nLint.kt 的配置期自检（enable 行

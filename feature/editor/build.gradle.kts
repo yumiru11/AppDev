@@ -27,7 +27,6 @@ dependencies {
     implementation(libs.compose.material.icons.core)
 
     // Material Symbols (icons)
-    implementation(libs.icons.material.symbols.rounded)
     implementation(libs.icons.material.symbols.rounded.cmp)
 
     // Activity + Lifecycle

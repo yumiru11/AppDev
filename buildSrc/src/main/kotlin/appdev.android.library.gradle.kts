@@ -1,17 +1,16 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
-
 plugins {
     id("com.android.library")
-    id("org.jetbrains.kotlin.android")
+    // AGP 9 built-in Kotlin：不再应用 org.jetbrains.kotlin.android（AGP 9 会硬拒绝）。
+    // Compose 编译器插件仍需显式应用——built-in Kotlin 只替代 kotlin-android。
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
-    // compileSdk 36：OkHttp 5.4（okhttp-android）AAR 要求 minCompileSdk 36（2026-08-12 实测）；
-    // android-36 平台已从腾讯镜像安装（本机无 dl.google.com 访问）；AGP 8.7.3 对 36 仅警告不阻塞
-    compileSdk = 36
-    buildToolsVersion = "35.0.0"
+    // compileSdk 37：AGP 9.1.x 支持的最高 API 即 37.0（android-37.0 平台已安装）；
+    // material3 1.5.0-alpha19+ 的 AAR 元数据要求 minCompileSdk=37，升到这里后解除升级门控。
+    compileSdk = 37
+    // AGP 9.x 的最低 SDK Build Tools 就是 36.0.0
+    buildToolsVersion = "36.0.0"
 
     defaultConfig {
         minSdk = 26
@@ -28,33 +27,10 @@ android {
 
     lint {
         abortOnError = true
-        // Compose/Lifecycle 库内 lint 检测器禁用：根因与解除条件见 :app 的 lint 块详细注释
-        // （#170 / Q01：compose-ui lint jar 链接了更老的 Kotlin Analysis API，需 AGP 9.x 才能跑）。
-        // 已移除两个不存在的 id（ComposableCoroutineCreation / UnrememberedState）——
-        // lint 会为它们报 UnknownIssueId（#170 / Q02）。
-        disable += "AutoboxingStateCreation"
-        disable += "AutoboxingStateValueProperty"
-        disable += "ComposableLambdaParameterNaming"
-        disable += "ComposableNaming"
-        disable += "CompositionLocalNaming"
-        disable += "FlowOperatorInvokedInComposition"
-        disable += "FrequentlyChangingValue"
-        disable += "MutableCollectionMutableState"
-        disable += "OpaqueUnitKey"
-        disable += "ProduceStateDoesNotAssignValue"
-        disable += "RememberInComposition"
-        disable += "UnrememberedAnimatable"
-        disable += "UnrememberedMutableState"
-        disable += "NullSafeMutableLiveData"
-        // 下面两条是 2026-09-12 实测补上的（library 模块恢复 lint 后暴露）：
-        // 这两个检测器在 library 的 lint 分析里执行到一半抛
-        // `IncompatibleClassChangeError: Found class KaFunctionCall, but interface was expected`
-        // （同一个 #170 根因：Compose lint jar 针对更新版 Kotlin Analysis API 编译），
-        // 且是**致命**的（:app 靠「整个 UiIssueRegistry 被跳过」侥幸躲过，library 没有这层保护）。
-        // lint 自己的崩溃提示就建议 disable 这两个 id；disable 生效后检测器不再被执行。
-        // 与 :app 的差异（app 有 StateFlowValueCalledInComposition、这里此前漏了）已在此对齐。
-        disable += "CoroutineCreationDuringComposition"
-        disable += "StateFlowValueCalledInComposition"
+        // #170 已随 AGP 9.1.1 关闭：lint 32.1.1 带上了 Kotlin 2.3 时代的 Analysis API，
+        // Compose/Lifecycle 库内检测器全部恢复加载并正常运行（library 模块不再有
+        // IncompatibleClassChangeError 崩溃）。
+        // 本文件不再允许出现 disable +=（CI 守卫断言 disable 数为 0）。
 
         // ── i18n 规则（plan.md §11.4 / 需求审计 §9.4）─────────────────────────────
         // 用户可见文案 99% 在 feature/core，所以这四条**必须配在约定插件**才对全模块生效。
@@ -65,11 +41,9 @@ android {
     }
 }
 
-extensions.configure<KotlinAndroidProjectExtension>("kotlin") {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
-}
+// built-in Kotlin 的 jvmTarget 默认取 android.compileOptions.targetCompatibility（已设 VERSION_17），
+// 故原先按 KotlinAndroidProjectExtension 类型 configure 的 jvmTarget 块已删除——既冗余，
+// 该类型也不再是 built-in Kotlin 下 "kotlin" 扩展的注册类型。
 
 // ── library 模块的 lint 任务已恢复启用（2026-09-12，本票实测）────────────────────────────
 //

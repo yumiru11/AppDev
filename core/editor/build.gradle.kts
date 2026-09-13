@@ -29,7 +29,6 @@ dependencies {
     implementation(project(":core:datastore"))
 
     // MarkdownComposer 的工具栏图标（#166 / UI05：评论输入 Sheet 与编辑器页共用同一套工具栏）
-    implementation(libs.icons.material.symbols.rounded)
     implementation(libs.icons.material.symbols.rounded.cmp)
 
     // 测试基建（ScreenshotTest 基类 + Robolectric/Roborazzi，见 AGENTS.md）
