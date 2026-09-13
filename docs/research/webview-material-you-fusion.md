@@ -269,7 +269,7 @@ MDN 用 scroll-behavior: smooth；sphinx_rtd_theme issue #1429 论证文档站�
          或 Shiki v4.4.3（行高亮/diff transformer）
 主题层   github-markdown-css v5.9.0（全 CSS 变量 + [data-theme] 双通道）
          + 自研 Material 桥：Compose colorScheme → :root CSS 变量（参照 KernelSU）
-安全层   DOMPurify v3.4.13（2026-08 活跃，MPL/Apache 双许可）
+安全层   DOMPurify v3.2.4（2026-08 活跃，MPL/Apache 双许可）
 注入层   WebViewAssetLoader（androidx.webkit 1.14.0）+ addWebMessageListener（锁 allowedOriginRules）
          + evaluateJavascript + 内联防 FOIT 脚本（~10 行，无第三方库）
 兜底     GitHub /markdown API（长文档/复杂 GFM，配缓存；context 提供 issue 链接）

@@ -568,4 +568,114 @@ class WebViewHtmlBuilderTest {
         assertTrue("仓库上下文必须交给 renderer.js", html.contains("data-base-repo=\"octo/hello\""))
         assertTrue("相对图片的原始写法必须无损传给 renderer.js", html.contains("![img](./docs/real.png)"))
     }
+
+    // ── 2026-09-13：离线 KaTeX 数学运行时（条件注入）────────────────────
+
+    @Test
+    fun build_offlineModeWithMath_injectsKatexStylesheetAndScript() {
+        val html = buildOffline("行内 \$E = mc^2\$ 与块级\n\n$$\n\\int_0^1 x^2 dx\n$$")
+
+        assertTrue(
+            "数学内容必须注入 katex.min.js（离线 assets）",
+            html.contains("<script src=\"https://appassets.androidplatform.net/assets/webview/katex/katex.min.js\"></script>"),
+        )
+        assertTrue(
+            "数学内容必须注入 katex.min.css（仅 woff2 字体）",
+            html.contains("<link rel=\"stylesheet\" href=\"https://appassets.androidplatform.net/assets/webview/katex/katex.min.css\">"),
+        )
+        assertTrue("KaTeX 样式表必须在 github-markdown.css 之前，叠加层才能覆盖", html.indexOf("katex.min.css") < html.indexOf("github-markdown.css"))
+    }
+
+    @Test
+    fun build_offlineModeWithoutMath_omitsKatexRuntimeEntirely() {
+        val html = buildOffline("# 标题\n\n普通段落，没有公式。\n\n```bash\necho \"\$HOME\"\n```")
+
+        assertFalse("无数学内容不得加载 KaTeX（约 273KB 解析成本）", html.contains("katex"))
+    }
+
+    @Test
+    fun build_serverHtmlWithMathRendererMarker_injectsKatexRuntime() {
+        // GitHub 服务端 HTML 的实测形态：<math-renderer> 占位 + 原文（见可行性报告 §3.5）
+        val html =
+            buildServerHtml(
+                "<p>Inline <math-renderer class=\"js-inline-math\" style=\"display: inline-block\">\$E=mc^2\$</math-renderer></p>",
+            )
+
+        assertTrue("服务端数学占位元素必须触发 KaTeX 注入", html.contains("katex/katex.min.js"))
+    }
+
+    @Test
+    fun build_serverHtmlWithDollarText_fallbackDetection_injectsKatexRuntime() {
+        val html = buildServerHtml("<p>Inline \$\$E=mc^2\$\$ without the placeholder element</p>")
+
+        assertTrue("\$…\$ 形态兜底检测必须生效（防 GitHub 改元素名）", html.contains("katex/katex.min.js"))
+    }
+
+    @Test
+    fun build_serverHtmlWithoutMath_omitsKatexRuntime() {
+        val html = buildServerHtml("<p>plain</p><pre><code class=\"language-bash\">echo \$HOME</code></pre>")
+
+        assertFalse("无数学内容不得加载 KaTeX", html.contains("katex"))
+    }
+
+    @Test
+    fun build_mathWithInlineCss_inlinesKatexCssAndAbsolutizesFontUrls() {
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "行内 \$x^2\$",
+                themeVariables = "--md-sys-color-primary: #123456;",
+                isDark = false,
+                renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+                inlineCss =
+                    mapOf(
+                        "github-markdown.css" to "/*gfm*/",
+                        "markdown-you.css" to "/*you*/",
+                        "highlight-theme.css" to "/*hl*/",
+                        WebViewHtmlBuilder.KATEX_CSS_KEY to "@font-face{src:url(fonts/KaTeX_Main-Regular.woff2) format(\"woff2\")}",
+                    ),
+            )
+
+        assertTrue("KaTeX 样式必须内联进 app-css", html.contains("KaTeX_Main-Regular.woff2"))
+        assertFalse(
+            "内联模式下不得再发 katex <link>",
+            html.contains("<link rel=\"stylesheet\" href=\"https://appassets.androidplatform.net/assets/webview/katex/katex.min.css\">"),
+        )
+        assertFalse("相对字体 URL 在内联模式下必然 404，必须绝对化", html.contains("url(fonts/"))
+        assertTrue(
+            "字体 URL 必须绝对化到 appassets",
+            html.contains("url(https://appassets.androidplatform.net/assets/webview/katex/fonts/KaTeX_Main-Regular.woff2)"),
+        )
+        assertTrue("KaTeX CSS 必须在 github-markdown 之前内联，覆盖规则才能胜出", html.indexOf("KaTeX_Main-Regular") < html.indexOf("/*gfm*/"))
+    }
+
+    @Test
+    fun build_mathWithInlineCssMissingKatexEntry_noKatexLinkFallback() {
+        // App 调用点会带上 KaTeX CSS；万一漏传，浏览器侧缺的只是排版样式——不因此发链接
+        // （内联模式的既有契约：只要有 inlineCss 就不再发 <link>）
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "行内 \$x^2\$",
+                themeVariables = "--md-sys-color-primary: #123456;",
+                isDark = false,
+                renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+                inlineCss = mapOf("github-markdown.css" to "/*gfm*/"),
+            )
+
+        assertFalse(html.contains("<link rel=\"stylesheet\""))
+        assertTrue("脚本仍必须注入（排版样式与运行时是两件事）", html.contains("katex/katex.min.js"))
+    }
+
+    private fun buildOffline(markdown: String): String =
+        WebViewHtmlBuilder.build(
+            sanitizedHtml = markdown,
+            tokens = MarkdownThemeTokens.fromLightScheme(),
+            renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+        )
+
+    private fun buildServerHtml(html: String): String =
+        WebViewHtmlBuilder.build(
+            sanitizedHtml = html,
+            tokens = MarkdownThemeTokens.fromLightScheme(),
+            renderMode = RenderMode.SERVER_HTML,
+        )
 }

@@ -212,6 +212,11 @@
 | D-8 | **跨端「与网页端一致」是否投入自动像素 diff 管线** | 高成本独立票，需优先级拍板 | PERF-2 |
 
 > 以上仍开口的 D-1/D-2/D-3/D-4/D-6/D-8 均属 `docs/ui-design.md`/交互取向类，按项目规则**先 grill 再实现**（`plan.md` 与 `workflow.md` §4 设计闸门）。
+>
+> **2026-09-13 更新**：D-2 的 KaTeX 部分已落地（离线 KaTeX 0.18.7，post-sanitize 渲染、
+> 仅 woff2 字体、条件注入；两条 WebView 通道覆盖，见 `docs/agents/markdown-consistency-2026-09-11.md`
+> 的 2026-09-13 更新与 `MathRenderExecutionTest`）。Mermaid 仍按可行性报告的 Phase 2 结论开放
+> （Tiny 11.17.2 + WebView ≥ 94 版本门禁）。
 
 ---
 

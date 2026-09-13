@@ -46,6 +46,22 @@ body {
   color: var(--fgColor-accent);
 }
 
+/* KaTeX 离线数学（post-sanitize 注入，见 renderer.js 的 renderMath）：
+ * - 颜色一律继承 .markdown-body 的 currentColor（--fgColor-default 随主题切换，
+ *   深色下无需额外规则）；KaTeX 0.18.7 样式表本身只有一个 color:currentColor。
+ * - 错误色由 renderer.js 读取 --md-sys-color-error 传给 errorColor（内联属性），
+ *   不在这里写死 #cc0000；禁止 color-mix（真机 WebView 不支持）。
+ * - 超宽块级公式横向滚动，不撑破 WebView 容器。 */
+.markdown-body .katex {
+  font-size: 1.1em;
+}
+
+.markdown-body .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 0;
+}
+
 /* Inline code: primary 10% tint background + primary text. */
 .markdown-body code {
   background: var(--inline-code-bg);

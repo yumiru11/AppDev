@@ -83,8 +83,23 @@ object FeatureDetector {
      */
     private val FENCED_CODE_REGEX = Regex("""```[^\n]*\n.*?```""", RegexOption.DOT_MATCHES_ALL)
 
-    /** 行内数学公式 $...$ 或块级 $$...$$（排除 $ 后跟数字如价格的误判） */
-    private val MATH_REGEX = Regex("""\$\$[^\$]+\$\$|\$[^\$\d\s][^\$]*[^\$\s]\$""")
+    /**
+     * 行内数学公式 $...$ 或块级 $$...$$（排除 $ 后跟数字如价格的误判）。
+     *
+     * 2026-09-13（离线 KaTeX）：与 `renderer.js` 的 `MATH_TOKEN_REGEX` 对齐收紧——
+     * 行内公式不跨行（原 `[^\$]*` 可跨行）、允许单字符公式（`$x$`，原规则要求 ≥2 字符）。
+     * 本判定只做「是否注入 KaTeX 脚本/CSS」的开关，JS 侧仍是独立且更严的正确性判据
+     * （见 docs/research/katex-mermaid-offline-feasibility.md §5）。
+     */
+    private val MATH_REGEX = Regex("""\$\$[^\$]+\$\$|\$(?![\d\s])[^\$\n]*[^\s$]\$""")
+
+    /**
+     * 内容是否含数学公式（$…$ / $$…$$）。
+     *
+     * 供 WebView 侧决定是否注入离线 KaTeX 运行时（`WebViewHtmlBuilder.needsKatex`）——
+     * 与 [shouldFallback] 的 MATH 判定同一规则（先剥离围栏代码块，再匹配 [MATH_REGEX]）。
+     */
+    fun containsMath(markdown: String): Boolean = MATH_REGEX.containsMatchIn(stripFencedCodeBlocks(markdown))
 
     /**
      * 判定 markdown 内容是否需要走 WebView 兜底通道。
@@ -102,7 +117,7 @@ object FeatureDetector {
 
         // 1b. 数学公式 $...$ / $$...$$（先剔除代码围栏内容——代码块中的
         //     ${'$'}{var}/${'$'}counter 非公式，P1 #64）
-        if (MATH_REGEX.containsMatchIn(stripFencedCodeBlocks(markdown))) {
+        if (containsMath(markdown)) {
             return FallbackDecision.WebView(FallbackReason.MATH)
         }
 

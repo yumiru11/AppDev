@@ -170,16 +170,19 @@ class GfmNativeParserCapabilityTest {
     fun mathFixture_dollarSyntax_parserRecognizesButNoNativeComponentExists() {
         val types = elementTypesOf("33-math-katex")
 
-        // 诚实分层：解析器认得 $-math（GFM flavour 内建），但原生链 markdownComponents 无 math 槽位，
-        // WebView 侧也未打包 KaTeX → 三条路径都不渲染公式（见 catalog 中 33 的 paths = 空集）。
+        // 诚实分层：解析器认得 $-math（GFM flavour 内建），但原生链 markdownComponents 无 math 槽位
+        // → 不走 NATIVE；WebView 两条通道 2026-09-13 起由离线 KaTeX 在清洗后渲染（见 MathRenderExecutionTest）。
         assertTrue(
             "GFM 解析器应识别 $...$ 为 INLINE_MATH，实际 = $types",
             GFMElementTypes.INLINE_MATH in types || GFMElementTypes.BLOCK_MATH in types,
         )
+        val paths = MarkdownGfmFixtures.byId("33-math-katex").paths
         assertTrue(
-            "33-math-katex 必须被登记为「无渲染路径」",
-            MarkdownGfmFixtures.byId("33-math-katex").paths.isEmpty(),
+            "33-math-katex 必须登记服务端 HTML + 离线 GFM 两条 WebView 路径",
+            MarkdownGfmFixtures.RenderPath.SERVER_HTML in paths &&
+                MarkdownGfmFixtures.RenderPath.OFFLINE_GFM in paths,
         )
+        assertTrue("原生链无 math 槽位，仍不得登记 NATIVE", MarkdownGfmFixtures.RenderPath.NATIVE !in paths)
     }
 
     @Test
