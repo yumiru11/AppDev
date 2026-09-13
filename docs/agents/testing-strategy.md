@@ -1,8 +1,8 @@
 # AppDev 测试策略（整合外部方法论 + 落地路线）
 
 > 2026-08-16 定稿。方法论来源：`docs/agents/unit-test-coverage.md`（外部 AI，25 节）；工具选型：主代理调研
-> （Kover→JaCoCo 官方转向、AGP 原生 coverage、diff coverage 插件）。技术栈：Kotlin 2.3.21 / AGP 8.7.3 /
-> JUnit4 + MockK + Turbine + MockWebServer3 + Robolectric 4.16 + Roborazzi。
+> （Kover→JaCoCo 官方转向、AGP 原生 coverage、diff coverage 插件）。技术栈：Kotlin 2.3.21 / AGP 9.1.1（Gradle 9.3.1 / compileSdk 37，
+> #270 从 AGP 8.7.3 升）/ JUnit4 + MockK + Turbine + MockWebServer3 + Robolectric 4.16 + Roborazzi。
 
 ## 1. 目标
 
@@ -22,14 +22,14 @@
 | DataSource（网络） | 70%+ | MockWebServer3 / Apollo MockServer | T5 ✅ |
 | Room / DataStore | 高 | Robolectric 内存库 / Fake | T5 14 测试 ✅ |
 | Compose UI | 行为断言 | Robolectric + Compose UI Test | 部分 ✅ |
-| 视觉 | 关键页面 | Roborazzi 截图 | 10+ 基线 ✅（WebView 除外） |
+| 视觉 | 关键页面 | Roborazzi 截图 | 110 张非 prototype 基线 ✅（含 WebView 两路径） |
 
 ## 3. 工具选型（主代理 2026-08 调研结论）
 
 ### 覆盖率工具：JaCoCo 0.8.13+（不用 Kover）
 - **Kover 独立插件停止新功能**（kotlinx-kover#746）：将并入 Kotlin Gradle Plugin，IntelliJ agent 弃用，全面转 JaCoCo agent
 - **官方推荐直接用 JaCoCo**（#729）：`kover { useJacoco("0.8.13") }`；**JaCoCo 0.8.13+ 支持 Kotlin inline functions**（jacoco#1670），覆盖精度追平 IntelliJ agent
-- AGP 8.7 原生支持：`enableUnitTestCoverage = true` + `createDebugUnitTestCoverageReport`
+- AGP 9.1.1 原生支持：`enableUnitTestCoverage = true` + `createDebugUnitTestCoverageReport`（JaCoCo agent 配置含 Robolectric 真值修复，见 T5）
 - 多模块聚合：AGP experimental `android.experimental.reportAggregationSupport=true` → `createAggregatedCoverageReport`
 
 ### 增量覆盖率（diff coverage）：PR 门禁用插件
@@ -63,13 +63,13 @@
 
 | 阶段 | 内容 |
 |---|---|
-| **PR** | spotless + detekt + konsist + lint + 单测 + **JaCoCo 报告 + diff coverage 门禁** + verifyRoborazzi |
+| **PR** | spotless + detekt + konsist + **lint（全模块，#270 后 0 disable）** + 单测 + **JaCoCo 报告 + diff coverage 门禁** + verifyRoborazzi |
 | **Merge 后** | 关键 Compose UI 测试（现有） |
 | **Nightly**（后续） | 全量截图 / 多设备 / 性能基线（T25 阶段） |
 
 ## 7. 落地路线（4 阶段，对应方法论文档 §23）
 
-- **Phase A（✅ 2026-08-16 完成）**：根 build 接 JaCoCo（AGP `enableUnitTestCoverage`，BuildType 级）→ `./gradlew :<模块>:createDebugUnitTestCoverageReport` 生成报告 → 基线数字（github-rest 23.5% / app 3.4%，注：AGP 报告只统计测试加载类，未加载类不计入——数字偏低，Phase B 定统计口径）→ **Phase B**：CI 门禁 + verification rules + diff coverage
+- **Phase A（✅ 2026-08-16 完成）**：根 build 接 JaCoCo（AGP `enableUnitTestCoverage`，BuildType 级）→ `./gradlew :<模块>:createDebugUnitTestCoverageReport` 生成报告 → 基线数字（github-rest 23.5% / app 3.4%）。⚠️ **「AGP 报告只统计测试加载类」的说法已被证伪**（见下方 T2 与 T5 的 #261）；真实偏低原因是 JaCoCo agent 跳过了 Robolectric 沙箱无 CodeSource 类 → **Phase B**：CI 门禁 + verification rules + diff coverage
 - **Phase B（✅ 2026-08-16 完成，本票）**：版本锁定 + 分母口径 + 聚合报告/验证 + diff coverage 门禁，详见下方「Phase B 交付物」。
 - **Phase C**：按 `docs/agents/testing-checklist.md` 分点清单补齐（A 纯逻辑 → B 数据层 → E ViewModel → G 可注入性，共 9 组 60+ 业务点）
 - **Phase D**：UI 自动化主流程（Compose UI Test 关键路径）+ Nightly 全量
@@ -97,29 +97,19 @@
 - **跨模块执行**：app/feature 测试会执行下层模块的类 → 单模块 exec 与聚合 exec 数字不一致。`coverageVerify` 契约要求"同一份聚合数据"→ 每模块报告/验证的 executionData 取全部模块 exec 的并集（惰性 provider），并显式 dependsOn 全部 `testDebugUnitTest`（否则 Gradle implicit-dependency 校验失败）。
 - 统计口径：JaCoCo LINE 计数器——部分覆盖行同时计入 covered 和 missed（COVEREDRATIO = covered/(covered+missed)），不要用逐行 `ci>0` 简单相除，会虚高。
 
-**T3 阈值表（2026-08-16 聚合口径实测，LINE COVEREDRATIO）**：
+**T3 阈值表（2026-08-16 首批；2026-09-13 已被 #263 全量真值棘轮取代）**
 
-| 模块 | 阈值 | 实测 | 模块类型 |
-|---|---|---|---|
-| core:navigation | 0.94 | 96.1% | 逻辑 |
-| core:github-data | 0.94 | 96.1% | 逻辑 |
-| core:datastore | 0.84 | 86.7% | 逻辑 |
-| core:github-graphql | 0.90 | 92.5% | 逻辑 |
-| core:github-auth | 0.70 | 72.5% | 逻辑 |
-| core:markdown | 0.42 | 44.2% | UI/渲染 |
-| core:designsystem | 0.64 | 66.7% | UI/渲染 |
-| core:github-rest | 0.76 | 78.2% | 网络 DTO |
-| feature:repo | 0.37 | 39.0% | 逻辑（地板 70，Phase C 目标） |
-| feature:profile | 0.29 | 30.9% | 逻辑（地板 60，Phase C 目标） |
-| feature:notifications | 0.28 | 30.2% | 逻辑（地板 60，Phase C 目标） |
-| feature:home | 0.28 | 30.7% | 逻辑（地板 60，Phase C 目标） |
-| feature:issue | 0.21 | 23.7% | 逻辑（地板 50，Phase C 目标） |
-| feature:settings | 0.17 | 19.6% | UI/渲染（地板 25，Phase C 目标） |
-| app、feature:auth | — | — | 豁免（纯 UI 装配） |
+> 本表为 Phase B 首批（AGP 8.7 / 旧分母口径）阈值，**已不再是现实**：旧实测普遍低于真实值数十 pp（JaCoCo agent 跳过 Robolectric 沙箱类，见下方 T2 与 T5）。当前唯一事实来源是 `build.gradle.kts` 的 `coverageThresholds`（**22 个模块**，逐一注有真实实测值与余量），已按 #261 修复后的真实覆盖率重设（#263），只升不降。仍豁免 = `core:data` / `core:testing` / `core:ui` / `prototype`（理由见 `build.gradle.kts` 注释）。
 
-阈值 = max(地板, 实测 − 2pt)，保证 CI 今天能过；实测低于地板的 6 个模块按实测 − 2pt 设阈值，地板作为 Phase C 收紧目标。无单元测试的模块（无 exec）跳过验证。
+**无 exec 数据 = 硬失败（#260，2026-09-13）**：声明了阈值的模块若没有单测执行数据，**任务直接失败**（旧行为是 SKIPPED + BUILD SUCCESSFUL，门禁形同虚设）。同理 `konsistCheck` 无匹配测试也已改为硬失败。
 
 **T4 diff coverage**：自研任务（方案 c）而非 diff-coverage 插件——插件任务名不满足契约且 Gradle 8.12/Kotlin 2.3 兼容性需额外验证；自研零新依赖（JDK XML + git）。算法：`git diff --unified=0 base...HEAD` 解析新增行（仅 `src/main/` 下 .kt/.java）→ 与聚合 XML 的 `<sourcefile>/<line>` 逐行比对（`ci>0` 计覆盖）→ 未达阈值列出未覆盖文件与行号并失败。base 来源：`-PdiffBaseSha` > `DIFF_BASE_SHA` 环境变量 > `HEAD~1`。实测：HEAD~3 基线 diff（49 行新增，49.0% 覆盖）在默认 0.80 下正确失败，`-PdiffCoverageThreshold=0.40` 下正确通过。
+
+**T5 Robolectric 覆盖率真值修复（2026-09-13，#261 / #263 / #260）**：
+- **根因**：JaCoCo agent 默认 `inclnolocationclasses=false`，Robolectric `SandboxClassLoader` 定义的应用类无 CodeSource → 整类被静默跳过 → 覆盖率假 0（与「逻辑是否纯 JVM 可测」无关）。修复 = `includeNoLocationClasses=true` + agent `includes=com/yumiru11/*`（`build.gradle.kts` 的 `configureRobolectricCoverage`）。
+- **效果**：`:app` 2.61% → **25.80%**、`:core:database` 5.17% → **86.43%**、`:feature:auth` 0% → **100%**。
+- **阈值棘轮**：22 个有阈值模块按真实值一次性重设（#263），只升不降（详见 `build.gradle.kts` 的 `coverageThresholds`）。
+- **无空转**：声明阈值却无 exec 数据 = 硬失败（#260）；`konsistCheck` 无匹配测试 = 硬失败。截图帧闭包与 APK 体积另有门禁，见 `AGENTS.md` 方法学。
 
 ## 8. 参考
 

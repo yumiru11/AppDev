@@ -7,18 +7,19 @@
 
 开发一个**功能全面的 Android GitHub 客户端**（轻量、流畅、全 Material You）。技术规划 = `plan.md`（41KB，必读），需求来源 = `request.txt`。应用名/包名仍为占位符：applicationId 与 namespace = `com.yumiru11.githubapp`（模块 namespace 用 `core.github_xxx` 下划线写法），产品定名后统一改。
 
-**当前状态（2026-09-12 修复波末）**：`main@54eba10`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、**四张新缺陷票 #200–#203** 全部关闭；#166 / #167 已关闭（条目逐条对账）。本轮修复波共合入 **37 张 PR（#229–#266，剔除非 PR 的 issue #250，全部 squash）**：前半 #229–#255（26 张，已由 PR #257 回写），后半 **#256–#266（11 张）** —— #256 截图基线扩展（9 屏 / 20 帧 + 离线 ImageLoader 确定性）、#258 RepoDetail 头修复、#259 设置返回箭头 + FAB 底部留白、#260 门禁去空转、#261 JaCoCo×Robolectric 修复、#262 markdown 引用链接、#263 覆盖率阈值棘轮、#264 ETag 跨进程持久化、#265 后半波文档回写、#266 剩余 6 屏 15 帧基线补齐。**已无 open PR**。
+**当前状态（2026-09-13 修复波末）**：`main@db1b696`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、**四张新缺陷票 #200–#203** 全部关闭；#166 / #167 已关闭（条目逐条对账）。本轮修复波共合入 **42 张 PR（#229–#271，剔除非 PR 的 issue #250，全部 squash）**：前半 #229–#255（26 张）、中段 **#256–#266（11 张）**、收尾 **#267–#271（5 张）**。收尾波 = **#267** 状态对账（#266 后）、**#268** 设计系统落地计划 + ADR-0010、**#269** 离线 KaTeX 数学渲染、**#270** AGP 9.1.1 迁移（Gradle 9.3.1 / compileSdk 37 / 全模块 lint 恢复，#170 兑现）、**#271** nightly APK 体积回归门禁。**已无 open PR**。
 **当前活动票三张**：**#26（T25 真机项，需用户配 Secrets）**、#1（Spec，常开）、#71（截图测试面板，勿关）。（#250 已关闭 —— 探针断言 bug 由 #252 修复。）
 **已知真实缺陷：无。** **RepoDetail 仓库头整块不渲染（UI-C01）已由 #258 修复**：根因是 `headerHeightPx` 自锁 —— 首帧外层高 0dp → 内层 `onSizeChanged` 在 `maxHeight=0` 约束下只能测到 0 → 自然高度永远回填不上，头部被裁成 0 高。改为 `Modifier.layout` 以 `Constraints.Infinity` 在 layout 阶段测自然高度，首帧即按自然高度渲染；回归测试 `repoDetailScreen_success_rendersRepositoryHeaderBlock` 锁定，CI `repo-star` / `repo-actions` 帧已转绿（坏帧 2 → 0）。
 
 > 🔴 **四份审计报告已入库（2026-09-12，开工前必读其一）**
 > `docs/agents/` 下：`spec-audit-2026-09-11.md`（需求符合性 106 条判定 / 16 条缺口 / 20 条文档漂移）· `commit-audit-2026-09-11.md`（296 提交逐票核对）· `ui-audit-2026-09-11.md`（**含系统栏的 CI 真机帧**逐张读图，Roborazzi 基线看不到系统栏）· `markdown-consistency-2026-09-11.md`（GFM §2.3 逐条 + 三层回归说明）· `agp9-feasibility-2026-09-11.md`（工具链迁移实测）
 >
-> 🔴 **本轮新增入库（2026-09-12）**：`docs/agents/remaining-backlog-2026-09-12.md`（残余审计缺口收敛：已闭环钉死 / 仍待实现 / 过时反证；**#256–#266 后已再次收敛**，只留 AGP9 / 设计系统 / KaTeX-Mermaid / 原型归档 / 真机性能等真开口）· `docs/research/katex-mermaid-offline-feasibility.md`（离线 KaTeX/Mermaid 体积实测）· `docs/adr/0009-graphql-read-path-deviation.md`（读路径全 REST 的架构决定）
+> 🔴 **本轮新增入库（2026-09-12 / 09-13）**：`docs/agents/remaining-backlog-2026-09-12.md`（残余审计缺口收敛：已闭环钉死 / 仍待实现 / 过时反证；**#267–#271 后已再次收敛**，只留真开口）· `docs/research/katex-mermaid-offline-feasibility.md`（离线 KaTeX/Mermaid 体积实测）· `docs/adr/0009-graphql-read-path-deviation.md`（读路径全 REST 的架构决定）· `docs/design-system/implementation-plan.md`（SPEC-1 组件 / SPEC-2 间距 / UI-2 选中态：批次表 + 门禁 + DoD）· `docs/adr/0010-design-system-rollout.md`（设计系统分批迁移决策）
 
-> ⚠️ **唯一需要用户操作的前置（其余已知 P0 均已修复）**
-> **OAuth 真机 PKCE 仍需你申请并填写 client id**（注入点已实现，#239）。`app/build.gradle.kts:11-48` 三级解析、**先命中先取**：Gradle 属性 `-PoauthClientId` → `local.properties:oauthClientId` → 环境变量 `OAUTH_CLIENT_ID`，写入 `BuildConfig.OAUTH_CLIENT_ID`；由 app 装配层 `OAuthConfigModule` 构造 `OAuthConfig`（core:github-auth 不感知 BuildConfig，Konsist 禁 core→app）。
-> **未配置时的行为**：回落到 `OAuthConfig.PLACEHOLDER_CLIENT_ID = "YOUR_OAUTH_APP_CLIENT_ID"`——构建/测试照常，仅**真机 PKCE 授权失败**；用 `OAuthConfig.isConfigured` 判定。不阻塞模拟器截图（CI 用 `SCREENSHOT_TOKEN` 注入 PAT）与全部测试。
+> ✅ **OAuth client id 注入已完成（PR #239），真机 PKCE 只剩你填一次值**
+> `app/build.gradle.kts:11-48` 三级解析、**先命中先取**：Gradle 属性 `-PoauthClientId` → `local.properties:oauthClientId` → 环境变量 `OAUTH_CLIENT_ID`，写入 `BuildConfig.OAUTH_CLIENT_ID`；由 app 装配层 `OAuthConfigModule` 构造 `OAuthConfig`（core:github-auth 不感知 BuildConfig，Konsist 禁 core→app）。真实值只进构建产物、不落库（`local.properties` 已 gitignore）。
+> **配置方法**：`./gradlew ... -PoauthClientId=Iv1.xxxx`，或在 `local.properties` 写一行 `oauthClientId=Iv1.xxxx`，或 `export OAUTH_CLIENT_ID=Iv1.xxxx`。CI 截图不消费此值（走 `SCREENSHOT_TOKEN` 注入只读 PAT）。
+> **未配置时的行为**：回落到 `OAuthConfig.PLACEHOLDER_CLIENT_ID = "YOUR_OAUTH_APP_CLIENT_ID"`——构建/测试照常，仅**真机 PKCE 授权失败**；用 `OAuthConfig.isConfigured` 判定。⏳ 登录入口的「未配置」提示**未在 feature 层实现**（`isConfigured` 目前仅生产装配层注释与测试消费），若需要另开票。不阻塞模拟器截图与全部测试。
 
 > 📌 **本轮已修复的三个 P0（勿再当成未修）**
 > 1. **T23 白屏** ✅ PR #220 —— `MainActivity` 补 `branchesScreen` / `createPullRequestScreen` 接线；并新增 **`NavHostWiringTest`** 结构化守卫（断言 19 个 screen lambda 无默认空实现残留）
@@ -28,7 +29,7 @@
 > 🧭 **此后必须遵守的方法学（本轮/修复波实测教训，代价很大）**
 > 1. **判断 Kotlin 库成员可用性，`javap` 不够** —— JVM `public` 可能是 Kotlin `internal`（`javap` 看不到 `@Metadata` 那一层）。**唯一可靠做法：用真实 Kotlin 编译探针引用目标符号、跑 `compileDebugKotlin`、读错误原文。** 本轮在 material3 1.4.0 与 1.5.0-alpha18 上各撞一次。
 > 2. **断言/门禁必须做「红→绿双向验证」** —— 任何守卫/断言先证明「缺陷形态下必红」。修复波两次抓到恒真守卫：**i18n lint canary 自引用断言**（期望值取自被检查的同一清单 → 恒真；已改为独立 `REQUIRED_I18N_LINT_RULES` + 运行期 canary，见 `buildSrc/.../AppDevI18nLint.kt:43,66,72`）、**`repo-actions` 探针空洞**（仓库头缺失仍假绿，补 `desc:"Avatar"` 闸门后才转红，#252）。RTL 旧写法 `@Config(qualifiers="...ldrtl")` 亦是「永远绿的假测试」，改组合内显式注入 + SHA 互斥断言（#245）。**不经红证明的守卫会以「在跑但什么都没查」的形态上线。**
-> 3. **含无限动画的屏必须用 `captureScreenshotDeterministic`** —— Roborazzi `captureRoboImage(content)` 截图前会 `ShadowLooper.idle()` 排空主 looper，而无限动画（转圈 / 下拉刷新指示器）每帧经 Choreographer 续订 → `idle()` 永不返回 → verify/record 挂死（`:feature:issue` 7min+ 挂起根因）。`core:testing` 的 `captureScreenshotDeterministic`（冻结 `mainClock.autoAdvance=false` + 固定 `advanceTimeBy` + 手工 `decorView.draw(Canvas)` + `Bitmap.captureRoboImage` 不做 idle 等待）才稳。⏳ 待核实：普通 `testDebugUnitTest`（未开 record/verify）下 `captureRoboImage` 不落盘，需当心「测试绿≠拍了帧」。
+> 3. **含无限动画的屏必须用 `captureScreenshotDeterministic`** —— Roborazzi `captureRoboImage(content)` 截图前会 `ShadowLooper.idle()` 排空主 looper，而无限动画（转圈 / 下拉刷新指示器）每帧经 Choreographer 续订 → `idle()` 永不返回 → verify/record 挂死（`:feature:issue` 7min+ 挂起根因，已修并纳入 CI verify）。`core:testing` 的 `captureScreenshotDeterministic`（冻结 `mainClock.autoAdvance=false` + 固定 `advanceTimeBy` + 手工 `decorView.draw(Canvas)` + `Bitmap.captureRoboImage` 不做 idle 等待）才稳。**已核实：普通 `testDebugUnitTest`（未开 record/verify）下 `captureRoboImage` 直接静默返回、不落盘** → 测试绿 **≠** 拍了帧，验收必须看产物（`.github/scripts/verify-screenshots.sh` 的帧闭包断言）。
 > 4. **截图基线只能由 CI canonical 录制** —— `record-screenshots.yml`（`Record screenshots (CI canonical)`）是唯一权威录制环境；本机 `recordRoborazziDebug` **禁止**（渲染与 runner 非逐字节相同，本机录的基线 CI verify 全红）。**录制前必须先 rebase 到最新 main**（**已证实**：#256 即 rebase 至 #259 后录制，仅重录语义确实变化的 4 帧）。
 > 5. **截图探针语义 + 时间炸弹** —— Compose `TabRow` 选中态是 `selected`，M3 `SegmentedButton` 是 `checkable/checked`（radio 语义，`selected` 恒 false，pr-diff 两帧假红根因）；`ExtendedFAB` 文案不进 uiautomator dump，须 `try_tap_fab` 结构性定位（**判据必须限制右下角 x ≥ 0.7w 且 y ≥ 0.85h**，放宽到「底部最大可点区域」会误点 diff 行，`adb-helpers.sh:840-842`）；M3 `OutlinedTextField` 的 placeholder 仅在聚焦且为空时渲染，**不得当就绪信号**（#250）。截图/测试夹具**禁止写死绝对时间戳**，一律相对时间（`isoDaysAgo`，#246）。探针不得静默降级为 `opt:`。
 > 6. **截图捕获必须禁网（离线 ImageLoader）** —— `AsyncImage` 的真实网络往返会让录制/校验两次运行不可复现（`ProfileScreen_light` 曾因头像时有时无单独 verify 红）。`captureScreenshotDeterministic` 在捕获期 `installOfflineImageLoader()`（拦截器短路 http(s) 图片 → Coil `ErrorResult` → 渲染空白，与既有全部基线一致），`finally` reset（#256）。机制由临时 Robolectric 探针实证后删除。
@@ -37,14 +38,14 @@
 
 - **无 Kotlin Multiplatform**、**无 Waydroid/虚拟机**：测试与截图全跑 Linux 纯 JVM（Robolectric + Roborazzi）
 - **GraphQL 读优先（Apollo Kotlin 5）、REST 写优先（Retrofit 3/OkHttp 5）**；认证用 OAuth PKCE（AppAuth），PAT 仅开发者模式（fine-grained PAT 不支持 GraphQL → 自动降级 REST-only）
-- **Markdown 分层渲染**：**WebView 主渲染**（README/Issue 正文——服务端 HTML 优先 + 离线 GFM markdown-it 降级两级，ADR-0007 拍板；github-markdown-css + DOMPurify + markdown-it + highlight.js，Material You 变量注入——**真机 WebView 不支持 CSS color-mix，混色必须 Kotlin 预计算**）；评论列表/通知短文本保持原生（**铁律「评论列表绝不用 WebView」不变**）；FeatureDetector 保留但 README 分流判定不再使用；增强组件链（EnhancedMarkdownViewer 等）继续服务短文本；shields 徽章需 **coil-svg + SvgDecoder**（Coil 默认无 SVG；SvgDecoder intrinsic 放大 ~10 倍，徽章固定高 20dp）
+- **Markdown 分层渲染**：**WebView 主渲染**（README/Issue 正文——服务端 HTML 优先 + 离线 GFM markdown-it 降级两级，ADR-0007 拍板；github-markdown-css + DOMPurify + markdown-it + highlight.js，Material You 变量注入——**真机 WebView 不支持 CSS color-mix，混色必须 Kotlin 预计算**；**数学公式走离线 KaTeX 0.18.7**，#269：DOMPurify 清洗**之后**渲染，仅 woff2 字体，`assets/webview/katex/` ≈ +0.32 MiB，配置未放宽；Mermaid 未实现）；评论列表/通知短文本保持原生（**铁律「评论列表绝不用 WebView」不变**）；FeatureDetector 保留但 README 分流判定不再使用；增强组件链（EnhancedMarkdownViewer 等）继续服务短文本；shields 徽章需 **coil-svg + SvgDecoder**（Coil 默认无 SVG；SvgDecoder intrinsic 放大 ~10 倍，徽章固定高 20dp）
 - **评论列表绝不用 WebView**；**token 绝不注入 WebView**；代码浏览/编辑用 Rosemoe Sora Editor
 - i18n 从第一天落实：Compose 一律 `stringResource()`，禁止硬编码字符串（GitLight 教训）
 - 版本目录（`gradle/libs.versions.toml`）单一事实来源；设计令牌、Konsist 架构测试从第一行代码开始
 - **`material3` 显式 pin 在 `1.5.0-alpha18`**（不走 BOM）—— **M3 Expressive** 的唯一可用窗口；决策与撤除条件见 `docs/adr/0008-material3-alpha18-pin.md`：
   - **为什么 pin**：`MotionScheme`（Expressive 弹簧物理）· `LoadingIndicator`（形变加载）· `WavyProgressIndicator` · `SplitButtonLayout` · `ButtonGroup` · `Medium/LargeFlexibleTopAppBar` 在 **1.4.0 上是 Kotlin `internal`**（拿不到），从 1.5.0-alpha 起才 public
-  - **为什么停在 alpha18**：**1.5.0-alpha19+ 要求 `minCompileSdk=37` + `minAGP=9.1.0`**（AAR 元数据实测）→ 本项目 compileSdk 36 / AGP 8.7.3 只能用 alpha01–alpha18
-  - **何时撤掉**：1.5.0 stable 回归某个 compose-bom 后删除本 pin（回到纯 BOM 托管）；或先做 AGP 9 迁移（已实测可行，见 `docs/agents/agp9-feasibility-2026-09-11.md`）再跟到 alpha28+/stable
+  - **为什么曾停在 alpha18**：**1.5.0-alpha19+ 要求 `minCompileSdk=37` + `minAGP=9.1.0`**（AAR 元数据实测）。**该门禁已随 #270 的 AGP 9.1.1 / compileSdk 37 迁移清除**（alpha19+ 的技术前提已满足），但 pin 仍**有意保留 alpha18**，等 1.5.0 stable 或明确要跟 alpha 线再动（撤除条件见 ADR-0008）
+  - **何时撤掉**：1.5.0 stable 回归某个 compose-bom 后删除本 pin（回到纯 BOM 托管）。AGP 9 迁移**已完成（#270）**；若确需 alpha 线新特性，可在此基础上直接跟 alpha19+/stable，不撤则维持现状
   - **代价**：alpha18 无 `FloatingToolbar` 家族；alpha 期改名已实测 2 例（`FlexibleTopAppBar` 这个名字在 1.5 线**根本不存在**；`SplitButtonDefaults.leadingButtonShape` 该版没有）
   - **只 pin 单个 artifact、不动 BOM**（BOM 覆盖 Compose 全家，改它是把整条线拖进 alpha）
 
@@ -53,10 +54,12 @@
 | 项 | 值 |
 |---|---|
 | Gradle | **无全局 `gradle` CLI，一律 `./gradlew`** |
-| Wrapper | `8.12-bin`，腾讯镜像（`~/.gradle/wrapper/dists` 已缓存） |
+| Wrapper | `9.3.1-bin`，腾讯镜像（`~/.gradle/wrapper/dists` 已缓存） |
 | JDK | 21（`gradle.properties` 已写 `org.gradle.java.home=/usr/lib/jvm/java-21-openjdk`，**勿改**） |
 | Android SDK | `/home/zhiyi/Android/Sdk`（`local.properties`，**勿改**） |
-| compileSdk | **36**（T5 合入时从 35 升；AGENTS 旧版写 35 是文档漂移，以代码为准） |
+| 工具链 | **AGP 9.1.1 / Gradle 9.3.1 / KSP 2.3.12 / Hilt 2.59.2 / built-in Kotlin**（#270 从 AGP 8.7.3 升；不再应用 `org.jetbrains.kotlin.android`，AGP 9 会硬拒绝） |
+| compileSdk | **37** / buildTools **36.0.0**（#270 从 36 升；android-37.0 平台已安装） |
+| targetSdk | **35**（`:app` 显式写死，不跟随 compileSdk；并设 `android.sdk.defaultTargetSdkToCompileSdkIfUnset=false`——AGP 9 新默认会让**库模块**取 37，Robolectric 4.16.1 报 `targetSdkVersion=37 > maxSdkVersion=36`） |
 | 镜像 | 本机 `~/.gradle/init.d/mirror.gradle` 全局注入（不入库）；**仓库内 settings.gradle.kts 保持官方源，不要加回镜像** |
 | 代理 | **需要代理时用户自己开**；禁止自行 `sudo mihomo`。push 被墙 → 停手告知用户 |
 
@@ -72,14 +75,16 @@
 ./gradlew --no-daemon spotlessCheck      # ktlint 格式（修正用 spotlessApply）
 ./gradlew --no-daemon detekt             # 静态分析（config/detekt/detekt.yml 基线）
 ./gradlew --no-daemon konsistCheck       # 架构测试（Konsist 分层依赖方向；无匹配测试已改为硬失败，#260）
-./gradlew --no-daemon :app:lintDebug     # Android Lint（abortOnError）
+./gradlew --no-daemon lintDebug         # Android Lint 全模块（abortOnError；#270 后检测器全恢复，0 disable）
 ./gradlew --no-daemon :app:testDebugUnitTest    # 单测
 ./gradlew --no-daemon coverageVerify     # JaCoCo 覆盖率硬门禁（22 模块阈值见 build.gradle.kts coverageThresholds；无 exec 数据 = 硬失败，#260）
 ./gradlew --no-daemon :app:verifyRoborazziDebug # 截图基准校验（app；模块需逐个列）
 ./gradlew --no-daemon :app:assembleDebug # 打 debug APK
 ```
 
-> **截图 verify 覆盖面（CI 同款，`ci.yml:210-227`）**：`app` + **13 个模块** —— `:core:ui` / `:core:designsystem` / `:core:markdown` / `:feature:auth` / `:feature:issue` / `:feature:repo` / `:feature:notifications` / `:feature:pullrequest` / `:feature:home` / `:feature:search` / `:feature:editor` / `:feature:profile` / `:feature:settings`；录制名单（`record-screenshots.yml`）与 verify 名单镜像。**帧闭包断言**：`.github/scripts/verify-screenshots.sh`（#260）要求 ≥1 张 PNG、无 0 字节 PNG、`screenshots.sh` 声明的每帧必有产出或显式处置标记（`.skipped.txt`），帧数下限 28。
+> **截图 verify 覆盖面（CI 同款，`ci.yml:192-205`）**：`app` + **13 个模块** —— `:core:ui` / `:core:designsystem` / `:core:markdown` / `:feature:auth` / `:feature:issue` / `:feature:repo` / `:feature:notifications` / `:feature:pullrequest` / `:feature:home` / `:feature:search` / `:feature:editor` / `:feature:profile` / `:feature:settings`；录制名单（`record-screenshots.yml`）与 verify 名单镜像。**帧闭包断言**：`.github/scripts/verify-screenshots.sh`（#260）要求 ≥1 张 PNG、无 0 字节 PNG、`screenshots.sh` 声明的每帧必有产出或显式处置标记（`.skipped.txt`），帧数下限 28。
+>
+> **两条新增硬门禁（2026-09-13）**：① **lint 覆盖面守卫**（`ci.yml`，AGP 9 收口）断言 0 跳过 registry + 0 `UnknownIssueId` + 0 `disable +=`（31 条旧 disable 已删、48 个 lint error 已在源码修复）；② **APK 体积回归**（`#271`）：`.github/scripts/check-apk-size.sh` 消费 `.github/apk-size-budget.properties`（baseline `7585167` B，budget = baseline + 256 KiB = `7847311` B），release APK 超预算即 nightly 判红。
 
 快速验证（大量编辑后查 error，最快）：
 ```bash
@@ -133,7 +138,7 @@ feature/                   auth, home, repo, issue, pullrequest, search, editor,
 
 - 分支命名：`feature/tX-<kebab>`（如 `feature/t12-repo-management`）
 - **提交信息 = Conventional Commits**：`type(scope): description`（type: feat/fix/refactor/chore/docs/test/perf）
-- **PR 合并策略**：默认 **squash**（用户偏好线性历史；2026-09-12 修复波 35 张全 squash）；确需保留多提交历史的复杂修复波可用 merge commit。PR body 写 `Fixes #N` 自动关票
+- **PR 合并策略**：默认 **squash**（用户偏好线性历史；2026-09-12/13 修复波 42 张全 squash）；确需保留多提交历史的复杂修复波可用 merge commit。PR body 写 `Fixes #N` 自动关票
 - **分支保护**：必需检查**只有 `Quality Gate`**（`required_status_checks.contexts = [\"Quality Gate\"]`，`strict=true`）；截图 job 名为 **`Screenshots (emulator + adb)`** 且**非必需**（红榜要读但不挡合并）。`strict=true` → PR 落后 main（BEHIND）时 `gh pr merge` 会拒，改用 REST：`gh api -X PUT repos/yumiru11/AppDev/pulls/<n>/merge -f merge_method=squash`（**docs-only PR 无 CI 检查，均走 REST 合并**）
 - **铁律：不提交 main、不 push main 之外的分支**；worktree 并行时子代理 prompt 必须带 WORKDIR
 - 参考仓库（~/dev/）：`rikkahub`（原生 Markdown 参考，**AGPL-3.0 只参考思路零复制**）、`PiliPlus`（卡片风格）、`XMSLEEP`（MD3）、`gh4a`（WebView markdown + Trending 数据源）
@@ -150,7 +155,8 @@ feature/                   auth, home, repo, issue, pullrequest, search, editor,
 | **UI 审查问题清单（2026-08-21 快照，缺陷/挂账/提案）** | `docs/ui-audit-2026-08-21.md` |
 | **全量审计报告（2026-09-06，9 张分类票来源）** | `docs/agents/task-audit-2026-09-06.md` |
 | **残余缺口清单（2026-09-12，修复波后收敛）** | `docs/agents/remaining-backlog-2026-09-12.md` |
-| 架构决策记录（ADR-0001~0009） | `docs/adr/` |
+| **设计系统落地计划（SPEC-1/2 + UI-2）** | `docs/design-system/implementation-plan.md` |
+| 架构决策记录（ADR-0001~0010） | `docs/adr/`（0009 GraphQL 读路径 / 0010 设计系统分批迁移） |
 | 术语表 | `CONTEXT.md` |
 | 真机走查反馈与状态 | `FEEDBACK.md` |
 | 调研报告 | `docs/research/`（webview-material-you-fusion、highlight-engine-analysis、katex-mermaid-offline-feasibility） |
