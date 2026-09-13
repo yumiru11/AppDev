@@ -285,6 +285,11 @@ fun Project.configureRobolectricCoverage() {
                 // （jdk/internal/reflect/Generated*Accessor 等）不被插桩，避免测试 worker 启动即崩。
                 setIncludes(listOf("com/yumiru11/*"))
             }
+        // 挂死守卫（2026-09-13 #282 实例）：单测若因无限动画 / 永不收敛的等待而卡住，任务级超时把
+        // 「吃满整条 Quality Gate job 的 60 分钟配额、挤掉后续全部门禁」变成「15 分钟红掉这一个任务」。
+        // 实例：`:feature:profile:testDebugUnitTest` 在 verify 阶段静默挂 48 分钟直到 job 超时；
+        // 正常模块全量单测 < 3 分钟（本机 27s，CI 同量级），15 分钟余量充足。
+        test.timeout.set(java.time.Duration.ofMinutes(15))
     }
 }
 

@@ -195,6 +195,9 @@ jobs:
       # Graphics 的渲染依赖运行环境（字体/原生库/JDK），本机与 runner 出的 PNG 不是逐字节
       # 相同，本机录的基线在 CI 上 verify 会全红（PR #181 实测 8 张全红）。
       - name: Verify Roborazzi screenshots (app + modules)
+        # 步骤级超时兜底：即使某模块单测挂死（Gradle 任务级 15min 超时未覆盖的场景，
+        # 如 Gradle 自身卡在 worker 回收），也不让后面的截图校验/覆盖率门禁全被跳过。
+        timeout-minutes: 30
         run: |
           ./gradlew \
             :app:verifyRoborazziDebug \
