@@ -1,7 +1,6 @@
 package com.yumiru11.githubapp.feature.issue
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -46,6 +45,8 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
+import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueFilter
@@ -208,7 +209,11 @@ private fun IssueListContent(
                 onRefresh = onEmptyRefresh,
                 modifier = modifier,
             ) {
-                EmptyContent(modifier = Modifier.fillMaxSize())
+                AppEmptyState(
+                    icon = AppDevOcticons.IssueOpened,
+                    title = stringResource(R.string.issue_list_empty),
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
 
@@ -319,17 +324,6 @@ private fun statusColor(state: IssueState): Color =
         IssueState.OPEN -> MaterialTheme.colorScheme.primary
         IssueState.CLOSED -> MaterialTheme.colorScheme.error
     }
-
-@Composable
-private fun EmptyContent(modifier: Modifier = Modifier) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Text(
-            text = stringResource(R.string.issue_list_empty),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
 
 @Composable
 private fun PagingErrorContent(

@@ -48,8 +48,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppStateColorRole
 import com.yumiru11.githubapp.core.designsystem.component.appStateColors
+import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
@@ -240,8 +242,9 @@ internal fun CommitsTab(
     modifier: Modifier = Modifier,
 ) {
     if (commits.isEmpty()) {
-        EmptyTabContent(
-            text = stringResource(R.string.pull_request_commits_empty),
+        AppEmptyState(
+            icon = AppDevOcticons.History,
+            title = stringResource(R.string.pull_request_commits_empty),
             modifier = modifier,
         )
         return
@@ -270,8 +273,9 @@ internal fun ChecksTab(
     modifier: Modifier = Modifier,
 ) {
     if (checkRuns.isEmpty()) {
-        EmptyTabContent(
-            text = stringResource(R.string.pull_request_checks_empty),
+        AppEmptyState(
+            icon = AppDevOcticons.Check,
+            title = stringResource(R.string.pull_request_checks_empty),
             modifier = modifier,
         )
         return
@@ -303,8 +307,9 @@ internal fun FilesTab(
     modifier: Modifier = Modifier,
 ) {
     if (files.isEmpty()) {
-        EmptyTabContent(
-            text = stringResource(R.string.pull_request_files_empty),
+        AppEmptyState(
+            icon = AppDevOcticons.Diff,
+            title = stringResource(R.string.pull_request_files_empty),
             modifier = modifier,
         )
         return
@@ -324,21 +329,6 @@ internal fun FilesTab(
                 onLineComment = onLineComment,
             )
         }
-    }
-}
-
-/** 空态 Tab 内容（居中次要文本） */
-@Composable
-private fun EmptyTabContent(
-    text: String,
-    modifier: Modifier = Modifier,
-) {
-    androidx.compose.foundation.layout.Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

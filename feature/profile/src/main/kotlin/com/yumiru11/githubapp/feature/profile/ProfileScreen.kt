@@ -669,29 +669,24 @@ private fun LoginGuide(
     }
 }
 
-/** 资料头加载失败（错误类型驱动文案） */
+/**
+ * 资料头加载失败（错误类型驱动文案）。
+ *
+ * 设计系统 Batch 2：收敛到共享 [AppErrorState]（Alert 插图 + 标题 + 重试），
+ * 不再手搓无插图的原文色小字 + 裸按钮。
+ */
 @Composable
 private fun ErrorContent(
     errorType: ProfileErrorType,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier.padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text(
-            text = stringResource(errorType.messageRes()),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onRetry) {
-            Text(stringResource(R.string.profile_retry))
-        }
-    }
+    AppErrorState(
+        title = stringResource(errorType.messageRes()),
+        actionLabel = stringResource(R.string.profile_retry),
+        onAction = onRetry,
+        modifier = modifier,
+    )
 }
 
 /** 错误类型 → 本地化文案资源（ViewModel 不产英文文案） */

@@ -1,43 +1,29 @@
 package com.yumiru11.githubapp.feature.issue
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.feature.issue.model.IssueErrorType
 
-/** 错误态：错误文案 + 重试按钮 */
+/**
+ * 错误态：错误类型文案 + 重试。
+ *
+ * 设计系统 Batch 2：收敛到共享 [AppErrorState]（Alert 插图 + 标题 + 按钮），
+ * 不再手搓 Box + 原文色文案 + 裸按钮；文案仍由本处按错误类型本地化。
+ */
 @Composable
 internal fun IssueErrorContent(
     errorType: IssueErrorType,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = issueErrorMessage(errorType),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.error,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onRetry) {
-                Text(text = stringResource(R.string.issue_retry))
-            }
-        }
-    }
+    AppErrorState(
+        title = issueErrorMessage(errorType),
+        actionLabel = stringResource(R.string.issue_retry),
+        onAction = onRetry,
+        modifier = modifier,
+    )
 }
 
 /** 错误类型 → 本地化文案（ViewModel 只产类型，不产英文） */

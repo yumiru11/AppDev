@@ -21,19 +21,25 @@ import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 
 /**
- * 空态占位：矢量插图 + 标题 + 可选说明 + 可选行动按钮。
+ * 空态占位：矢量插图 + 标题 + 可选说明 + 可选行动。
  *
- * 替换 Home/Notifications/Profile 各自手搓的空态（#84）。插图由调用方从
- * 已批准的 [com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons]
- * 中按语境选择（如通知空态用 Check「全部已读」、仓库列表空态用 Repo）；
- * 文案由调用方传本地化 stringResource，本组件不内嵌字符串。图标纯装饰
- * （无 contentDescription），信息由文本承载；全 app 禁 emoji 图标。
+ * 替换各 feature 手搓的空态（#84 / 设计系统 Batch 2）。插图由调用方按语境选择：
+ * GitHub 语义走 [com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons]
+ * （如仓库列表 Repo、Issue 列表 IssueOpened），通用语义走
+ * [com.yumiru11.githubapp.core.designsystem.icon.AppIcons]；文案由调用方传本地化
+ * stringResource，本组件不内嵌字符串。图标纯装饰（无 contentDescription），
+ * 信息由文本承载；全 app 禁 emoji 图标。
  *
- * @param icon 矢量插图（Octicons，纯装饰）
+ * **厚包装 + 逃生舱**：默认形态 = 48dp 插图 + `titleMedium` 标题 + `bodyMedium` 说明
+ * + 内置 [Button]（`actionLabel`/`onAction` 成对时渲染）；逃生舱 = `modifier`（布局，
+ * 含外距/对齐）与 [action]（自定义行动区，替代内置按钮，供「非单按钮」特例）。
+ *
+ * @param icon 矢量插图（纯装饰，contentDescription 恒为 null）
  * @param title 主文案（如「暂无通知」）
  * @param message 次级说明（可空）
- * @param actionLabel 行动按钮文案（与 [onAction] 成对出现才渲染按钮）
- * @param onAction 行动回调（可空则不渲染按钮）
+ * @param actionLabel 内置行动按钮文案（与 [onAction] 成对出现才渲染按钮）
+ * @param onAction 内置行动回调（可空则不渲染按钮）
+ * @param action 逃生舱：自定义行动区（非空时**替代**内置按钮；`actionLabel` 被忽略）
  */
 @Composable
 fun AppEmptyState(
@@ -43,6 +49,7 @@ fun AppEmptyState(
     message: String? = null,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    action: (@Composable () -> Unit)? = null,
 ) {
     AppMessageState(
         icon = icon,
@@ -51,16 +58,21 @@ fun AppEmptyState(
         message = message,
         actionLabel = actionLabel,
         onAction = onAction,
+        action = action,
     )
 }
 
 /**
- * 错误态占位：矢量插图（Octicons Alert）+ 标题 + 可选说明 + 可选行动按钮。
+ * 错误态占位：矢量插图（Octicons Alert）+ 标题 + 可选说明 + 可选行动。
+ *
+ * **厚包装 + 逃生舱**：契约与 [AppEmptyState] 一致，仅插图语义固定为 Alert（错误）。
+ * 典型用法 = `title` 传本地化错误文案、`actionLabel`/`onAction` 传重试。
  *
  * @param title 主文案
  * @param message 次级说明（可空）
- * @param actionLabel 行动按钮文案（与 [onAction] 成对出现才渲染按钮）
- * @param onAction 行动回调（可空则不渲染按钮）；典型用法 actionLabel=重试
+ * @param actionLabel 内置行动按钮文案（与 [onAction] 成对出现才渲染按钮）
+ * @param onAction 内置行动回调（可空则不渲染按钮）；典型用法 actionLabel=重试
+ * @param action 逃生舱：自定义行动区（非空时**替代**内置按钮；`actionLabel` 被忽略）
  */
 @Composable
 fun AppErrorState(
@@ -69,6 +81,7 @@ fun AppErrorState(
     message: String? = null,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    action: (@Composable () -> Unit)? = null,
 ) {
     AppMessageState(
         icon = AppDevOcticons.Alert,
@@ -77,6 +90,7 @@ fun AppErrorState(
         message = message,
         actionLabel = actionLabel,
         onAction = onAction,
+        action = action,
     )
 }
 
@@ -128,6 +142,7 @@ private fun AppMessageState(
     message: String?,
     actionLabel: String?,
     onAction: (() -> Unit)?,
+    action: (@Composable () -> Unit)?,
 ) {
     Column(
         modifier =
@@ -157,9 +172,15 @@ private fun AppMessageState(
                 textAlign = TextAlign.Center,
             )
         }
-        if (actionLabel != null && onAction != null) {
-            Button(onClick = onAction) {
-                Text(text = actionLabel)
+        when {
+            action != null -> {
+                action()
+            }
+
+            actionLabel != null && onAction != null -> {
+                Button(onClick = onAction) {
+                    Text(text = actionLabel)
+                }
             }
         }
     }

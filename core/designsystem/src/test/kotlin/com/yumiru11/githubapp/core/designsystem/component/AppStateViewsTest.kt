@@ -1,5 +1,7 @@
 package com.yumiru11.githubapp.core.designsystem.component
 
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
@@ -73,6 +75,59 @@ class AppStateViewsTest {
         composeRule.onNodeWithText("Failed to load").assertIsDisplayed()
         composeRule.onNodeWithText("Retry").performClick()
         assertEquals(1, retries)
+    }
+
+    /**
+     * 逃生舱契约：`action` 槽非空时**替代**内置按钮（`actionLabel` 被忽略）。
+     *
+     * 锁定「厚包装 + 逃生舱」的优先级语义，防止将来重构把两种行动区叠在一起渲染。
+     */
+    @Test
+    fun appEmptyState_customActionSlot_replacesBuiltInButton() {
+        var customClicks = 0
+        composeRule.setContent {
+            AppTheme {
+                AppEmptyState(
+                    icon = AppDevOcticons.Repo,
+                    title = "Nothing here",
+                    actionLabel = "Built-in action",
+                    onAction = {},
+                    action = {
+                        TextButton(onClick = { customClicks++ }) {
+                            Text(text = "Custom action")
+                        }
+                    },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Custom action").assertIsDisplayed()
+        composeRule.onNodeWithText("Built-in action").assertDoesNotExist()
+        composeRule.onNodeWithText("Custom action").performClick()
+        assertEquals(1, customClicks)
+    }
+
+    /** 逃生舱契约：错误态同款 `action` 槽（替代内置重试按钮），单测与空态对称。 */
+    @Test
+    fun appErrorState_customActionSlot_replacesBuiltInButton() {
+        var customClicks = 0
+        composeRule.setContent {
+            AppTheme {
+                AppErrorState(
+                    title = "Failed to load",
+                    actionLabel = "Built-in retry",
+                    onAction = {},
+                    action = {
+                        TextButton(onClick = { customClicks++ }) {
+                            Text(text = "Custom retry")
+                        }
+                    },
+                )
+            }
+        }
+        composeRule.onNodeWithText("Custom retry").assertIsDisplayed()
+        composeRule.onNodeWithText("Built-in retry").assertDoesNotExist()
+        composeRule.onNodeWithText("Custom retry").performClick()
+        assertEquals(1, customClicks)
     }
 
     @Test

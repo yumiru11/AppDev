@@ -63,7 +63,10 @@ import com.yumiru11.githubapp.core.data.model.Repository
 import com.yumiru11.githubapp.core.data.model.SearchCodeItem
 import com.yumiru11.githubapp.core.data.model.SearchIssue
 import com.yumiru11.githubapp.core.data.model.User
-import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
+import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.appFadeThroughTransform
@@ -641,28 +644,28 @@ private fun CodeLoginGateContent(
 }
 
 /**
- * 加载态：项目共享的 [AppLoadingState]（#84/#185 建立）+ 本地化文案。
+ * 加载态：直接用共享 [AppCenteredLoadingState] 在给定区域内水平+垂直居中
+ * （内部即 alpha18 的 M3 Expressive `LoadingIndicator` 形变加载），本函数只负责
+ * 注入本地化文案。
  *
- * 该组件内部即 alpha18 的 M3 Expressive `LoadingIndicator`（形变加载），
- * 故本屏不再直调 `LoadingIndicator` —— 复用共享组件同时拿到形变加载与统一文案，
- * 也是「Issue/PR/Search 加载态一致」的收敛点（见 AppCenteredLoadingState）。
+ * 契约：`modifier` 决定居中区域（全屏用 `fillMaxSize`，LazyColumn item 用
+ * `fillParentMaxSize`）——与 issue/PR 的加载态收敛到同一组件。
  */
 @Composable
 private fun LoadingContent(modifier: Modifier = Modifier) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        AppLoadingState(label = stringResource(R.string.search_loading))
-    }
+    AppCenteredLoadingState(
+        label = stringResource(R.string.search_loading),
+        modifier = modifier,
+    )
 }
 
 @Composable
 private fun EmptyContent(modifier: Modifier = Modifier) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Text(
-            text = stringResource(R.string.search_empty),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    AppEmptyState(
+        icon = AppIcons.Search.rounded,
+        title = stringResource(R.string.search_empty),
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -699,25 +702,24 @@ private fun PagingErrorContent(
     ErrorContent(errorType = error.toSearchErrorType(), onRetry = onRetry, modifier = modifier)
 }
 
+/**
+ * 错误态：错误类型文案 + 重试。
+ *
+ * 设计系统 Batch 2：收敛到共享 [AppErrorState]（Alert 插图 + 标题 + 按钮），
+ * 不再手搓 Box + 原文色文案 + 裸按钮；文案仍由本处按错误类型本地化。
+ */
 @Composable
 private fun ErrorContent(
     errorType: SearchErrorType,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = errorMessage(errorType),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.error,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onRetry) {
-                Text(text = stringResource(R.string.search_retry))
-            }
-        }
-    }
+    AppErrorState(
+        title = errorMessage(errorType),
+        actionLabel = stringResource(R.string.search_retry),
+        onAction = onRetry,
+        modifier = modifier,
+    )
 }
 
 /** 错误类型 → 本地化文案（ViewModel/UI 只产类型，不产英文） */

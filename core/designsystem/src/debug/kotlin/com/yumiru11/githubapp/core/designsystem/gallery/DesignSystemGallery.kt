@@ -304,27 +304,53 @@ private fun DialogSection() {
     )
 }
 
-/** 状态：空态（带行动按钮）。 */
+/**
+ * 状态：空态 —— 厚包装默认形态（带内置 `Button`）与逃生舱 `action` 槽（自定义 `TextButton`）
+ * 同屏对照；第二项锁定「`action` 非空时替代内置按钮」的契约。
+ */
 @Composable
 private fun EmptyStateSection() {
-    AppEmptyState(
-        icon = AppDevOcticons.Repo,
-        title = stringResource(R.string.gallery_empty_title),
-        message = stringResource(R.string.gallery_empty_message),
-        actionLabel = stringResource(R.string.gallery_empty_action),
-        onAction = {},
-    )
+    Column(verticalArrangement = Arrangement.spacedBy(GALLERY_ITEM_GAP)) {
+        AppEmptyState(
+            icon = AppDevOcticons.Repo,
+            title = stringResource(R.string.gallery_empty_title),
+            message = stringResource(R.string.gallery_empty_message),
+            actionLabel = stringResource(R.string.gallery_empty_action),
+            onAction = {},
+        )
+        AppEmptyState(
+            icon = AppDevOcticons.Repo,
+            title = stringResource(R.string.gallery_empty_title),
+            action = {
+                TextButton(onClick = {}) {
+                    Text(text = stringResource(R.string.gallery_empty_action))
+                }
+            },
+        )
+    }
 }
 
-/** 状态：错误态（内置 Alert 图标 + 重试）。 */
+/**
+ * 状态：错误态（内置 Alert 图标）—— 厚包装重试按钮与逃生舱 `action` 槽同屏对照。
+ */
 @Composable
 private fun ErrorStateSection() {
-    AppErrorState(
-        title = stringResource(R.string.gallery_error_title),
-        message = stringResource(R.string.gallery_error_message),
-        actionLabel = stringResource(R.string.gallery_error_action),
-        onAction = {},
-    )
+    Column(verticalArrangement = Arrangement.spacedBy(GALLERY_ITEM_GAP)) {
+        AppErrorState(
+            title = stringResource(R.string.gallery_error_title),
+            message = stringResource(R.string.gallery_error_message),
+            actionLabel = stringResource(R.string.gallery_error_action),
+            onAction = {},
+        )
+        AppErrorState(
+            title = stringResource(R.string.gallery_error_title),
+            action = {
+                TextButton(onClick = {}) {
+                    Text(text = stringResource(R.string.gallery_error_action))
+                }
+            },
+        )
+    }
 }
 
 /** 状态：加载态（含 `LoadingIndicator` 无限动画——必须走确定性捕获）。 */
