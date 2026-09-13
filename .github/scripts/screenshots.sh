@@ -517,41 +517,36 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════
-# 5.15 PR Files changed 双视图 Diff（T16：unified / side-by-side）
+# 5.15 PR Files changed 视图（T16 + UI-1）：<600dp 只提供 unified，≥600dp 才有 side-by-side
 # ══════════════════════════════════════════════════════════════════════
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/yumiru11/AppDev/pull/101" -p "$PKG" >/dev/null
 if wait_for_text "Files changed"; then
   tap_text "Files changed"
-  # 文件行默认折叠——Unified/Side-by-side 分段按钮在展开补丁后才渲染
-  # （此前两帧实为同一文件列表页：Unified 必然超时，重试全在列表页空转）
+  # 文件行默认折叠——展开补丁后才渲染 diff 正文
+  # （此前两帧实为同一文件列表页：unified 必然超时，重试全在列表页空转）
   if wait_for_desc "Show patch"; then
     tap_desc "Show patch"
   fi
-  # M3 SingleChoiceSegmentedButtonRow 的选中态是 checkable/checked=true（radio 语义），
-  # 不是 selected —— 旧断言用 exact:（=selected）必然假红。CI run 34698275775 的
-  # pr-diff-unified.ui.xml 实证：选中段 checkable=true checked=true、selected=false，
-  # 且 checked 随点击在两段间移动（side-by-side 帧里移到右段）。
+  # UI-1 决策：窗口 < 600dp（本机 pixel_6 = 411dp）不提供 side-by-side，只渲染 unified。
+  # 断言两件套：① 补丁正文已渲染（@@ hunk 头，任何 patch 必有 —— 此前 M3 分段按钮的
+  # checked 断言随按钮一起移除）；② **反向断言**切换段不存在：按钮回流到窄窗口即判坏帧。
+  # 反向断言的 assert_attr_absent 强制新 dump（用旧 dump 会真空通过），红→绿见 PR body。
   capture_frame pr-diff-unified warn 4 \
-    act:"$PKG" checked:"Unified" text:"Side-by-side"
-  tap_text "Side-by-side"
-  # 换段两件套证据：① 帧必须与 unified 不同（capture_until_changed，其内部重按重截）；
-  # ② Side-by-side 段必须真的进入 checked=true —— 否则这帧只是 unified 的复制品，
-  #    宁可标坏帧也不产出一张看起来对的图。
-  capture_until_changed "$OUT/pr-diff-unified.png" "$OUT/pr-diff-side-by-side.png" "Side-by-side" || true
-  sel_rc=0
-  if [ -f "$OUT/pr-diff-side-by-side.png" ]; then
-    assert_checked_holds "Side-by-side" 12 || sel_rc=$?
+    act:"$PKG" text:"@@" absent:"Side-by-side"
+  # side-by-side 段仅 ≥600dp 提供 → 手机模拟器上按设计不适用，留显式 SKIPPED 标记
+  # （帧清单闭合校验要求每帧有产出或显式处置）；换 ≥600dp 设备会自动走拍摄路径。
+  # 拍摄路径的证据链：点击后 checked=true + 末尾全局 md5 去重（与 unified 同图即 DUPLICATE）。
+  if wait_for_text "Side-by-side" 5; then
+    tap_text "Side-by-side"
+    capture_frame pr-diff-side-by-side warn 4 \
+      act:"$PKG" checked:"Side-by-side"
   else
-    sel_rc=1
-  fi
-  if [ "$sel_rc" -eq 0 ]; then
-    record_md5 pr-diff-side-by-side "$OUT/pr-diff-side-by-side.png"
-  elif [ "$sel_rc" -eq 2 ]; then
-    # 宿主机无 python3：无法判定选中态（整脚本已在开头告警），保留帧但记为不确定
-    echo "::warning::无法判定 Side-by-side 选中态（缺少 python3）—— 该帧未纳入 md5 去重"
-  else
-    rm -f "$OUT/pr-diff-side-by-side.png"
-    mark_bad_frame pr-diff-side-by-side FAILED "Side-by-side 段未进入 checked=true（分段切换未生效，帧与 unified 无区别）"
+    {
+      echo "frame: pr-diff-side-by-side"
+      echo "kind: SKIPPED"
+      echo "severity: info"
+      echo "reason: UI-1——窗口宽度 < 600dp 时按设计不提供 side-by-side（本机 pixel_6 = 411dp）；≥600dp 自动恢复拍摄"
+    } > "$OUT/pr-diff-side-by-side.skipped.txt"
   fi
 else
   mark_missing_frame pr-diff-unified "PR 详情页未出现 Files changed Tab"
@@ -686,10 +681,21 @@ bad_frame_info() {
   # 注意：两个变量分开声明——同一 local 里 $name 此时尚未生效（shellcheck SC2318）
   local name="$1"
   local f="$OUT/$name.badframe.txt"
-  [ -f "$f" ] || return 0
-  printf '%s|%s' \
-    "$(sed -n 's/^kind: //p' "$f" | head -1)" \
-    "$(sed -n 's/^reason: //p' "$f" | head -1)"
+  if [ -f "$f" ]; then
+    printf '%s|%s' \
+      "$(sed -n 's/^kind: //p' "$f" | head -1)" \
+      "$(sed -n 's/^reason: //p' "$f" | head -1)"
+    return 0
+  fi
+  # 按设计跳过的帧（.skipped.txt，如 repos-guest / 窄窗口下的 pr-diff-side-by-side）：
+  # 也必须进板并显示 SKIPPED —— 不处理时它们会在拼板里退化成误导性的 NOT CAPTURED
+  # （review 的人会以为帧漏拍，而不是「按设计不适用」）。
+  local s="$OUT/$name.skipped.txt"
+  if [ -f "$s" ]; then
+    printf '%s|%s' \
+      "$(sed -n 's/^kind: //p' "$s" | head -1)" \
+      "$(sed -n 's/^reason: //p' "$s" | head -1)"
+  fi
 }
 
 # 坏帧水印（叠在帧内），MISSING 无原图则生成占位图

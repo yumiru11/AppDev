@@ -231,6 +231,25 @@ assert_attr_holds() {
   return 2
 }
 
+# 反向断言：当前 UI 层级**不得**出现该子串（负向守卫，如 UI-1：<600dp 窄窗口
+# 不得再出现 side-by-side 切换段）。
+#
+# 两个与正向断言不同的点（都是为「不假红也不假绿」）：
+#   1. **强制重新 dump**：负向断言用上面的快路径旧 dump 会「真空通过」——
+#      stale 文件里恰好也没有该文本时永远判绿；这里必须拿当前屏的 dump 再判；
+#   2. **不轮询**：「不存在」无法用等待证明（等再久也可能只是还没渲染）——
+#      只在当前帧判一次；dump/解析失败返回 2（宿主机能力缺失，与正向断言同口径）。
+assert_attr_absent() {
+  local value="$1"
+  command -v python3 >/dev/null 2>&1 || return 2
+  adb shell "rm -f /sdcard/ui.xml; uiautomator dump /sdcard/ui.xml" >/dev/null 2>&1 || return 2
+  adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1 || return 2
+  if grep -qF "$value" /tmp/ui.xml 2>/dev/null; then
+    return 1
+  fi
+  return 0
+}
+
 # Tab 选中态断言的「能力缺失」包装：dump 解析全依赖 python3，缺了就 skip（2）。
 assert_selected_holds() {
   local value="$1" timeout="${2:-12}"
@@ -520,6 +539,7 @@ frame_unlock() {
 # 断言规格（前缀 opt: 表示可选探针，见 assert_frame 注释）：
 #   act:<substr>         前台 activity 含该子串
 #   text:<文本>          UI 层级出现该文本（含 WebView 渲染出的文本）
+#   absent:<文本>        UI 层级**不得**出现该文本（反向断言，见 assert_attr_absent）
 #   exact:<文本>         该文本节点处于 selected=true（Tab 选中态）
 #   checked:<文本>       该文本节点处于 checked=true（radio/分段按钮选中态）
 #   desc:<content-desc>  出现该 content-desc
@@ -559,6 +579,11 @@ capture_frame() {
       text)
         FRAME_CHECKS+=("assert_attr_holds text '$val'")
         FRAME_REASONS+=("屏幕文本未出现「$val」")
+        ;;
+      absent)
+        # 反向断言：当前屏不得出现该文本（如窄窗口不得出现 side-by-side 段）
+        FRAME_CHECKS+=("assert_attr_absent '$val'")
+        FRAME_REASONS+=("屏幕出现了不应存在的「$val」")
         ;;
       exact)
         FRAME_CHECKS+=("assert_selected_holds '$val'")

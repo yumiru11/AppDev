@@ -3,8 +3,11 @@ package com.yumiru11.githubapp.feature.pullrequest
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -34,11 +39,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.feature.pullrequest.data.DiffParser
 import com.yumiru11.githubapp.feature.pullrequest.model.DiffLine
 import com.yumiru11.githubapp.feature.pullrequest.model.DiffLineKind
@@ -50,6 +57,18 @@ import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThread
 
 /** 连续 context 行超过该阈值则折叠中间行（GitHub 网页同款做法） */
 private const val CONTEXT_FOLD_THRESHOLD = 3
+
+/**
+ * side-by-side 的最低窗口宽度（UI-1 / M3 compact 上界 600dp）：
+ *
+ * - **< 600dp**（手机竖屏）：不提供 side-by-side —— 两栏各约 40 字符，长行再截断后
+ *   完全不可读；只渲染 unified（横向滚动，见 [UnifiedDiff] 注释）。
+ * - **≥ 600dp**（平板 / 桌面窗口）：保持原有双栏 + 切换按钮不变。
+ *
+ * 判定读窗口宽度 [android.content.res.Configuration.screenWidthDp]（与 core:markdown
+ * 的宽度兜底同一机制；不引入 material3-window-size-class 新依赖）。
+ */
+private const val SIDE_BY_SIDE_MIN_WINDOW_WIDTH_DP = 600
 
 /**
  * T16 自研轻量 diff 视图：unified / side-by-side 切换 + 行号 + 增删着色 + context 折叠 +
@@ -75,19 +94,26 @@ internal fun PullRequestDiffView(
         return
     }
     var mode by rememberSaveable { mutableStateOf(DiffViewMode.UNIFIED) }
+    // UI-1：窄窗口（< 600dp）不提供 side-by-side —— 隐藏切换按钮并强制 unified；
+    // 宽窗口行为与此前完全一致（按钮 + 用户选择）。窗口从窄变宽时用户此前的选择仍保留。
+    val sideBySideAvailable =
+        LocalConfiguration.current.screenWidthDp >= SIDE_BY_SIDE_MIN_WINDOW_WIDTH_DP
+    val activeMode = if (sideBySideAvailable) mode else DiffViewMode.UNIFIED
     Column(modifier = modifier.fillMaxWidth()) {
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            DiffViewMode.entries.forEachIndexed { index, entry ->
-                SegmentedButton(
-                    selected = mode == entry,
-                    onClick = { mode = entry },
-                    shape = SegmentedButtonDefaults.itemShape(index = index, count = DiffViewMode.entries.size),
-                    label = { Text(text = stringResource(entry.labelRes())) },
-                )
+        if (sideBySideAvailable) {
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                DiffViewMode.entries.forEachIndexed { index, entry ->
+                    SegmentedButton(
+                        selected = activeMode == entry,
+                        onClick = { mode = entry },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = DiffViewMode.entries.size),
+                        label = { Text(text = stringResource(entry.labelRes())) },
+                    )
+                }
             }
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        Crossfade(targetState = mode, label = "diff-mode") { current ->
+        Crossfade(targetState = activeMode, label = "diff-mode") { current ->
             when (current) {
                 DiffViewMode.UNIFIED -> {
                     UnifiedDiff(
@@ -163,36 +189,56 @@ private fun UnifiedDiff(
 ) {
     val items = remember(diff) { unifiedItems(diff) }
     val expandedFolds = remember { mutableStateListOf<Int>() }
-    Column(modifier = Modifier.fillMaxWidth()) {
-        items.forEach { item ->
-            when (item) {
-                is DisplayItem.Row -> {
-                    DiffLineRow(
-                        path = path,
-                        line = item.line,
-                        comments = comments,
-                        threads = threads,
-                        onLineComment = onLineComment,
-                    )
-                }
-
-                is DisplayItem.Fold -> {
-                    val expanded = item.headIndex in expandedFolds
-                    if (expanded) {
-                        diff.subList(item.headIndex, item.headIndex + item.count).forEach { line ->
+    val scrollState = rememberScrollState()
+    // UI-1：unified 不再静默截断超长行 —— 整块 diff 横向滚动。列宽 = max(视口宽, 最长行
+    // 的自然宽)，因此：① 长行完整可达（不再 maxLines=1 截断）；② 各行底色条纹等宽
+    // （列宽固定，行 fillMaxWidth 拉伸）；③ 行号与正文同行，滚动时始终对齐。
+    // 宽度用 `IntrinsicSize.Max` 取内容自然宽（不经过 scroll 节点，不引入测量 API）。
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val viewportWidth = maxWidth
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(scrollState),
+        ) {
+            Column(
+                modifier =
+                    Modifier
+                        .widthIn(min = viewportWidth)
+                        .width(IntrinsicSize.Max),
+            ) {
+                items.forEach { item ->
+                    when (item) {
+                        is DisplayItem.Row -> {
                             DiffLineRow(
                                 path = path,
-                                line = line,
+                                line = item.line,
                                 comments = comments,
                                 threads = threads,
                                 onLineComment = onLineComment,
                             )
                         }
-                    } else {
-                        FoldRow(
-                            count = item.count,
-                            onClick = { expandedFolds.add(item.headIndex) },
-                        )
+
+                        is DisplayItem.Fold -> {
+                            val expanded = item.headIndex in expandedFolds
+                            if (expanded) {
+                                diff.subList(item.headIndex, item.headIndex + item.count).forEach { line ->
+                                    DiffLineRow(
+                                        path = path,
+                                        line = line,
+                                        comments = comments,
+                                        threads = threads,
+                                        onLineComment = onLineComment,
+                                    )
+                                }
+                            } else {
+                                FoldRow(
+                                    count = item.count,
+                                    onClick = { expandedFolds.add(item.headIndex) },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -268,7 +314,8 @@ private fun DiffLineRow(
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        softWrap = false,
+                        overflow = TextOverflow.Visible,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -282,8 +329,8 @@ private fun DiffLineRow(
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
+                        softWrap = false,
+                        overflow = TextOverflow.Visible,
                     )
                 }
             }
