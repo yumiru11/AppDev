@@ -69,16 +69,48 @@ class WebViewOfflineGfmCapabilityTest {
     }
 
     @Test
-    fun webviewAssets_containNoKatexOrMermaidRuntime() {
+    fun webviewAssets_containKatexRuntime_wiredAsPostSanitizePass() {
+        val katexDir = File(webviewAssetsDir, "katex")
+        assertTrue("KaTeX 运行时目录必须存在（否则数学渲染空转）", katexDir.isDirectory)
+        listOf("katex.min.js", "katex.min.css", "LICENSE").forEach { name ->
+            assertTrue("KaTeX 资产必须存在: katex/$name", File(katexDir, name).isFile)
+        }
+
+        val fonts = File(katexDir, "fonts").listFiles().orEmpty()
+        assertEquals("只打包 20 个 woff2 字体（woff/ttf 是约 816KB 死重）", 20, fonts.size)
+        assertTrue("字体目录必须全为 woff2", fonts.all { it.name.endsWith(".woff2") })
+        val css = File(katexDir, "katex.min.css").readText()
+        assertFalse("CSS 不得留 woff 回退引用（文件已裁）", css.contains(".woff)"))
+        assertFalse("CSS 不得留 ttf 回退引用（文件已裁）", css.contains(".ttf)"))
+        assertEquals("20 个 @font-face 必须都指向本地 woff2", 20, Regex("""\.woff2\)""").findAll(css).count())
+
+        val renderer = rendererJs()
+        assertTrue("数学渲染必须由 renderer.js 的 renderMath 完成", renderer.contains("function renderMath(root"))
+        assertTrue(
+            "renderMath 必须在 sanitizeNode(root) 之后调用（方案 B：post-sanitize，不放宽 DOMPurify）",
+            renderer.indexOf("sanitizeNode(root);") < renderer.indexOf("renderMath(root);"),
+        )
+        assertTrue(
+            "PURIFY_CONFIG 必须原样保住 FORBID_ATTR 的 style（FORBID_* 优先于 ADD_*，放宽=全局削弱 sanitizer）",
+            renderer.contains("FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style']"),
+        )
+        assertTrue("KaTeX 只在 Kotlin 侧检测到数学时注入（renderMath 以 window.katex 为开关）", renderer.contains("window.katex"))
+        assertTrue("错误色必须读主题变量，不得写死 KaTeX 默认 #cc0000", renderer.contains("--md-sys-color-error"))
+        assertTrue("trust:false 必须钉住（未信源 LaTeX 不得产链接）", renderer.contains("trust: false"))
+        assertFalse("KaTeX 不得被打包进 markdown-it bundle", markdownItBundle().contains("katex"))
+    }
+
+    @Test
+    fun webviewAssets_containNoMermaidRuntime_phase2OutOfScope() {
         val files = webviewAssetsDir.listFiles()?.map { it.name }.orEmpty()
 
-        val offenders = files.filter { name -> name.contains("katex", ignoreCase = true) || name.contains("mermaid", ignoreCase = true) }
-        assertTrue("assets/webview 不得出现 KaTeX / Mermaid 运行时（§2.3 两条「兜底通道，可选」未实现）: $offenders", offenders.isEmpty())
+        val offenders = files.filter { name -> name.contains("mermaid", ignoreCase = true) }
+        assertTrue("Mermaid 属 Phase 2，本轮不得引入: $offenders", offenders.isEmpty())
 
-        assertFalse("任何打包脚本都不得含 katex", markdownItBundle().contains("katex"))
         assertFalse("任何打包脚本都不得含 mermaid", markdownItBundle().contains("mermaid"))
-        assertFalse("renderer.js 不得含 katex", rendererJs().contains("katex"))
-        assertFalse("renderer.js 不得含 mermaid", rendererJs().contains("mermaid"))
+        listOf("window.mermaid", "mermaid.run", "mermaid.initialize").forEach { signal ->
+            assertFalse("renderer.js 不得有 Mermaid 运行时信号（$signal）", rendererJs().contains(signal))
+        }
     }
 
     @Test
@@ -167,7 +199,6 @@ class WebViewOfflineGfmCapabilityTest {
                 "23-mention-org-team",
                 "24-issue-ref",
                 "25-commit-sha-ref",
-                "33-math-katex",
                 "34-mermaid",
             )
         val actual =
@@ -187,8 +218,8 @@ class WebViewOfflineGfmCapabilityTest {
                 .map { it.id }
 
         assertEquals(
-            "离线通道覆盖的 §2.3 条目数（2026-09-12 @user 提及补齐后：23 + 相对图/相对链/emoji/锚点/脚注/图片懒加载 + 提及）",
-            30,
+            "离线通道覆盖的 §2.3 条目数（2026-09-13 KaTeX 落地后：30 + math）",
+            31,
             offlineIds.size,
         )
     }
@@ -279,6 +310,7 @@ class WebViewOfflineGfmCapabilityTest {
                 "30-image-zoom" to "onImageClick",
                 "31-image-gif" to MARKDOWN_IT_BANNER,
                 "32-inline-html" to "html: true",
+                "33-math-katex" to "renderMath",
                 "35-footnote" to "footnotePlugin",
             )
 

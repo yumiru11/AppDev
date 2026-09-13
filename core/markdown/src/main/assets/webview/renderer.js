@@ -17,6 +17,8 @@
  * 4. 服务端 HTML 主通道（SERVER_HTML）同样用 highlight.js 高亮代码块（双预算护栏，
  *    见 highlightCodeBlocks）；图片统一补 loading="lazy" / decoding="async"
  *    （离线产物在 renderOfflineHtml 内联注入，服务端 HTML 由 decorateImages 在清洗后补）
+ * 5. 数学公式（$…$ / $$…$$）由 renderMath 在 DOMPurify 清洗**之后**用离线 KaTeX 渲染
+ *    （不得放宽清洗配置，理由见该函数上方的顺序决策说明）
  *
  * 安全：本脚本不接收任何 token；token 仅由 PrivateImageInterceptor 加到网络请求。
  * 仓库上下文（`owner/repo`）不是凭据，由 `data-base-repo` 属性传入（公开信息）。
@@ -173,6 +175,171 @@
       }
     }
     return highlighted;
+  }
+
+  // ── 数学公式（KaTeX 0.18.7，清洗后渲染）──────────────────────────────────
+  //
+  // 顺序决策（方案 B，见 docs/research/katex-mermaid-offline-feasibility.md §3.4/§4）：
+  // 必须在 sanitizeNode() **之后**运行。PURIFY_CONFIG 的 FORBID_TAGS/FORBID_ATTR 含
+  // 'style'，KaTeX 的排版产物（每式约 25 个 style 属性 + MathML）过一遍清洗就被剥掉样式；
+  // 且 DOMPurify 的 FORBID_* 优先于 ADD_*，唯一「放宽」途径是把 style 移出 FORBID_*
+  // ——那是全局削弱 sanitizer，已否决。因此 KaTeX 的产出作为**库生成的可信 DOM** 直接挂到
+  // 已清洗的树上，LaTeX 源码侧由 trust:false（禁 \href/\html*）、throwOnError:false
+  // （错误渲染为 .katex-error 而非抛）与 maxSize 上限兜住，绝不写 innerHTML。
+  //
+  // 误判防线（Kotlin 的 FeatureDetector.MATH_REGEX 只做「是否注入脚本」的开关；此处独立更严）：
+  // 1. 只扫文本节点，天然跳过 pre/code/script/style/textarea —— 代码里的 $var 不中招；
+  // 2. 块级 $$…$$ 可跨行且优先于行内；行内不跨行；
+  // 3. 行内 $ 前不接字母/数字、$ 后非数字/空白、收尾 $ 前非空白、后不接字母/数字。
+  // 风格与文件其余部分一致：ES5（var/function），新旧 WebView 同构。
+  var MATH_MAX_FORMULAS = 120;
+  var MATH_MAX_FORMULA_CHARS = 2000;
+  var MATH_MAX_TOTAL_CHARS = 120000;
+  var MATH_SKIP_TAGS = { PRE: 1, CODE: 1, SCRIPT: 1, STYLE: 1, TEXTAREA: 1 };
+  var MATH_TOKEN_REGEX = /\$\$([^$]+?)\$\$|\$(?![\d\s])([^$\n]*[^\s$])\$/g;
+
+  /** 该元素子树是否可参与数学扫描（代码/预格式/已渲染公式都不再扫）。 */
+  function isMathScannableElement(el) {
+    var tag = el.tagName ? String(el.tagName).toUpperCase() : '';
+    if (MATH_SKIP_TAGS[tag]) return false;
+    // KaTeX 产物（.katex / .katex-display / .katex-error）里含公式源码文本，重扫会自我递归
+    var cls = el.className ? String(el.className) : '';
+    return cls.indexOf('katex') < 0;
+  }
+
+  /** 收集可扫描的文本节点（含 `$` 的才收，避免无谓遍历）。 */
+  function collectMathTextNodes(node, out) {
+    var children = node.childNodes || [];
+    for (var i = 0; i < children.length; i++) {
+      var child = children[i];
+      if (child.nodeType === 3) {
+        if (child.nodeValue && child.nodeValue.indexOf('$') >= 0) out.push(child);
+        continue;
+      }
+      if (child.nodeType !== 1) continue;
+      if (isMathScannableElement(child)) collectMathTextNodes(child, out);
+    }
+    return out;
+  }
+
+  /**
+   * 从一个文本节点的内容里提取数学段（纯函数，Node 单测直接覆盖）。
+   *
+   * @returns {Array<{start:number,end:number,tex:string,displayMode:boolean}>}
+   */
+  function scanMathText(text) {
+    var out = [];
+    if (!text || text.indexOf('$') < 0) return out;
+    MATH_TOKEN_REGEX.lastIndex = 0;
+    var match;
+    while ((match = MATH_TOKEN_REGEX.exec(text)) !== null) {
+      var block = match[1] !== undefined;
+      var tex = block ? match[1] : match[2];
+      var start = match.index;
+      var end = MATH_TOKEN_REGEX.lastIndex;
+      if (block) {
+        // 块级：不与相邻 $ 粘连（$$$…$$$ 这种形态不视为公式）
+        if (text.charAt(start - 1) === '$' || text.charAt(end) === '$') continue;
+      } else {
+        // 行内：两侧不接字母/数字（US$5、$x$5 不误判）
+        var prev = start > 0 ? text.charAt(start - 1) : '';
+        var next = end < text.length ? text.charAt(end) : '';
+        if (/[A-Za-z0-9]/.test(prev) || /[A-Za-z0-9]/.test(next)) continue;
+      }
+      out.push({ start: start, end: end, tex: tex, displayMode: block });
+    }
+    return out;
+  }
+
+  /**
+   * 读取 CSS 变量（KaTeX 的 errorColor 必须是具体色值——真机 WebView 不支持 color-mix，
+   * 混色只能由 Kotlin 预计算后以变量注入）。取不到时返回备用色，保证深色下仍可读。
+   */
+  function readThemeColor(name, fallback) {
+    try {
+      if (typeof window.getComputedStyle === 'function' && document.documentElement) {
+        var value = window.getComputedStyle(document.documentElement).getPropertyValue(name);
+        if (value && String(value).trim()) return String(value).trim();
+      }
+    } catch (e) {
+      // 主题变量读取失败不影响渲染，走备用色
+    }
+    return fallback;
+  }
+
+  /**
+   * 渲染 root 下的数学公式（**清洗后** pass；服务端 HTML 与离线通道共用）。
+   *
+   * 预算护栏（与 highlightCodeBlocks 同构，测试可覆盖 options）：公式数、单式字符数、
+   * 总字符数三个上限——超限的公式保留原文而不是静默丢内容；单式渲染失败同样保留原文。
+   *
+   * @param {Element} root 已清洗的内容根节点
+   * @param {{maxFormulas:(number|undefined),maxFormulaChars:(number|undefined),maxTotalChars:(number|undefined),errorColor:(string|undefined)}} [options] 预算覆盖（测试用）
+   * @returns {number} 实际渲染的公式数
+   */
+  function renderMath(root, options) {
+    if (!root || typeof window.katex === 'undefined' || typeof window.katex.render !== 'function') return 0;
+    var opts = options || {};
+    var maxFormulas = opts.maxFormulas || MATH_MAX_FORMULAS;
+    var maxFormulaChars = opts.maxFormulaChars || MATH_MAX_FORMULA_CHARS;
+    var budget = opts.maxTotalChars || MATH_MAX_TOTAL_CHARS;
+    var errorColor = opts.errorColor || readThemeColor('--md-sys-color-error', '#b3261e');
+    var baseOptions = {
+      throwOnError: false, // 语法错误 → 渲染 .katex-error，不抛、不丢正文
+      strict: 'ignore', // 非致命 KaTeX 警示不打断
+      trust: false, // 禁 \href / \html* / \includegraphics（未信源内容）
+      maxSize: 25, // \rule/\kern 等尺寸上限（em）
+      errorColor: errorColor,
+    };
+
+    var nodes = collectMathTextNodes(root, []);
+    var rendered = 0;
+    for (var i = 0; i < nodes.length && rendered < maxFormulas; i++) {
+      var textNode = nodes[i];
+      var segments = scanMathText(textNode.nodeValue);
+      if (!segments.length) continue;
+      var parent = textNode.parentNode;
+      if (!parent) continue;
+
+      var frag = document.createDocumentFragment();
+      var cursor = 0;
+      var replaced = false;
+      for (var s = 0; s < segments.length; s++) {
+        var segment = segments[s];
+        if (rendered >= maxFormulas) continue;
+        if (segment.tex.length > maxFormulaChars || segment.tex.length > budget) continue;
+        if (segment.start > cursor) {
+          frag.appendChild(document.createTextNode(textNode.nodeValue.slice(cursor, segment.start)));
+        }
+        budget -= segment.tex.length;
+        var holder = document.createElement('span');
+        holder.setAttribute('data-math', segment.displayMode ? 'block' : 'inline');
+        var renderOptions = {
+          throwOnError: baseOptions.throwOnError,
+          strict: baseOptions.strict,
+          trust: baseOptions.trust,
+          maxSize: baseOptions.maxSize,
+          errorColor: baseOptions.errorColor,
+          displayMode: segment.displayMode,
+        };
+        try {
+          window.katex.render(segment.tex, holder, renderOptions);
+          rendered++;
+        } catch (e) {
+          // 渲染异常（非 ParseError，如环境问题）：保留原文，绝不吞内容
+          holder.textContent = segment.tex;
+        }
+        frag.appendChild(holder);
+        cursor = segment.end;
+        replaced = true;
+      }
+      if (!replaced) continue;
+      if (cursor < textNode.nodeValue.length) {
+        frag.appendChild(document.createTextNode(textNode.nodeValue.slice(cursor)));
+      }
+      parent.replaceChild(frag, textNode);
+    }
+    return rendered;
   }
 
   var IMG_TAG_REGEX = /<img\b[^>]*>/gi;
@@ -1037,6 +1204,13 @@
     parseRepoContext: parseRepoContext,
     scrollToAnchor: scrollToAnchor,
     highlightCodeBlocks: highlightCodeBlocks,
+    renderMath: renderMath,
+    scanMathText: scanMathText,
+    mathLimits: {
+      maxFormulas: MATH_MAX_FORMULAS,
+      maxFormulaChars: MATH_MAX_FORMULA_CHARS,
+      maxTotalChars: MATH_MAX_TOTAL_CHARS,
+    },
     addImageLoadingAttributes: addImageLoadingAttributes,
     decorateImages: decorateImages,
     highlightLimits: { maxBlocks: HIGHLIGHT_MAX_BLOCKS, maxTotalChars: HIGHLIGHT_MAX_TOTAL_CHARS },
@@ -1054,6 +1228,10 @@
 
     // 权威清洗
     sanitizeNode(root);
+
+    // 数学公式（KaTeX）：必须在 DOMPurify 清洗之后（方案 B）——清洗会剥掉 KaTeX 排版
+    // 所需的全部 style 属性；katex.min.js 未注入时（Kotlin 侧未检测到数学）本调用 no-op。
+    renderMath(root);
 
     // 图片懒加载/异步解码：服务端 HTML 主通道在清洗后补属性；离线产物已在
     // renderOfflineHtml 里写好，这里兜底一次清洗可能剥掉属性的情况（hasAttribute 不覆盖已有值）

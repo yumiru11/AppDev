@@ -221,6 +221,9 @@ fun WebViewMarkdownRenderer(
                     "github-markdown.css" to readAsset(context, "webview/github-markdown.css"),
                     "markdown-you.css" to readAsset(context, "webview/markdown-you.css"),
                     "highlight-theme.css" to readAsset(context, "webview/highlight-theme.css"),
+                    // KaTeX 样式（含 woff2 字体引用）也内联：内联模式下 <link> 全部被跳过，
+                    // 不含它数学就没有排版。仅数学内容才会被 WebViewHtmlBuilder 注入。
+                    WebViewHtmlBuilder.KATEX_CSS_KEY to readAsset(context, "webview/katex/katex.min.css"),
                 )
             val html = WebViewHtmlBuilder.build(sanitizedHtml, themeVariables, isDark, renderMode, baseRepoUrl, inlineCss)
             webView.loadDataWithBaseURL(

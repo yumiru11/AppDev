@@ -30,9 +30,11 @@ enum class RenderMode {
  *   <link rel="stylesheet" href="github-markdown.css">
  *   <link rel="stylesheet" href="markdown-you.css">
  *   <link rel="stylesheet" href="highlight-theme.css">
+ *   [math] <link rel="stylesheet" href="katex/katex.min.css">
  *   <style id="theme-vars">Material You + GitHub semantic variables</style>
  *   [offline] <script src="markdown-it.min.js"></script>
  *   [offline] <script src="highlight.min.js"></script>
+ *   [math] <script src="katex/katex.min.js"></script>
  *   <script src="purify.min.js"></script>
  * </head>
  * <body data-theme="light|dark">
@@ -58,6 +60,20 @@ object WebViewHtmlBuilder {
     /** GitHub 站点路由关键字（与 `GitHubLinkParser.parsePath` 的 vocabulary 对齐）。 */
     private val SITE_ROUTE_SEGMENTS =
         setOf("issues", "pull", "blob", "tree", "commit", "releases", "discussions", "raw")
+
+    /** 内联 CSS 模式下 KaTeX 样式在 [inlineCss] 里的键（其余三份 CSS 用文件名）。 */
+    const val KATEX_CSS_KEY: String = "katex/katex.min.css"
+
+    /** KaTeX 字体在 assets 里的绝对基址（内联 `<style>` 的相对 URL 基于文档 base，须绝对化）。 */
+    private const val KATEX_FONT_BASE = "${ASSET_BASE}katex/fonts/"
+
+    // SERVER_HTML 通道的数学标记（实测，见 katex-mermaid-offline-feasibility §3.5）：GitHub 把
+    // $…$ / $$…$$ 渲染成 <math-renderer> 占位元素 + 原文，DOMPurify 移除元素但保留文本。
+    private val MATH_HTML_REGEX =
+        Regex(
+            "<math-renderer\\b|\\\$\\\$[^$]+\\\$\\\$|\\\$(?![\\d\\s])[^$]*[^\\s$]\\\$",
+            RegexOption.IGNORE_CASE,
+        )
 
     private val REPO_ROUTE_NUMBER_REGEX = Regex("""\d+""")
 
@@ -92,7 +108,8 @@ object WebViewHtmlBuilder {
     ): String {
         val themeMarker = if (isDark) "dark" else "light"
         val contentBlock = buildContentBlock(sanitizedHtml, renderMode, baseRepoUrl)
-        val runtimeScripts = runtimeScripts(renderMode, sanitizedHtml)
+        val mathEnabled = needsKatex(renderMode, sanitizedHtml)
+        val runtimeScripts = runtimeScripts(renderMode, sanitizedHtml, mathEnabled)
 
         return buildString {
             append("<!DOCTYPE html>\n")
@@ -102,11 +119,13 @@ object WebViewHtmlBuilder {
             append("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1\">\n")
             append("  <meta name=\"color-scheme\" content=\"light dark\">\n")
             if (inlineCss.isEmpty()) {
+                appendKatexStylesheetLink(mathEnabled)
                 append("  <link rel=\"stylesheet\" href=\"${ASSET_BASE}github-markdown.css\">")
                 append("\n  <link rel=\"stylesheet\" href=\"${ASSET_BASE}markdown-you.css\">")
                 append("\n  <link rel=\"stylesheet\" href=\"${ASSET_BASE}highlight-theme.css\">")
             } else {
                 append("<style id=\"app-css\">\n")
+                appendInlineKatexCss(inlineCss, mathEnabled)
                 listOf("github-markdown.css", "markdown-you.css", "highlight-theme.css").forEach { name ->
                     inlineCss[name]?.let { append(it).append("\n") }
                 }
@@ -131,13 +150,53 @@ object WebViewHtmlBuilder {
     }
 
     /**
+     * KaTeX 是否启用（决定注入 katex.min.css / katex.min.js）。
+     *
+     * - OFFLINE_MARKDOWN_IT：内容是原始 markdown，用 [FeatureDetector.containsMath]（先剥离围栏代码块）
+     * - SERVER_HTML：内容是 GitHub HTML，用服务端数学标记 [MATH_HTML_REGEX]
+     *
+     * KaTeX 的渲染本身发生在 WebView 内 `sanitizeNode` 之后（renderer.js 的 renderMath）——
+     * 这里只决定「是否加载运行时」，正确性判据是 JS 侧的严格扫描（防御性双保险）。
+     */
+    private fun needsKatex(
+        renderMode: RenderMode,
+        content: String,
+    ): Boolean =
+        when (renderMode) {
+            RenderMode.OFFLINE_MARKDOWN_IT -> FeatureDetector.containsMath(content)
+            RenderMode.SERVER_HTML -> MATH_HTML_REGEX.containsMatchIn(content)
+        }
+
+    /** 非内联 CSS 模式：KaTeX 样式表放最前，让 markdown-you.css / theme-vars 的覆盖规则胜出。 */
+    private fun StringBuilder.appendKatexStylesheetLink(mathEnabled: Boolean) {
+        if (!mathEnabled) return
+        append("  <link rel=\"stylesheet\" href=\"${ASSET_BASE}katex/katex.min.css\">\n")
+    }
+
+    /**
+     * 内联 CSS 模式：KaTeX 样式表同样内联（App 真机走 [WebViewMarkdownRenderer] 的 inlineCss，
+     * 不内联则公式无排版）。字体 URL 必须绝对化——内联 `<style>` 的相对 URL 解析基于**文档 base**
+     * 而不是 CSS 文件位置，`fonts/x.woff2` 会 404。
+     */
+    private fun StringBuilder.appendInlineKatexCss(
+        inlineCss: Map<String, String>,
+        mathEnabled: Boolean,
+    ) {
+        if (!mathEnabled) return
+        inlineCss[KATEX_CSS_KEY]
+            ?.let { append(it.replace("url(fonts/", "url($KATEX_FONT_BASE")).append("\n") }
+    }
+
+    /**
      * 运行时脚本：离线模式恒加载 markdown-it + highlight.js；服务端 HTML 模式只在内容含代码块
      * （`<pre`）时加载 highlight.js —— README 主通道此前完全不高亮（2026-09-12 审计缺口 1），
-     * 但无代码块的页面也不应为约 130KB 的 highlight.js 付解析成本。
+     * 但无代码块的页面也不应为约 130KB 的 highlight.js 付解析成本。KaTeX（约 273KB）同理：
+     * 仅内容检测到数学时加载（KaTeX 0.18.7，仅 woff2 字体，离线 assets）。
      */
     private fun runtimeScripts(
         renderMode: RenderMode,
         sanitizedHtml: String,
+        mathEnabled: Boolean,
     ): String =
         buildString {
             if (renderMode == RenderMode.OFFLINE_MARKDOWN_IT) {
@@ -145,6 +204,9 @@ object WebViewHtmlBuilder {
             }
             if (renderMode == RenderMode.OFFLINE_MARKDOWN_IT || containsCodeBlock(sanitizedHtml)) {
                 append("\n    <script src=\"${ASSET_BASE}highlight.min.js\"></script>")
+            }
+            if (mathEnabled) {
+                append("\n    <script src=\"${ASSET_BASE}katex/katex.min.js\"></script>")
             }
         }
 

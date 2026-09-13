@@ -113,7 +113,8 @@ class MarkdownGfmFixtureCatalogTest {
     @Test
     fun unimplementedFixtures_planChecklistOptionalItems_areEnumerated() {
         // §2.3 明确标注「兜底通道，可选」与未落的条目：报告必须点名，不允许被静默合入「已覆盖」
-        val expected = setOf("33-math-katex", "34-mermaid")
+        // （33-math-katex 已于 2026-09-13 落地离线 KaTeX；Mermaid 属 Phase 2，仍未实现）
+        val expected = setOf("34-mermaid")
         val actual = MarkdownGfmFixtures.unimplementedFixtures().map { it.id }.toSet()
 
         assertEquals("未实现集合发生变化时必须同步更新本断言与一致性报告", expected, actual)

@@ -1,6 +1,7 @@
 package com.yumiru11.githubapp.core.markdown.webview
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -230,5 +231,37 @@ class FeatureDetectorTest {
         val decision = FeatureDetector.shouldFallback(markdown)
 
         assertTrue("代码围栏外的真实公式仍须触发 WebView", decision is FallbackDecision.WebView)
+    }
+
+    @Test
+    fun containsMath_inlineFormula_returnsTrue() {
+        assertTrue(FeatureDetector.containsMath("Inline \$x^2\$ is supported."))
+    }
+
+    @Test
+    fun containsMath_singleCharacterFormula_returnsTrue() {
+        // 2026-09-13 与 JS 侧对齐收紧规则时顺带修的能力缺口：$x$ 这类单字符公式此前漏检
+        assertTrue(FeatureDetector.containsMath("基数 \$x\$ 与 \$y\$"))
+    }
+
+    @Test
+    fun containsMath_blockFormulaAcrossLines_returnsTrue() {
+        assertTrue(FeatureDetector.containsMath("$$\nE = mc^2\n$$"))
+    }
+
+    @Test
+    fun containsMath_formulaInsideCodeFence_returnsFalse() {
+        assertFalse(FeatureDetector.containsMath("```bash\necho \"\$HOME\"\n```"))
+    }
+
+    @Test
+    fun containsMath_priceLikeDollarText_returnsFalse() {
+        assertFalse(FeatureDetector.containsMath("It costs \$5 and \$10 today."))
+    }
+
+    @Test
+    fun containsMath_inlineFormulaSpanningLines_returnsFalse() {
+        // 与 renderer.js 的 MATH_TOKEN_REGEX 同规则：行内公式不得跨行（2026-09-13 收紧）
+        assertFalse(FeatureDetector.containsMath("\$a\nb\$"))
     }
 }
