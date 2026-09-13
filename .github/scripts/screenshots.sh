@@ -208,6 +208,10 @@ capture_frame readme-webview critical 5 \
 #   3. **滑动与截图之间不插 dump**：取帧走 capture_frame 的 `settle=now` 路径
 #      （先截图后断言），dump 的 5-15s 挪到截图之后（窗口冲突见该函数头注释）；
 #   4. **滚不到就显式判坏**：绝不把「没滚到位置」的帧当通过（旧实现正是这样骗过审计的）。
+# 视口内短滑：起点/终点都留在 WebView 视口内（见上方约束 1）。每 2 次检查前台——
+# ⚠️ 实测（CI 34743676596）：jank 下 `input swipe` 会退化成点击（InputDispatcher 日志
+# 显示那条手势的 UP 被 2.9s 后当 click 处理），点到 README 里的链接后 CustomTabs 把
+# 外部浏览器拉起来，后面的滑动全部喂给浏览器 → 判据 state=none。前台丢了就回退。
 readme_mermaid_swipe() {
   local n="$1" dir="${2:-up}" i y_from y_to
   if [ "$dir" = "down" ]; then
@@ -220,7 +224,33 @@ readme_mermaid_swipe() {
   for ((i = 0; i < n; i++)); do
     retry_input swipe 540 "$y_from" 540 "$y_to" 550
     sleep 0.15
+    if [ $((i % 2)) -eq 1 ]; then readme_mermaid_recover; fi
   done
+}
+
+# 前台还是本应用吗？（同 wait_for_activity 的判据，但只看当前状态）
+readme_mermaid_in_app() {
+  adb shell dumpsys activity activities 2>/dev/null | grep -q "mResumedActivity.*$PKG"
+}
+
+# 重新深链打开 README（滚动位置回到顶部 → 置 RESET 标志，定位循环按「从头再来」处理）
+readme_mermaid_open_readme() {
+  adb shell am start -a android.intent.action.VIEW -d "https://github.com/mermaid-js/mermaid" -p "$PKG" >/dev/null 2>&1 || true
+  wait_for_activity_quick "$PKG" || true
+  sleep 4
+  README_MERMAID_RESET=1
+}
+
+# 前台被外部浏览器接管时回退：先 BACK（保留 README 滚动位置）；仍回不来才重开。
+readme_mermaid_recover() {
+  readme_mermaid_in_app && return 0
+  echo "::warning::readme-mermaid 前台不是本应用（短滑退化成点击、打开了外链？）——尝试 BACK 回退"
+  adb shell input keyevent 4 >/dev/null 2>&1 || true
+  sleep 2
+  readme_mermaid_in_app && return 0
+  echo "::warning::readme-mermaid BACK 未回退——重新深链打开 README（滚动位置从头再来）"
+  readme_mermaid_open_readme
+  return 0
 }
 
 # 「图表区在屏」判据 = 本探针的滚动闭环信号。
@@ -256,39 +286,52 @@ if tops:
     print('target %d %d' % (min(tops), max(bottoms)))
 elif overshoot:
     print('overshoot')
-else:
+elif 'Table of content' in xml:
     print('none')
+else:
+    print('noreadme')
 PY
 }
 
-# 闭环定位：先按 CI 校准值推进（16 次短滑 ≈ 图表区入口），再按判据微调（每次 ±2~4 次）。
+# 一次定位尝试：先按 CI 校准值推进（14 次短滑 ≈ 图表区入口），再按判据微调。
 # 每次迭代一次 dump（5-15s）——只做位置确认，不参与取帧。
-readme_mermaid_swipe 16
-readme_mermaid_state="none"
-readme_mermaid_top=""
-for readme_mermaid_try in 1 2 3 4 5 6; do
-  read -r readme_mermaid_state readme_mermaid_top _ <<<"$(readme_mermaid_target_state)"
-  echo "::notice::readme-mermaid 定位 $readme_mermaid_try/6：state=$readme_mermaid_state top=${readme_mermaid_top:-n/a}"
-  case "$readme_mermaid_state" in
-    target)
-      if [ "${readme_mermaid_top:-0}" -lt 400 ]; then
-        readme_mermaid_swipe 2 down
-      elif [ "${readme_mermaid_top:-0}" -gt 1700 ]; then
-        readme_mermaid_swipe 2
-      else
-        break
-      fi
-      ;;
-    overshoot) readme_mermaid_swipe 3 down ;;
-    *) readme_mermaid_swipe 4 ;;
-  esac
-done
+# 返回 0 = 图表区已在视口且位置合适；1 = 5 次校正后仍未到位。
+readme_mermaid_position_once() {
+  local i state top
+  README_MERMAID_RESET=0
+  readme_mermaid_swipe 14
+  for i in 1 2 3 4 5; do
+    if [ "$README_MERMAID_RESET" = "1" ]; then
+      README_MERMAID_RESET=0
+      readme_mermaid_swipe 14
+      continue
+    fi
+    read -r state top _ <<<"$(readme_mermaid_target_state)"
+    echo "::notice::readme-mermaid 定位 $i/5：state=$state top=${top:-n/a}"
+    case "$state" in
+      target)
+        if [ "${top:-0}" -lt 400 ]; then
+          readme_mermaid_swipe 2 down
+        elif [ "${top:-0}" -gt 1700 ]; then
+          readme_mermaid_swipe 2
+        else
+          return 0
+        fi
+        ;;
+      overshoot) readme_mermaid_swipe 3 down ;;
+      noreadme) readme_mermaid_open_readme ;;
+      *) readme_mermaid_swipe 3 ;;
+    esac
+  done
+  return 1
+}
 
-if [ "$readme_mermaid_state" = "target" ]; then
+# 定位失败（中途被外链/重载打断）就再来一轮；两轮都失败 → 显式坏帧。
+if readme_mermaid_position_once || { readme_mermaid_recover; readme_mermaid_position_once; }; then
   capture_frame readme-mermaid critical now act:"$PKG" exact:"README"
 else
   FRAME_SEVERITY=critical
-  mark_bad_frame readme-mermaid FAILED "6 次滚动校正后图表区仍未进入视口（state=$readme_mermaid_state）——不拿无关注的滚动帧当通过"
+  mark_bad_frame readme-mermaid FAILED "两轮滚动定位后图表区仍未进入视口——不拿无关注的滚动帧当通过"
 fi
 
 # ══════════════════════════════════════════════════════════════════════
