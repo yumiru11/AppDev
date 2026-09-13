@@ -1,7 +1,6 @@
 package com.yumiru11.githubapp.feature.pullrequest
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -45,6 +44,8 @@ import androidx.paging.compose.itemKey
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Add
 import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
+import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequest
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestFilter
@@ -198,7 +199,11 @@ private fun PullRequestListContent(
                 onRefresh = { lazyItems.refresh() },
                 modifier = modifier,
             ) {
-                EmptyContent(modifier = Modifier.fillMaxSize())
+                AppEmptyState(
+                    icon = AppDevOcticons.PullRequest,
+                    title = stringResource(R.string.pull_request_list_empty),
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
 
@@ -316,17 +321,6 @@ private fun statusColor(state: PullRequestState): Color =
         PullRequestState.CLOSED -> MaterialTheme.colorScheme.error
         PullRequestState.DRAFT -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-
-@Composable
-private fun EmptyContent(modifier: Modifier = Modifier) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Text(
-            text = stringResource(R.string.pull_request_list_empty),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
 
 // ── @Preview（#86）：行组件 Light/Dark 双主题预览，样例数据离线自足 ──
 
