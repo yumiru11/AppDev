@@ -549,8 +549,10 @@ watermarked() {
   tmp="${TMPDIR:-/tmp}/wm-$name.png"
   if [ ! -f "$src" ]; then
     # MISSING / 断言失败未留原始帧 → 生成占位图，让 review 的人看到「这帧没拿到」
+    # 标 kind（FAILED/MISSING/DUPLICATE）而不是写死 MISSING——DUPLICATE 帧的原始 PNG
+    # 已被改名，走的就是这条分支，写死 MISSING 会误导 review
     convert -size 540x1170 xc:'#3a1d1d' \
-      -fill '#ffb4ab' -pointsize 54 -gravity center -annotate +0-40 "MISSING" \
+      -fill '#ffb4ab' -pointsize 54 -gravity center -annotate +0-40 "$kind" \
       -fill '#ffb4ab' -pointsize 26 -annotate +0+40 "$name" \
       -fill '#ffd7d4' -pointsize 20 -gravity south -annotate +0+200 "${reason:0:46}" \
       "$tmp" 2>/dev/null || return 0
@@ -564,12 +566,17 @@ watermarked() {
 
 montage_board() {
   local out="$1"; shift
-  local imgs=() tiles=() f wm info label tmp
+  local imgs=() tiles=() f base wm info label tmp
   for f in "$@"; do
-    wm=$(watermarked "$f")
+    # 帧名契约：watermarked()/bad_frame_info() 收「无扩展名帧名」（内部拼 $OUT/$name.png 与
+    # $OUT/$name.badframe.txt）。这里曾直接把带 .png 的 $f 传进去 → 实际查找
+    # $OUT/home-light.png.png 恒不存在 → 每格退化为 NOT CAPTURED 占位图、且无任何告警
+    # （2026-09-13 事故：boards 从上线起就没显示过真实帧）。保留 $f 仅用于 label 显示。
+    base="${f%.png}"
+    wm=$(watermarked "$base")
     if [ -n "$wm" ]; then
       imgs+=("$wm")
-      info=$(bad_frame_info "$f")
+      info=$(bad_frame_info "$base")
       if [ -n "$info" ]; then
         label="$f [${info%%|*}]"
       else
@@ -577,6 +584,12 @@ montage_board() {
       fi
     else
       label="$f [NOT CAPTURED]"
+      # 帧文件存在却没进板 = 取帧契约被破坏（脚本 bug），不是「没拍到」。这种坏法会静默
+      # 把整张板变成占位图，必须显式拦下（末尾汇总后 job 红）。
+      if [ -f "$OUT/$base.png" ]; then
+        echo "::error::board $out: $OUT/$base.png 存在但未被取用 —— 拼板取帧契约破坏"
+        BOARD_LOOKUP_MISMATCH=$((BOARD_LOOKUP_MISMATCH + 1))
+      fi
       # 占位图必须落成**文件**再交给 montage：$(convert ... png:-) 会被命令替换
       # 吃掉 NUL 字节导致 PNG 损坏（本脚本首版就踩了）
       tmp="${TMPDIR:-/tmp}/placeholder-$out-$f.png"
@@ -609,6 +622,7 @@ if [ -n "$APT_PID" ]; then
   wait "$APT_PID" || echo "::warning::imagemagick install failed — boards may be skipped"
 fi
 if command -v montage >/dev/null 2>&1; then
+  BOARD_LOOKUP_MISMATCH=0
   montage_board board-A-home.jpg          home-light.png home-dark.png profile.png
   montage_board board-B-repo-code.jpg     repos.png repo-actions.png repo-releases.png file-tree.png readme-webview.png code-sora.png editor.png
   montage_board board-C-issue-pr-diff.jpg issue-comments.png create-issue.png pr-conversation.png pr-commits.png pr-diff-unified.png pr-diff-side-by-side.png
@@ -617,6 +631,7 @@ if command -v montage >/dev/null 2>&1; then
   montage_board board-F-search.jpg        search-history.png search-tabs.png
 else
   echo "::warning::ImageMagick montage not found — boards skipped, raw frames only"
+  BOARD_LOOKUP_MISMATCH=0
 fi
 
 # ══════════════════════════════════════════════════════════════════════
@@ -677,3 +692,10 @@ echo "截图可信度门禁：PASS（坏帧 ${#BAD_FRAMES[@]} 个，均非关键
 
 echo "screenshots:"
 ls -la "$OUT"
+
+# 拼板取帧契约破坏（帧存在却没进板）→ job 红：产物照常上传，但必须让人知道 boards 不可信。
+# 本条是 2026-09-13 事故（$OUT/$name.png 双扩展名，boards 全为占位图且零告警）的防回归闸门。
+if [ "${BOARD_LOOKUP_MISMATCH:-0}" -gt 0 ]; then
+  echo "::error::拼板取帧契约破坏 $BOARD_LOOKUP_MISMATCH 处 —— boards 不可信（详见上方 ::error::）"
+  exit 1
+fi
