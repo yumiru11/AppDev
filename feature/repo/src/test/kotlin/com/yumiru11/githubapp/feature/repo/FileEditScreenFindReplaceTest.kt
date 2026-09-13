@@ -1,6 +1,5 @@
 package com.yumiru11.githubapp.feature.repo
 
-import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -23,11 +22,11 @@ import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -71,6 +70,8 @@ class FileEditScreenFindReplaceTest {
         }
 
         composeRule.onNodeWithTag(FileFindReplaceBarTags.QUERY).performTextInput("a")
+        // 先确认输入真的进了状态（CI 上曾出现"输入未落 → 后面干等结果"的假超时）
+        assertEquals("a", viewModel.uiState.value.findState.query)
         // Sora 查找是异步的：等匹配回灌后再点替换（按钮以 hasMatches 为可用判据）
         awaitMatches(viewModel)
         composeRule.onNodeWithTag(FileFindReplaceBarTags.REPLACE).performTextInput("X")
@@ -101,6 +102,7 @@ class FileEditScreenFindReplaceTest {
         }
 
         composeRule.onNodeWithTag(FileFindReplaceBarTags.QUERY).performTextInput("a")
+        assertEquals("a", viewModel.uiState.value.findState.query)
         awaitMatches(viewModel)
         composeRule.onNodeWithTag(FileFindReplaceBarTags.REPLACE).performTextInput("X")
         composeRule.onNodeWithText("Replace").performClick()
@@ -130,6 +132,7 @@ class FileEditScreenFindReplaceTest {
         }
 
         composeRule.onNodeWithTag(FileFindReplaceBarTags.QUERY).performTextInput("zzz")
+        assertEquals("zzz", viewModel.uiState.value.findState.query)
         // 无匹配：替换动作保持禁用（不给「点了没反应」的死按钮）
         composeRule.waitForIdle()
         composeRule.onNodeWithText("Replace all").assertIsNotEnabled()
@@ -202,13 +205,19 @@ class FileEditScreenFindReplaceTest {
      * 等 Sora 异步查找回灌（匹配数 > 0）。
      *
      * Sora 在后台线程扫描完成后经 `postInLifecycle` 回主线程派发；Robolectric 的主 looper 是
-     * 暂停态，必须显式 `idle()` 才会执行队列里的回灌（`waitUntil` 自身不驱动 looper）。
+     * 暂停态，必须**显式排空**才会执行队列里的回灌。（CI 实测：`waitUntil` 自身的轮询不驱动
+     * looper，10s 超时偶发；这里改成「waitForIdle + 小睡」的有界轮询，失败信息自带状态。）
      */
     private fun awaitMatches(viewModel: RepoFilesViewModel) {
-        composeRule.waitUntil(timeoutMillis = ASYNC_SEARCH_TIMEOUT_MS) {
-            Shadows.shadowOf(Looper.getMainLooper()).idle()
-            viewModel.uiState.value.findState.hasMatches
+        val deadline = System.currentTimeMillis() + ASYNC_SEARCH_TIMEOUT_MS
+        while (!viewModel.uiState.value.findState.hasMatches && System.currentTimeMillis() < deadline) {
+            composeRule.waitForIdle()
+            Thread.sleep(SEARCH_POLL_INTERVAL_MS)
         }
+        assertTrue(
+            "Sora 查找结果未在 ${ASYNC_SEARCH_TIMEOUT_MS}ms 内回灌：findState=${viewModel.uiState.value.findState}",
+            viewModel.uiState.value.findState.hasMatches,
+        )
     }
 
     /** 真实 VM（桩仓库）+ 已加载文件 + 进入编辑态 + 展开查找栏。 */
@@ -238,7 +247,10 @@ class FileEditScreenFindReplaceTest {
     }
 
     private companion object {
-        /** Sora 查找在后台线程执行，回灌到主线程的等待上限（Robolectric 下实测 < 1s）。 */
-        const val ASYNC_SEARCH_TIMEOUT_MS = 10_000L
+        /** Sora 查找回灌等待上限（本地 < 1s；CI 慢机留 30s 余量）。 */
+        const val ASYNC_SEARCH_TIMEOUT_MS = 30_000L
+
+        /** 轮询间隔（每轮先排空 looper 再小睡）。 */
+        const val SEARCH_POLL_INTERVAL_MS = 50L
     }
 }
