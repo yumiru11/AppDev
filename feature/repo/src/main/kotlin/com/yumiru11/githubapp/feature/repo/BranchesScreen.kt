@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,6 +78,7 @@ fun BranchesScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val resources = LocalResources.current
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     var pendingDelete by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -84,8 +86,8 @@ fun BranchesScreen(
         viewModel.events.collect { event ->
             val message =
                 when (event) {
-                    is BranchEvent.Created -> context.getString(R.string.repo_branch_snackbar_created, event.name)
-                    is BranchEvent.Deleted -> context.getString(R.string.repo_branch_snackbar_deleted, event.name)
+                    is BranchEvent.Created -> resources.getString(R.string.repo_branch_snackbar_created, event.name)
+                    is BranchEvent.Deleted -> resources.getString(R.string.repo_branch_snackbar_deleted, event.name)
                     is BranchEvent.Failed -> branchErrorText(context, event.errorType)
                 }
             snackbarHostState.showSnackbar(message)

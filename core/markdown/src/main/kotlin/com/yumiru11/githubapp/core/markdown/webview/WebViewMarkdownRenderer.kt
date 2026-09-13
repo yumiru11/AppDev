@@ -113,7 +113,6 @@ fun WebViewMarkdownRenderer(
                 }
             }
         }
-    val bridge = remember(heightAwareCallback) { MarkdownBridge(heightAwareCallback) }
 
     val heightDp =
         if (measuredHeight > 0) {
@@ -194,7 +193,11 @@ fun WebViewMarkdownRenderer(
                         setOf("https://appassets.androidplatform.net"),
                     )
                 }
-                addJavascriptInterface(bridge, "AndroidBridge")
+                // JS bridge 实例在 factory 内构造（只被 WebView 持有、生命周期与 WebView 一致）。
+                // 不能在组合期用 `remember<T> { MarkdownBridge(...) }` 持有后再传入：lint 32 的
+                // JavascriptInterface 检测器在 K2 UAST 下会把该实参类型解析成 remember 的类型变量 T，
+                // 误报 "None of the methods ... (T) ..."（@JavascriptInterface 已在 MarkdownBridge 上）。
+                addJavascriptInterface(MarkdownBridge(heightAwareCallback), "AndroidBridge")
                 webViewClient =
                     object : WebViewClient() {
                         override fun shouldInterceptRequest(

@@ -1,18 +1,18 @@
 [versions]
-agp = "8.7.3"
+agp = "9.1.1"
 kotlin = "2.3.21"
 # KSP2 纯版本号；2.3.8 起调用 AGP 9 才有的 addKspConfigurations(boolean)，
-# 与锁定基线 AGP 8.7.3 不兼容（NoSuchMethodError），取 AGP8 兼容最高版 2.3.7
-ksp = "2.3.7"
+# AGP 9 迁移完成后解锁到 2.3.12（AGP 官方 skill 要求 AGP 9 下 KSP ≥ 2.3.6）。
+ksp = "2.3.12"
 compose-bom = "2026.06.01"
 # ⚠️ M3 Expressive 临时 pin（技术债，决策与撤除条件见 docs/adr/0008-material3-alpha18-pin.md）
 # 为什么 pin alpha：Expressive 的组件（LoadingIndicator / Circular·LinearWavyProgressIndicator /
 #   SplitButtonLayout / ButtonGroup / Medium·LargeFlexibleTopAppBar）与公开的
 #   MotionScheme.standard()/expressive() 工厂全部只存在于 material3 1.5.0 线；
 #   1.4.0（BOM 当前 pin）里 MotionScheme 工厂在 Kotlin 层是 internal，拿不到。
-# 为什么是 alpha18 而不是更高：1.5.0-alpha19 起 AAR 元数据升到 minCompileSdk=37 + minAGP=9.1.0，
-#   与本项目锁定的 compileSdk 36 / AGP 8.7.3 硬冲突；alpha18 是「不改工具链还能装的最高版本」
-#   （minCompileSdk=35 / minAGP=8.6.0，实测通过）。
+# 为什么是 alpha18 而不是更高：1.5.0-alpha19 起 AAR 元数据升到 minCompileSdk=37 + minAGP=9.1.0。
+#   本仓已升到 compileSdk 37 / AGP 9.1.1（chore/agp9-migration），工具链门控已解除——
+#   alpha19+/stable 现已可达，但升 alpha 本身是独立决策（ADR-0008 的撤除条件），不在本次迁移范围。
 # 为什么不改 compose-bom：BOM 覆盖 Compose 全家（ui/foundation/runtime/…），
 #   改 BOM 会把整条 Compose 线一起拖到 alpha，改动面与风险远大于只 pin 单个 artifact。
 #   显式版本的直接依赖在冲突解析里胜过 BOM 的 constraint（alpha18 > 1.4.0），故只动这一个 key。
@@ -20,7 +20,9 @@ compose-bom = "2026.06.01"
 #   compose-material3 的 version.ref（回到纯 BOM 托管）；若届时已升 AGP 9 + compileSdk 37，
 #   也可直接跟到当时的 stable/BOM。撤除前必须重跑全门禁 + 重录截图基线。
 compose-material3 = "1.5.0-alpha18"
-hilt = "2.57.2"
+# Hilt：AGP 9 移除旧 variant API（applicationVariants 等）→ 2.57.2 插件直接报
+# "Android BaseExtension not found."，必须 ≥ 2.59.2（AGP 官方 skill 要求）。
+hilt = "2.59.2"
 apollo = "5.0.1"
 retrofit = "3.0.0"
 okhttp = "5.4.0"
@@ -92,12 +94,10 @@ compose-material-icons-core = { group = "androidx.compose.material", name = "mat
 haze = { group = "dev.chrisbanes.haze", name = "haze", version.ref = "haze" }
 
 # Icons — Material Symbols（= marella.github.io / fonts.google.com 同一套 Google 图标），MIT
-icons-material-symbols-outlined = { group = "com.composables", name = "icons-material-symbols-outlined-android", version.ref = "icons" }
-icons-material-symbols-rounded = { group = "com.composables", name = "icons-material-symbols-rounded-android", version.ref = "icons" }
-icons-material-symbols-sharp = { group = "com.composables", name = "icons-material-symbols-sharp-android", version.ref = "icons" }
-icons-material-symbols-outlined-filled = { group = "com.composables", name = "icons-material-symbols-outlined-filled-android", version.ref = "icons" }
-icons-material-symbols-rounded-filled = { group = "com.composables", name = "icons-material-symbols-rounded-filled-android", version.ref = "icons" }
-icons-material-symbols-sharp-filled = { group = "com.composables", name = "icons-material-symbols-sharp-filled-android", version.ref = "icons" }
+# 只用 `-cmp` 变体：ImageVector 对象（Compose 直接引用，如 MaterialSymbols.Rounded.Info）+
+# base-cmp 提供 MaterialSymbols 命名空间；老 base `-android` artifact 实测为空壳
+# （classes.jar 0 条目，只有未被引用的 drawable XML）且与 `-cmp` 共用 namespace
+# → 全部移除（AGP 9 的 uniquePackageNames=true 下会撞车，详见 gradle.properties 注释）。
 # cmp 变体：ImageVector 对象（Compose 直接引用，如 MaterialSymbols.Rounded.Info）；base 提供 MaterialSymbols 命名空间
 icons-material-symbols-base-cmp = { group = "com.composables", name = "icons-material-symbols-cmp", version.ref = "icons" }
 icons-material-symbols-rounded-cmp = { group = "com.composables", name = "icons-material-symbols-rounded-cmp", version.ref = "icons" }
@@ -208,7 +208,8 @@ roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "robora
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+# Compose 编译器插件（built-in Kotlin 仍需显式应用；kotlin-android 已由 AGP 9 built-in Kotlin 接管，
+# 对应的 android-library/android-application plugin alias 也不再声明 kotlin-android）
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

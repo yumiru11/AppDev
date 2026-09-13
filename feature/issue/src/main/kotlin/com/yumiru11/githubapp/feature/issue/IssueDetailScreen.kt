@@ -87,6 +87,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -155,7 +156,7 @@ fun IssueDetailScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val currentUrl = (uiState as? IssueDetailUiState.Success)?.issue?.htmlUrl
 
     val editState by viewModel.editState.collectAsStateWithLifecycle()
@@ -171,7 +172,7 @@ fun IssueDetailScreen(
         viewModel.events.collect { event ->
             when (event) {
                 is IssueDetailEvent.ShowSnackbar -> {
-                    snackbarHostState.showSnackbar(context.getString(event.message.toRes()))
+                    snackbarHostState.showSnackbar(resources.getString(event.message.toRes()))
                 }
             }
         }
@@ -365,6 +366,7 @@ private fun IssueMoreMenu(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
         IconButton(onClick = { expanded = true }) {
@@ -393,7 +395,7 @@ private fun IssueMoreMenu(
                 onClick = {
                     expanded = false
                     copyLink(context, url)
-                    scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.issue_link_copied)) }
+                    scope.launch { snackbarHostState.showSnackbar(resources.getString(R.string.issue_link_copied)) }
                 },
             )
         }

@@ -43,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
@@ -77,6 +78,7 @@ fun CommitDetailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val resources = LocalResources.current
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -131,7 +133,7 @@ fun CommitDetailScreen(
                             onCopySha = {
                                 copyToClipboard(context, state.commit.sha, CLIP_LABEL_COMMIT_SHA)
                                 scope.launch {
-                                    snackbarHostState.showSnackbar(context.getString(R.string.repo_commit_sha_copied))
+                                    snackbarHostState.showSnackbar(resources.getString(R.string.repo_commit_sha_copied))
                                 }
                             },
                         )

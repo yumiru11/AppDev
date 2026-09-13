@@ -152,6 +152,11 @@ val coverageExcludes =
         "**/*_HiltComponents*.class",
         "**/Dagger*Component*.class",
         "**/*_Factory.class",
+        // AGP 9 修正 classDirs 后新进入分母的 Hilt 生成类（实测：:feature:auth 的
+        // AuthViewModel_HiltModules$KeyModule 与 …_ProvideFactory$InstanceHolder，各 1 行未覆盖 →
+        // 0.92 假红）。它们与上方 *_Factory / Dagger* / Hilt_* 同类，按既有「生成代码不入分母」口径排除；
+        // 阈值不动（0.99 不变）。模式限定 `_HiltModules`，不会命中任何生产类。
+        "**/*_HiltModules*.class",
         // ── UI 层排除（口径选择：单测门禁只查逻辑；UI 视觉由真机/截图管线兜底）────────
         // ⚠️ 这是【口径选择】，不是工具链限制：#261 修复后 Robolectric 单测（含截图测试）的
         // 覆盖数据会真实进入 exec（见 coverageThresholds 上方注释）；排除 UI 类是为了让单测门禁
@@ -238,29 +243,30 @@ val coverageVerify =
 
 subprojects {
     plugins.withId("com.android.application") {
-        extensions.configure<com.android.build.gradle.AppExtension> {
-            buildTypes.getByName("debug") { enableUnitTestCoverage = true }
-        }
-        configureJacocoVersion()
+        configureAndroidCoverage()
         configureRobolectricCoverage()
         this@subprojects.registerCoverageTasks()
     }
     plugins.withId("com.android.library") {
-        extensions.configure<com.android.build.gradle.LibraryExtension> {
-            buildTypes.getByName("debug") { enableUnitTestCoverage = true }
-        }
-        configureJacocoVersion()
+        configureAndroidCoverage()
         configureRobolectricCoverage()
         this@subprojects.registerCoverageTasks()
     }
 }
 
-// T1：锁定 JaCoCo 0.8.13（AGP 官方 DSL testCoverage.jacocoVersion，TestCoverage 接口）。
-// testCoverage 在 CommonExtension（新 DSL 接口）上，legacy 的 AppExtension/LibraryExtension 没有；
-// 且 Gradle 的 configure<CommonExtension> 按注册类型精确匹配（android 扩展注册为 BaseAppModuleExtension），
-// 必须 getByName("android") 后强转（plugins.withId 回调里 jacoco 插件尚未应用，无法改 toolVersion）。
-fun Project.configureJacocoVersion() {
-    val androidExt = extensions.getByName("android") as com.android.build.api.dsl.CommonExtension<*, *, *, *, *, *>
+// AGP 9 新 DSL：android 扩展实现（ApplicationExtension/LibraryExtension）实现的是**非泛型**
+// CommonExtension（AGP 9 移除了泛型参数；legacy AppExtension/LibraryExtension 在新 DSL 下
+// 不再是公开接口类型）。buildTypes 与 testCoverage 都在 CommonExtension 上，一处转换同时覆盖。
+// 必须 getByName("android") 后强转：Gradle 的 configure<T> 按注册类型精确匹配，而注册类型是
+// BaseAppModuleExtension（非公开 API，不能直接声明）。
+fun Project.configureAndroidCoverage() {
+    val androidExt = extensions.getByName("android") as com.android.build.api.dsl.CommonExtension
+    // debug buildType 开单测覆盖率（AGP 自动应用 jacoco 插件到子模块）
+    androidExt.buildTypes.getByName("debug") { enableUnitTestCoverage = true }
+    // T1：锁定 JaCoCo 0.8.13（AGP 官方 DSL testCoverage.jacocoVersion，TestCoverage 接口；
+    // 0.8.13+ 支持 Kotlin inline functions，jacoco#1670）。
+    // 不能用 extensions.getByName("jacoco") 改 toolVersion——plugins.withId 回调时 jacoco 插件
+    // 还没被 AGP 应用，扩展不存在；testCoverage DSL 属于 android 扩展本身，无时序问题。
     androidExt.testCoverage.jacocoVersion = libs.versions.jacoco.get()
 }
 
@@ -268,7 +274,7 @@ fun Project.configureJacocoVersion() {
 // 必须在 android 扩展可用后调用；testOptions.unitTests.all 由 AGP 在配置每个 Test 任务时回放，
 // 此时 JacocoTaskExtension 已存在（AGP 用 findByType 取它），因此这是唯一不依赖插件应用时序的注入点。
 fun Project.configureRobolectricCoverage() {
-    val androidExt = extensions.getByName("android") as com.android.build.api.dsl.CommonExtension<*, *, *, *, *, *>
+    val androidExt = extensions.getByName("android") as com.android.build.api.dsl.CommonExtension
     androidExt.testOptions.unitTests.all { test ->
         test.extensions
             .findByType(org.gradle.testing.jacoco.plugins.JacocoTaskExtension::class.java)
@@ -292,12 +298,17 @@ fun Project.registerCoverageTasks() {
     // 任务路径（:core:common:jacocoTestCoverageVerification）；这里先捕获项目路径供报错信息用。
     val modulePath = path
     val srcDirs = files(listOf("src/main/kotlin", "src/main/java").map { file(it) }.filter { it.exists() })
+    // ★ AGP 9 路径（2026-09-13 实测修正）：Kotlin 类输出从 `tmp/kotlin-classes/debug` 移到
+    // `intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes`；Java 类输出从
+    // `intermediates/javac/debug/classes` 移到 `intermediates/javac/debug/compileDebugJavaWithJavac/classes`。
+    // 不修则 classDirectories 为空 → 报告 0 类 → coverageVerify 静默恒绿（实测：迁移首跑 XML 只有
+    // sessioninfo、无任何 package/counter，而 24 份 exec 全在）。这正是 GATE-3 同类“空转门禁”，必须锁死。
     val classDirs =
         files(
             fileTree(
                 file(
                     layout.buildDirectory
-                        .dir("tmp/kotlin-classes/debug")
+                        .dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes")
                         .get()
                         .asFile,
                 ),
@@ -305,7 +316,7 @@ fun Project.registerCoverageTasks() {
             fileTree(
                 file(
                     layout.buildDirectory
-                        .dir("intermediates/javac/debug/classes")
+                        .dir("intermediates/javac/debug/compileDebugJavaWithJavac/classes")
                         .get()
                         .asFile,
                 ),
@@ -376,6 +387,16 @@ fun Project.registerCoverageTasks() {
                         "${layout.buildDirectory.get().asFile}/outputs/unit_test_code_coverage/**/*.exec 下无文件。" +
                         "有阈值却不产生 exec，说明单测被跳过或从未执行——覆盖率验证拒绝空转：" +
                         "请检查 src/test 是否存在、testDebugUnitTest 是否被 --exclude-task / NO-SOURCE 跳过。",
+                )
+            }
+            // ★ AGP 9 追加（2026-09-13）：classDirectories 为空 = JaCoCo 报告 0 类 → 验证恒绿（空转）。
+            // 实测根因：AGP 9 built-in Kotlin 把 Kotlin 类输出移出 tmp/kotlin-classes，classDirs 失配后
+            // 聚合报告只剩 sessioninfo、无任何 counter。此断言把「路径失配」从静默绿变成立即红。
+            if (classDirs.isEmpty) {
+                throw GradleException(
+                    "覆盖率门禁失败：模块 $modulePath 的 classDirectories 为空（编译产物路径变化或编译未执行）。" +
+                        "空分母会让覆盖率验证恒绿（空转门禁），拒绝放行。" +
+                        "AGP 9 的 Kotlin 类路径应为 build/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes。",
                 )
             }
         }
