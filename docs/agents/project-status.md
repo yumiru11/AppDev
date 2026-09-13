@@ -1,8 +1,8 @@
-# AppDev 项目状态（2026-09-12）
+# AppDev 项目状态（2026-09-13）
 
 > 本文件是当前进度的**权威快照**。每张票合并/关闭后更新。配合 `docs/agents/workflow.md`（流程）、`AGENTS.md`（环境）与 `docs/agents/task-audit-2026-09-06.md`（全量审计）阅读。
 > 本版修正 2026-09-06 审计发现的 §7 D01「文档三处失真」：AGENTS.md / project-status.md / FEEDBACK.md 已与 `gh` 票面 + git 历史对齐。
-> **基线**：`main@54eba10`（2026-09-12 修复波末，37 张 PR #229–#266 全部 squash 合入，其中 #250 是 issue 非 PR；后半 #256–#266 见 §2.1）。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`。
+> **基线**：`main@db1b696`（2026-09-13 修复波末，42 张 PR #229–#271 全部 squash 合入，其中 #250 是 issue 非 PR；中段 #256–#266 见 §2.1，收尾 #267–#271 见 §2.2）。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`。
 
 ## 1. 里程碑概览
 
@@ -15,9 +15,9 @@
 | M4 全功能（PR 深化/编辑提交/分支） | ✅ 完成（T16/T17/T23 已合入） |
 | M5 发布收尾（性能/签名 Release） | 🔶 进行中：Baseline Profile + i18n 覆盖断言 + RTL 基线 + 发布链路演练已落地（PR #186）；**冷启动实测 / macrobenchmark / 生产签名密钥仍需真机或 Secrets**（见 §3.2） |
 | M6 审计补全与 UI 打磨（2026-09-06 立项） | ✅ 9 张分类票 #163–#170 **全部关闭并合入**；#166/#167 的少数挂账项见 §3.1 |
-| M7 修复波 + 门禁/截图链路加固（2026-09-12） | ✅ **37 张 PR #229–#266 全部 squash 合入**：前半 26 张（#229–#255，明细见 §2.1）；后半 11 张 —— #256 截图基线扩展（9 屏/20 帧）、#258 RepoDetail 头修复、#259 设置返回箭头 + FAB 留白、#260 门禁去空转、#261 JaCoCo×Robolectric 修复、#262 markdown 引用链接、#263 阈值棘轮、#264 ETag 持久化、#265 后半波文档回写、#266 剩余 6 屏 15 帧基线。**已无 open PR** |
+| M7 修复波 + 门禁/截图链路加固（2026-09-12/13） | ✅ **42 张 PR #229–#271 全部 squash 合入**：前半 26 张（#229–#255，明细见 §2.1）；中段 11 张（#256–#266，见 §2.1）；收尾 5 张（#267–#271，见 §2.2）—— AGP 9.1.1 迁移 + 全模块 lint 恢复（#270）、离线 KaTeX（#269）、设计系统落地计划 + ADR-0010（#268）、nightly APK 体积门禁（#271）。**已无 open PR** |
 
-## 2. 已完成（T1–T26 中 25 票 + 计划外交付 + 2026-09-12 修复波全部合入 main）
+## 2. 已完成（T1–T26 中 25 票 + 计划外交付 + 2026-09-12/13 修复波全部合入 main）
 
 | Ticket | Issue | 内容 | 合入 |
 |---|---|---|---|
@@ -101,6 +101,16 @@
 | #265 | 文档 | 后半波回写：AGENTS.md / project-status 对账到 #264（本表 #256–#264、方法学、剩余清单）+ `remaining-backlog` 剪枝（已闭环逐条勾除） |
 | #266 | 截图 | 补齐剩余 6 屏 / 15 帧基线（Repos list+grid+guest、CreateRepo、ReleaseCreate、CommitDetail list+diff、CreateIssue、PullRequestCreate）；三个目标模块已在 verify 名单内，无需改 ci.yml |
 
+### 2.2 2026-09-13 收尾波（#267–#271，全部 squash 合入 main）
+
+| PR | 范围 | 交付 |
+|---|---|---|
+| #267 | 文档 | 状态对账到 #266（37 张 PR / `main@54eba10` / 114 张基线）；即 #265 之后的追齐 |
+| #268 | 设计系统 | 落地计划 `docs/design-system/implementation-plan.md`（组件契约 / 批次表 / 门禁 / DoD）+ ADR-0010；实现严格排在 AGP 9 之后（现已解除阻塞，本地 `feat/design-system-batch1` 开工未合入） |
+| #269 | markdown | **离线 KaTeX 0.18.7**（post-sanitize 渲染、仅 woff2 字体、`assets/webview/katex/` 共 556,268 B raw / ≈ +0.32 MiB；`FeatureDetector.containsMath` gate + SERVER_HTML `<math-renderer>` 检测 + JS 独立更严扫描；`trust:false` + 三上限；错误色读 `--md-sys-color-error`）。**Mermaid 未实现**（Phase 2 开放） |
+| #270 | 构建/lint | **AGP 9.1.1 迁移**：Gradle 8.12 → 9.3.1；AGP 8.7.3 → 9.1.1；built-in Kotlin（不再应用 `org.jetbrains.kotlin.android`）；compileSdk 36 → 37 / buildTools 36.0.0 / KSP 2.3.12 / Hilt 2.59.2；`targetSdk` 保 35 + `android.sdk.defaultTargetSdkToCompileSdkIfUnset=false`（Robolectric 约束）；**全模块 lint 恢复**：31 条 disable 删除、48 个 error 源码修复、0 disable；`com.composables` namespace 撞车根治（删空壳 base artifact，无 `uniquePackageNames` 逃生开关）；删 `AarMetadata` 禁用 hack；CI lint guard 三断言（0 跳过 registry / 0 `UnknownIssueId` / 0 disable） |
+| #271 | CI | **nightly APK 体积回归门禁**：`.github/scripts/check-apk-size.sh` + `.github/apk-size-budget.properties`（baseline 7,585,167 B @ `2a44912`；budget = baseline + 256 KiB = 7,847,311 B）；超预算/缺配置/缺产物一律硬失败（#260 纪律）；红→绿实证含用 KaTeX 前预算拦住 KaTeX 后 APK |
+
 ## 3. 进行中：审计补全波（2026-09-06 立项，9 张分类票 #163–#171）
 
 > 来源 `docs/agents/task-audit-2026-09-06.md`。分类票映射见审计报告 §5.1。
@@ -132,7 +142,7 @@
 | **UI14 代码浏览悬浮搜索** | #166 | `FileViewerScreen` 顶栏已有 `startSearch()` 与跳行入口，与审计描述的「悬浮按钮」形态不同 —— 需先确认形态 |
 | **PR 时间线表情回应** | #166 | Issue 侧有、PR 侧无；`ReactionChip` 目前是 feature:issue 私有，需先抽到共享模块 |
 | **PR 评论 Sheet 与 Issue 统一** | #166 | 两边各有一份 Sheet 实现，宜连带上面那条一起抽共享组件，一次消除重复 |
-| **Q01 Compose lint 15 项检查失效** | #170 | 根因是 compose-ui lint jar 需要更新的 Kotlin Analysis API；**实测 AGP 8.13.2 + Gradle 8.14.3 无法修复**，需 AGP 9.x 迁移。已加「lint 覆盖面守卫」防止继续退化 |
+| ~~**Q01 Compose lint 15 项检查失效**~~ | #170 | ✅ **已闭环（#270）**：AGP 9.1.1 内置 lint 32.1.1 使检测器全部恢复；31 条 disable 删除、48 个 error 在源码修复、0 disable；守卫升级为 0 跳过 registry / 0 `UnknownIssueId` / 0 disable |
 
 ### 3.2 T25 剩余（均为"本机无法验证"类）
 
@@ -155,14 +165,14 @@
 |---|---|
 | T25 真机项 | ⏳ 冷启动 <1.5s 实测、Baseline Profile macrobenchmark 采集；本机纯 JVM 无法验（见 §3.2） |
 | 生产签名密钥 | 🔶 需用户在 Secrets 配 `KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` |
-| AGP 9.x 迁移 | ⏳ 未做；是 Q01 Compose lint 失效的根因解，可行性实测路线见 `docs/agents/agp9-feasibility-2026-09-11.md` |
-| 设计系统 SPEC-1 / SPEC-2 | ⏳ `App*` 组件 10 个仅 1 个落地；间距未令牌化（裸 `.dp` 约 639 处） |
+| ~~AGP 9.x 迁移~~ | ✅ **已闭环（#270）**：AGP 9.1.1 / Gradle 9.3.1 / compileSdk 37 / buildTools 36.0.0 / KSP 2.3.12 / Hilt 2.59.2 / built-in Kotlin；targetSdk 35 保留；Q01 lint 根因随之消除（可行性报告 `docs/agents/agp9-feasibility-2026-09-11.md`） |
+| 设计系统 SPEC-1 / SPEC-2 | 🔶 计划已入库（#268）：`docs/design-system/implementation-plan.md` + ADR-0010；**Batch 1（Card/Chip 家族/Dialog/Snackbar）本地分支 `feat/design-system-batch1` 开工未合入**；间距仍未令牌化（`AppDimens` 只有圆角 + contentPadding，裸 `.dp` 待迁移） |
 | EDITOR-1 | ⏳ 软换行不可切、replace 缺失、CRLF/编码未显式处理 |
 | UI-1 窄屏 side-by-side diff | ⏳ 每栏 ~40 字符且无横向滚动（需 §6 决策） |
 | SPEC-3 @mention 补全 | ⏳ `MarkdownComposer.mentions` 生产调用点仍不传值 |
 | UI-2 / UI-4 / UI-6 / UI-7 | ⏳ 选中态对比 / No-README 空态 / 文件树时间列 / feed 骨架——均未动 |
 | DATA-2 / PROTO-1 / PERF-1 / PERF-2 | ⏳ `core:data` 无测试配置 / 原型归档决策 / 冷启动+macrobenchmark（真机）/ 跨端像素 diff——见 backlog §3.3 |
-| 覆盖率剩余模块 | 🔶 2026-09-13 全量棘轮（`chore/coverage-ratchet-true-values`）：22 个有阈值模块按 #261 修复后的**真实**覆盖率重设（旧阈值普遍低于实测数十 pp，门禁曾形同虚设）；仍豁免 = `core:data` / `core:testing` / `core:ui` / `prototype`（理由见 `build.gradle.kts` 注释） |
+| ~~覆盖率剩余模块~~ | ✅ 已闭环：22 个有阈值模块全量棘轮到 #261 后的真实值（#263）；声明了阈值却无 exec 数据的模块**硬失败**（#260）；仍豁免 = `core:data` / `core:testing` / `core:ui` / `prototype`（理由见 `build.gradle.kts` 注释） |
 
 > 另有若干需产品/设计先 grill 的决策（窄屏 diff、feed 骨架、KaTeX/Mermaid、原型去留等，D-5/D-7 已闭环），见 `remaining-backlog-2026-09-12.md` §6。
 
@@ -178,11 +188,11 @@
 | PiliPlus 卡片风格细节 | ✅ 闭环（PR #182：「仓库」大分区 + 网格/通栏切换） |
 | Material Symbols 变量字体（wght=300） | ✅ 评估完成（PR #185）：暂缓引入，含再评估触发条件 |
 | **模块级截图基线不在任何门禁里** | ✅ 闭环（PR #181 引入 CI 权威录制 workflow，#188 应用基线并开启 app + 6 模块 verify）。**注意：模块级基线的权威录制环境是 CI** —— 本机渲染与之不同，不要本机 record 后提交 |
-| Compose lint 15 项检查失效 | 🔶 见 §3.1（需 AGP 9.x 迁移） |
+| ~~Compose lint 15 项检查失效~~ | ✅ 已闭环（#270，见 §3.1） |
 | diffCoverage 软门禁从未实测 | ✅ 已修两个真缺陷并转**硬门禁**（PR #181）：① 阈值口径把 80 当 8000%；② 非可执行行计入分母造成假失败 |
 | Nightly 全量截图/多设备/性能基线 | ✅ 已落地（PR #181 的 nightly.yml：verify / 全模块 record+diff / release 体积 / 失败汇总） |
 | 应用图标缺失 / Bundle 语言拆分 | ✅ 已闭环（PR #174：自适应+主题化单色层图标、Bundle 语言拆分） |
-| **截图基线覆盖（2026-09-12 修复波）** | ✅ 大幅补齐：模块级基线纳入 CI verify（app + 13 模块，PR #188/#256）；#245 补 OLED/高对比/zh + RTL；#249 补 `:feature:pullrequest`；#256 补 9 屏/20 帧（Home/RepoDetail/FileViewer/Branches/Search/MarkdownEditor/Profile/Gists/Settings）+ 离线 ImageLoader 确定性；#252 修探针；#260 加帧闭包断言。当前入库 **114 张 PNG（非 prototype）**（#266 再补 6 屏/15 帧：Repos 3 + CreateRepo/ReleaseCreate/CreateIssue/PullRequestCreate 各 2 + CommitDetail 3）；TEST-2 仅余少量低 ROI 屏 |
+| **截图基线覆盖（2026-09-12/13 修复波）** | ✅ 大幅补齐：模块级基线纳入 CI verify（app + 13 模块，PR #188/#256）；#245 补 OLED/高对比/zh + RTL；#249 补 `:feature:pullrequest`；#256 补 9 屏/20 帧（Home/RepoDetail/FileViewer/Branches/Search/MarkdownEditor/Profile/Gists/Settings）+ 离线 ImageLoader 确定性；#252 修探针；#260 加帧闭包断言。当前入库 **114 张 PNG（含 `prototype/readme-comparison` 4 张，非 prototype = 110）**（#266 再补 6 屏/15 帧：Repos 3 + CreateRepo/ReleaseCreate/CreateIssue/PullRequestCreate 各 2 + CommitDetail 3）；TEST-2 仅余少量低 ROI 屏 |
 | **RepoDetail 仓库头整块不渲染（UI-C01）** | ✅ 已修复（#258）：根因 `headerHeightPx` 自锁，改 `Modifier.layout` 量自然高度；回归测试 + `repo-star`/`repo-actions` 帧转绿（坏帧 2→0）。已知真实缺陷清单**已清空** |
 
 ## 5. 更新规则
@@ -215,6 +225,10 @@
 | **截图探针语义**：`TabRow` 选中态 = `selected`；M3 `SegmentedButton` = `checkable/checked`（radio 语义）；`ExtendedFAB` 文案不进 uiautomator dump，须 `try_tap_fab`（判据右下角 x≥0.7w 且 y≥0.85h，放宽会误点 diff 行）；M3 `OutlinedTextField` placeholder 不当就绪信号（#250）；探针不得静默降级为 `opt:` | #250 / #252 |
 | **时间炸弹**：截图/测试夹具禁止写死绝对时间戳，一律相对时间（`isoDaysAgo`） | #246 |
 | **守卫先做红证明**：恒真守卫会以「在跑但什么都没查」上线——修复波抓到 i18n lint canary 自引用、`repo-actions` 探针空洞、RTL `@Config(qualifiers)` 假测试三例 | #235 / #245 / #252 |
+| **`captureRoboImage` 在普通测试模式下静默返回、不落盘**：测试绿 ≠ 拍了帧；无限动画屏必须 `captureScreenshotDeterministic`，验收看产物帧闭包断言 | #260 |
+| **AGP 9 恢复全模块 lint 后禁止 re-disable**：31 条旧 disable 删除 + 48 个 error 源码修复，CI 守卫断言 0 跳过 registry / 0 `UnknownIssueId` / 0 `disable +=` | #270 |
+| **APK 体积回归门禁**：release APK 超 `.github/apk-size-budget.properties` 的 `budget_bytes`（baseline + 256 KiB）即 nightly 判红；有意增重要在 PR 里同步抬预算并记录理由 | #271 |
+| **设计系统迁移以像素等价为前提分批**：Batch 1 = Card / Chip 家族 / Dialog / Snackbar；门禁禁止新增裸控件；实现严格排在 AGP 9 之后（已解除阻塞） | #268 / ADR-0010 |
 
 ---
 

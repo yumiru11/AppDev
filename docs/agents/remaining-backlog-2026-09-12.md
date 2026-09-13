@@ -1,8 +1,9 @@
-# 残余审计缺口清单（审计修复波 #229–#241 之后的现实核验）
+# 残余审计缺口清单（#229–#271 审计修复波之后的现实核验）
 
 > 生成日期：2026-09-12
 > 核验基准：`main@d00533f`（Merge PR #241；本 worktree `docs/remaining-backlog`，与 main 同树）
 > **更新 2026-09-12（后半波 #256–#264 后）：`main@fd899b9`**。§3 已剪除本波闭环项（MD-1/2/3、TEST-1、GATE-1/2/3/4/5、DATA-1、DEAD-1/2、UI-3、UI-5、REPO-1），只留真开口；新增条目见 §2 尾部与 §3。
+> **更新 2026-09-13（收尾波 #267–#271 后）：`main@db1b696`**。AGP9-1 / KaTeX（D-2 部分）/ 设计系统计划（SPEC-1/2 的 plan 部分）/ APK 体积门禁 / 覆盖率口径 / 探针加固 / 深链编辑 / 仓库头 均已闭环，逐条钉死见下方 §2 收尾波表；§3 只留真开口。
 > 审计基准：`a48ede1`（Merge PR #199，2026-09-11；四份审计报告的取证起点）
 > 目的：把四份审计报告里**仍未解决**的条目收敛成一张可执行清单；把**已闭环**的条目显式钉死，防止被重新开票。
 
@@ -92,6 +93,18 @@
 | #263 | 覆盖率 | **GATE-3**（22 模块真值棘轮） | `build.gradle.kts:102-141` coverageThresholds |
 | #264 | 数据 | **DATA-1** | `core/github-data/.../RoomEtagStore.kt`；`RestNetworkModule` 不再用 `InMemoryEtagStore` |
 
+**收尾波（#265–#271）新增闭环（2026-09-13，核验于 `db1b696`）**
+
+| PR | 范围 | 解决的审计条目 | 当前代码证据 |
+|---|---|---|---|
+| #265 | 文档 | 后半波回写 | `AGENTS.md` / `project-status.md` |
+| #266 | 截图 | **TEST-2**（补 6 屏/15 帧） | 114 张 PNG（非 prototype 110） |
+| #267 | 文档 | 状态对账到 #266 | `project-status.md` |
+| #268 | 设计系统 | **SPEC-1 / SPEC-2 / UI-2 的 plan 部分** | `docs/design-system/implementation-plan.md` + `docs/adr/0010-design-system-rollout.md` |
+| #269 | markdown | **D-2 KaTeX 部分** | `core/markdown/src/main/assets/webview/katex/`；`renderer.js:180-330`（post-sanitize）；`FeatureDetector.containsMath`；`MathRenderExecutionTest` |
+| #270 | 构建/lint | **AGP9-1** + **Q01 lint 根因** | `gradle/wrapper/gradle-wrapper.properties`（9.3.1）；`gradle/libs.versions.toml:2-6,25`；`buildSrc/.../appdev.android.*.gradle.kts`（compileSdk 37 / built-in Kotlin）；CI lint guard（`ci.yml`） |
+| #271 | CI | **APK 体积回归门禁（KaTeX 研究 R11）** | `.github/scripts/check-apk-size.sh`；`.github/apk-size-budget.properties`；`nightly.yml` |
+
 **结论**：四份报告点名的 P0 级用户可见阻断（T23 白屏、OAuth 占位、PAT 降级、README-404 语义、离线相对链接死链）**均已闭环**。
 
 ---
@@ -117,6 +130,8 @@
 | **UI-2** | S3 UI-B06 / UI-C04 | 选中态对比不足（FilterChip / SegmentedButton） | `IssueListScreen.kt:168-177`、`PullRequestDiffView.kt:79-88`、`NotificationsPanel.kt:671-679` 均**无**显式 `selectedContainerColor` | 用户分不清当前筛选/视图 | 在 designsystem 收口 token，选中态统一 `secondaryContainer` | 与 SPEC-1 同源 | **S** |
 | **EDITOR-1** | S1 §7.2 / §8.1 | 软换行不可切；查找有、替换无；CRLF/编码未处理 | `MarkdownEditorView.kt:90`/`CodeEditorView.kt:85` 硬编码 wrap；find 有 replace 无；CRLF 仅「原样保留」注释 `CodeEditorView.kt:36` | 代码编辑体验不完整 | 加 wrap 开关 + replace + 显式 CRLF/编码策略 | Sora API | **M** |
 
+> **SPEC-1 / SPEC-2 / UI-2 的计划部分已闭环（#268）**：组件契约 / 批次表 / 禁裸控件门禁 / DoD 见 `docs/design-system/implementation-plan.md` + ADR-0010；实现（Batch 1 起）**严格排在 AGP 9 之后**，AGP 9 已合入（#270）→ 阻塞解除，本地 `feat/design-system-batch1` 开工未合入。上表三行仍为**实现**开口。
+
 ### 3.3 P2
 
 | ID | 来源 | 原文摘要 | 当前现实（file:line） | 建议动作 | 规模 |
@@ -129,18 +144,18 @@
 | **PROTO-1** | S2 §6 / S4 G-10 | 原型模块不在任何 verify/detekt 门禁 | `build.gradle.kts` 跳过 detekt；`ci.yml`/`nightly.yml` verify 列表无 prototype；PR #241 只修编译 | 归档或按 S2 §6 最小路径复活（见 §4/§6，待拍板） | S |
 | **PERF-1** | S1 §14.1/§14.3 / S4 | 冷启动无实测；macrobenchmark 未接 | 无 `androidx.benchmark`；`baseline-prof.txt` 手写 | 需真机/模拟器（挂 #26） | L |
 | **PERF-2** | S2 §8.5 | 无跨端像素 diff 管线 | 仓内只有原型 `WebViewHeadlessHtmlWriterTest`（带外手跑） | 独立票：headless Chromium 采集比对 | L |
-| **AGP9-1** | S5 | AGP 9.x 迁移未做（Q01 Compose lint 失效的根因解） | 当前 AGP 8.7.3 / compileSdk 36；报告实测路线可行 | 按 S5 PR1→PR3 推进（3–5 天），见 §3.4 | L |
 
 ### 3.4 在途分支（勿重复实现）
 
-> 2026-09-12 后半波后已核验：多数分支已合入并删除（见下表「现状」）。仅原型分支仍独立存在。
+> 2026-09-12 后半波后已核验：多数分支已合入并删除（见下表「现状」）。收尾波（#267–#271）后，AGP9 工具链也已合入；仅原型分支与设计系统 Batch 1 仍独立存在。
 
 | 分支 | 内容 | 与本清单关系 | 现状 |
 |---|---|---|---|
 | `feature/md-render-fixes` | 修 **D1**（details 重复渲染）、**D2**（baseRepoUrl 透传）、**D4**（coil-gif）、**D5b**（script 正文残留）+ 重录 32-inline-html 基线 | 覆盖 **MD-2** | ✅ **已合入 main（PR #237）**，远端已删 |
 | `fix/editor-screenshot-probe` | editor 探针 30s 有界等待 + 文档化 REPO-1 | 与 **REPO-1** 相关（探针侧） | ✅ **已合入 main（PR #242）** |
 | `docs/katex-mermaid-feasibility` | KaTeX/Mermaid 离线可行性评估（含体积实测） | §6 D-2 决策输入 | ✅ **已合入 main（PR #243）**；报告在 `docs/research/` |
-| `chore/agp9-feasibility` | 升 AGP 9.1.1/Gradle 9.3.1/compileSdk 37 + 可行性报告 | **AGP9-1** 的工具链骨架 | 🔶 报告已在 main（`docs/agents/agp9-feasibility-2026-09-11.md`）；工具链分支未合入 |
+| `chore/agp9-feasibility` | 升 AGP 9.1.1/Gradle 9.3.1/compileSdk 37 + 可行性报告 | **AGP9-1** 的工具链骨架 | ✅ **已合入 main（PR #270）**，远端已删 |
+| `feat/design-system-batch1` | 设计系统 Batch 1（Card / Chip 家族 / Dialog / Snackbar） | **SPEC-1 / UI-2** 实现起点 | 🔶 本地分支开工（#268 计划已合入），未合入 main |
 | `prototype/markdown-renderer` | 7 提交：独立原型（KotlinTextMate/grammars/themes），探索性 | **PROTO-1** 归档决策 | ❌ 未合入（`origin/prototype/markdown-renderer` 仍存在，领先 main 7 提交） |
 | `test/screenshot-matrix-2` | 矩阵/RTL 守卫 | **明确排除，不入 backlog**；已并入 main | 已并入 main，无领先提交 |
 
@@ -193,6 +208,10 @@
 | S2 D1/D2/D4/D5a/D5b（details/baseRepoUrl/coil-gif/script/kbd-sub-sup） | 缺口 | #237 + #251 已修 |
 | S4 P1-2 / G-01（PR 三屏三重盲区） | P1 | 3 屏基线 + `ci.yml:221` verify（#249） |
 | S1 §2.4（`FeatureDetector` 死代码） | P2 | #254 核验后保留并加注释（文档化墓碑）；对应 §6 D-5 闭环 |
+| S5（AGP9 可行性）「迁移未做」 | 缺口 | **已落地（#270）**：AGP 9.1.1 / Gradle 9.3.1 / compileSdk 37 / buildTools 36.0.0 / built-in Kotlin；报告路线被采用 |
+| S2 §3 缺口 3（KaTeX/Mermaid） | 缺口 | **KaTeX 已落地（#269）**；Mermaid 仍开放（Phase 2，WebView ≥ 94 门禁） |
+| S1 §5.5 / §5.4（SPEC-1/SPEC-2） | P1 | **计划已入库（#268）**，实现 Batch 1 开工；不再是「无人管」 |
+| KaTeX 可行性研究 R11（体积无回归门禁） | 缺口 | **已加门禁（#271）**：`check-apk-size.sh` + `.github/apk-size-budget.properties` |
 
 > 备注：S1 D8（代码字体/行号设置项与 ui-design 冲突）随 #225 闭环；S1 D15–D20 的余额见 §3.3/§3.4。
 
@@ -203,7 +222,7 @@
 | # | 决策点 | 为什么不能由代理拍板 | 关联条目 |
 |---|---|---|---|
 | D-1 | **`docs/ui-design.md` §7.1 六套主题命名** vs ADR-0004 的六模式 | 需决定「改文档对齐 ADR」还是「改代码实现文档命名」，影响设置页文案与截图矩阵 | S1 D9 |
-| D-2 | **离线通道是否引入 KaTeX/Mermaid** | 收益（Issue 正文数学/图）vs 体积与真机性能；可行性报告已入库（`docs/research/katex-mermaid-offline-feasibility.md`） | S2 §3 缺口 3、S1 §2.3 |
+| D-2 | **离线通道是否引入 KaTeX/Mermaid** | 收益（Issue 正文数学/图）vs 体积与真机性能；**KaTeX 已落地（#269）**，Mermaid 仍开放（Phase 2） | S2 §3 缺口 3、S1 §2.3 |
 | D-3 | **窄屏 side-by-side diff：隐藏还是横向滚动** | 交互取舍；可结合 WindowSizeClass 自适应方案 | UI-1 |
 | D-4 | **feed 首载：骨架屏还是 M3 LoadingIndicator** | 纯观感取向，需设计确认 | UI-7 |
 | ~~D-5~~ | ~~`FeatureDetector`：删除还是保留为文档化墓碑~~ | ✅ **已决定**（#254 核验后保留 + 注释；与 ADR-0007 措辞一致） | ~~DEAD-2~~ |
@@ -226,10 +245,10 @@
 
 | 波次 | 内容 | 涉及模块 | 模块冲突点 | 建议 |
 |---|---|---|---|---|
-| **Wave A：设计系统 / 令牌** | SPEC-1（组件层，先 AppCard/AppDialog/AppChip/AppSnackbar）、SPEC-2（spacing）、UI-2（选中态 token） | `core/designsystem`、`core/ui` → 各 feature | 会触及几乎所有 `feature/**` 的裸控件/裸 dp | 先合 A 再开 C，或按 feature 分包交错 |
+| **Wave A：设计系统 / 令牌** | SPEC-1（组件层，先 AppCard/AppDialog/AppChip/AppSnackbar）、SPEC-2（spacing）、UI-2（选中态 token） | `core/designsystem`、`core/ui` → 各 feature | 会触及几乎所有 `feature/**` 的裸控件/裸 dp | **AGP 9 已合入（#270），阻塞解除**；按 `docs/design-system/implementation-plan.md` 的 Batch 1→3 推进 |
 | **Wave C：UI 残余缺陷** | UI-1（窄屏 diff）、UI-4（空态）、UI-6（文件树时间列）、UI-7（feed 骨架） | `feature/{pullrequest,repo,home}` | 与 Wave A 的组件改造重叠 | UI-3/UI-5/REPO-1 已完成；余项在 A 之后 |
 | **Wave D：测试 / 数据 / 文档债** | DATA-2（core:data 测试配置）、TEST-2 低 ROI 余量、PROTO-1 归档、§5 文档漂移余量 | `core/data`、`build.gradle.kts`、`docs/**` | 与 A/C 基本不冲突 | **可与其他波并行**，冲突最少 |
-| **Wave E：决策与工具链（先 grill）** | §6 的 D-1/D-2/D-3/D-4/D-6/D-8；AGP9-1（按 S5 路线，3–5 天）、PERF-1/PERF-2 | `docs/**`、工具链 | 与 A–D 无代码冲突 | 先出决策，AGP9 建议在 Wave A 之前做（为 Q01 lint 恢复铺路） |
+| **Wave E：决策与工具链（先 grill）** | §6 的 D-1/D-3/D-4/D-6/D-8；PERF-1/PERF-2 | `docs/**`、工具链 | 与 A–D 无代码冲突 | 先出决策。~~AGP9-1~~ 已闭环（#270）；D-2 的 Mermaid 仍开放 |
 
 **并行建议**：Wave D 与 Wave A/C 任意组合并行；Wave E 的决策项优先产出。
 
@@ -238,14 +257,17 @@
 ## 附：核验基准与复现
 
 ```bash
-# 核验基准（2026-09-12 后半波后）
-git log -1 --format='%H %ci %s'        # fd899b9 ... (#264)
+# 核验基准（2026-09-13 收尾波后）
+git log -1 --format='%H %ci %s'        # db1b696 ... (#271)
 git merge-base --is-ancestor 423bc79 HEAD && echo "31 基线已在 main"
 
 # 报告 vs 现实快速对照
 grep -rn "fun AppScaffold\|fun AppCard\|fun AppChip\|fun AppDialog" --include=*.kt core feature app
 ls .github/scripts/verify-screenshots.sh          # 帧闭包断言（#260）
-find . -path "*/src/test/screenshots/*.png" -not -path "*/build/*" | wc -l   # 99（非 prototype）
+find . -path "*/src/test/screenshots/*.png" -not -path "*/build/*" | wc -l   # 114（含 prototype 4；非 prototype 110）
+ls docs/design-system/implementation-plan.md docs/adr/0010-design-system-rollout.md   # #268
+grep -n 'buildToolsVersion' buildSrc/src/main/kotlin/appdev.android.application.gradle.kts   # #270 → 36.0.0
+grep -n 'budget_bytes' .github/apk-size-budget.properties   # #271 → 7847311
 grep -n "includeNoLocationClasses" build.gradle.kts   # #261 Robolectric 覆盖率修复
 ls core/github-data/src/main/kotlin/com/yumiru11/githubapp/core/githubdata/cache/RoomEtagStore.kt  # #264
 ```
