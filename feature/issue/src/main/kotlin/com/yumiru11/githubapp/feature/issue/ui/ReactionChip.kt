@@ -113,7 +113,7 @@ internal fun ReactionChip(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = AppDimens.spacing.m, vertical = 6.dp),
             ) {
                 Text(
                     text = content,
@@ -121,7 +121,7 @@ internal fun ReactionChip(
                     color = contentColor,
                 )
                 if (count > 0) {
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
                     Text(
                         text = count.toString(),
                         style = MaterialTheme.typography.labelMedium,

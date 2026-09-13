@@ -85,6 +85,7 @@ import com.yumiru11.githubapp.core.designsystem.component.AppSegmentedButton
 import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.designsystem.token.GlassScope
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
@@ -257,7 +258,12 @@ fun NotificationsPanelContent(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp),
+                    .padding(
+                        start = AppDimens.spacing.l,
+                        end = AppDimens.spacing.s,
+                        top = AppDimens.spacing.m,
+                        bottom = AppDimens.spacing.xs,
+                    ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -350,8 +356,8 @@ private fun NotificationGroupedList(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
         // 分组折叠 = 跳过该组行条目；组头/行的 animateItem 统一承载补位动画
         // （lazy 布局下 animateItem 是折叠/删除/已读重排的正确工具，替代静态容器的 animateContentSize）
@@ -397,7 +403,7 @@ private fun GroupHeader(
             modifier
                 .fillMaxWidth()
                 .clickable(onClick = onToggle)
-                .padding(vertical = 8.dp, horizontal = 4.dp),
+                .padding(vertical = AppDimens.spacing.s, horizontal = AppDimens.spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -409,7 +415,7 @@ private fun GroupHeader(
                     .size(20.dp)
                     .rotate(chevronRotation),
         )
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
         Text(
             text = group.repoFullName,
             style = MaterialTheme.typography.titleMedium,
@@ -425,7 +431,7 @@ private fun GroupHeader(
                     text = stringResource(R.string.notification_unread_count, group.unreadCount),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                    modifier = Modifier.padding(horizontal = AppDimens.spacing.s, vertical = 2.dp),
                 )
             }
         }
@@ -510,7 +516,7 @@ private fun DismissBackground(
             Modifier
                 .fillMaxSize()
                 .background(color = backgroundColor)
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = AppDimens.spacing.xl),
         contentAlignment = if (fromStart) Alignment.CenterStart else Alignment.CenterEnd,
     ) {
         Icon(
@@ -565,7 +571,7 @@ internal fun NotificationCard(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                        .padding(AppDimens.spacing.m),
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -575,7 +581,7 @@ internal fun NotificationCard(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
                     Text(
                         text = item.repoFullName,
                         style = MaterialTheme.typography.bodySmall,
@@ -591,7 +597,7 @@ internal fun NotificationCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                             Text(
                                 text = date,
                                 style = MaterialTheme.typography.labelSmall,
@@ -600,7 +606,7 @@ internal fun NotificationCard(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 Icon(
                     imageVector = eventIconFor(item.subjectType),
                     contentDescription = null,
@@ -649,7 +655,7 @@ private fun FilterAndSortRow(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
@@ -657,7 +663,7 @@ private fun FilterAndSortRow(
                 Modifier
                     .weight(1f)
                     .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
         ) {
             NotificationFilter.entries.forEach { entry ->
                 AppFilterChip(
@@ -667,7 +673,7 @@ private fun FilterAndSortRow(
                 )
             }
         }
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.s))
         SingleChoiceSegmentedButtonRow(modifier = Modifier.semantics { contentDescription = sortDescription }) {
             NotificationSortOrder.entries.forEachIndexed { index, entry ->
                 AppSegmentedButton(

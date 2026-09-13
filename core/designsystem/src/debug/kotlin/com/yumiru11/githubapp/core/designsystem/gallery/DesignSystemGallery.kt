@@ -46,6 +46,7 @@ import com.yumiru11.githubapp.core.designsystem.component.LongBarAction
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.designsystem.theme.extendedColors
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 
 /*
  * 设计系统画廊（**debug-only**，ADR-0010 决策 10 / `docs/design-system/implementation-plan.md` §7）。
@@ -76,11 +77,11 @@ import com.yumiru11.githubapp.core.designsystem.theme.extendedColors
  */
 
 /** 分节间距 / 内边距（画廊自身的排版常量，不进组件契约）。 */
-private val GALLERY_PADDING = 16.dp
+private val GALLERY_PADDING = AppDimens.spacing.l
 
-private val GALLERY_SECTION_GAP = 24.dp
+private val GALLERY_SECTION_GAP = AppDimens.spacing.xl
 
-private val GALLERY_ITEM_GAP = 12.dp
+private val GALLERY_ITEM_GAP = AppDimens.spacing.m
 
 /**
  * 整屏画廊（debug 走查入口）：按顺序渲染 [sections]，可滚动。
@@ -219,8 +220,8 @@ private fun CardGroupSection() {
 @Composable
 private fun FilterChipsSection() {
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.xs),
     ) {
         AppFilterChip(
             selected = false,
@@ -366,8 +367,8 @@ private fun LoadingStateSection() {
 @Composable
 private fun StateChipsSection() {
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
         AppStateChip(status = GitHubStatus.OPEN, label = stringResource(R.string.gallery_state_open))
         AppStateChip(status = GitHubStatus.CLOSED, label = stringResource(R.string.gallery_state_closed))
@@ -424,13 +425,13 @@ private fun ColorSwatch(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.xs),
     ) {
         Box(
             modifier =
                 Modifier
                     .size(48.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(AppDimens.cornerSmall))
                     .background(color),
         )
         Text(
@@ -448,6 +449,6 @@ private fun GalleryItemText(text: String) {
         text = text,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp),
+        modifier = Modifier.padding(horizontal = AppDimens.spacing.m, vertical = AppDimens.spacing.l),
     )
 }
