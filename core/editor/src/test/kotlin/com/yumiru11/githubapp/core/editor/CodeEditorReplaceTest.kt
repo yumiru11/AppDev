@@ -1,6 +1,7 @@
 package com.yumiru11.githubapp.core.editor
 
 import android.content.Context
+import android.os.Looper
 import android.view.View
 import androidx.test.core.app.ApplicationProvider
 import io.github.rosemoe.sora.widget.CodeEditor
@@ -10,6 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -26,12 +28,14 @@ import org.robolectric.annotation.GraphicsMode
 class CodeEditorReplaceTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 
+    private val searchSettleTimeoutMs = 5_000L
+
     // ── replace-all ────────────────────────────────────────────────────────
 
     @Test
     fun replaceAll_allMatches_replacesEveryOccurrence() {
         val (editor, controller) = editableEditor("a b a b a")
-        controller.findText("a")
+        armReplaceQuery(editor, controller, "a")
 
         val count = controller.replaceAll("X")
 
@@ -42,7 +46,7 @@ class CodeEditorReplaceTest {
     @Test
     fun replaceAll_afterReplace_undoRestoresOriginalInSingleStep() {
         val (editor, controller) = editableEditor("a b a b a")
-        controller.findText("a")
+        armReplaceQuery(editor, controller, "a")
         controller.replaceAll("X")
 
         assertTrue("替换后应可撤销", editor.canUndo())
@@ -55,7 +59,7 @@ class CodeEditorReplaceTest {
     @Test
     fun replaceAll_noMatch_returnsZeroAndKeepsText() {
         val (editor, controller) = editableEditor("abc")
-        controller.findText("z")
+        armReplaceQuery(editor, controller, "z")
 
         val count = controller.replaceAll("X")
 
@@ -80,7 +84,7 @@ class CodeEditorReplaceTest {
         editor.setText("a a")
         layoutEditor(editor)
         val controller = CodeEditorController(editor)
-        controller.findText("a")
+        armReplaceQuery(editor, controller, "a")
 
         assertEquals(0, controller.replaceAll("X"))
         assertEquals("a a", editor.text.toString())
@@ -89,7 +93,7 @@ class CodeEditorReplaceTest {
     @Test
     fun replaceAll_multiLineText_replacesAcrossLines() {
         val (editor, controller) = editableEditor("foo line\nbar line\nfoo end")
-        controller.findText("line")
+        armReplaceQuery(editor, controller, "line")
 
         val count = controller.replaceAll("row")
 
@@ -102,7 +106,7 @@ class CodeEditorReplaceTest {
     @Test
     fun replaceCurrent_selectionOnSecondMatch_replacesOnlyThatMatch() {
         val (editor, controller) = editableEditor("a b a b a")
-        controller.findText("a")
+        armReplaceQuery(editor, controller, "a")
         // 选中第二处匹配（行 0，列 4..5）
         editor.setSelectionRegion(0, 4, 0, 5)
 
@@ -115,7 +119,7 @@ class CodeEditorReplaceTest {
     @Test
     fun replaceCurrent_cursorBetweenMatches_picksNextMatchAtOrAfterCursor() {
         val (editor, controller) = editableEditor("a b a")
-        controller.findText("a")
+        armReplaceQuery(editor, controller, "a")
         // 光标在列 2（不落在任何匹配上）→ 取其后的首处匹配（字符 4..5）
         editor.setSelection(0, 2)
 
@@ -127,7 +131,7 @@ class CodeEditorReplaceTest {
     @Test
     fun replaceCurrent_emptyReplacement_deletesSelectedMatch() {
         val (editor, controller) = editableEditor("a b a")
-        controller.findText("a")
+        armReplaceQuery(editor, controller, "a")
         editor.setSelectionRegion(0, 0, 0, 1)
 
         controller.replaceCurrent("")
@@ -138,7 +142,7 @@ class CodeEditorReplaceTest {
     @Test
     fun replaceCurrent_noMatch_returnsFalseAndKeepsText() {
         val (editor, controller) = editableEditor("abc")
-        controller.findText("z")
+        armReplaceQuery(editor, controller, "z")
 
         assertFalse(controller.replaceCurrent("X"))
         assertEquals("abc", editor.text.toString())
@@ -147,13 +151,36 @@ class CodeEditorReplaceTest {
     @Test
     fun replaceCurrent_afterReplace_undoRestoresMatch() {
         val (editor, controller) = editableEditor("a b a")
-        controller.findText("a")
+        armReplaceQuery(editor, controller, "a")
         editor.setSelectionRegion(0, 0, 0, 1)
         controller.replaceCurrent("XYZ")
 
         editor.undo()
 
         assertEquals("a b a", editor.text.toString())
+    }
+
+    /**
+     * 设好替换用的查询词，并把 Sora 侧的后台扫描停掉。
+     *
+     * 为什么必须停：`EditorSearcher` 在**每次内容变更**后都会重扫（订阅 ContentChangeEvent），
+     * 扫描线程与测试线程并发读写 Content/布局时，Robolectric 下 `LineBreakLayout.afterDelete`
+     * 会偶发越界（CI 与本地各复现过一次）。停掉 pattern 只影响 Sora 的高亮/计数，
+     * 控制器自己的查询词镜像保留 → 替换路径照常生效（替换不依赖 Sora 的匹配表）。
+     */
+    private fun armReplaceQuery(
+        editor: CodeEditor,
+        controller: CodeEditorController,
+        query: String,
+    ) {
+        controller.findText(query)
+        val deadline = System.currentTimeMillis() + searchSettleTimeoutMs
+        while (controller.currentFindState().matchCount == 0 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10)
+        }
+        // 排空主 looper 上的回灌，再停掉 pattern（此后内容变更不再触发重扫）
+        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        editor.searcher.stopSearch()
     }
 
     /** 可编辑编辑器 + 控制器（编辑器是文本唯一事实源，控制器镜像查询词）。 */
