@@ -525,9 +525,18 @@ frame_unlock() {
 #   desc:<content-desc>  出现该 content-desc
 #   log:<正则>           **本帧开始之后**的 logcat 里出现该正则
 # severity：critical | warn（见各帧注释；决定 mark_bad_frame 用 ::error:: 还是 ::warning::）
+# settle：秒数（等待页面稳定后再断言+取图）；或字面量 `now`（见下）
 #
 # 判定口径：断言在截图**之前**跑（先确认在目标屏 → 再取图）。这修掉的是本 bug 的
 # 根因——旧写法「等不到就照截」，产物里分不清「拍对了但界面有问题」与「没拍到」。
+#
+# ⚠️ `settle=now` 例外路径（2026-09-13 readme-mermaid 探针修复新增）：先截图、后断言。
+#   为什么必须开这条路径：README 正文的滚动位置只稳定约 2-3s——滑动会触发 Compose
+#   状态更新 → 重组 → WebView 重载（loadDataWithBaseURL），页面弹回顶部（CI logcat
+#   实证：滑动后 ~3s 的 Davey! 3.1s 卡顿 + 帧与 README 顶部逐字节相同）。常规路径的
+#   断言要跑 uiautomator dump（单次 5-10s），正好吃掉这个窗口 → 稳定拍到重置后的顶部。
+#   仅当断言与滚动位置无关时才可用（act/exact 是屏级语义，滚动不影响其成立）；
+#   断言失败仍走坏帧路径，只是现场帧已在断言前落盘。
 capture_frame() {
   local name="$1" severity="$2" settle="$3"; shift 3
   local spec key val lc_before optional
@@ -580,6 +589,19 @@ capture_frame() {
   # 日志基线：断言只看本帧开始之后的日志（否则上一帧的旧行会让 log: 断言假通过）
   lc_before=$(adb logcat -d 2>/dev/null | wc -c || echo 0)
   probe_baseline_bytes=$((lc_before + 1))
+
+  # `settle=now`：先取图，再断言（理由见函数头注释）。record_md5 只在断言通过时记，
+  # 与常规路径一致——坏帧不进 md5 去重表（它的文件会被 mark_bad_frame 改名）。
+  if [ "$settle" = "now" ]; then
+    adb exec-out screencap -p > "$OUT/$name.png"
+    if assert_frame; then
+      record_md5 "$name" "$OUT/$name.png"
+    else
+      mark_bad_frame "$name" FAILED "$FRAME_FAIL_REASON"
+    fi
+    frame_unlock
+    return 0
+  fi
 
   sleep "$settle"
   if ! assert_frame; then

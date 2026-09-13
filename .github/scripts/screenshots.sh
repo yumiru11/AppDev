@@ -186,10 +186,153 @@ fi
 adb shell am start -a android.intent.action.VIEW -d "https://github.com/mermaid-js/mermaid" -p "$PKG" >/dev/null
 capture_frame readme-webview critical 5 \
   act:"$PKG" exact:"README" opt:log:"ReadmeRender.*renderMode=" opt:text:"Mermaid"
-# mermaid 代码块路径（同一屏滚到正文中部）：README tab 仍须选中
-retry_input swipe 540 1800 540 600 400
-capture_frame readme-mermaid critical 2 \
-  act:"$PKG" exact:"README" opt:text:"Mermaid"
+
+# ── 4-6. README 图表区（readme-mermaid）────────────────────────────────────
+# 帧目的：README 正文**滚到图表区**——同时给出两个机器证据：① 正文可滚动（WebView
+# 内滚动链路可用）② mermaid 代码块/渲染图确实出现在正文里（离线 mermaid 渲染的
+# 端到端锚点。本 job 是 API 30 / WebView 83，低于 mermaid 的 Chromium ≥94 注入门禁，
+# 图按设计回退为代码块——帧固定在「图表所在区」，渲染与否都落在这里）。
+#
+# 旧实现为什么拍假帧（CI 34740229533、34741143272 实证：readme-mermaid 与
+# readme-webview 逐字节相同，md5 d5afb68c / c241871a；8 轮里坏 2 轮）：
+#   1. 单次 `swipe 540 1800 → 540 600` 的起点距 WebView 顶边（首屏 ~1620px）只有
+#      ~180px，手势绝大部分落在仓库头/Tab 上——有效位移 ≈ 手势落在 WebView 内的部分，
+#      就算「成功」也只滚到 README hero 图，永远到不了图表区；
+#   2. 滚动位置只稳定数秒：滑动触发重组 → WebView 重载 → 弹回顶部（logcat 实证）。
+#      是否拍到全看时序 → 偶发 DUPLICATE（同一实现时好时坏）。
+# 新实现四条硬约束：
+#   1. **视口内短滑**：起点 2150 / 终点 1750 全程留在 WebView 视口内（仓库头展开时
+#      WebView 约 1620→2400，收起后上移；两种状态都覆盖）→ 位移可预期、可累加；
+#   2. **滚到「图表区在屏」为止**（闭环，不是盲滑固定次数）——判据见
+#      readme_mermaid_target_state；
+#   3. **滑动与截图之间不插 dump**：取帧走 capture_frame 的 `settle=now` 路径
+#      （先截图后断言），dump 的 5-15s 挪到截图之后（窗口冲突见该函数头注释）；
+#   4. **滚不到就显式判坏**：绝不把「没滚到位置」的帧当通过（旧实现正是这样骗过审计的）。
+# 视口内短滑：起点/终点都留在 WebView 视口内（见上方约束 1）。每 2 次检查前台——
+# ⚠️ 实测（CI 34743676596）：jank 下 `input swipe` 会退化成点击（InputDispatcher 日志
+# 显示那条手势的 UP 被 2.9s 后当 click 处理），点到 README 里的链接后 CustomTabs 把
+# 外部浏览器拉起来，后面的滑动全部喂给浏览器 → 判据 state=none。前台丢了就回退。
+readme_mermaid_swipe() {
+  local n="$1" dir="${2:-up}" i y_from y_to
+  if [ "$dir" = "down" ]; then
+    y_from=1750
+    y_to=2150
+  else
+    y_from=2150
+    y_to=1750
+  fi
+  for ((i = 0; i < n; i++)); do
+    retry_input swipe 540 "$y_from" 540 "$y_to" 550
+    sleep 0.15
+    if [ $((i % 2)) -eq 1 ]; then readme_mermaid_recover; fi
+  done
+}
+
+# 前台还是本应用吗？（同 wait_for_activity 的判据，但只看当前状态）
+readme_mermaid_in_app() {
+  adb shell dumpsys activity activities 2>/dev/null | grep -q "mResumedActivity.*$PKG"
+}
+
+# 重新深链打开 README（滚动位置回到顶部 → 置 RESET 标志，定位循环按「从头再来」处理）
+readme_mermaid_open_readme() {
+  adb shell am start -a android.intent.action.VIEW -d "https://github.com/mermaid-js/mermaid" -p "$PKG" >/dev/null 2>&1 || true
+  wait_for_activity_quick "$PKG" || true
+  sleep 4
+  README_MERMAID_RESET=1
+}
+
+# 前台被外部浏览器接管时回退：先 BACK（保留 README 滚动位置）；仍回不来才重开。
+readme_mermaid_recover() {
+  readme_mermaid_in_app && return 0
+  echo "::warning::readme-mermaid 前台不是本应用（短滑退化成点击、打开了外链？）——尝试 BACK 回退"
+  adb shell input keyevent 4 >/dev/null 2>&1 || true
+  sleep 2
+  readme_mermaid_in_app && return 0
+  echo "::warning::readme-mermaid BACK 未回退——重新深链打开 README（滚动位置从头再来）"
+  readme_mermaid_open_readme
+  return 0
+}
+
+# 「图表区在屏」判据 = 本探针的滚动闭环信号。
+# ⚠️ 关键实测（CI 34743057536 的诊断 dump）：WebView 正文**全文**都在 uiautomator
+# dump 里（含不可见部分）——所以 `text:` 类断言对滚动位置零判别力（`opt:text:Mermaid`
+# 恒真就是这个原因）；但**只有真正落在屏内的文本节点有非零 bounds**，不可见节点是
+# [0,0][0,0]。于是「目标节点的 bounds 是否非零」是滚动位置唯一可靠、与渲染通道无关
+# 的信号。
+# 输出：`target <top> <bottom>`＝图表区在屏（附目标区包围盒）；
+#      `overshoot`＝已滚过头（屏内出现后一段「Sequence diagram」标题）；
+#      `none`＝不在屏（既没到也没过）。
+readme_mermaid_target_state() {
+  # dump_ui 的失败告警走 stdout——必须转 stderr，否则会混进本函数的单行返回值
+  if ! dump_ui >&2; then
+    echo "none"
+    return 0
+  fi
+  python3 - <<'PY' 2>/dev/null || echo "none"
+import re
+xml = open('/tmp/ui.xml', encoding='utf-8').read()
+pat = re.compile(r'<node[^>]*text="([^"]*)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"')
+tops, bottoms, overshoot = [], [], False
+for text, _l, top, _r, bottom in pat.findall(xml):
+    top, bottom = int(top), int(bottom)
+    if bottom - top <= 0:
+        continue
+    if 'Flowchart [' in text or 'A[Hard]' in text:
+        tops.append(top)
+        bottoms.append(bottom)
+    elif 'Sequence diagram [' in text or 'Gantt chart [' in text:
+        overshoot = True
+if tops:
+    print('target %d %d' % (min(tops), max(bottoms)))
+elif overshoot:
+    print('overshoot')
+elif 'Table of content' in xml:
+    print('none')
+else:
+    print('noreadme')
+PY
+}
+
+# 一次定位尝试：先按 CI 校准值推进（14 次短滑 ≈ 图表区入口），再按判据微调。
+# 每次迭代一次 dump（5-15s）——只做位置确认，不参与取帧。
+# 返回 0 = 图表区已在视口且位置合适；1 = 5 次校正后仍未到位。
+readme_mermaid_position_once() {
+  local i state top
+  README_MERMAID_RESET=0
+  readme_mermaid_swipe 14
+  for i in 1 2 3 4 5; do
+    if [ "$README_MERMAID_RESET" = "1" ]; then
+      README_MERMAID_RESET=0
+      readme_mermaid_swipe 14
+      continue
+    fi
+    read -r state top _ <<<"$(readme_mermaid_target_state)"
+    echo "::notice::readme-mermaid 定位 $i/5：state=$state top=${top:-n/a}"
+    case "$state" in
+      target)
+        if [ "${top:-0}" -lt 400 ]; then
+          readme_mermaid_swipe 2 down
+        elif [ "${top:-0}" -gt 1700 ]; then
+          readme_mermaid_swipe 2
+        else
+          return 0
+        fi
+        ;;
+      overshoot) readme_mermaid_swipe 3 down ;;
+      noreadme) readme_mermaid_open_readme ;;
+      *) readme_mermaid_swipe 3 ;;
+    esac
+  done
+  return 1
+}
+
+# 定位失败（中途被外链/重载打断）就再来一轮；两轮都失败 → 显式坏帧。
+if readme_mermaid_position_once || { readme_mermaid_recover; readme_mermaid_position_once; }; then
+  capture_frame readme-mermaid critical now act:"$PKG" exact:"README"
+else
+  FRAME_SEVERITY=critical
+  mark_bad_frame readme-mermaid FAILED "两轮滚动定位后图表区仍未进入视口——不拿无关注的滚动帧当通过"
+fi
 
 # ══════════════════════════════════════════════════════════════════════
 # 5.5-5.6 Issue 详情 → 评论列表（原生短文本渲染）
