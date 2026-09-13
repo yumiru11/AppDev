@@ -437,6 +437,11 @@ assert_frame() {
 #   DUPLICATE 与另一帧像素完全相同——两帧必有一帧没拍到位
 BAD_FRAMES=()          # 人读行：<name>.png  <KIND>  <原因>
 BAD_CRITICAL_FRAMES=() # 其中的 critical 帧名（决定是否染红 job，见 screenshots.sh 结尾）
+# 每个帧**自己声明**的 severity（capture_frame 第 2 参）。必须按帧名存：
+# md5 去重断言在所有 capture 之后才跑，那时全局 FRAME_SEVERITY 已被最后一帧覆盖，
+# 直接读全局会把「critical 帧失败」降级成 warn → 关键帧闸门静默失效
+# （2026-09-13 事故：readme-mermaid(critical) 被判 DUPLICATE 却 severity=warn）。
+declare -A FRAME_SEVERITIES=()
 
 record_bad_frame() {
   local name="$1" kind="$2" reason="$3"
@@ -448,8 +453,11 @@ record_bad_frame() {
 mark_bad_frame() {
   local name="$1" kind="$2" reason="$3"
   local path="$OUT/$name.png"
+  # 帧自己的 severity 优先（捕获时登记）；取不到才回退当前全局值。
+  # 去重断言在末尾跑时只能靠这张表，否则 critical 会被降级（见 FRAME_SEVERITIES 注释）。
+  local severity="${FRAME_SEVERITIES[$name]:-${FRAME_SEVERITY:-fail}}"
   record_bad_frame "$name" "$kind" "$reason"
-  if [ "${FRAME_SEVERITY:-fail}" = "critical" ]; then
+  if [ "$severity" = "critical" ]; then
     BAD_CRITICAL_FRAMES+=("$name")
   fi
   if [ -f "$path" ]; then
@@ -458,14 +466,14 @@ mark_bad_frame() {
   {
     echo "frame: $name"
     echo "kind: $kind"
-    echo "severity: ${FRAME_SEVERITY:-fail}"
+    echo "severity: $severity"
     echo "reason: $reason"
   } > "$OUT/$name.badframe.txt" 2>/dev/null || true
   # 现场取证：当帧 UI 层级（WebView 文本/控件树都在里面），供下一轮定位
   if dump_ui 2>/dev/null; then
     cp -f /tmp/ui.xml "$OUT/$name.ui.xml" 2>/dev/null || true
   fi
-  if [ "${FRAME_SEVERITY:-fail}" = "critical" ]; then
+  if [ "$severity" = "critical" ]; then
     echo "::error::$name.png $kind — $reason（第一优先级帧，本轮不给过）"
   else
     echo "::warning::$name.png $kind — $reason"
@@ -528,6 +536,7 @@ capture_frame() {
   frame_lock
   FRAME_CHECKS=(); FRAME_REASONS=(); FRAME_OPTIONAL=()
   FRAME_SEVERITY="$severity"
+  FRAME_SEVERITIES["$name"]="$severity"
   FRAME_FAIL_REASON=""
   for spec in "$@"; do
     optional=0
