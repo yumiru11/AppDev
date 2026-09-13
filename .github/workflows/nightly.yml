@@ -256,12 +256,13 @@ jobs:
       - name: Assemble release (minified)
         run: ./gradlew :app:assembleRelease --no-daemon
 
-      - name: Report shrink size
-        run: |
-          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
-          test -n "$APK" || { echo "::error::release APK not produced"; exit 1; }
-          echo "### Release APK size" >> "$GITHUB_STEP_SUMMARY"
-          ls -lh "$APK" | awk '{print "- APK: " $5 " (" $9 ")"}' >> "$GITHUB_STEP_SUMMARY"
+      # ★ 体积回归门禁（KaTeX/Mermaid 可行性研究 R11）：原「Report shrink size」只打印
+      # 体积、不做任何比较，静默膨胀无人发现；现升级为**硬失败**——超预算即
+      # ::error:: + exit 1，经 notify-failure 开/更新 nightly-failure issue。
+      # 预算与「如何有意提高」见 .github/apk-size-budget.properties；
+      # APK 缺失同样硬失败而非静默跳过（#260 门禁纪律）。
+      - name: Check release APK size budget
+        run: bash .github/scripts/check-apk-size.sh
 
       - name: Upload release APK + mapping
         if: always()
