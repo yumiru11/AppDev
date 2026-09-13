@@ -7,7 +7,7 @@
 
 开发一个**功能全面的 Android GitHub 客户端**（轻量、流畅、全 Material You）。技术规划 = `plan.md`（41KB，必读），需求来源 = `request.txt`。应用名/包名仍为占位符：applicationId 与 namespace = `com.yumiru11.githubapp`（模块 namespace 用 `core.github_xxx` 下划线写法），产品定名后统一改。
 
-**当前状态（2026-09-13 修复波末）**：`main@db1b696`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、**四张新缺陷票 #200–#203** 全部关闭；#166 / #167 已关闭（条目逐条对账）。本轮修复波共合入 **42 张 PR（#229–#271，剔除非 PR 的 issue #250，全部 squash）**：前半 #229–#255（26 张）、中段 **#256–#266（11 张）**、收尾 **#267–#271（5 张）**。收尾波 = **#267** 状态对账（#266 后）、**#268** 设计系统落地计划 + ADR-0010、**#269** 离线 KaTeX 数学渲染、**#270** AGP 9.1.1 迁移（Gradle 9.3.1 / compileSdk 37 / 全模块 lint 恢复，#170 兑现）、**#271** nightly APK 体积回归门禁。**已无 open PR**。
+**当前状态（2026-09-13 修复波末）**：`main@db1b696`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、**四张新缺陷票 #200–#203** 全部关闭；#166 / #167 已关闭（条目逐条对账）。本轮修复波共合入 **42 张 PR（#229–#271，剔除非 PR 的 issue #250，全部 squash）**：前半 #229–#255（26 张）、中段 **#256–#266（11 张）**、收尾 **#267–#271（5 张）**。收尾波 = **#267** 状态对账（#266 后）、**#268** 设计系统落地计划 + ADR-0010、**#269** 离线 KaTeX 数学渲染、**#270** AGP 9.1.1 迁移（Gradle 9.3.1 / compileSdk 37 / 全模块 lint 恢复，#170 兑现）、**#271** nightly APK 体积回归门禁。**在途 PR：#275 离线 Mermaid（Phase 2，KaTeX/Mermaid 计划最后一块）**。
 **当前活动票三张**：**#26（T25 真机项，需用户配 Secrets）**、#1（Spec，常开）、#71（截图测试面板，勿关）。（#250 已关闭 —— 探针断言 bug 由 #252 修复。）
 **已知真实缺陷：无。** **RepoDetail 仓库头整块不渲染（UI-C01）已由 #258 修复**：根因是 `headerHeightPx` 自锁 —— 首帧外层高 0dp → 内层 `onSizeChanged` 在 `maxHeight=0` 约束下只能测到 0 → 自然高度永远回填不上，头部被裁成 0 高。改为 `Modifier.layout` 以 `Constraints.Infinity` 在 layout 阶段测自然高度，首帧即按自然高度渲染；回归测试 `repoDetailScreen_success_rendersRepositoryHeaderBlock` 锁定，CI `repo-star` / `repo-actions` 帧已转绿（坏帧 2 → 0）。
 

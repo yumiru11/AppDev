@@ -107,9 +107,15 @@
 |---|---|---|
 | #267 | 文档 | 状态对账到 #266（37 张 PR / `main@54eba10` / 114 张基线）；即 #265 之后的追齐 |
 | #268 | 设计系统 | 落地计划 `docs/design-system/implementation-plan.md`（组件契约 / 批次表 / 门禁 / DoD）+ ADR-0010；实现严格排在 AGP 9 之后（现已解除阻塞，本地 `feat/design-system-batch1` 开工未合入） |
-| #269 | markdown | **离线 KaTeX 0.18.7**（post-sanitize 渲染、仅 woff2 字体、`assets/webview/katex/` 共 556,268 B raw / ≈ +0.32 MiB；`FeatureDetector.containsMath` gate + SERVER_HTML `<math-renderer>` 检测 + JS 独立更严扫描；`trust:false` + 三上限；错误色读 `--md-sys-color-error`）。**Mermaid 未实现**（Phase 2 开放） |
+| #269 | markdown | **离线 KaTeX 0.18.7**（post-sanitize 渲染、仅 woff2 字体、`assets/webview/katex/` 共 556,268 B raw / ≈ +0.32 MiB；`FeatureDetector.containsMath` gate + SERVER_HTML `<math-renderer>` 检测 + JS 独立更严扫描；`trust:false` + 三上限；错误色读 `--md-sys-color-error`）。**Mermaid 随后落地（#275）** |
 | #270 | 构建/lint | **AGP 9.1.1 迁移**：Gradle 8.12 → 9.3.1；AGP 8.7.3 → 9.1.1；built-in Kotlin（不再应用 `org.jetbrains.kotlin.android`）；compileSdk 36 → 37 / buildTools 36.0.0 / KSP 2.3.12 / Hilt 2.59.2；`targetSdk` 保 35 + `android.sdk.defaultTargetSdkToCompileSdkIfUnset=false`（Robolectric 约束）；**全模块 lint 恢复**：31 条 disable 删除、48 个 error 源码修复、0 disable；`com.composables` namespace 撞车根治（删空壳 base artifact，无 `uniquePackageNames` 逃生开关）；删 `AarMetadata` 禁用 hack；CI lint guard 三断言（0 跳过 registry / 0 `UnknownIssueId` / 0 disable） |
 | #271 | CI | **nightly APK 体积回归门禁**：`.github/scripts/check-apk-size.sh` + `.github/apk-size-budget.properties`（baseline 7,585,167 B @ `2a44912`；budget = baseline + 256 KiB = 7,847,311 B）；超预算/缺配置/缺产物一律硬失败（#260 纪律）；红→绿实证含用 KaTeX 前预算拦住 KaTeX 后 APK |
+
+### 2.3 2026-09-13 离线 Mermaid（Phase 2，PR #275，待合入）
+
+| PR | 范围 | 交付 |
+|---|---|---|
+| #275 | markdown | **离线 Mermaid Tiny 11.17.2**（`assets/webview/mermaid/` 2,555,146 B raw / deflate 672,490 B，IIFE 单文件 0 动态 import；post-sanitize 渲染，`securityLevel:'strict'` + `htmlLabels:false` + 图数上限 10；**Chromium ≥94 门禁**（class static block）Kotlin UA 判定 + JS 语法探针 + `window.mermaid` 三层兜底，不满足回退代码块）。同树 APK 实测 7,486,103 → 8,162,579 B（**+676,476 B ≈ +0.65 MiB**），`apk-size-budget.properties` 基线 7,585,167 → 8,162,579 / 预算 7,847,311 → 8,424,723。测试：`MermaidRenderExecutionTest`（12）+ `WebViewMermaidSupportTest`（7）+ FeatureDetector/WebViewHtmlBuilder 扩展；fixtures 34 登记双通道，未实现集合清零；Roborazzi 零漂移 |
 
 ## 3. 进行中：审计补全波（2026-09-06 立项，9 张分类票 #163–#171）
 
