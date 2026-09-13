@@ -260,7 +260,7 @@ readme_mermaid_recover() {
 # [0,0][0,0]。于是「目标节点的 bounds 是否非零」是滚动位置唯一可靠、与渲染通道无关
 # 的信号。
 # 输出：`target <top> <bottom>`＝图表区在屏（附目标区包围盒）；
-#      `overshoot`＝已滚过头（屏内出现后一段「Sequence diagram」标题）；
+#      `overshoot`＝已滚过头（屏内出现目标之后的任一示例代码块标记）；
 #      `none`＝不在屏（既没到也没过）。
 readme_mermaid_target_state() {
   # dump_ui 的失败告警走 stdout——必须转 stderr，否则会混进本函数的单行返回值
@@ -280,7 +280,20 @@ for text, _l, top, _r, bottom in pat.findall(xml):
     if 'Flowchart [' in text or 'A[Hard]' in text:
         tops.append(top)
         bottoms.append(bottom)
-    elif 'Sequence diagram [' in text or 'Gantt chart [' in text:
+    elif any(
+        marker in text
+        for marker in (
+            'Sequence diagram [',
+            'Gantt chart [',
+            # 目标之后的示例代码块标记（小写代码形态不在 TOC 里出现，无顶部误报；
+            # 2026-09-13 阅读密度变更后页高约 +1/3，滚过头时旧标记可能全部离屏
+            # → 探针一路向下滑不回头，补这些深层标记兜底）：
+            'sequenceDiagram',
+            'gantt',
+            'classDiagram',
+            'gitGraph',
+        )
+    ):
         overshoot = True
 if tops:
     print('target %d %d' % (min(tops), max(bottoms)))
@@ -294,13 +307,13 @@ PY
 }
 
 # 一次定位尝试：先按 CI 校准值推进（14 次短滑 ≈ 图表区入口），再按判据微调。
-# 每次迭代一次 dump（5-15s）——只做位置确认，不参与取帧。
-# 返回 0 = 图表区已在视口且位置合适；1 = 5 次校正后仍未到位。
+# 每次迭代一次 dump（5-15s）——只做位置确认，不参与取帧。取帧前一次只能微调。
+# 返回 0 = 图表区已在视口且位置合适；1 = 8 次校正后仍未到位。
 readme_mermaid_position_once() {
   local i state top
   README_MERMAID_RESET=0
   readme_mermaid_swipe 14
-  for i in 1 2 3 4 5; do
+  for i in 1 2 3 4 5 6 7 8; do
     if [ "$README_MERMAID_RESET" = "1" ]; then
       README_MERMAID_RESET=0
       readme_mermaid_swipe 14
