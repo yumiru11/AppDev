@@ -281,13 +281,18 @@ object MarkdownGfmFixtures {
                         "renderer.js 的 renderMath 在 DOMPurify 清洗**之后**渲染（不放宽 PURIFY_CONFIG）；" +
                         "离线通道检测 \$…\$ / \$\$…\$\$（FeatureDetector.containsMath），服务端 HTML 通道按 " +
                         "GitHub 的 <math-renderer> 占位检测。真实执行回归见 MathRenderExecutionTest；" +
-                        "原生链无 math 槽位（NATIVE 仍不含本夹具），Mermaid 属 Phase 2 未实现",
+                        "原生链无 math 槽位（NATIVE 仍不含本夹具）",
             ),
             Fixture(
                 "34-mermaid",
                 "Mermaid（兜底通道，可选）",
-                emptySet(),
-                note = "未实现：无 Mermaid 运行时；围栏降级为普通代码块（语言标签 mermaid）",
+                setOf(RenderPath.SERVER_HTML, RenderPath.OFFLINE_GFM),
+                note =
+                    "2026-09-13 落地：离线 Mermaid Tiny 11.17.2（assets/webview/mermaid/mermaid.tiny.js，" +
+                        "IIFE 单文件、无动态 import）由 renderer.js 的 renderMermaid 在 DOMPurify 清洗**之后**" +
+                        "渲染（不放宽 PURIFY_CONFIG）；securityLevel:'strict' + htmlLabels:false；" +
+                        "Chromium ≥94 门禁（class static block，WebViewMermaidSupport）不满足时回退为普通代码块。" +
+                        "真实执行回归见 MermaidRenderExecutionTest；原生链无图表槽位（NATIVE 不含本夹具）",
             ),
             Fixture(
                 "35-footnote",

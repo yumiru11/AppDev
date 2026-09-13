@@ -12,8 +12,8 @@
 
 ## 0. 一句话结论
 
-§2.3 的 **35 条**里：**10 条**有渲染且回归可执行、**24 条**有渲染但像素基线待云端录制、
-**1 条**完全没有渲染路径（Mermaid）。
+§2.3 的 **35 条**里：**11 条**有渲染且回归可执行、**24 条**有渲染但像素基线待云端录制、
+**0 条**完全没有渲染路径（最后一条 Mermaid 于 2026-09-13 落地）。
 WebView 路径的**产物层**回归已覆盖全部 35 条；**像素层**在 Linux JVM 上对 WebView
 永远不可测，只能靠 CI 模拟器截图与真机走查。
 
@@ -21,7 +21,17 @@ WebView 路径的**产物层**回归已覆盖全部 35 条；**像素层**在 Li
 > （KaTeX 0.18.7，仅 woff2 字体）由 `renderer.js` 的 `renderMath` 在 DOMPurify 清洗**之后**
 > 渲染（**未放宽** `PURIFY_CONFIG`）；两条 WebView 通道都覆盖（离线检测 `$…$`/`$$…$$`，
 > 服务端 HTML 按 GitHub 的 `<math-renderer>` 占位检测）。行为证据见 `MathRenderExecutionTest`
-> （Node 真实执行真实 `katex.min.js` + `renderer.js`）。Mermaid 仍属 Phase 2（未实现）。
+> （Node 真实执行真实 `katex.min.js` + `renderer.js`）。Mermaid 属 Phase 2（见更新（四））。
+
+> **2026-09-13 更新（四）**：离线 Mermaid 图表渲染已落地（Phase 2）——
+> `assets/webview/mermaid/mermaid.tiny.js`（`@mermaid-js/tiny` 11.17.2，IIFE 单文件
+> 2,555,146 B raw / 672,490 B deflate，实测 0 处 `import(`）由 `renderer.js` 的
+> `renderMermaid` 在 DOMPurify 清洗**之后**渲染（**未放宽** `PURIFY_CONFIG`）；
+> `securityLevel:'strict'` + `htmlLabels:false` + 单文档图数上限 10。Chromium ≥94 门禁
+> （bundle 内 513 处 class static block：解析期语法级失败，脚本内 catch 不住）由 Kotlin
+> （`WebViewMermaidSupport`，按 UA 决定是否注入）与 JS（`new Function` 语法探针 +
+> `window.mermaid` 检查）双层兜底，不满足时回退为普通代码块。行为证据见
+> `MermaidRenderExecutionTest`（真实 bundle 的 parse + 真实 `renderer.js` 驱动）。
 
 > **2026-09-12 更新**：D3（离线相对链接/图片重写）与 emoji 短码、脚注、锚点跳转已随
 > `fix/offline-gfm-relative-urls` 修复；下面的表格与统计已同步为修复后的状态。离线渲染
@@ -89,7 +99,7 @@ App 侧要保证的是「不要把它弄坏」（清洗、相对 URL 改写、CS
 | `31-image-gif` | 图片：GIF | — | ✅ | ✅ | ✅ |
 | `32-inline-html` | 内嵌 HTML（安全子集） | ✅ | ✅ | ✅ | 🟡 |
 | `33-math-katex` | Math/KaTeX（兜底通道，可选） | — | ✅ | ✅ | ✅ |
-| `34-mermaid` | Mermaid（兜底通道，可选） | — | — | — | ❌ |
+| `34-mermaid` | Mermaid（兜底通道，可选） | — | ✅ | ✅ | ✅ |
 | `35-footnote` | 脚注（尽力而为，不保证与网页完全一致） | — | ✅ | ✅ | ✅ |
 <!-- END FIXTURE TABLE -->
 
@@ -107,33 +117,33 @@ App 侧要保证的是「不要把它弄坏」（清洗、相对 URL 改写、CS
 | 口径 | 数量 |
 |---|---|
 | §2.3 原子条目总数 | 35 |
-| ✅ 有渲染 + 回归可执行 | **10** |
+| ✅ 有渲染 + 回归可执行 | **11** |
 | 🟡 有渲染 + 原生像素基线待录制（WebView 产物回归已就位） | **24** |
-| ❌ 无渲染路径 | **1** |
-| 服务端 HTML 通道覆盖 | 33 / 35 |
-| 离线 GFM 通道覆盖 | 31 / 35 |
+| ❌ 无渲染路径 | **0** |
+| 服务端 HTML 通道覆盖 | 34 / 35 |
+| 离线 GFM 通道覆盖 | 32 / 35 |
 | 原生通道覆盖 | 24 / 35 |
 
-严格口径（只认「基线已生效的像素回归」）：**0**——因为 24 条原生基线尚未录制，
-1 条无渲染。这就是本票结束时「与网页端一致」的**真实自动化水位**，不要按 7/35 之外的数字宣传。
+严格口径（只认「基线已生效的像素回归」）：**0**。这就是本票结束时「与网页端一致」的
+**真实自动化水位**，不要按 7/35 之外的数字宣传。
 
 ## 3. 最严重的 3 个缺口
 
-### 缺口 1：离线 GFM 通道仍缺 4 条 §2.3 写法（2026-09-11 时点为 12 条）
+### 缺口 1：离线 GFM 通道仍缺 3 条 §2.3 写法（2026-09-11 时点为 12 条）
 
 离线 GFM（markdown-it 14.1.0 + renderer.js）是 **Issue/PR 正文的唯一通道**，也是 README
 服务端异常时的降级通道。产物级证据（`WebViewOfflineGfmCapabilityTest`）。
 2026-09-12 的修复波补上 6 条（相对链接、相对图片、emoji 短码、锚点跳转、脚注、`@user` 提及）；
 相对链接/图片的改写移到 markdown-it 渲染产物层（`renderer.js` 的 `rewriteRelativeUrls`，
 Node 真实执行回归 `OfflineRendererExecutionTest`）。2026-09-13 又补上 KaTeX 数学
-（`renderer.js` 的 `renderMath`，Node 真实执行回归 `MathRenderExecutionTest`）。当前剩余缺口：
+（`renderer.js` 的 `renderMath`，Node 真实执行回归 `MathRenderExecutionTest`）。2026-09-13 再补上
+Mermaid 图表（`renderer.js` 的 `renderMermaid`，Node 真实执行回归 `MermaidRenderExecutionTest`）。当前剩余缺口：
 
 | 缺失写法 | 产物证据 |
 |---|---|
 | `@org/team` 提及 | 用户提及已由 `mentionPlugin` 补齐；团队提及无应用内路由（GitHubLinkParser 归 External），整段保持纯文本 |
 | `#123` / `owner/repo#123` / `gh-123` 引用 | 正文裸引用不被 linkify（`GfmNativeParserCapabilityTest.issueReferenceFixture_hashSyntax_isNotAutolinked` 同样在原生侧证否） |
 | 裸 sha 提交引用 | 同上 |
-| Mermaid | Phase 2：`assets/webview/` 无 Mermaid 运行时（围栏降级为普通代码块） |
 
 > 曾经的 D3 是**功能性损坏**：离线产物不改写相对路径，而 WebView base 是
 > `https://appassets.androidplatform.net/`（`WebViewMarkdownRenderer.kt:226`），
@@ -144,11 +154,12 @@ Node 真实执行回归 `OfflineRendererExecutionTest`）。2026-09-13 又补上
 
 见 §4 的 D1 / D2。二者都在**用户可见的正文**里，且都在 §2.3 明确要求的写法上。
 
-### 缺口 3：1 条「完全没有渲染路径」的写法
+### 缺口 3：0 条「完全没有渲染路径」的写法（2026-09-13 清零）
 
-`34-mermaid`（`28-anchor-jump`、`29-image-lazy` 于 2026-09-12 落地，`33-math-katex` 于
-2026-09-13 由离线 KaTeX 落地）。`mermaid` 是 §2.3 标注「兜底通道，可选」中尚未做的一项
-（Phase 2；可行性报告已给出 Mermaid Tiny 11.17.2 的体积与版本门禁结论）。
+`34-mermaid` 于 2026-09-13 由离线 Mermaid Tiny 11.17.2 落地（`28-anchor-jump`、
+`29-image-lazy` 于 2026-09-12 落地，`33-math-katex` 于 2026-09-13 由离线 KaTeX 落地）。
+至此 §2.3 的 35 条**全部至少有一条渲染路径**；「完全未实现」为零。Mermaid 的实际可用性
+还受 Chromium ≥94 门禁约束（不满足的设备回退为普通代码块，见缺口 1 之上的说明）。
 
 ## 4. 发现但**未修**的真实渲染缺陷（本票只记录，不修）
 

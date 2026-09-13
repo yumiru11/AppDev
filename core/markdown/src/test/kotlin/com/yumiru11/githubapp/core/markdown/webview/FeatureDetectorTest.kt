@@ -264,4 +264,42 @@ class FeatureDetectorTest {
         // 与 renderer.js 的 MATH_TOKEN_REGEX 同规则：行内公式不得跨行（2026-09-13 收紧）
         assertFalse(FeatureDetector.containsMath("\$a\nb\$"))
     }
+
+    // ── 2026-09-13（离线 Mermaid）：containsMermaid 注入开关 ────────────────
+
+    @Test
+    fun containsMermaid_lowercaseFence_returnsTrue() {
+        assertTrue(FeatureDetector.containsMermaid("# 架构\n\n```mermaid\ngraph TD\nA-->B\n```"))
+    }
+
+    @Test
+    fun containsMermaid_uppercaseFence_returnsTrue() {
+        assertTrue(FeatureDetector.containsMermaid("```MERMAID\nsequenceDiagram\n  A->>B: Hi\n```"))
+    }
+
+    @Test
+    fun containsMermaid_fenceWithExtraInfoString_returnsTrue() {
+        // ```mermaid 后跟信息串（如 title）也是合法围栏
+        assertTrue(FeatureDetector.containsMermaid("```mermaid title=\"架构图\"\ngraph TD\nA-->B\n```"))
+    }
+
+    @Test
+    fun containsMermaid_languagePrefixWithoutWordBoundary_returnsFalse() {
+        // ```mermaidx 不是 mermaid 围栏（\b 词边界不得被当成前缀匹配）
+        assertFalse(FeatureDetector.containsMermaid("```mermaidish\nnot a diagram\n```"))
+    }
+
+    @Test
+    fun containsMermaid_plainTextAndInlineCode_returnsFalse() {
+        assertFalse(FeatureDetector.containsMermaid("Use `mermaid` for diagrams, plain text only."))
+        assertFalse(FeatureDetector.containsMermaid("```kotlin\nval x = 1\n```"))
+    }
+
+    @Test
+    fun containsMermaid_mermaidFenceInsideDocumentationFence_returnsTrueButRendererRejects() {
+        // 有意不剥离围栏代码块（mermaid 围栏本身就是围栏）：文档里展示 mermaid 语法会多注入
+        // 一次脚本，但 renderer.js 按清洗后的真实 DOM 独立严判（language-markdown 不是
+        // language-mermaid），不会误渲染。这里锁定「注入开关宁可多开，正确性在 JS 侧」。
+        assertTrue(FeatureDetector.containsMermaid("````markdown\n```mermaid\ngraph TD\n```\n````"))
+    }
 }

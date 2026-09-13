@@ -228,7 +228,16 @@ fun WebViewMarkdownRenderer(
                     // 不含它数学就没有排版。仅数学内容才会被 WebViewHtmlBuilder 注入。
                     WebViewHtmlBuilder.KATEX_CSS_KEY to readAsset(context, "webview/katex/katex.min.css"),
                 )
-            val html = WebViewHtmlBuilder.build(sanitizedHtml, themeVariables, isDark, renderMode, baseRepoUrl, inlineCss)
+            val html =
+                WebViewHtmlBuilder.build(
+                    sanitizedHtml,
+                    themeVariables,
+                    isDark,
+                    renderMode,
+                    baseRepoUrl,
+                    inlineCss,
+                    mermaidRuntimeSupported = WebViewMermaidSupport.isRuntimeSupported(webView),
+                )
             webView.loadDataWithBaseURL(
                 "https://appassets.androidplatform.net/",
                 html,

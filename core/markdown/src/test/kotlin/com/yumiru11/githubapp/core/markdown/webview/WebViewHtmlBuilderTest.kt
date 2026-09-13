@@ -665,6 +665,77 @@ class WebViewHtmlBuilderTest {
         assertTrue("脚本仍必须注入（排版样式与运行时是两件事）", html.contains("katex/katex.min.js"))
     }
 
+    // ── 2026-09-13：离线 Mermaid 运行时（条件注入 + Chromium 门禁）────────
+
+    @Test
+    fun build_offlineModeWithMermaidFence_injectsMermaidRuntimeScript() {
+        val html = buildOffline("```mermaid\ngraph TD\n    A[Start] --> B{Done}\n```")
+
+        assertTrue(
+            "mermaid 围栏必须注入 mermaid.tiny.js（离线 assets，IIFE 单文件）",
+            html.contains("<script src=\"https://appassets.androidplatform.net/assets/webview/mermaid/mermaid.tiny.js\"></script>"),
+        )
+    }
+
+    @Test
+    fun build_offlineModeWithoutMermaid_omitsMermaidRuntimeEntirely() {
+        val html = buildOffline("# 标题\n\n普通段落\n\n```kotlin\nval x = 1\n```")
+
+        assertFalse("无图内容不得加载 Mermaid（约 2.5MB 未压缩解析成本）", html.contains("mermaid"))
+    }
+
+    @Test
+    fun build_serverHtmlWithHighlightSourceMermaid_injectsMermaidRuntime() {
+        // GitHub 实测形态：语法高亮代码块 div.highlight-source-mermaid > pre（可行性报告 §3.5）
+        val html =
+            buildServerHtml(
+                "<div class=\"highlight highlight-source-mermaid\"><pre>graph TD\nA--&gt;B</pre></div>",
+            )
+
+        assertTrue("服务端 Mermaid 高亮块必须触发脚本注入", html.contains("mermaid/mermaid.tiny.js"))
+    }
+
+    @Test
+    fun build_serverHtmlWithLanguageMermaidCode_injectsMermaidRuntime() {
+        val html = buildServerHtml("<pre><code class=\"language-mermaid\">graph TD</code></pre>")
+
+        assertTrue("language-mermaid 形态也必须触发注入", html.contains("mermaid/mermaid.tiny.js"))
+    }
+
+    @Test
+    fun build_serverHtmlWithoutMermaid_omitsMermaidRuntime() {
+        val html = buildServerHtml("<p>plain</p><pre><code class=\"language-kotlin\">val x = 1</code></pre>")
+
+        assertFalse("普通代码块不得加载 Mermaid", html.contains("mermaid"))
+    }
+
+    @Test
+    fun build_mermaidDetectedButRuntimeUnsupported_omitsScriptEntirely() {
+        // Chromium < 94 门禁（WebViewMermaidSupport）：即使内容含图也不注入——
+        // mermaid.tiny.js 的 class static block 在老引擎上是不可捕获的语法级失败。
+        val html =
+            WebViewHtmlBuilder.build(
+                sanitizedHtml = "```mermaid\ngraph TD\nA-->B\n```",
+                themeVariables = "--md-sys-color-primary: #123456;",
+                isDark = false,
+                renderMode = RenderMode.OFFLINE_MARKDOWN_IT,
+                mermaidRuntimeSupported = false,
+            )
+
+        assertFalse(
+            "不支持 Mermaid 的 WebView 不得注入脚本（回退为普通代码块）",
+            html.contains("mermaid/mermaid.tiny.js"),
+        )
+    }
+
+    @Test
+    fun build_mathAndMermaidDetected_injectsBothRuntimes() {
+        val html = buildOffline("行内 \$x^2\$\n\n```mermaid\ngraph TD\nA-->B\n```")
+
+        assertTrue("两条运行时必须共存（同一页可同时有公式与图）", html.contains("katex/katex.min.js"))
+        assertTrue(html.contains("mermaid/mermaid.tiny.js"))
+    }
+
     private fun buildOffline(markdown: String): String =
         WebViewHtmlBuilder.build(
             sanitizedHtml = markdown,

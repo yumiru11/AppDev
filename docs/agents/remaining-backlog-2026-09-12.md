@@ -209,7 +209,7 @@
 | S4 P1-2 / G-01（PR 三屏三重盲区） | P1 | 3 屏基线 + `ci.yml:221` verify（#249） |
 | S1 §2.4（`FeatureDetector` 死代码） | P2 | #254 核验后保留并加注释（文档化墓碑）；对应 §6 D-5 闭环 |
 | S5（AGP9 可行性）「迁移未做」 | 缺口 | **已落地（#270）**：AGP 9.1.1 / Gradle 9.3.1 / compileSdk 37 / buildTools 36.0.0 / built-in Kotlin；报告路线被采用 |
-| S2 §3 缺口 3（KaTeX/Mermaid） | 缺口 | **KaTeX 已落地（#269）**；Mermaid 仍开放（Phase 2，WebView ≥ 94 门禁） |
+| S2 §3 缺口 3（KaTeX/Mermaid） | 缺口 | **均已落地**：KaTeX（#269）；Mermaid 离线 Tiny 11.17.2（post-sanitize；Chromium ≥94 门禁，不满足回退普通代码块） |
 | S1 §5.5 / §5.4（SPEC-1/SPEC-2） | P1 | **计划已入库（#268）**，实现 Batch 1 开工；不再是「无人管」 |
 | KaTeX 可行性研究 R11（体积无回归门禁） | 缺口 | **已加门禁（#271）**：`check-apk-size.sh` + `.github/apk-size-budget.properties` |
 
@@ -222,7 +222,7 @@
 | # | 决策点 | 为什么不能由代理拍板 | 关联条目 |
 |---|---|---|---|
 | D-1 | **`docs/ui-design.md` §7.1 六套主题命名** vs ADR-0004 的六模式 | 需决定「改文档对齐 ADR」还是「改代码实现文档命名」，影响设置页文案与截图矩阵 | S1 D9 |
-| D-2 | **离线通道是否引入 KaTeX/Mermaid** | 收益（Issue 正文数学/图）vs 体积与真机性能；**KaTeX 已落地（#269）**，Mermaid 仍开放（Phase 2） | S2 §3 缺口 3、S1 §2.3 |
+| D-2 | **离线通道是否引入 KaTeX/Mermaid** | 收益（Issue 正文数学/图）vs 体积与真机性能；**KaTeX 已落地（#269）**，Mermaid 也已落地（离线 Tiny 11.17.2 + Chromium ≥94 门禁） | S2 §3 缺口 3、S1 §2.3 |
 | D-3 | **窄屏 side-by-side diff：隐藏还是横向滚动** | 交互取舍；可结合 WindowSizeClass 自适应方案 | UI-1 |
 | D-4 | **feed 首载：骨架屏还是 M3 LoadingIndicator** | 纯观感取向，需设计确认 | UI-7 |
 | ~~D-5~~ | ~~`FeatureDetector`：删除还是保留为文档化墓碑~~ | ✅ **已决定**（#254 核验后保留 + 注释；与 ADR-0007 措辞一致） | ~~DEAD-2~~ |
@@ -234,8 +234,8 @@
 >
 > **2026-09-13 更新**：D-2 的 KaTeX 部分已落地（离线 KaTeX 0.18.7，post-sanitize 渲染、
 > 仅 woff2 字体、条件注入；两条 WebView 通道覆盖，见 `docs/agents/markdown-consistency-2026-09-11.md`
-> 的 2026-09-13 更新与 `MathRenderExecutionTest`）。Mermaid 仍按可行性报告的 Phase 2 结论开放
-> （Tiny 11.17.2 + WebView ≥ 94 版本门禁）。
+> 的 2026-09-13 更新与 `MathRenderExecutionTest`）。Mermaid 已按可行性报告的 Phase 2 结论落地
+> （Tiny 11.17.2 + WebView ≥ 94 版本门禁，见 `MermaidRenderExecutionTest`）。
 
 ---
 
@@ -248,7 +248,7 @@
 | **Wave A：设计系统 / 令牌** | SPEC-1（组件层，先 AppCard/AppDialog/AppChip/AppSnackbar）、SPEC-2（spacing）、UI-2（选中态 token） | `core/designsystem`、`core/ui` → 各 feature | 会触及几乎所有 `feature/**` 的裸控件/裸 dp | **AGP 9 已合入（#270），阻塞解除**；按 `docs/design-system/implementation-plan.md` 的 Batch 1→3 推进 |
 | **Wave C：UI 残余缺陷** | UI-1（窄屏 diff）、UI-4（空态）、UI-6（文件树时间列）、UI-7（feed 骨架） | `feature/{pullrequest,repo,home}` | 与 Wave A 的组件改造重叠 | UI-3/UI-5/REPO-1 已完成；余项在 A 之后 |
 | **Wave D：测试 / 数据 / 文档债** | DATA-2（core:data 测试配置）、TEST-2 低 ROI 余量、PROTO-1 归档、§5 文档漂移余量 | `core/data`、`build.gradle.kts`、`docs/**` | 与 A/C 基本不冲突 | **可与其他波并行**，冲突最少 |
-| **Wave E：决策与工具链（先 grill）** | §6 的 D-1/D-3/D-4/D-6/D-8；PERF-1/PERF-2 | `docs/**`、工具链 | 与 A–D 无代码冲突 | 先出决策。~~AGP9-1~~ 已闭环（#270）；D-2 的 Mermaid 仍开放 |
+| **Wave E：决策与工具链（先 grill）** | §6 的 D-1/D-3/D-4/D-6/D-8；PERF-1/PERF-2 | `docs/**`、工具链 | 与 A–D 无代码冲突 | 先出决策。~~AGP9-1~~ 已闭环（#270）；~~D-2 的 KaTeX/Mermaid~~ 均已落地，决策项关闭 |
 
 **并行建议**：Wave D 与 Wave A/C 任意组合并行；Wave E 的决策项优先产出。
 

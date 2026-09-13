@@ -102,6 +102,16 @@ object FeatureDetector {
     fun containsMath(markdown: String): Boolean = MATH_REGEX.containsMatchIn(stripFencedCodeBlocks(markdown))
 
     /**
+     * 内容是否含 mermaid 围栏（三个反引号 + mermaid 信息串）。
+     *
+     * 供 WebView 侧决定是否注入离线 Mermaid 运行时（`WebViewHtmlBuilder.needsMermaid`）。
+     * **有意不剥离围栏代码块**（与 [containsMath] 不同）：mermaid 围栏本身就是围栏代码块，
+     * 剥离会把唯一命中源删掉。代价是「文档里用围栏展示 mermaid 语法」会多注入一次脚本，
+     * 但 JS 侧（renderer.js 的 renderMermaid）按清洗后的真实 DOM 独立严判，不会误渲染。
+     */
+    fun containsMermaid(markdown: String): Boolean = MERMAID_FENCE_REGEX.containsMatchIn(markdown)
+
+    /**
      * 判定 markdown 内容是否需要走 WebView 兜底通道。
      *
      * @param markdown 原始 markdown 文本（空串返回 Native）

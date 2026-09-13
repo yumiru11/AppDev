@@ -101,16 +101,40 @@ class WebViewOfflineGfmCapabilityTest {
     }
 
     @Test
-    fun webviewAssets_containNoMermaidRuntime_phase2OutOfScope() {
-        val files = webviewAssetsDir.listFiles()?.map { it.name }.orEmpty()
+    fun webviewAssets_containMermaidTinyRuntime_wiredAsPostSanitizePass() {
+        val mermaidDir = File(webviewAssetsDir, "mermaid")
+        assertTrue("Mermaid 运行时目录必须存在（否则图表渲染空转）", mermaidDir.isDirectory)
+        val bundle = File(mermaidDir, "mermaid.tiny.js")
+        assertTrue("Mermaid 资产必须存在: mermaid/mermaid.tiny.js", bundle.isFile)
+        assertTrue("MIT LICENSE 必须随包", File(mermaidDir, "LICENSE").isFile)
 
-        val offenders = files.filter { name -> name.contains("mermaid", ignoreCase = true) }
-        assertTrue("Mermaid 属 Phase 2，本轮不得引入: $offenders", offenders.isEmpty())
+        val source = bundle.readText()
+        assertTrue(
+            "必须是 Mermaid Tiny 11.17.2（升级需同步体积与 Chromium ≥94 门禁结论）",
+            source.contains("11.17.2-tiny"),
+        )
+        assertEquals("IIFE 不得有动态 import（老 WebView 的 asset loader 解析不了）", 0, Regex("""import\(""").findAll(source).count())
+        assertTrue("必须含 class static block —— 这正是 Chromium ≥94 门禁的语法依据", source.contains("static{"))
 
-        assertFalse("任何打包脚本都不得含 mermaid", markdownItBundle().contains("mermaid"))
-        listOf("window.mermaid", "mermaid.run", "mermaid.initialize").forEach { signal ->
-            assertFalse("renderer.js 不得有 Mermaid 运行时信号（$signal）", rendererJs().contains(signal))
-        }
+        val renderer = rendererJs()
+        assertTrue("图表渲染必须由 renderer.js 的 renderMermaid 完成", renderer.contains("function renderMermaid(root"))
+        assertTrue(
+            "renderMermaid 必须在 sanitizeNode(root) 之后调用（方案 B：post-sanitize，不放宽 DOMPurify）",
+            renderer.indexOf("sanitizeNode(root);") < renderer.indexOf("renderMermaid(root);"),
+        )
+        assertTrue(
+            "PURIFY_CONFIG 必须原样保住 FORBID_ATTR 的 style（Mermaid SVG 配色同样不过清洗）",
+            renderer.contains("FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style']"),
+        )
+        assertTrue("引擎以 window.mermaid 为开关（Kotlin 门禁拦下时不注入 → no-op）", renderer.contains("window.mermaid"))
+        assertTrue("安全档必须钉住 securityLevel:'strict'（不得 loose/antiscript）", renderer.contains("securityLevel: 'strict'"))
+        assertTrue("htmlLabels 必须关闭（未信源文本不产 HTML 标签）", renderer.contains("htmlLabels: false"))
+        assertTrue(
+            "必须含 ES2024 class static block 语法探针（Chromium <94 回退代码块）",
+            renderer.contains("__appdev_mermaid_probe"),
+        )
+        assertTrue("主题变量必须读 CSS 变量（mermaidThemeVariables），不得写死配色", renderer.contains("mermaidThemeVariables"))
+        assertFalse("Mermaid 不得被打包进 markdown-it bundle", markdownItBundle().contains("mermaid"))
     }
 
     @Test
@@ -194,12 +218,12 @@ class WebViewOfflineGfmCapabilityTest {
     @Test
     fun offlineGfmUnsupportedFixtures_areExactlyTheDocumentedGapSet() {
         // 不含 OFFLINE_GFM 路径的夹具 = 离线通道的已知缺口，必须与报告一致
+        // （34-mermaid 已于 2026-09-13 由离线 Mermaid Tiny 落地，移出缺口集合）
         val expected =
             setOf(
                 "23-mention-org-team",
                 "24-issue-ref",
                 "25-commit-sha-ref",
-                "34-mermaid",
             )
         val actual =
             MarkdownGfmFixtures.ALL
@@ -218,8 +242,8 @@ class WebViewOfflineGfmCapabilityTest {
                 .map { it.id }
 
         assertEquals(
-            "离线通道覆盖的 §2.3 条目数（2026-09-13 KaTeX 落地后：30 + math）",
-            31,
+            "离线通道覆盖的 §2.3 条目数（2026-09-13 KaTeX + Mermaid 落地后：31 + mermaid）",
+            32,
             offlineIds.size,
         )
     }
@@ -311,6 +335,7 @@ class WebViewOfflineGfmCapabilityTest {
                 "31-image-gif" to MARKDOWN_IT_BANNER,
                 "32-inline-html" to "html: true",
                 "33-math-katex" to "renderMath",
+                "34-mermaid" to "renderMermaid",
                 "35-footnote" to "footnotePlugin",
             )
 
