@@ -101,14 +101,15 @@
 | 图片懒加载/点击放大/GIF | 🔶 | 🔶 | 🔶 | 🔶 | 点击放大：`bindImages` → `onImageClick`（`renderer.js:51-64`）；**无 `loading="lazy"`**（grep 0 命中）；GIF 走 Coil（原生）/WebView 默认 |
 | 内嵌 HTML（安全子集） | 🔶 | ✅ | 🔶 | 🔶 | 原生 `EnhancedHtmlBlock.kt`（170 行）+ `HtmlBadgeParser`/`HtmlDetailsParser`；安全治理见 §2.14 表；DOMPurify `FORBID_TAGS` 含 `style`/`form`（`renderer.js:24`）——GitHub 实际允许的 `<kbd>`/`<sub>` 等保留，但 `<details>` 的 `open` 属性、部分 `<span class>` 白名单未验证 |
 | Math / KaTeX | ❌ | ~~✅ GitHub 渲染~~ **（2026-09-13 更正）GitHub 只出 `<math-renderer>` 占位，App 用离线 KaTeX 水合 ⇒ ✅** | 🔶→**✅（2026-09-13 落地离线 KaTeX 0.18.7）** | ✅ | 2026-09-13 起 WebView 打包离线 KaTeX（post-sanitize 渲染，两条通道都覆盖）。⚠️ 原判「GitHub 服务端渲染 ✅」经 `POST /markdown` 实测**不成立**：GitHub 只返回 `<math-renderer>` 占位 + 原始 `$…$` 文本（水合靠 github.com 前端脚本），见 `docs/research/katex-mermaid-offline-feasibility.md` §3.5 |
-| Mermaid | ❌ | ~~✅ GitHub 渲染~~ **❌（2026-09-13 更正，实测）** | ❌ | ❌ | `FeatureDetector.kt` 判定 → WebView **未打包 mermaid**（Phase 2，未实现）⇒ 同 MATH。⚠️ 原判「README 走服务端 HTML 时由 GitHub 出图 ✅」同样被实测推翻：GitHub 返回的是语法高亮代码块 `highlight-source-mermaid`，图由 github.com 前端脚本渲染 |
+| Mermaid | ❌ | ~~✅ GitHub 渲染~~ **（2026-09-13 更正，实测）GitHub 只出 `highlight-source-mermaid` 高亮代码块，App 用离线 Mermaid Tiny 水合 ⇒ ✅** | ❌→**✅（2026-09-13 落地离线 Mermaid Tiny 11.17.2）** | ✅ | 2026-09-13 起 WebView 打包离线 Mermaid（`assets/webview/mermaid/mermaid.tiny.js`，IIFE 单文件，post-sanitize 渲染；`securityLevel:'strict'` + `htmlLabels:false`；Chromium ≥94 门禁（class static block 是解析期语法级失败）不满足时回退普通代码块）。⚠️ 原判「README 走服务端 HTML 时由 GitHub 出图 ✅」同样被实测推翻：GitHub 返回的是语法高亮代码块，图由 github.com 前端脚本渲染 |
 | 脚注 | ❌ | ✅ | ❌ | 🔶 | markdown-it `footnote` 插件未装（`renderer.js:308-309` 只 `use` 了 alert + taskList 两个自研插件）；原生无 |
 
 **统计：§2.3 共 22 项 → ✅9 / 🔶11 / ❌2（锚点、Math 渲染器缺失；Mermaid/脚注/emoji 短码归 🔶 因服务端 HTML 路径可覆盖）。**
 
 > **2026-09-13 更正**：本表是 2026-09-11 快照。其中 Math/KaTeX 已于 2026-09-13 落地离线渲染
 > （两条 WebView 通道；见 `docs/agents/markdown-consistency-2026-09-11.md` 的 2026-09-13 更新）、
-> Mermaid 与部分 🔶 项的现状也已有变化——**以 catalog + 一致性报告为准**，本表不再逐行维护。
+> **Mermaid 也于同日由离线 Mermaid Tiny 11.17.2 落地**（Phase 2；Chromium ≥94 门禁，
+> 不满足时回退代码块），部分 🔶 项的现状也已有变化——**以 catalog + 一致性报告为准**，本表不再逐行维护。
 
 ### 2.2 §2.4 渲染器抽象接口
 

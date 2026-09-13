@@ -1,0 +1,122 @@
+# 离线 Mermaid 渲染的**真机渲染证据**（CI，模拟器）。
+#
+# 为什么需要独立 job：mermaid 11（Tiny 11.17.2）的构建含 ES2024 class static block，
+# Chromium < 94 在解析期直接拒绝脚本 —— 而 CI 的常规截图 job 跑 API 30（WebView
+# Chromium 83），**只可能**证明「门禁回退为代码块」。要证明「图真的渲染出来了」必须
+# 上 API 33（WebView Chromium 101）。两条腿（render + blocked）合起来才是完整证据：
+#   - API 33：logcat `MermaidRender: engine=supported rendered>=1`（真渲染）
+#   - API 30：logcat `MermaidRender: engine=blocked rendered=0` 且无 supported（真回退）
+# 证据/断言实现全部在 .github/scripts/mermaid-render-verify.sh（本 job 只提供模拟器与产物上传）。
+#
+# 触发面刻意收窄（path filter）：只有 markdown 渲染链路 / README 宿主 / 本 job 自身
+# 相关文件变更才跑，无关 PR 零成本；不替代 screenshots.sh（那是 32 帧视觉回归，
+# 本 job 只做「渲染事实」断言，不跑 screenshots.sh）。
+name: Mermaid render verify (emulator)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'core/markdown/**'
+      - 'feature/repo/**'
+      - 'app/src/main/**'
+      - '.github/scripts/mermaid-render-verify.sh'
+      - '.github/scripts/lib/adb-helpers.sh'
+      - '.github/workflows/mermaid-render-verify.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # 与 ci.yml 同款：gradle.properties 的本机 JDK 路径在 runner 上不存在
+      - name: Override local JDK path for CI
+        run: python3 -c "import re; p='gradle.properties'; s=open(p).read(); open(p,'w').write(re.sub(r'(?m)^org\.gradle\.java\.home.*\n?', '', s))"
+
+      - name: Seed plugin artifacts into mavenLocal
+        run: bash .github/gradle/seed-plugins.sh
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Assemble debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: mermaid-verify-apk
+          path: app/build/outputs/apk/debug/*.apk
+
+  verify:
+    name: Mermaid ${{ matrix.mode }} (API ${{ matrix.api-level }})
+    needs: build-apk
+    strategy:
+      # 两条腿各自独立判分：一条红必须能看到另一条的结果（fail-fast: false）
+      fail-fast: false
+      matrix:
+        include:
+          # API 33 → WebView Chromium 101（≥94）：真渲染腿
+          - api-level: 33
+            mode: render
+          # API 30 → WebView Chromium 83（<94）：门禁回退腿
+          - api-level: 30
+            mode: blocked
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download debug APK
+        uses: actions/download-artifact@v8
+        with:
+          name: mermaid-verify-apk
+          path: app/build/outputs/apk/debug
+
+      # KVM 组权限（同 ci.yml 截图 job；否则 action 报 hardware acceleration unavailable）
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      - name: Run mermaid render verification on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: default
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            bash .github/scripts/mermaid-render-verify.sh ${{ matrix.api-level }} ${{ matrix.mode }}
+
+      # 失败也保留证据（截图/UI 层级/logcat/断言清单）——本 job 的全部价值就是可复核
+      - name: Upload evidence (screenshot + logcat + assertions)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mermaid-verify-api${{ matrix.api-level }}
+          path: artifacts/mermaid-verify/**
+          if-no-files-found: warn

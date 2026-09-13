@@ -164,4 +164,11 @@ private class EditorPreviewBridgeCallback(
     ) = Unit
 
     override fun onHeightChanged(heightPx: Int) = Unit
+
+    /** Mermaid 渲染结果：编辑器预览无 CI 断言锚点（README 主路径在 feature:repo 打点），保留空实现。 */
+    override fun onMermaidResult(
+        rendered: Int,
+        failed: Int,
+        engineSupported: Boolean,
+    ) = Unit
 }

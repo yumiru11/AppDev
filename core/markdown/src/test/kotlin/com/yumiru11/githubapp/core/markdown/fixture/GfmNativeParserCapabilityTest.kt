@@ -186,14 +186,17 @@ class GfmNativeParserCapabilityTest {
     }
 
     @Test
-    fun mermaidFixture_fenceDegradesToPlainCodeFence_notDiagram() {
+    fun mermaidFixture_staysCodeFenceInNativeParser_webViewChannelsRenderIt() {
         val types = elementTypesOf("34-mermaid")
 
-        assertTrue("mermaid 围栏只会被解析为普通 CODE_FENCE（无图表运行时）", MarkdownElementTypes.CODE_FENCE in types)
+        assertTrue("mermaid 围栏在原生解析器里仍是普通 CODE_FENCE（原生链无图表槽位）", MarkdownElementTypes.CODE_FENCE in types)
+        val paths = MarkdownGfmFixtures.byId("34-mermaid").paths
         assertTrue(
-            "34-mermaid 必须被登记为「无渲染路径」而不是「已覆盖」",
-            MarkdownGfmFixtures.byId("34-mermaid").paths.isEmpty(),
+            "34-mermaid 必须登记服务端 HTML + 离线 GFM 两条 WebView 路径（2026-09-13 离线 Mermaid 落地）",
+            MarkdownGfmFixtures.RenderPath.SERVER_HTML in paths &&
+                MarkdownGfmFixtures.RenderPath.OFFLINE_GFM in paths,
         )
+        assertTrue("原生链无图表槽位，仍不得登记 NATIVE", MarkdownGfmFixtures.RenderPath.NATIVE !in paths)
     }
 
     @Test

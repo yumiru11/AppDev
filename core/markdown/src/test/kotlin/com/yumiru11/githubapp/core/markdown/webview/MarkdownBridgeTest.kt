@@ -3,6 +3,7 @@ package com.yumiru11.githubapp.core.markdown.webview
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -10,7 +11,8 @@ import org.junit.Test
  * MarkdownBridge 单元测试（纯 JVM，无需 Robolectric）。
  *
  * 验证 JS bridge 白名单回调分派：onLinkClick 走 GitHubLinkParser，
- * 其余回调（onCodeCopy/onImageClick/onCheckboxClick/onHeightChanged）转发至回调收集器。
+ * 其余回调（onCodeCopy/onImageClick/onCheckboxClick/onHeightChanged/onMermaidResult）
+ * 转发至回调收集器。
  */
 class MarkdownBridgeTest {
     @Test
@@ -95,6 +97,34 @@ class MarkdownBridgeTest {
     }
 
     @Test
+    fun onMermaidResult_renderedAndFailedCounts_forwardedToCallback() {
+        val recorder = RecordingBridgeCallback()
+        val bridge = MarkdownBridge(recorder, GitHubLinkParser)
+
+        bridge.onMermaidResult(3, 1, true)
+
+        assertEquals(1, recorder.mermaidResults.size)
+        val (rendered, failed, engineSupported) = recorder.mermaidResults.first()
+        assertEquals(3, rendered)
+        assertEquals(1, failed)
+        assertTrue("引擎放行时 engineSupported 必须为 true", engineSupported)
+    }
+
+    @Test
+    fun onMermaidResult_blockedEngine_forwardedAsZeroCountsAndFalse() {
+        val recorder = RecordingBridgeCallback()
+        val bridge = MarkdownBridge(recorder, GitHubLinkParser)
+
+        bridge.onMermaidResult(0, 0, false)
+
+        assertEquals(1, recorder.mermaidResults.size)
+        val (rendered, failed, engineSupported) = recorder.mermaidResults.first()
+        assertEquals(0, rendered)
+        assertEquals(0, failed)
+        assertFalse("门禁拦下时 engineSupported=false 是回退证据", engineSupported)
+    }
+
+    @Test
     fun onLinkClick_emptyUrl_noDispatch() {
         val recorder = RecordingBridgeCallback()
         val bridge = MarkdownBridge(recorder, GitHubLinkParser)
@@ -113,6 +143,7 @@ class MarkdownBridgeTest {
         val clickedImages = mutableListOf<String>()
         val checkboxChanges = mutableListOf<Pair<Int, Boolean>>()
         val heightChanges = mutableListOf<Int>()
+        val mermaidResults = mutableListOf<Triple<Int, Int, Boolean>>()
 
         override fun onExternalLink(url: String) {
             externalClicks.add(url)
@@ -141,6 +172,14 @@ class MarkdownBridgeTest {
 
         override fun onHeightChanged(heightPx: Int) {
             heightChanges.add(heightPx)
+        }
+
+        override fun onMermaidResult(
+            rendered: Int,
+            failed: Int,
+            engineSupported: Boolean,
+        ) {
+            mermaidResults.add(Triple(rendered, failed, engineSupported))
         }
     }
 }

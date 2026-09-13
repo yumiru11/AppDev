@@ -239,7 +239,8 @@ data class RenderContext(
 
    - markdown-it + markdown-it-task-lists/tables/anchor/emoji/footnote
    - **highlight.js 11.11.1（整包，非按语言懒加载）** ← 2026-09-11 回写：原计划为 Shiki（TextMate 语法、按语言懒加载，Web Worker 里跑）
-   - KaTeX、Mermaid **未接入**（⏳ 保留计划；当前 assets 内无对应脚本，见 §2.3 目标清单中二者的「可选」定位）
+   - KaTeX 0.18.7 与 Mermaid Tiny 11.17.2 **已接入**（2026-09-13）：均 post-sanitize 渲染、离线 assets、
+     条件注入；Mermaid 带 Chromium ≥94 门禁（不满足回退为普通代码块），见 §2.3 目标清单中二者的「可选」定位
    - 全部 JS/CSS 打包进 assets，`WebViewAssetLoader` 提供，不从网络加载
 
 ### 2.7 Issue/PR 正文渲染策略

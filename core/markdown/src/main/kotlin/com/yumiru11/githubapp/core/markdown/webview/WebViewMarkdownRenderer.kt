@@ -49,7 +49,7 @@ import okhttp3.OkHttpClient
  * @param sanitizedHtml 待渲染内容（SERVER_HTML 模式：服务端 HTML，构建时强制清洗；
  *   OFFLINE 模式：原始 markdown）
  * @param tokenProvider OAuth token 提供方（私有图床白名单拦截用；游客返回 null）
- * @param bridgeCallback JS bridge 白名单回调（链接/代码/图片/复选框/高度）
+ * @param bridgeCallback JS bridge 白名单回调（链接/代码/图片/复选框/高度/Mermaid 渲染结果）
  * @param renderMode 渲染模式（默认 SERVER_HTML）
  * @param modifier Modifier
  * @param httpClient 复用 OkHttp（私有图床代理请求用；默认 null 表示不代理，图直通）
@@ -228,7 +228,16 @@ fun WebViewMarkdownRenderer(
                     // 不含它数学就没有排版。仅数学内容才会被 WebViewHtmlBuilder 注入。
                     WebViewHtmlBuilder.KATEX_CSS_KEY to readAsset(context, "webview/katex/katex.min.css"),
                 )
-            val html = WebViewHtmlBuilder.build(sanitizedHtml, themeVariables, isDark, renderMode, baseRepoUrl, inlineCss)
+            val html =
+                WebViewHtmlBuilder.build(
+                    sanitizedHtml,
+                    themeVariables,
+                    isDark,
+                    renderMode,
+                    baseRepoUrl,
+                    inlineCss,
+                    mermaidRuntimeSupported = WebViewMermaidSupport.isRuntimeSupported(webView),
+                )
             webView.loadDataWithBaseURL(
                 "https://appassets.androidplatform.net/",
                 html,

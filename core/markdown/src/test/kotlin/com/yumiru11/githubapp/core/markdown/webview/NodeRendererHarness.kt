@@ -32,6 +32,7 @@ internal object NodeRendererHarness {
     private val HARNESS_FILE = File("src/test/js/offline-render-harness.js")
     private val SERVER_HTML_HARNESS_FILE = File("src/test/js/server-html-harness.js")
     private val MATH_HARNESS_FILE = File("src/test/js/math-render-harness.js")
+    private val MERMAID_HARNESS_FILE = File("src/test/js/mermaid-render-harness.js")
     private val ASSETS_DIR = File("src/main/assets/webview")
 
     /** 可用的 node 可执行文件；未安装/不在 PATH 时为 null。 */
@@ -58,6 +59,7 @@ internal object NodeRendererHarness {
         check(HARNESS_FILE.isFile) { "Node harness 缺失（执行层会空转）: ${HARNESS_FILE.absolutePath}" }
         check(SERVER_HTML_HARNESS_FILE.isFile) { "服务端 HTML 主通道 harness 缺失（执行层会空转）: ${SERVER_HTML_HARNESS_FILE.absolutePath}" }
         check(MATH_HARNESS_FILE.isFile) { "KaTeX 数学通道 harness 缺失（执行层会空转）: ${MATH_HARNESS_FILE.absolutePath}" }
+        check(MERMAID_HARNESS_FILE.isFile) { "Mermaid 图表通道 harness 缺失（执行层会空转）: ${MERMAID_HARNESS_FILE.absolutePath}" }
         check(ASSETS_DIR.isDirectory) { "WebView 资源目录缺失: ${ASSETS_DIR.absolutePath}" }
     }
 
@@ -106,6 +108,16 @@ internal object NodeRendererHarness {
         val node = requireAvailable()
         assertHarnessPresent()
         return runHarness(node, MATH_HARNESS_FILE, emptyList())
+    }
+
+    /**
+     * 驱动 Mermaid 图表通道（真实 mermaid.tiny.js 11.17.2 + 真实 renderer.js + 最小 fake DOM），
+     * 返回 harness 的逐行输出（`[key] value`）。
+     */
+    fun runMermaidChannel(): String {
+        val node = requireAvailable()
+        assertHarnessPresent()
+        return runHarness(node, MERMAID_HARNESS_FILE, emptyList())
     }
 
     /** 执行 harness 脚本，追加 stdout 为返回值（非 0 退出 / 超时直接抛，不静默跳过）。 */

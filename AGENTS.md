@@ -7,7 +7,7 @@
 
 开发一个**功能全面的 Android GitHub 客户端**（轻量、流畅、全 Material You）。技术规划 = `plan.md`（41KB，必读），需求来源 = `request.txt`。应用名/包名仍为占位符：applicationId 与 namespace = `com.yumiru11.githubapp`（模块 namespace 用 `core.github_xxx` 下划线写法），产品定名后统一改。
 
-**当前状态（2026-09-13 修复波末）**：`main@db1b696`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、**四张新缺陷票 #200–#203** 全部关闭；#166 / #167 已关闭（条目逐条对账）。本轮修复波共合入 **42 张 PR（#229–#271，剔除非 PR 的 issue #250，全部 squash）**：前半 #229–#255（26 张）、中段 **#256–#266（11 张）**、收尾 **#267–#271（5 张）**。收尾波 = **#267** 状态对账（#266 后）、**#268** 设计系统落地计划 + ADR-0010、**#269** 离线 KaTeX 数学渲染、**#270** AGP 9.1.1 迁移（Gradle 9.3.1 / compileSdk 37 / 全模块 lint 恢复，#170 兑现）、**#271** nightly APK 体积回归门禁。**已无 open PR**。
+**当前状态（2026-09-13 修复波末）**：`main@db1b696`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、**四张新缺陷票 #200–#203** 全部关闭；#166 / #167 已关闭（条目逐条对账）。本轮修复波共合入 **42 张 PR（#229–#271，剔除非 PR 的 issue #250，全部 squash）**：前半 #229–#255（26 张）、中段 **#256–#266（11 张）**、收尾 **#267–#271（5 张）**。收尾波 = **#267** 状态对账（#266 后）、**#268** 设计系统落地计划 + ADR-0010、**#269** 离线 KaTeX 数学渲染、**#270** AGP 9.1.1 迁移（Gradle 9.3.1 / compileSdk 37 / 全模块 lint 恢复，#170 兑现）、**#271** nightly APK 体积回归门禁。**在途 PR：#275 离线 Mermaid（Phase 2，KaTeX/Mermaid 计划最后一块）**。
 **当前活动票三张**：**#26（T25 真机项，需用户配 Secrets）**、#1（Spec，常开）、#71（截图测试面板，勿关）。（#250 已关闭 —— 探针断言 bug 由 #252 修复。）
 **已知真实缺陷：无。** **RepoDetail 仓库头整块不渲染（UI-C01）已由 #258 修复**：根因是 `headerHeightPx` 自锁 —— 首帧外层高 0dp → 内层 `onSizeChanged` 在 `maxHeight=0` 约束下只能测到 0 → 自然高度永远回填不上，头部被裁成 0 高。改为 `Modifier.layout` 以 `Constraints.Infinity` 在 layout 阶段测自然高度，首帧即按自然高度渲染；回归测试 `repoDetailScreen_success_rendersRepositoryHeaderBlock` 锁定，CI `repo-star` / `repo-actions` 帧已转绿（坏帧 2 → 0）。
 
@@ -38,7 +38,7 @@
 
 - **无 Kotlin Multiplatform**、**无 Waydroid/虚拟机**：测试与截图全跑 Linux 纯 JVM（Robolectric + Roborazzi）
 - **GraphQL 读优先（Apollo Kotlin 5）、REST 写优先（Retrofit 3/OkHttp 5）**；认证用 OAuth PKCE（AppAuth），PAT 仅开发者模式（fine-grained PAT 不支持 GraphQL → 自动降级 REST-only）
-- **Markdown 分层渲染**：**WebView 主渲染**（README/Issue 正文——服务端 HTML 优先 + 离线 GFM markdown-it 降级两级，ADR-0007 拍板；github-markdown-css + DOMPurify + markdown-it + highlight.js，Material You 变量注入——**真机 WebView 不支持 CSS color-mix，混色必须 Kotlin 预计算**；**数学公式走离线 KaTeX 0.18.7**，#269：DOMPurify 清洗**之后**渲染，仅 woff2 字体，`assets/webview/katex/` ≈ +0.32 MiB，配置未放宽；Mermaid 未实现）；评论列表/通知短文本保持原生（**铁律「评论列表绝不用 WebView」不变**）；FeatureDetector 保留但 README 分流判定不再使用；增强组件链（EnhancedMarkdownViewer 等）继续服务短文本；shields 徽章需 **coil-svg + SvgDecoder**（Coil 默认无 SVG；SvgDecoder intrinsic 放大 ~10 倍，徽章固定高 20dp）
+- **Markdown 分层渲染**：**WebView 主渲染**（README/Issue 正文——服务端 HTML 优先 + 离线 GFM markdown-it 降级两级，ADR-0007 拍板；github-markdown-css + DOMPurify + markdown-it + highlight.js，Material You 变量注入——**真机 WebView 不支持 CSS color-mix，混色必须 Kotlin 预计算**；**数学公式走离线 KaTeX 0.18.7**，#269：DOMPurify 清洗**之后**渲染，仅 woff2 字体，`assets/webview/katex/` ≈ +0.32 MiB，配置未放宽；**Mermaid 图走离线 @mermaid-js/tiny 11.17.2**（IIFE 单文件，同样清洗后渲染，`securityLevel:'strict'` + 图数上限 10；**Chromium ≥94 门禁**——class static block 是解析期语法级失败，Kotlin 按 UA 决定注入 + JS 语法探针双层兜底，不满足回退普通代码块，`assets/webview/mermaid/` ≈ +0.64 MiB））；评论列表/通知短文本保持原生（**铁律「评论列表绝不用 WebView」不变**）；FeatureDetector 保留但 README 分流判定不再使用；增强组件链（EnhancedMarkdownViewer 等）继续服务短文本；shields 徽章需 **coil-svg + SvgDecoder**（Coil 默认无 SVG；SvgDecoder intrinsic 放大 ~10 倍，徽章固定高 20dp）
 - **评论列表绝不用 WebView**；**token 绝不注入 WebView**；代码浏览/编辑用 Rosemoe Sora Editor
 - i18n 从第一天落实：Compose 一律 `stringResource()`，禁止硬编码字符串（GitLight 教训）
 - 版本目录（`gradle/libs.versions.toml`）单一事实来源；设计令牌、Konsist 架构测试从第一行代码开始

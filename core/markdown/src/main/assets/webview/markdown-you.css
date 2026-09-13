@@ -62,6 +62,24 @@ body {
   padding: 2px 0;
 }
 
+/* Mermaid 离线图（post-sanitize 注入，见 renderer.js 的 renderMermaid）：
+ * - 容器只在渲染成功前短暂存在；失败时 renderer.js 会把原代码块换回去，所以这里
+ *   只做成功路径的尺寸护栏，不写背景/颜色（配色由 mermaid 的 themeVariables 烘进 SVG，
+ *   取值自 --md-sys-color-*，见 renderer.js 的 mermaidThemeVariables）。
+ * - 超宽图横向滚动，不撑破 WebView 容器；禁止 color-mix。 */
+.markdown-body .mermaid {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+  margin: 16px 0;
+}
+
+.markdown-body .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
 /* Inline code: primary 10% tint background + primary text. */
 .markdown-body code {
   background: var(--inline-code-bg);

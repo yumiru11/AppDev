@@ -35,6 +35,7 @@ enum class RenderMode {
  *   [offline] <script src="markdown-it.min.js"></script>
  *   [offline] <script src="highlight.min.js"></script>
  *   [math] <script src="katex/katex.min.js"></script>
+ *   [mermaid] <script src="mermaid/mermaid.tiny.js"></script>
  *   <script src="purify.min.js"></script>
  * </head>
  * <body data-theme="light|dark">
@@ -75,6 +76,21 @@ object WebViewHtmlBuilder {
             RegexOption.IGNORE_CASE,
         )
 
+    // SERVER_HTML 通道的 Mermaid 标记（两代实测形态）：
+    // - GET /repos/{o}/{r}/readme Accept: html+json（README 主路径，2026-09-13 实测 CI 深链目标
+    //   mermaid-js/mermaid）：`<pre lang="mermaid" aria-label="Raw mermaid code">`
+    //   （外层 js-render-enrichment-target + render-plaintext-hidden；图由 github.com
+    //   前端脚本水合，App 侧用离线 Mermaid Tiny 水合）；
+    // - POST /markdown GFM（备用通道，可行性报告 §3.5 实测）：
+    //   `<div class="highlight highlight-source-mermaid"><pre>…`。
+    // 只认 `<pre>` 本体的 lang 属性：`lang="mermaid"` 出现在其它元素上不是图定义；
+    // 按最窄面匹配，误判的代价只是一次多余的 2.5MB 脚本注入。
+    private val MERMAID_HTML_REGEX =
+        Regex(
+            """highlight-source-mermaid|language-mermaid|<pre[^>]*\blang\s*=\s*["']?mermaid""",
+            RegexOption.IGNORE_CASE,
+        )
+
     private val REPO_ROUTE_NUMBER_REGEX = Regex("""\d+""")
 
     private val REPO_ROUTE_SHA_REGEX = Regex("""[0-9a-fA-F]{7,40}""")
@@ -97,6 +113,10 @@ object WebViewHtmlBuilder {
      * @param themeVariables [MaterialYouFusionMapper] 生成的完整 CSS 变量声明块，
      *   必须放在 github-markdown-css 之后注入（后声明同特异性规则胜出）
      * @param isDark 当前深色主题（同时设置 `<html data-theme>` 与 `<body data-theme>`）
+     * @param mermaidRuntimeSupported 当前 WebView 是否支持 Mermaid 运行时（Chromium ≥ 94，
+     *   由 [WebViewMermaidSupport] 按设备 UA 判定）。为 false 时即使内容含图也**不注入**
+     *   脚本（mermaid.tiny.js 的 class static block 在老引擎上是不可捕获的语法级失败）。
+     *   默认 true 仅服务纯 JVM 测试与能力未知场景：WebView 内 renderer.js 仍有独立探测兜底。
      */
     fun build(
         sanitizedHtml: String,
@@ -105,11 +125,13 @@ object WebViewHtmlBuilder {
         renderMode: RenderMode = RenderMode.SERVER_HTML,
         baseRepoUrl: String? = null,
         inlineCss: Map<String, String> = emptyMap(),
+        mermaidRuntimeSupported: Boolean = true,
     ): String {
         val themeMarker = if (isDark) "dark" else "light"
         val contentBlock = buildContentBlock(sanitizedHtml, renderMode, baseRepoUrl)
         val mathEnabled = needsKatex(renderMode, sanitizedHtml)
-        val runtimeScripts = runtimeScripts(renderMode, sanitizedHtml, mathEnabled)
+        val mermaidEnabled = mermaidRuntimeSupported && needsMermaid(renderMode, sanitizedHtml)
+        val runtimeScripts = runtimeScripts(renderMode, sanitizedHtml, mathEnabled, mermaidEnabled)
 
         return buildString {
             append("<!DOCTYPE html>\n")
@@ -167,6 +189,25 @@ object WebViewHtmlBuilder {
             RenderMode.SERVER_HTML -> MATH_HTML_REGEX.containsMatchIn(content)
         }
 
+    /**
+     * Mermaid 是否启用（决定是否注入 mermaid.tiny.js）。
+     *
+     * - OFFLINE_MARKDOWN_IT：内容是原始 markdown，用 [FeatureDetector.containsMermaid]（```mermaid 围栏）
+     * - SERVER_HTML：内容是 GitHub HTML，用 [MERMAID_HTML_REGEX]（README 的 `pre[lang="mermaid"]`
+     *   与 POST /markdown 的 `highlight-source-mermaid`）
+     *
+     * 渲染本身发生在 WebView 内 `sanitizeNode` 之后（renderer.js 的 renderMermaid）——
+     * 这里只决定「是否加载运行时」，正确性判据是 JS 侧对清洗后 DOM 的独立扫描。
+     */
+    private fun needsMermaid(
+        renderMode: RenderMode,
+        content: String,
+    ): Boolean =
+        when (renderMode) {
+            RenderMode.OFFLINE_MARKDOWN_IT -> FeatureDetector.containsMermaid(content)
+            RenderMode.SERVER_HTML -> MERMAID_HTML_REGEX.containsMatchIn(content)
+        }
+
     /** 非内联 CSS 模式：KaTeX 样式表放最前，让 markdown-you.css / theme-vars 的覆盖规则胜出。 */
     private fun StringBuilder.appendKatexStylesheetLink(mathEnabled: Boolean) {
         if (!mathEnabled) return
@@ -191,12 +232,14 @@ object WebViewHtmlBuilder {
      * 运行时脚本：离线模式恒加载 markdown-it + highlight.js；服务端 HTML 模式只在内容含代码块
      * （`<pre`）时加载 highlight.js —— README 主通道此前完全不高亮（2026-09-12 审计缺口 1），
      * 但无代码块的页面也不应为约 130KB 的 highlight.js 付解析成本。KaTeX（约 273KB）同理：
-     * 仅内容检测到数学时加载（KaTeX 0.18.7，仅 woff2 字体，离线 assets）。
+     * 仅内容检测到数学时加载（KaTeX 0.18.7，仅 woff2 字体，离线 assets）。Mermaid Tiny（约 2.5MB
+     * 未压缩，deflate 后 ~657KB）同构：仅检测到图定义且设备 WebView 过 Chromium 门禁时加载。
      */
     private fun runtimeScripts(
         renderMode: RenderMode,
         sanitizedHtml: String,
         mathEnabled: Boolean,
+        mermaidEnabled: Boolean,
     ): String =
         buildString {
             if (renderMode == RenderMode.OFFLINE_MARKDOWN_IT) {
@@ -207,6 +250,9 @@ object WebViewHtmlBuilder {
             }
             if (mathEnabled) {
                 append("\n    <script src=\"${ASSET_BASE}katex/katex.min.js\"></script>")
+            }
+            if (mermaidEnabled) {
+                append("\n    <script src=\"${ASSET_BASE}mermaid/mermaid.tiny.js\"></script>")
             }
         }
 

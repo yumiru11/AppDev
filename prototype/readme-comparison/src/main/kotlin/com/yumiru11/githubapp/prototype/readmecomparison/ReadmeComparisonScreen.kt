@@ -126,4 +126,11 @@ private class InertBridgeCallback(
     ) {}
 
     override fun onHeightChanged(heightPx: Int) {}
+
+    /** Mermaid 渲染结果：原型屏不接日志（README 主路径的 CI 锚点在 feature:repo）。 */
+    override fun onMermaidResult(
+        rendered: Int,
+        failed: Int,
+        engineSupported: Boolean,
+    ) = Unit
 }
