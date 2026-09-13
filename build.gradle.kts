@@ -132,6 +132,11 @@ val coverageThresholds =
         // 根因/修复见上方长注释；这两条在 #261 已按真值棘轮，本次全量重设后数值不变。
         ":core:database" to 0.85, // 实测 86.43%（618/715 行；余量 1.43pp；#261 前 5.17%）
         ":feature:auth" to 0.99, // 实测 100.00%（25/25 行；余量 1.00pp；#261 前 0.00%）
+        // ── 2026-09-14 DATA-2：:core:data 补测试配置后首次纳入门禁 ─────────────────────
+        // 纯模型层（7 个 data class）：本模块唯一的派生逻辑 Repository.fullName 由模块内契约
+        // 测试锁定（core/data/src/test/.../model/）；其余模型被全仓 mapper/fixture 测试顺带执行。
+        // 首次纳入无旧阈，按 #263 棘轮规则取 floor2(实测 − 0.5pp)。
+        ":core:data" to 0.99, // 实测 100.00%（56/56 行；余量 1.00pp，首次纳入）
     )
 
 // JaCoCo 分析排除：生成代码/样板（R/BuildConfig/Manifest/Hilt 产物）+ UI 层，不计入分母
@@ -377,9 +382,9 @@ fun Project.registerCoverageTasks() {
         // 被 --exclude-task / NO-SOURCE）——此时**必须红**，不得静默 SKIP。旧实现用
         // onlyIf 跳过验证，等于该模块的覆盖率门禁空转（残余审计 G-02/G-03，PR #255 前的
         // 5 个豁免模块就是靠这种空转「看起来有阈值」）。
-        // 只约束 coverageThresholds 里声明了阈值的模块；仍豁免的 4 个模块不注册本任务（照旧跳过）：
-        //   :core:data —— 无 src/test、无自身 exec（设阈会被 GATE-3 判「有阈值却无 exec」）；
-        //     模型类仅被其它模块测试顺带执行，进聚合报告但不单独设阈；
+        // 只约束 coverageThresholds 里声明了阈值的模块；仍豁免的 3 个模块不注册本任务（照旧跳过）：
+        //   （:core:data 已于 2026-09-14 DATA-2 补 src/test 并设阈，不再豁免；原先的豁免理由
+        //     「无 src/test、无自身 exec」已随本票消失。）
         //   :core:testing —— 测试基建模块（MainDispatcherRule / ScreenshotTest / GitHubFakes），
         //     按定义由被测模块执行，无独立测试与 exec（#215）；
         //   :core:ui —— 有测试与 exec，但类全被 `**/ui/**` 排除 → 分母 0 类，设阈无意义；
