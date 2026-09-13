@@ -134,6 +134,14 @@ class WebViewOfflineGfmCapabilityTest {
             renderer.contains("__appdev_mermaid_probe"),
         )
         assertTrue("主题变量必须读 CSS 变量（mermaidThemeVariables），不得写死配色", renderer.contains("mermaidThemeVariables"))
+        assertTrue(
+            "渲染结果必须经 bridge 上报（MarkdownBridgeCallback.onMermaidResult；CI 从 logcat 断言）",
+            renderer.contains("onMermaidResult"),
+        )
+        assertTrue(
+            "引擎被拦下时也必须上报 blocked（rendered=0）——回退原因要机器可读",
+            renderer.contains("reportMermaidResult(0, 0, false)"),
+        )
         assertFalse("Mermaid 不得被打包进 markdown-it bundle", markdownItBundle().contains("mermaid"))
     }
 
@@ -153,7 +161,7 @@ class WebViewOfflineGfmCapabilityTest {
         val renderer = rendererJs()
 
         // plan §2.9 的 JS → Kotlin bridge 契约
-        listOf("onLinkClick", "onCodeCopy", "onImageClick", "onCheckboxClick", "onHeightChanged").forEach { callback ->
+        listOf("onLinkClick", "onCodeCopy", "onImageClick", "onCheckboxClick", "onHeightChanged", "onMermaidResult").forEach { callback ->
             assertTrue("bridge 回调 $callback 必须被绑定", renderer.contains(callback))
         }
     }

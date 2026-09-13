@@ -1,3 +1,5 @@
+@file:Suppress("LargeClass") // WebView HTML 模板契约测试（清洗/注入/相对链接/数学/图表按段组织在同一文件），拆分反损可读性（PullRequestApiTest 同款先例）
+
 package com.yumiru11.githubapp.core.markdown.webview
 
 import org.junit.Assert.assertEquals
@@ -700,6 +702,31 @@ class WebViewHtmlBuilderTest {
         val html = buildServerHtml("<pre><code class=\"language-mermaid\">graph TD</code></pre>")
 
         assertTrue("language-mermaid 形态也必须触发注入", html.contains("mermaid/mermaid.tiny.js"))
+    }
+
+    @Test
+    fun build_serverHtmlWithReadmePreLangMermaid_injectsMermaidRuntime() {
+        // GET /repos/{o}/{r}/readme Accept: html+json 的实测形态（2026-09-13，CI 深链目标
+        // mermaid-js/mermaid）：<pre lang="mermaid" aria-label="Raw mermaid code">，
+        // 外层是 js-render-enrichment-target + render-plaintext-hidden。
+        val html =
+            buildServerHtml(
+                "<div class=\"js-render-enrichment-target\"><div class=\"render-plaintext-hidden\">" +
+                    "<pre lang=\"mermaid\" aria-label=\"Raw mermaid code\">flowchart LR</pre>" +
+                    "</div></div>",
+            )
+
+        assertTrue("README 的 pre[lang=mermaid] 形态必须触发脚本注入", html.contains("mermaid/mermaid.tiny.js"))
+    }
+
+    @Test
+    fun build_serverHtmlWithLangMermaidOutsidePre_doesNotInject() {
+        val html = buildServerHtml("<p lang=\"mermaid\">not a diagram</p>")
+
+        assertFalse(
+            "lang=mermaid 只认 <pre> 本体（其它元素上的 lang 不是图定义，不该为它加载 2.5MB）",
+            html.contains("mermaid/mermaid.tiny.js"),
+        )
     }
 
     @Test

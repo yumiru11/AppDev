@@ -9,8 +9,9 @@ import org.junit.Test
  *
  * `mermaid-render-harness.js` 用生产 assets 里的真实 `mermaid/mermaid.tiny.js`（11.17.2）与
  * 真实 `renderer.js`，配最小 fake DOM 端到端跑 `renderMermaid(root)`——证明的是「哪些节点被
- * 选中、用什么 initialize 配置、DOM 产出什么、失败/门禁路径是否回退为代码块」，不是源码文本
- * 里有没有某个字符串。真实栅格化（浏览器布局/SVG 绘制）由 CI 模拟器截图与真机走查兜底。
+ * 选中、用什么 initialize 配置、DOM 产出什么、失败/门禁路径是否回退为代码块、上报给 bridge
+ * 的计数是什么」，不是源码文本里有没有某个字符串。真实栅格化（浏览器布局/SVG 绘制）由
+ * `mermaid-render-verify` CI job（API 33 rendered>=1 / API 30 blocked 回退）兜底。
  *
  * harness 输出为逐行 `[key] value`；本类解析成 map 后断言。node 缺失时经
  * [NodeRendererHarness.requireAvailable] assume 跳过（CI 自带 node）。
@@ -82,6 +83,37 @@ class MermaidRenderExecutionTest {
     }
 
     @Test
+    fun renderMermaid_githubReadmePreLangShape_takesOverAndReports() {
+        // CI 深链目标 mermaid-js/mermaid 的 README 走 GET html+json（实测形态），
+        // 不是 POST /markdown 的 highlight-source-mermaid —— 它是真实渲染的第一入口。
+        assertEquals("GitHub README 的 pre[lang=mermaid] 必须被接管", "1", output["readmeTookOver"])
+        assertEquals("README 形态必须产出 SVG", "1", output["readmeSvgCount"])
+        assertEquals("README 形态必须被识别为图定义", "true", output["sourceReadme"])
+        assertEquals("成功路径上报 rendered=1 failed=0 engineSupported=true", "1,0,true", output["readmeReport"])
+        assertEquals("lang=其他值不得误判为图定义", "true", output["sourceLangOther"])
+        assertEquals("成功渲染后 GitHub 下发的可见源码块必须隐藏（真图替代源码）", "true", output["readmeSourceHidden"])
+        assertEquals("成功渲染后加载指示器必须隐藏", "true", output["readmeLoaderHidden"])
+        assertEquals("渲染失败时源码块必须保持可见（回退绝不丢内容）", "true", output["readmeFailSourceVisible"])
+        assertEquals("渲染失败时加载指示器保持可见", "true", output["readmeFailLoaderVisible"])
+        assertEquals("渲染失败时原代码块恢复（源码块 + 恢复的 pre）", "true", output["readmeFailCodeRestored"])
+    }
+
+    @Test
+    fun renderMermaid_reportsOutcomeToBridge_includingBlockedCase() {
+        // JS → Kotlin 的机器可读结果（MarkdownBridgeCallback.onMermaidResult）：
+        // rendered,failed,engineSupported 三元组覆盖成功 / 回退 / 门禁三套路径。
+        assertEquals("离线成功路径必须上报 rendered=1", "1,0,true", output["offlineReport"])
+        assertEquals("服务端形态同样必须上报", "1,0,true", output["serverReport"])
+        assertEquals("无图页面不得上报（没有可观测事实）", "0", output["noDiagramReports"])
+        assertEquals("引擎缺失（脚本未注入）必须上报 blocked", "0,0,false", output["engineAbsentReport"])
+        assertEquals("语法探针失败（Chromium <94）必须上报 blocked", "0,0,false", output["syntaxReport"])
+        assertEquals("run 失败必须上报 failed=1（已恢复代码块）", "0,1,true", output["runFailureReport"])
+        assertEquals("run reject 同样上报 failed=1", "0,1,true", output["runRejectReport"])
+        assertEquals("initialize 抛异常必须上报 failed=N", "0,1,true", output["initThrowsReport"])
+        assertEquals("预算内成功图全部计入 rendered", "2,0,true", output["budgetReport"])
+    }
+
+    @Test
     fun renderMermaid_noDiagram_detectedPerformsNoEngineWork() {
         assertEquals("无图页面不得接管（检测优先于执行）", "0", output["noDiagramTookOver"])
         assertEquals("无图页面不得 initialize（性能护栏）", "0", output["noDiagramInitCalls"])
@@ -107,6 +139,15 @@ class MermaidRenderExecutionTest {
         assertEquals("未产出 SVG 时必须恢复原 <pre> 代码块", "true", output["runFailureCodeRestored"])
         assertEquals("回退后不得残留 .mermaid 容器", "true", output["runFailureHolderGone"])
         assertEquals("run reject 同样恢复代码块", "true", output["runRejectCodeRestored"])
+    }
+
+    @Test
+    fun renderMermaid_errorCardSvg_countsAsFailedAndRestoresCode() {
+        // 真实 Chromium 实测：mermaid 解析失败/不支持类型时注入 aria-roledescription="error"
+        // 的错误卡片 SVG——只查「有 SVG」会把它误判为渲染成功（rendered 虚高、代码块不恢复）。
+        assertEquals("错误卡片同样按接管计数", "1", output["errorCardTookOver"])
+        assertEquals("错误卡片必须恢复为原代码块", "true", output["errorCardCodeRestored"])
+        assertEquals("错误卡片不得计入 rendered", "0,1,true", output["errorCardReport"])
     }
 
     @Test

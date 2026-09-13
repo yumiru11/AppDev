@@ -19,9 +19,10 @@
  *    （离线产物在 renderOfflineHtml 内联注入，服务端 HTML 由 decorateImages 在清洗后补）
  * 5. 数学公式（$…$ / $$…$$）由 renderMath 在 DOMPurify 清洗**之后**用离线 KaTeX 渲染
  *    （不得放宽清洗配置，理由见该函数上方的顺序决策说明）
- * 6. Mermaid 图（```mermaid 围栏 / GitHub 的 highlight-source-mermaid 代码块）由
- *    renderMermaid 在清洗**之后**用离线 Mermaid Tiny 渲染；引擎门禁（Chromium ≥ 94，
- *    class static block）不满足时静默回退为普通代码块（见该函数上方的门禁说明）
+ * 6. Mermaid 图（```mermaid 围栏 / GitHub README 的 pre[lang="mermaid"] / POST /markdown 的
+ *    highlight-source-mermaid 代码块）由 renderMermaid 在清洗**之后**用离线 Mermaid Tiny 渲染；
+ *    引擎门禁（Chromium ≥ 94，class static block）不满足时回退为普通代码块，并把
+ *    「拦下 / 渲染了几张 / 失败几张」经 AndroidBridge.onMermaidResult 上报（见该函数上方的门禁说明）
  *
  * 安全：本脚本不接收任何 token；token 仅由 PrivateImageInterceptor 加到网络请求。
  * 仓库上下文（`owner/repo`）不是凭据，由 `data-base-repo` 属性传入（公开信息）。
@@ -364,9 +365,13 @@
   // 任一不满足都回退为普通代码块。注：若未来加 CSP 且不含 unsafe-eval，探针会失败并
   // 同样回退（优雅降级，不崩页面；见可行性报告 R1）。
   //
-  // 检测面（两类形态，与 Kotlin 侧 MERMAID_HTML_REGEX 对应）：
+  // 检测面（三类形态，与 Kotlin 侧 MERMAID_HTML_REGEX 对应）：
   // - 离线通道：`pre > code.language-mermaid`（markdown-it 对 ```mermaid 围栏的产物）；
-  // - 服务端 HTML：`div.highlight-source-mermaid > pre`（GitHub 实测形态，见报告 §3.5）。
+  // - GitHub README 服务端 HTML（GET /repos/{o}/{r}/readme Accept html+json，2026-09-13 实测
+  //   深链 CI 目标 mermaid-js/mermaid）：`<pre lang="mermaid" aria-label="Raw mermaid code">`
+  //   （外层是 js-render-enrichment-target + render-plaintext-hidden，图由 github.com 前端
+  //   脚本水合；旧报告里写的 highlight-source-mermaid **不是**这条路径的形态）；
+  // - POST /markdown GFM 渲染（备用通道，可行性报告 §3.5 实测）：`div.highlight-source-mermaid > pre`。
   // 只在检测到图定义时才 parse/execute（性能护栏），单文档最多接管 MERMAID_MAX_DIAGRAMS 张。
   var MERMAID_MAX_DIAGRAMS = 10;
 
@@ -379,8 +384,11 @@
   /**
    * `<pre>` 是否承载 Mermaid 图定义；是则返回源文本，否则 null（纯函数，Node 单测直接覆盖）。
    *
-   * 两类形态互斥：离线通道的 code.language-mermaid，与服务端 HTML 的
-   * div.highlight-source-mermaid > pre（后者的 <pre> 里是 hljs 产物，取 textContent）。
+   * 三类形态（互斥）：
+   * - 离线通道：`pre > code.language-mermaid`（markdown-it 对 ```mermaid 围栏的产物）；
+   * - GitHub README 服务端 HTML（GET /repos/{o}/{r}/readme html+json，2026-09-13 对 CI 目标
+   *   mermaid-js/mermaid 实测）：`<pre lang="mermaid">`（位于 div.render-plaintext-hidden 内）；
+   * - POST /markdown 备用通道：`div.highlight-source-mermaid > pre`（可行性报告 §3.5 实测）。
    */
   function mermaidSourceOf(pre) {
     if (!pre || pre.nodeType !== 1) return null;
@@ -393,6 +401,11 @@
       if (String(child.tagName).toUpperCase() === 'CODE' && hasClassName(child, 'language-mermaid')) {
         return child.textContent || '';
       }
+    }
+    // GitHub README 实测形态：属性在 <pre> 本身上（lang="mermaid"），无 language-* 子节点。
+    if (typeof pre.getAttribute === 'function') {
+      var lang = pre.getAttribute('lang');
+      if (lang && String(lang).toLowerCase() === 'mermaid') return pre.textContent || '';
     }
     if (pre.parentNode && hasClassName(pre.parentNode, 'highlight-source-mermaid')) {
       return pre.textContent || '';
@@ -413,6 +426,75 @@
       collectMermaidPreElements(child, out);
     }
     return out;
+  }
+
+  /** 沿 parentNode 向上找最近含指定类名的祖先（不含自身；fake DOM 无 closest）。 */
+  function closestByClass(node, className) {
+    var current = node ? node.parentNode : null;
+    while (current && current.nodeType === 1) {
+      if (hasClassName(current, className)) return current;
+      current = current.parentNode;
+    }
+    return null;
+  }
+
+  /** 前一个元素兄弟（fake DOM 无 previousElementSibling）。 */
+  function previousElementSibling(node) {
+    if (!node || !node.parentNode) return null;
+    var siblings = node.parentNode.childNodes || [];
+    var previous = null;
+    for (var i = 0; i < siblings.length; i++) {
+      if (siblings[i] === node) return previous;
+      if (siblings[i].nodeType === 1) previous = siblings[i];
+    }
+    return null;
+  }
+
+  /** 深度优先找第一个含指定类名的后代元素（fake DOM 无 querySelectorAll）。 */
+  function findDescendantByClass(node, className) {
+    var children = node.childNodes || [];
+    for (var i = 0; i < children.length; i++) {
+      var child = children[i];
+      if (child.nodeType !== 1) continue;
+      if (hasClassName(child, className)) return child;
+      var found = findDescendantByClass(child, className);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  /** 逐个隐藏（display:none；style 不可用时退化为 hidden 属性）。 */
+  function hideElements(elements) {
+    for (var i = 0; i < (elements || []).length; i++) {
+      var element = elements[i];
+      if (!element) continue;
+      if (element.style) element.style.display = 'none';
+      else if (typeof element.setAttribute === 'function') element.setAttribute('hidden', '');
+    }
+  }
+
+  /**
+   * GitHub README 的 Mermaid 占位结构解析（**必须在替换 pre 之前调用**：替换后 pre 已脱离文档树）。
+   *
+   * GitHub 对 ```mermaid 围栏同时下发三份内容：可见的源码块
+   * （`div.snippet-clipboard-content`）、待水合的 section（`section.js-render-needs-enrichment`，
+   * 内含隐藏的 `div.render-plaintext-hidden > pre[lang="mermaid"]`）与加载指示器
+   * （`span.js-render-enrichment-loader`）。github.com 的前端脚本把 section 换成真图并隐藏
+   * 源码块；App 不跑 GitHub 脚本，故由 renderer.js 在**成功渲染后**补这一步。
+   *
+   * 只在成功路径隐藏：失败回退为普通代码块时源码块必须可见（绝不丢内容）。
+   *
+   * @returns {Array<Element>} 成功渲染后需要隐藏的元素（非 GitHub 结构/离线通道为空数组）
+   */
+  function githubEnrichmentNodesToHide(pre) {
+    var section = closestByClass(pre, 'js-render-needs-enrichment');
+    if (!section) return [];
+    var nodes = [];
+    var source = previousElementSibling(section);
+    if (source && hasClassName(source, 'snippet-clipboard-content')) nodes.push(source);
+    var loader = findDescendantByClass(section, 'js-render-enrichment-loader');
+    if (loader) nodes.push(loader);
+    return nodes;
   }
 
   /**
@@ -474,23 +556,78 @@
     }
   }
 
-  /** 容器是否已含渲染产物（<svg>）；无 = mermaid.run 失败且未产出 SVG。 */
-  function containsSvgElement(node) {
+  /**
+   * SVG 是否是 mermaid 的**错误卡片**（而非真图）。
+   *
+   * mermaid 11 在 `suppressErrors:true` 下对解析失败/不支持的类型也会注入 <svg>：
+   * `aria-roledescription="error"` + `.error-icon`/`.error-text`（真实 Chromium 实测）。
+   * 只查「是否有 SVG」会把错误卡片误判为渲染成功。
+   */
+  function isMermaidErrorSvg(svg) {
+    if (!svg || typeof svg.getAttribute !== 'function') return false;
+    if (String(svg.getAttribute('aria-roledescription') || '').toLowerCase() === 'error') return true;
+    return typeof svg.querySelector === 'function' && !!svg.querySelector('.error-icon, .error-text');
+  }
+
+  /**
+   * 容器是否已含**有效**渲染产物（真图 SVG，不是错误卡片）。
+   *
+   * 判定失败 = 回退为普通代码块 + 计入 failed。
+   */
+  function containsRenderedSvg(node) {
     var children = node.childNodes || [];
     for (var i = 0; i < children.length; i++) {
       var child = children[i];
       if (child.nodeType !== 1) continue;
-      if (String(child.tagName).toUpperCase() === 'SVG') return true;
-      if (containsSvgElement(child)) return true;
+      if (String(child.tagName).toUpperCase() === 'SVG') {
+        if (!isMermaidErrorSvg(child)) return true;
+        continue; // 错误卡片：继续找是否还有其它有效 SVG
+      }
+      if (containsRenderedSvg(child)) return true;
     }
     return false;
   }
 
-  /** run() 结束后：仍未产出 SVG 的容器（语法错误/图类型不支持）恢复为代码块。 */
-  function restoreUnprocessedMermaid(items) {
-    for (var i = 0; i < items.length; i++) {
-      if (!containsSvgElement(items[i].holder)) restoreMermaidPre(items[i]);
+  /**
+   * Mermaid 渲染结果上报（JS → Kotlin bridge）。
+   *
+   * 语义与 Kotlin 侧 `MarkdownBridgeCallback.onMermaidResult` 一一对应：
+   * rendered = 产出**有效** SVG（真图，非错误卡片）的图数；failed = 接管后未产出有效 SVG
+   * （已恢复代码块）的图数；engineSupported = false 表示引擎不可用（Kotlin 门禁拦下 /
+   * 语法探针失败 / window.mermaid 缺失）。
+   *
+   * 为什么引擎被拦下也要上报（rendered=0）：这是**机器可读的「为什么没渲染」**——
+   * CI 的 mermaid-render-verify job 用 API 30（Chromium 83）断言 blocked 回退、
+   * API 33（Chromium 101）断言 rendered>=1，没这条上报就只能靠人眼看截图。
+   */
+  function reportMermaidResult(rendered, failed, engineSupported) {
+    if (!ANDROID_BRIDGE || typeof ANDROID_BRIDGE.onMermaidResult !== 'function') return;
+    try {
+      ANDROID_BRIDGE.onMermaidResult(rendered, failed, engineSupported);
+    } catch (e) {
+      // bridge 不可用/宿主未接线：静默（上报失败不得影响渲染本身）
     }
+  }
+
+  /**
+   * run() 结束后收尾：未产出**有效** SVG 的容器（语法错误/不支持的类型，含 mermaid 错误卡片）
+   * 恢复为代码块，并上报结果。
+   *
+   * @returns {number} 失败（已恢复代码块）的图数
+   */
+  function settleMermaidRun(items) {
+    var failed = 0;
+    for (var i = 0; i < items.length; i++) {
+      if (!containsRenderedSvg(items[i].holder)) {
+        restoreMermaidPre(items[i]);
+        failed++;
+      } else {
+        // 成功：隐藏 GitHub 下发的源码块与加载指示器（真图替代源码展示；失败路径不隐藏）
+        hideElements(items[i].hideOnSuccess);
+      }
+    }
+    reportMermaidResult(items.length - failed, failed, true);
+    return failed;
   }
 
   /**
@@ -504,12 +641,18 @@
    * @returns {number} 实际接管的图表数（0 = 引擎不可用 / 未检测到图 / 替换失败）
    */
   function renderMermaid(root, options) {
-    var engine = detectMermaidEngine();
-    if (!engine.supported) return 0;
     if (!root) return 0;
 
+    // 先收集候选（检测优先于执行）：无图页面不触碰引擎，也不上报——没有可观测事实。
     var candidates = collectMermaidPreElements(root, []);
     if (!candidates.length) return 0;
+
+    // 引擎门禁（Chromium < 94 / 脚本未注入）：有图但引擎不可用 → 回退代码块 + 上报 blocked。
+    var engine = detectMermaidEngine();
+    if (!engine.supported) {
+      reportMermaidResult(0, 0, false);
+      return 0;
+    }
 
     var opts = options || {};
     var maxDiagrams = opts.maxDiagrams || MERMAID_MAX_DIAGRAMS;
@@ -522,12 +665,14 @@
       holder.className = 'mermaid';
       holder.setAttribute('data-appdev-mermaid', 'pending');
       holder.textContent = mermaidSourceOf(pre) || '';
+      // GitHub 占位结构必须在替换前解析（替换后 pre 脱离文档树，找不到 section）
+      var hideOnSuccess = githubEnrichmentNodesToHide(pre);
       try {
         parent.replaceChild(holder, pre);
       } catch (e) {
         continue; // 替换失败（非真实 DOM 的边界形态）：保留代码块
       }
-      items.push({ holder: holder, pre: pre });
+      items.push({ holder: holder, pre: pre, hideOnSuccess: hideOnSuccess });
     }
     if (!items.length) return 0;
 
@@ -545,19 +690,23 @@
       });
       started = window.mermaid.run({ nodes: nodes, suppressErrors: true });
     } catch (e) {
-      // initialize/run 同步阶段异常：整体回退为代码块
+      // initialize/run 同步阶段异常：整体回退为代码块（图确实尝试过但没渲染出来 → failed 计数）
       for (var r = 0; r < items.length; r++) restoreMermaidPre(items[r]);
+      reportMermaidResult(0, items.length, true);
       return 0;
     }
     if (started && typeof started.then === 'function') {
       started.then(
         function () {
-          restoreUnprocessedMermaid(items);
+          settleMermaidRun(items);
         },
         function () {
-          restoreUnprocessedMermaid(items);
+          settleMermaidRun(items);
         },
       );
+    } else {
+      // run() 未返回 thenable（异常实现/stub）：只能按当前 DOM 状态同步结算
+      settleMermaidRun(items);
     }
     return items.length;
   }

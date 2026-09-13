@@ -116,6 +116,7 @@ import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
+import com.yumiru11.githubapp.core.markdown.webview.MermaidRenderLog
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppImageOverlay
@@ -1842,6 +1843,21 @@ private fun createBridgeCallback(
         ) {}
 
         override fun onHeightChanged(heightPx: Int) {}
+
+        /**
+         * Mermaid 渲染结果 → logcat 锚点（CI mermaid-render-verify job 断言行格式，见 [MermaidRenderLog]）。
+         *
+         * 为什么打在消费层：README 渲染事件的观测锚点与 `renderMode=` 日志同层（feature:repo），
+         * core:markdown 不感知宿主日志环境；且这是唯一需要真机渲染证据的页面类型
+         * （服务端 HTML 通道 + Chromium ≥94 门禁）。
+         */
+        override fun onMermaidResult(
+            rendered: Int,
+            failed: Int,
+            engineSupported: Boolean,
+        ) {
+            Log.i(TAG, MermaidRenderLog.line(rendered, failed, engineSupported))
+        }
     }
 }
 

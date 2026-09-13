@@ -218,13 +218,37 @@ var PURIFY_CONFIG = {
 
 所以审计 `spec-audit-2026-09-11.md:104` 的「GitHub 出图 ✅」判断应更正为 ❌；这也是本文判定「KaTeX/Mermaid 值得做」的正当性依据：它们不是服务端能力的重复，而是**所有通道共同的真实缺口**。
 
+> **2026-09-13 补测（PR #275 证据层）——README 主路径与 `POST /markdown` 形态不同**：上面的
+> `highlight-source-mermaid` 只是 `POST /markdown` 的形态。`GET /repos/{o}/{r}/readme`
+> （`Accept: application/vnd.github.html+json`，App 的 `ReadmeApi.getReadmeHtml` 正是此调用）
+> 对 `mermaid-js/mermaid` 实测返回的是**待水合占位结构**：
+>
+> ```html
+> <div class="snippet-clipboard-content notranslate"><pre class="notranslate"><code>flowchart LR …</code></pre></div>
+> <section class="js-render-needs-enrichment render-needs-enrichment" data-type="mermaid">
+>   <div class="js-render-enrichment-target" data-json="…" data-plain="…">
+>     <div class="render-plaintext-hidden">
+>       <pre lang="mermaid" aria-label="Raw mermaid code">flowchart LR …</pre>
+>     </div>
+>   </div>
+>   <span class="js-render-enrichment-loader …">…</span>
+> </section>
+> ```
+>
+> 即源码块与水合占位**同时下发**，真图由 github.com 前端 JS 换入（App 不加载）。后果：
+> SERVER_HTML 通道的检测面必须覆盖 `pre[lang="mermaid"]`（Kotlin `MERMAID_HTML_REGEX` ＋
+> JS `mermaidSourceOf`），且渲染成功后要隐藏源码块/加载指示器
+> （`renderer.js` 的 `githubEnrichmentNodesToHide`）。只认 `highlight-source-mermaid` 会让
+> README 主路径一张图都不接管（2026-09-13 由真实 Chromium 探针确认后修复；回归由
+> `MermaidRenderExecutionTest` 的 README 形态用例 ＋ `mermaid-render-verify` CI job 钉住）。
+
 ### 3.6 脚本加载与安全边界
 
 - 资产经 `WebViewAssetLoader` 以 `https://appassets.androidplatform.net/` 域提供（`WebViewMarkdownRenderer.kt:95-102`），`loadDataWithBaseURL` 同源基址（`:226-232`）；无 `file://`。
 - 条件脚本已有先例：`WebViewHtmlBuilder.runtimeScripts`（`:138-152`）按 `RenderMode` 与 `containsCodeBlock()`（`html.contains("<pre")`）决定是否加载 markdown-it / highlight.js——KaTeX/Mermaid 的开关可复用同一模式。
 - 首帧注入：`addDocumentStartJavaScript` 绑定 origin `https://appassets.androidplatform.net`（`WebViewMarkdownRenderer.kt:186-196`），主题切换时用 `evaluateJavascript` 重放（`:233-238`）。
 - **无 CSP**：全仓无 `Content-Security-Policy`/`http-equiv`（仅注释提及）；HTML 只有 charset/viewport/color-scheme meta。
-- **token 绝不进 WebView**：Token 仅由 `PrivateImageInterceptor` 加到**原生 OkHttp 请求头**（`PrivateImageInterceptor.kt:55-68`）；`WebViewHtmlBuilder.kt:45-49` KDoc 与 `renderer.js:20-21` 注释均声明；Bridge 是 5 方法白名单（`MarkdownBridge.kt:45-92`）。主题 startScript 只注入 `data-theme` + hex 色值（`MaterialYouFusionMapper.kt:118`）。
+- **token 绝不进 WebView**：Token 仅由 `PrivateImageInterceptor` 加到**原生 OkHttp 请求头**（`PrivateImageInterceptor.kt:55-68`）；`WebViewHtmlBuilder.kt:45-49` KDoc 与 `renderer.js:20-21` 注释均声明；Bridge 是 6 方法白名单（原 5 个事件 ＋ 2026-09-13 新增的 `onMermaidResult` 渲染结果上报，`MarkdownBridge.kt`）。主题 startScript 只注入 `data-theme` + hex 色值（`MaterialYouFusionMapper.kt:118`）。
 - `WebSettings` 已锁：`allowFileAccess/allowContentAccess/domStorage/database = false`、无 filr URL 跨源（`WebViewSecurity.kt:32-56`）。
 
 ### 3.7 主题注入（供 Mermaid/KaTeX 复用）

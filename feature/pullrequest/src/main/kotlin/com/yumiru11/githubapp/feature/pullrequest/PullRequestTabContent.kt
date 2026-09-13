@@ -228,6 +228,13 @@ private fun createPullRequestBridgeCallback(
         ) {}
 
         override fun onHeightChanged(heightPx: Int) {}
+
+        /** Mermaid 渲染结果：本屏无 CI 断言锚点（README 主路径在 feature:repo 打点），保留空实现。 */
+        override fun onMermaidResult(
+            rendered: Int,
+            failed: Int,
+            engineSupported: Boolean,
+        ) = Unit
     }
 }
 

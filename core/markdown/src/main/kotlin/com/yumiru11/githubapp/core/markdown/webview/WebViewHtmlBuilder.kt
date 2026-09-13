@@ -76,10 +76,20 @@ object WebViewHtmlBuilder {
             RegexOption.IGNORE_CASE,
         )
 
-    // SERVER_HTML 通道的 Mermaid 标记（实测，见可行性报告 §3.5）：GitHub 把 ```mermaid 围栏
-    // 渲染成语法高亮代码块 `<div class="highlight highlight-source-mermaid"><pre>…`，
-    // 图由 github.com 前端脚本水合——App 侧用离线 Mermaid Tiny 水合。
-    private val MERMAID_HTML_REGEX = Regex("""highlight-source-mermaid|language-mermaid""", RegexOption.IGNORE_CASE)
+    // SERVER_HTML 通道的 Mermaid 标记（两代实测形态）：
+    // - GET /repos/{o}/{r}/readme Accept: html+json（README 主路径，2026-09-13 实测 CI 深链目标
+    //   mermaid-js/mermaid）：`<pre lang="mermaid" aria-label="Raw mermaid code">`
+    //   （外层 js-render-enrichment-target + render-plaintext-hidden；图由 github.com
+    //   前端脚本水合，App 侧用离线 Mermaid Tiny 水合）；
+    // - POST /markdown GFM（备用通道，可行性报告 §3.5 实测）：
+    //   `<div class="highlight highlight-source-mermaid"><pre>…`。
+    // 只认 `<pre>` 本体的 lang 属性：`lang="mermaid"` 出现在其它元素上不是图定义；
+    // 按最窄面匹配，误判的代价只是一次多余的 2.5MB 脚本注入。
+    private val MERMAID_HTML_REGEX =
+        Regex(
+            """highlight-source-mermaid|language-mermaid|<pre[^>]*\blang\s*=\s*["']?mermaid""",
+            RegexOption.IGNORE_CASE,
+        )
 
     private val REPO_ROUTE_NUMBER_REGEX = Regex("""\d+""")
 
@@ -183,7 +193,8 @@ object WebViewHtmlBuilder {
      * Mermaid 是否启用（决定是否注入 mermaid.tiny.js）。
      *
      * - OFFLINE_MARKDOWN_IT：内容是原始 markdown，用 [FeatureDetector.containsMermaid]（```mermaid 围栏）
-     * - SERVER_HTML：内容是 GitHub HTML，用 [MERMAID_HTML_REGEX]（highlight-source-mermaid）
+     * - SERVER_HTML：内容是 GitHub HTML，用 [MERMAID_HTML_REGEX]（README 的 `pre[lang="mermaid"]`
+     *   与 POST /markdown 的 `highlight-source-mermaid`）
      *
      * 渲染本身发生在 WebView 内 `sanitizeNode` 之后（renderer.js 的 renderMermaid）——
      * 这里只决定「是否加载运行时」，正确性判据是 JS 侧对清洗后 DOM 的独立扫描。
