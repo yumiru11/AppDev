@@ -233,10 +233,11 @@ readme_mermaid_swipe() {
 #      `overshoot`＝已滚过头（屏内出现后一段「Sequence diagram」标题）；
 #      `none`＝不在屏（既没到也没过）。
 readme_mermaid_target_state() {
-  dump_ui || {
+  # dump_ui 的失败告警走 stdout——必须转 stderr，否则会混进本函数的单行返回值
+  if ! dump_ui >&2; then
     echo "none"
     return 0
-  }
+  fi
   python3 - <<'PY' 2>/dev/null || echo "none"
 import re
 xml = open('/tmp/ui.xml', encoding='utf-8').read()
