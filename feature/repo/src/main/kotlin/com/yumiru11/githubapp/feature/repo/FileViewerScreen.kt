@@ -26,8 +26,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -35,7 +33,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,6 +65,9 @@ import com.composables.icons.materialsymbols.rounded.Format_list_numbered
 import com.composables.icons.materialsymbols.rounded.Keyboard_arrow_down
 import com.composables.icons.materialsymbols.rounded.Keyboard_arrow_up
 import com.composables.icons.materialsymbols.rounded.Search
+import com.yumiru11.githubapp.core.designsystem.component.AppCard
+import com.yumiru11.githubapp.core.designsystem.component.AppDialog
+import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.editor.CodeEditorController
 import com.yumiru11.githubapp.core.editor.CodeEditorView
 import com.yumiru11.githubapp.core.editor.CodeLanguageDetector
@@ -123,7 +123,7 @@ fun FileViewerScreen(
         if (isFindOpen) findFocusRequester.requestFocus()
     }
 
-    Scaffold(
+    AppScaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
@@ -249,7 +249,7 @@ fun FileViewerScreen(
 
     if (showJumpDialog) {
         var lineInput by remember { mutableStateOf("") }
-        AlertDialog(
+        AppDialog(
             onDismissRequest = { showJumpDialog = false },
             title = { Text(text = stringResource(R.string.repo_file_jump_to_line)) },
             text = {
@@ -528,7 +528,7 @@ private fun FilePromptCard(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Card(
+        AppCard(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
             Column(

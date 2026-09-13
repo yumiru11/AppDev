@@ -76,3 +76,14 @@ dependencies {
     // MockWebServer 测试构造 Retrofit 需直接引用 Json 类型（core:github-rest 的 implementation 不外泄）
     testImplementation(libs.kotlinx.serialization.json)
 }
+
+// 临时诊断（2026-09-13 #282 CI 挂死定位）：CI 的 verify 步骤在 :feature:profile:testDebugUnitTest
+// 静默挂 48 分钟（本地同任务/同 verify 路径 6m26s 全绿，不可复现）。输出每个测试的开始/结束事件，
+// 用于区分「某个测试挂住」（有 started 无 passed）与「测试全过但 worker 不退出」（全 passed 后静默）。
+// 定位完成后删除本块。
+tasks.withType<Test>().configureEach {
+    testLogging {
+        events("started", "passed", "failed", "skipped")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
+}

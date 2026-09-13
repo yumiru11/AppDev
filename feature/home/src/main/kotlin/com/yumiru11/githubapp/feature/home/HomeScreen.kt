@@ -26,7 +26,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -59,6 +58,7 @@ import androidx.paging.compose.itemKey
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
 import com.yumiru11.githubapp.core.designsystem.component.LongBarAction
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
@@ -164,7 +164,7 @@ fun HomeScreen(
     var tabClickTicks by remember { mutableIntStateOf(0) }
 
     CompositionLocalProvider(LocalHazeState provides hazeState) {
-        Scaffold(
+        AppScaffold(
             modifier = modifier,
             // 内容 full-bleed（insets 由本组件手工分配到滚动容器 contentPadding）
             contentWindowInsets = WindowInsets(0.dp),

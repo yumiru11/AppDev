@@ -13,14 +13,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -43,8 +40,11 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Add
+import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
+import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
+import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequest
@@ -75,7 +75,7 @@ fun PullRequestListScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val filter by viewModel.filter.collectAsStateWithLifecycle()
 
-    Scaffold(
+    AppScaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
@@ -152,20 +152,20 @@ private fun FilterRow(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        FilterChip(
+        AppFilterChip(
             selected = filter == PullRequestFilter.OPEN,
             onClick = { onFilterSelected(PullRequestFilter.OPEN) },
-            label = { Text(text = stringResource(R.string.pull_request_filter_open)) },
+            label = stringResource(R.string.pull_request_filter_open),
         )
-        FilterChip(
+        AppFilterChip(
             selected = filter == PullRequestFilter.CLOSED,
             onClick = { onFilterSelected(PullRequestFilter.CLOSED) },
-            label = { Text(text = stringResource(R.string.pull_request_filter_closed)) },
+            label = stringResource(R.string.pull_request_filter_closed),
         )
-        FilterChip(
+        AppFilterChip(
             selected = filter == PullRequestFilter.ALL,
             onClick = { onFilterSelected(PullRequestFilter.ALL) },
-            label = { Text(text = stringResource(R.string.pull_request_filter_all)) },
+            label = stringResource(R.string.pull_request_filter_all),
         )
     }
 }
@@ -260,7 +260,7 @@ private fun PullRequestRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    AppCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         colors =

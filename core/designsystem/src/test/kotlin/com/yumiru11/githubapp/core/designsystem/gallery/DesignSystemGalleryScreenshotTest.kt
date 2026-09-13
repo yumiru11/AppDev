@@ -11,8 +11,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 设计系统画廊截图基线（22 帧 = 11 分节 × 明/暗；DIALOG 分节见
- * [DesignSystemGalleryDialogScreenshotTest]）。
+ * 设计系统画廊截图基线（24 帧 = 12 分节 × 明/暗；DIALOG 与 BOTTOM_SHEET 分节见
+ * [DesignSystemGalleryWindowScreenshotTest]）。
  *
  * 基准 PNG：`core/designsystem/src/test/screenshots/DesignSystemGallery_<section>_<theme>.png`
  * （入库；**只能由 CI "Record screenshots (CI canonical)" workflow 录制**，本机录制无效）。
@@ -74,6 +74,12 @@ class DesignSystemGalleryScreenshotTest {
 
     @Test
     fun gallerySegmentedButtons_darkTheme_matchesBaseline() = captureSection(GallerySection.SEGMENTED_BUTTONS, darkTheme = true)
+
+    @Test
+    fun galleryScaffold_lightTheme_matchesBaseline() = captureSection(GallerySection.SCAFFOLD, darkTheme = false)
+
+    @Test
+    fun galleryScaffold_darkTheme_matchesBaseline() = captureSection(GallerySection.SCAFFOLD, darkTheme = true)
 
     @Test
     fun galleryEmptyState_lightTheme_matchesBaseline() = captureSection(GallerySection.EMPTY_STATE, darkTheme = false)

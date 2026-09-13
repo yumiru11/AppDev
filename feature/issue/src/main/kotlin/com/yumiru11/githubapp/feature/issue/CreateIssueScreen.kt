@@ -20,12 +20,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -39,6 +37,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
+import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.feature.issue.model.IssueErrorType
 
 /**
@@ -74,7 +74,7 @@ fun CreateIssueScreen(
         }
     }
 
-    Scaffold(
+    AppScaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
@@ -137,25 +137,15 @@ fun CreateIssueScreen(
                 ) {
                     availableLabels.forEach { label ->
                         val selected = label.name in selectedLabels
-                        FilterChip(
+                        AppFilterChip(
                             selected = selected,
                             onClick = {
                                 selectedLabels =
                                     if (selected) selectedLabels - label.name else selectedLabels + label.name
                             },
-                            label = { Text(text = label.name) },
-                            leadingIcon =
-                                if (selected) {
-                                    {
-                                        Icon(
-                                            imageVector = Icons.Filled.Check,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
+                            label = label.name,
+                            leadingIcon = if (selected) Icons.Filled.Check else null,
+                            leadingIconSize = 16.dp,
                         )
                     }
                 }

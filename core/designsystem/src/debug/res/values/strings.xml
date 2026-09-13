@@ -14,6 +14,8 @@
     <string name="gallery_section_assist_chips">Assist chips</string>
     <string name="gallery_section_segmented_buttons">Segmented buttons</string>
     <string name="gallery_section_dialog">Dialog</string>
+    <string name="gallery_section_bottom_sheet">Bottom sheet</string>
+    <string name="gallery_section_scaffold">Scaffold</string>
     <string name="gallery_section_empty_state">Empty state</string>
     <string name="gallery_section_error_state">Error state</string>
     <string name="gallery_section_loading_state">Loading state</string>
@@ -51,6 +53,14 @@
     <string name="gallery_dialog_text">Dialog body text used to verify the container rendering.</string>
     <string name="gallery_dialog_confirm">Confirm</string>
     <string name="gallery_dialog_dismiss">Dismiss</string>
+
+    <!-- Bottom sheet -->
+    <string name="gallery_bottom_sheet_title">Bottom sheet title</string>
+    <string name="gallery_bottom_sheet_body">Bottom sheet body text used to verify the sheet container rendering.</string>
+
+    <!-- Scaffold -->
+    <string name="gallery_scaffold_top_bar">Scaffold top bar</string>
+    <string name="gallery_scaffold_content">Scaffold content</string>
 
     <!-- Empty / error / loading states -->
     <string name="gallery_empty_title">Nothing here</string>

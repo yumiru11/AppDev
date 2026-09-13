@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,7 +23,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,6 +41,8 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Delete
 import com.composables.icons.materialsymbols.rounded.Edit
+import com.yumiru11.githubapp.core.designsystem.component.AppDialog
+import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.editor.CodeEditorView
 import com.yumiru11.githubapp.core.editor.CodeLanguageDetector
 import com.yumiru11.githubapp.core.editor.rememberM3EditorThemeTokens
@@ -101,7 +101,7 @@ fun FileEditScreen(
     var newBranchName by rememberSaveable { mutableStateOf("") }
     var deleteMessage by rememberSaveable { mutableStateOf("") }
 
-    Scaffold(
+    AppScaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
@@ -191,7 +191,7 @@ fun FileEditScreen(
             commitMessage.isNotBlank() &&
                 (!useNewBranch || (newBranchName.trim().isNotBlank() && !newBranchName.contains(' '))) &&
                 (!isNew || commitPath.trim().isNotBlank())
-        AlertDialog(
+        AppDialog(
             onDismissRequest = { showCommitDialog = false },
             title = { Text(text = stringResource(R.string.repo_file_commit)) },
             text = {
@@ -336,7 +336,7 @@ fun FileEditScreen(
 
     // ── 删除确认对话框：commit message 必填 ─────────────────────────────────
     if (showDeleteDialog && editing != null && !isNew) {
-        AlertDialog(
+        AppDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text(text = stringResource(R.string.repo_file_delete)) },
             text = {
