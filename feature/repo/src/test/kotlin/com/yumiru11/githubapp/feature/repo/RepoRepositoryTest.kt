@@ -1,4 +1,7 @@
-@file:Suppress("LargeClass") // README 渲染/文件树/文件读写/分支/UI-6 行级修改时间映射/编辑器 CRLF 往返（含 BOM）聚在同一仓库类测试（文件内按主题分段），拆分反损可读性（RepoFilesViewModelTest 同款先例）
+@file:Suppress("LargeClass")
+// 仓库数据仓库为单一被测类（树/文件读写/编辑提交/README 渲染/UI-6 行级修改时间映射/编辑器 CRLF
+// 往返），拆文件会把同一组 MockK 桩与构造分散到多处；测试膨胀到需要拆分时再按子域拆
+// （同 RepoFilesViewModelTest 先例）。
 
 package com.yumiru11.githubapp.feature.repo
 
