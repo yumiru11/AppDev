@@ -2,7 +2,6 @@ package com.yumiru11.githubapp.feature.editor
 
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.lifecycle.SavedStateHandle
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.core.testing.screenshot.captureScreenshotDeterministic
 import org.junit.Rule
@@ -39,7 +38,6 @@ class MarkdownEditorScreenScreenshotTest {
             MarkdownEditorScreen(
                 initialContent = SAMPLE_MARKDOWN,
                 onClose = {},
-                mentionsViewModel = emptyMentionsViewModel(),
             )
         }
     }
@@ -50,13 +48,9 @@ class MarkdownEditorScreenScreenshotTest {
             MarkdownEditorScreen(
                 initialContent = SAMPLE_MARKDOWN,
                 onClose = {},
-                mentionsViewModel = emptyMentionsViewModel(),
             )
         }
     }
-
-    /** 截图首帧不需要候选：空 owner/repo → VM 不请求网络，补全面板不出现（基线不因本票改变）。 */
-    private fun emptyMentionsViewModel(): EditorMentionsViewModel = EditorMentionsViewModel(SavedStateHandle(), FakeRepositoryRepository())
 
     private companion object {
         val SAMPLE_MARKDOWN =

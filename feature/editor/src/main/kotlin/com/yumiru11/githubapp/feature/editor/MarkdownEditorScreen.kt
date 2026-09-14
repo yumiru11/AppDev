@@ -25,7 +25,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
@@ -70,8 +69,9 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
  * @param onClose 返回回调
  * @param onInternalLink 预览内 GitHub 内部链接分发（默认忽略）
  * @param onExternalLink 预览内外部链接分发（默认忽略）
- * @param mentionsViewModel `@mention` 候选（SPEC-3）：由导航 route 的 owner/repo 拉仓库
- *   协作者；测试注入假仓库构造的实例，避免 Robolectric 下走 Hilt 图。
+ * @param mentions `@mention` 补全候选（SPEC-3）。屏幕只消费数据，**不做 Hilt 解析**——
+ *   候选由 route 层（`editorScreen` 宿主 lambda，owner/repo 来自 editor route 参数）解析
+ *   后传入；无仓库语境的调用点省略即为空。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -81,7 +81,7 @@ fun MarkdownEditorScreen(
     onInternalLink: (ParsedUrl) -> Unit = {},
     onExternalLink: (String) -> Unit = {},
     modifier: Modifier = Modifier,
-    mentionsViewModel: EditorMentionsViewModel = hiltViewModel(),
+    mentions: List<String> = emptyList(),
 ) {
     val viewModel: MarkdownEditorViewModel =
         viewModel(
@@ -91,7 +91,6 @@ fun MarkdownEditorScreen(
                 },
         )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val mentions by mentionsViewModel.candidates.collectAsStateWithLifecycle()
     val editorTokens = rememberM3EditorThemeTokens()
 
     AppScaffold(
