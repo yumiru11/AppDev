@@ -62,6 +62,7 @@ import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
 import com.yumiru11.githubapp.core.designsystem.component.LongBarAction
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
 import com.yumiru11.githubapp.core.designsystem.token.GlassScope
@@ -422,8 +423,8 @@ private fun QuickActionsSection(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.padding(vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.padding(vertical = AppDimens.spacing.s),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
         Text(
             text = stringResource(R.string.home_title),
@@ -497,7 +498,7 @@ private fun FeedPage(
         // 整块按玻璃头高度整体避让（此处用布局 padding 是安全的——不参与穿越）
         Column(modifier = modifier.padding(top = topGlassPadding)) {
             // 列表态横向 16dp 由 contentPadding 给；这里没有列表，横向自己补
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.spacing.l)) {
                 quickActions()
             }
             Box(modifier = Modifier.weight(1f)) {
@@ -571,12 +572,12 @@ private fun FeedList(
             modifier = Modifier.fillMaxSize(),
             contentPadding =
                 PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
+                    start = AppDimens.spacing.l,
+                    end = AppDimens.spacing.l,
                     top = topGlassPadding,
-                    bottom = 8.dp + bottomContentPadding,
+                    bottom = AppDimens.spacing.s + bottomContentPadding,
                 ),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
         ) {
             item(key = QUICK_ACTIONS_KEY) {
                 quickActions()
@@ -646,7 +647,7 @@ private fun UnauthenticatedContent(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.l))
             Button(onClick = onLoginClick) {
                 Text(text = stringResource(R.string.feed_login))
             }

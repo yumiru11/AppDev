@@ -26,6 +26,7 @@ import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.ui.appTransientEnterAlpha
 import com.yumiru11.githubapp.feature.home.R
 import com.yumiru11.githubapp.feature.home.RepoPickerUiState
@@ -73,11 +74,11 @@ internal fun RepoPickerSheetContent(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+    Column(modifier = modifier.fillMaxWidth().padding(bottom = AppDimens.spacing.xl)) {
         Text(
             text = stringResource(R.string.repo_picker_title),
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.m),
         )
         when (uiState) {
             is RepoPickerUiState.Loading -> {
@@ -85,7 +86,7 @@ internal fun RepoPickerSheetContent(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 32.dp),
+                            .padding(vertical = AppDimens.spacing.xxl),
                 )
             }
 
@@ -136,7 +137,7 @@ private fun RepoPickerRow(
             modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -144,7 +145,7 @@ private fun RepoPickerRow(
             contentDescription = null,
             modifier = Modifier.size(20.dp),
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.m))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = repo.fullName,
