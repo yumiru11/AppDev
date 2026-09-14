@@ -70,14 +70,27 @@ class CodeEditorController
         /** Sora 侧当前查询词镜像（`EditorSearcher` 没有 pattern getter，只能自行记录）。 */
         private var findQuery: String = ""
 
-        // Sora 搜索线程完成 / 清除时派发结果事件 → 回灌宿主（销毁时退订，见 destroy）
+        /** `destroy()` 后置位：事件的延迟回灌不再上报（旧控制器不得污染已关闭的查找会话）。 */
+        private var destroyed = false
+
+        // Sora 搜索线程完成 / 清除时派发结果事件 → 回灌宿主（销毁时退订，见 destroy）。
+        //
+        // ⚠️ 回灌必须在**下一个主线程消息**里交付，不能在事件派发期间同步读匹配表：
+        // Sora 在 `dispatchEvent` 返回之后才置空 `currentThread`（`EditorSearcher.lambda$run$0`），
+        // 而 `isResultValid() = currentThread == null || !currentThread.isAlive()`（均 `javap -c` 核实）
+        // —— 派发瞬间扫描线程可能尚未退出（post 后被抢占；CI 双核 + JaCoCo 下高发），
+        // 此刻读计数得 0：面板假阴性「无匹配」且不自愈。推迟一拍后 Sora 收尾已完成，读到权威值。
+        // 时序由 `CodeEditorFindResultDeliveryTest` 逐条推进消息锁定。
         private val findReceipt =
             editor.subscribeEvent(PublishSearchResultEvent::class.java) { _: PublishSearchResultEvent, _: Unsubscribe ->
-                onFindResult(currentFindState())
+                editor.postInLifecycle {
+                    if (!destroyed) onFindResult(currentFindState())
+                }
             }
 
         /** 销毁控制器，移除监听器防止内存泄漏。必须在 Compose onReset/onRelease 中调用。 */
         fun destroy() {
+            destroyed = true
             editor.text.removeContentListener(contentListener)
             findReceipt.unsubscribe()
             findQuery = ""
