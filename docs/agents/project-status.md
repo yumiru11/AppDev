@@ -177,8 +177,8 @@
 | UI-1 窄屏 side-by-side diff | ⏳ 每栏 ~40 字符且无横向滚动（需 §6 决策） |
 | SPEC-3 @mention 补全 | ⏳ `MarkdownComposer.mentions` 生产调用点仍不传值 |
 | UI-2 / UI-4 / UI-6 / UI-7 | ⏳ 选中态对比 / No-README 空态 / 文件树时间列 / feed 骨架——均未动 |
-| DATA-2 / PROTO-1 / PERF-1 / PERF-2 | ⏳ `core:data` 无测试配置 / 原型归档决策 / 冷启动+macrobenchmark（真机）/ 跨端像素 diff——见 backlog §3.3 |
-| ~~覆盖率剩余模块~~ | ✅ 已闭环：22 个有阈值模块全量棘轮到 #261 后的真实值（#263）；声明了阈值却无 exec 数据的模块**硬失败**（#260）；仍豁免 = `core:data` / `core:testing` / `core:ui` / `prototype`（理由见 `build.gradle.kts` 注释） |
+| PROTO-1 / PERF-1 / PERF-2 | ⏳ 原型归档决策 / 冷启动+macrobenchmark（真机）/ 跨端像素 diff——见 backlog §3.3（DATA-2 已闭环：`core:data` 补测试配置 + 契约测试并首次设阈，2026-09-14） |
+| ~~覆盖率剩余模块~~ | ✅ 已闭环：23 个有阈值模块全量棘轮到 #261 后的真实值（#263）+ `core:data` 首次纳入（DATA-2）；声明了阈值却无 exec 数据的模块**硬失败**（#260）；仍豁免 = `core:testing` / `core:ui` / `prototype`（理由见 `build.gradle.kts` 注释） |
 
 > 另有若干需产品/设计先 grill 的决策（窄屏 diff、feed 骨架、KaTeX/Mermaid、原型去留等，D-5/D-7 已闭环），见 `remaining-backlog-2026-09-12.md` §6。
 

@@ -99,7 +99,7 @@
 
 **T3 阈值表（2026-08-16 首批；2026-09-13 已被 #263 全量真值棘轮取代）**
 
-> 本表为 Phase B 首批（AGP 8.7 / 旧分母口径）阈值，**已不再是现实**：旧实测普遍低于真实值数十 pp（JaCoCo agent 跳过 Robolectric 沙箱类，见下方 T2 与 T5）。当前唯一事实来源是 `build.gradle.kts` 的 `coverageThresholds`（**22 个模块**，逐一注有真实实测值与余量），已按 #261 修复后的真实覆盖率重设（#263），只升不降。仍豁免 = `core:data` / `core:testing` / `core:ui` / `prototype`（理由见 `build.gradle.kts` 注释）。
+> 本表为 Phase B 首批（AGP 8.7 / 旧分母口径）阈值，**已不再是现实**：旧实测普遍低于真实值数十 pp（JaCoCo agent 跳过 Robolectric 沙箱类，见下方 T2 与 T5）。当前唯一事实来源是 `build.gradle.kts` 的 `coverageThresholds`（**23 个模块**，逐一注有真实实测值与余量），已按 #261 修复后的真实覆盖率重设（#263），只升不降。仍豁免 = `core:testing` / `core:ui` / `prototype`（理由见 `build.gradle.kts` 注释）；`core:data` 已于 2026-09-14（DATA-2）补测试配置并首次设阈 0.99。
 
 **无 exec 数据 = 硬失败（#260，2026-09-13）**：声明了阈值的模块若没有单测执行数据，**任务直接失败**（旧行为是 SKIPPED + BUILD SUCCESSFUL，门禁形同虚设）。同理 `konsistCheck` 无匹配测试也已改为硬失败。
 
