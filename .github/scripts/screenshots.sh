@@ -261,7 +261,17 @@ readme_mermaid_recover() {
 # 的信号。
 # 输出：`target <top> <bottom>`＝图表区在屏（附目标区包围盒）；
 #      `overshoot`＝已滚过头（屏内出现目标之后的任一示例代码块标记）；
-#      `none`＝不在屏（既没到也没过）。
+#      `below`＝**过冲标记也全部离屏**（已深入目标区之后的正文，如 Reporting
+#              vulnerabilities / Appreciation，页首 TOC 不在屏）→ 必须回滚向上；
+#      `none`＝仍在目标之前（页首 TOC 在屏）；
+#      `noreadme`＝README 未加载（全文连 TOC 都没有）。
+#
+# ⚠️ 2026-09-14 实证补的 `below`（main run 34813154405，critical 帧 FAILED）：初段 14 次
+#    连续下滑可能一口气冲过整个示例区，连 overshoot 兜底标记（Sequence diagram [ / gantt /
+#    sequenceDiagram…）都全部离屏；此时旧状态机一律归 `none` → `*) swipe 3` 继续**向下**，
+#    于是越滑越远永不回头 → 两轮定位必然失败。失败现场 dump 可见 Reporting vulnerabilities /
+#    Appreciation（都在图表区之后），而 tops/overshoot 为空。修复=按「TOC 是否在屏」区分
+#    `none` 与 `below`，后者反向回滚。
 readme_mermaid_target_state() {
   # dump_ui 的失败告警走 stdout——必须转 stderr，否则会混进本函数的单行返回值
   if ! dump_ui >&2; then
@@ -272,11 +282,13 @@ readme_mermaid_target_state() {
 import re
 xml = open('/tmp/ui.xml', encoding='utf-8').read()
 pat = re.compile(r'<node[^>]*text="([^"]*)"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"')
-tops, bottoms, overshoot = [], [], False
+tops, bottoms, overshoot, toc_visible = [], [], False, False
 for text, _l, top, _r, bottom in pat.findall(xml):
     top, bottom = int(top), int(bottom)
     if bottom - top <= 0:
         continue
+    if 'Table of content' in text:
+        toc_visible = True
     if 'Flowchart [' in text or 'A[Hard]' in text:
         tops.append(top)
         bottoms.append(bottom)
@@ -299,10 +311,12 @@ if tops:
     print('target %d %d' % (min(tops), max(bottoms)))
 elif overshoot:
     print('overshoot')
-elif 'Table of content' in xml:
+elif 'Table of content' not in xml:
+    print('noreadme')
+elif toc_visible:
     print('none')
 else:
-    print('noreadme')
+    print('below')
 PY
 }
 
@@ -312,6 +326,16 @@ PY
 readme_mermaid_position_once() {
   local i state top
   README_MERMAID_RESET=0
+  # 起始位置自检：仍停在过冲区（overshoot/below）时先重置到页首。
+  # 为什么必须做（main run 34813154405 失败现场 dump 实证）：`position_once` 一进来就
+  # 无条件连推 14 次下滑，而两轮之间滚动位置**不会**回页首——第一轮若停在图表区之后，
+  # 第二轮从那里再推 14 次只会越推越深，两轮必然都失败。`none`（页首 TOC 在屏）与
+  # `target` 不重置：前者本就在目标之前，后者已在位。
+  read -r state _ <<<"$(readme_mermaid_target_state)"
+  case "$state" in
+    overshoot | below) readme_mermaid_open_readme ;;
+    *) : ;;
+  esac
   readme_mermaid_swipe 14
   for i in 1 2 3 4 5 6 7 8; do
     if [ "$README_MERMAID_RESET" = "1" ]; then
@@ -332,6 +356,7 @@ readme_mermaid_position_once() {
         fi
         ;;
       overshoot) readme_mermaid_swipe 3 down ;;
+      below) readme_mermaid_swipe 3 down ;;
       noreadme) readme_mermaid_open_readme ;;
       *) readme_mermaid_swipe 3 ;;
     esac
