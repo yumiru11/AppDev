@@ -4,7 +4,7 @@
 > 核验基准：`main@d00533f`（Merge PR #241；本 worktree `docs/remaining-backlog`，与 main 同树）
 > **更新 2026-09-12（后半波 #256–#264 后）：`main@fd899b9`**。§3 已剪除本波闭环项（MD-1/2/3、TEST-1、GATE-1/2/3/4/5、DATA-1、DEAD-1/2、UI-3、UI-5、REPO-1），只留真开口；新增条目见 §2 尾部与 §3。
 > **更新 2026-09-13（收尾波 #267–#271 后）：`main@db1b696`**。AGP9-1 / KaTeX（D-2 部分）/ 设计系统计划（SPEC-1/2 的 plan 部分）/ APK 体积门禁 / 覆盖率口径 / 探针加固 / 深链编辑 / 仓库头 均已闭环，逐条钉死见下方 §2 收尾波表；§3 只留真开口。
-> **更新 2026-09-14（设计系统/渲染/加固波 #272–#289 后）：`main@15d1092`**。设计系统 SPEC-1 / SPEC-2 / UI-2 实现（Batch 1–4）、离线 Mermaid、UI-1 / UI-4 / UI-6 / UI-7、EDITOR-1、DATA-2、截图证据链（#276/#277）均已闭环；§2 尾部新增闭环表，§3 只列真开口（含 OPEN 的 #290/#291）。
+> **更新 2026-09-14（设计系统/渲染/加固波 #272–#291 后）：`main@42821ef`**。设计系统 SPEC-1 / SPEC-2 / UI-2 实现（Batch 1–4）、离线 Mermaid、UI-1 / UI-4 / UI-6 / UI-7、EDITOR-1、DATA-2、SPEC-3（#290）、游客 REST 配额守卫（#291）、截图证据链（#276/#277）均已闭环；§2 尾部新增闭环表，§3 只列真开口（**wave 内 PR 已全部合入，无 open PR**）。
 > 审计基准：`a48ede1`（Merge PR #199，2026-09-11；四份审计报告的取证起点）
 > 目的：把四份审计报告里**仍未解决**的条目收敛成一张可执行清单；把**已闭环**的条目显式钉死，防止被重新开票。
 
@@ -106,7 +106,7 @@
 | #270 | 构建/lint | **AGP9-1** + **Q01 lint 根因** | `gradle/wrapper/gradle-wrapper.properties`（9.3.1）；`gradle/libs.versions.toml:2-6,25`；`buildSrc/.../appdev.android.*.gradle.kts`（compileSdk 37 / built-in Kotlin）；CI lint guard（`ci.yml`） |
 | #271 | CI | **APK 体积回归门禁（KaTeX 研究 R11）** | `.github/scripts/check-apk-size.sh`；`.github/apk-size-budget.properties`；`nightly.yml` |
 
-**设计系统/渲染/加固波（#272–#289）新增闭环（2026-09-14，核验于 `15d1092`）**
+**设计系统/渲染/加固波（#272–#291）新增闭环（2026-09-14，核验于 `42821ef`）**
 
 | PR | 范围 | 解决的审计条目 | 当前代码证据 |
 |---|---|---|---|
@@ -124,6 +124,8 @@
 | #287 | editor | **EDITOR-1** | `MarkdownEditorScreen.kt:107-117`；`core/editor/.../TextFileFormat.kt` |
 | #288 | data | **DATA-2** | `build.gradle.kts:139` `":core:data" to 0.99` |
 | #289 | home | **UI-7 / D-4** | `feature/home/.../ui/FeedSkeleton.kt` |
+| #290 | editor | **SPEC-3**（`@mention` 真实候选） | `core/editor/.../MentionCandidates.kt`；`core/navigation/.../AppRoute.kt`（`Editor(owner, repo)`）；宿主层 Hilt `mentions` |
+| #291 | repo | 游客 REST 配额守卫（mtime 列） | `feature/repo/.../RepoFilesViewModel.kt`（`AuthState.Anonymous` 短路、无负缓存） |
 | #272 / #285 | 文档 / CI | 文档对账 / 移除临时诊断日志 | `project-status.md`；`ci.yml` |
 
 **结论**：四份报告点名的 P0 级用户可见阻断（T23 白屏、OAuth 占位、PAT 降级、README-404 语义、离线相对链接死链）**均已闭环**。
@@ -142,13 +144,13 @@
 
 ### 3.2 P1
 
-**已无未闭环 P1**（2026-09-14 核验，仅 SPEC-3 的实现 PR 在途）：
+**已无未闭环 P1**（2026-09-14 核验，全部闭环）：
 - **SPEC-1**（10 个 `App*` 组件 / 裸控件 / 重复状态视图）✅ 闭环：#273（Batch 1）+ #274（Batch 2）+ #282（Batch 4，六类裸控件清零）。
 - **SPEC-2**（间距未令牌化）✅ 闭环：#280（`AppDimens.spacing` scale）。
 - **UI-1**（窄屏 side-by-side 不可读）✅ 闭环：#284（`<600dp` unified-only + 超长行横向滚动，D-3 关闭）。
 - **UI-2**（选中态对比不足）✅ 闭环：#273/#274/#282（`AppFilterChip` / `AppSegmentedButton` 显式 `selectedContainerColor`）。
 - **EDITOR-1**（软换行 / 替换 / CRLF+编码）✅ 闭环：#287。
-- **SPEC-3**（`@mention` 补全永不产生候选）🔶 **实现 PR #290 OPEN、未合入 main** —— 本节唯一真开口。
+- **SPEC-3**（`@mention` 补全永不产生候选）✅ 闭环：#290（REST collaborators 数据源 + `core:editor/MentionCandidates.kt` + `AppRoute.Editor(owner, repo)`，屏收 `mentions: List<String>`，宿主层 Hilt 解析）。
 
 > SPEC-1 / SPEC-2 / UI-2 的**计划部分**由 #268 闭环（`docs/design-system/implementation-plan.md` + ADR-0010）；**实现**已随 #273/#274/#280/#282 落地。
 
@@ -165,7 +167,7 @@
 
 ### 3.4 在途分支（勿重复实现）
 
-> 2026-09-14 核验：设计系统 Batch 1–4 已随 #273/#274/#280/#282 合入；AGP9 工具链已随 #270 合入。当前独立存在的分支：原型 `prototype/markdown-renderer`（待归档决策）+ 两张 OPEN PR 分支（#290/#291）。
+> 2026-09-14 核验：设计系统 Batch 1–4 已随 #273/#274/#280/#282 合入；AGP9 工具链已随 #270 合入；#290/#291 已合入（main@42821ef）。当前独立存在的分支仅原型 `prototype/markdown-renderer`（待归档决策）。
 
 | 分支 | 内容 | 与本清单关系 | 现状 |
 |---|---|---|---|
@@ -174,8 +176,8 @@
 | `docs/katex-mermaid-feasibility` | KaTeX/Mermaid 离线可行性评估（含体积实测） | §6 D-2 决策输入 | ✅ **已合入 main（PR #243）**；报告在 `docs/research/` |
 | `chore/agp9-feasibility` | 升 AGP 9.1.1/Gradle 9.3.1/compileSdk 37 + 可行性报告 | **AGP9-1** 的工具链骨架 | ✅ **已合入 main（PR #270）**，远端已删 |
 | `feat/design-system-batch1` | 设计系统 Batch 1（Card / Chip 家族 / Dialog / Snackbar） | **SPEC-1 / UI-2** 实现起点 | ✅ **已合入 main（PR #273）**；后续 Batch 2–4 见 #274/#280/#282 |
-| `feat/editor-mention-completion` | SPEC-3 `@mention` 接真实候选 | §3.2 SPEC-3 | 🔶 **OPEN PR #290**，未合入 main |
-| `fix/repo-guest-commit-date-guard` | 游客模式不再为 mtime 列消耗 REST 配额 | §3.3 | 🔶 **OPEN PR #291**，未合入 main |
+| `feat/editor-mention-completion` | SPEC-3 `@mention` 接真实候选 | §3.2 SPEC-3 | ✅ **已合入 main（PR #290）** |
+| `fix/repo-guest-commit-date-guard` | 游客模式不再为 mtime 列消耗 REST 配额 | §3.3 | ✅ **已合入 main（PR #291）**，main 头 |
 | `prototype/markdown-renderer` | 7 提交：独立原型（KotlinTextMate/grammars/themes），探索性 | **PROTO-1** 归档决策 | ❌ 未合入（`origin/prototype/markdown-renderer` 仍存在，领先 main 7 提交） |
 | `test/screenshot-matrix-2` | 矩阵/RTL 守卫 | **明确排除，不入 backlog**；已并入 main | 已并入 main，无领先提交 |
 
@@ -239,6 +241,8 @@
 | S3 UI-C10（UI-7 feed 骨架） | P2 | **已修（#289）**：`FeedSkeleton.kt`（D-4 关闭） |
 | S4 P2-5 / G-11（DATA-2） | P2 | **已修（#288）**：`:core:data` 补测试基建 + 首次设阈 0.99 |
 | 截图证据链（拼板取帧契约 / 严重度旁路 / readme-mermaid 假帧） | 缺陷 | **已修（#276/#277）**：`base=${f%.png}` + 逐帧 critical 严重度 + 视口内短滑 + 先取帧后断言 + `lookup_mismatch` 闸门 |
+| S1 §6.1 / §10 P3（SPEC-3 `@mention`） | P1 | **已修（#290）**：REST collaborators 数据源 + `MentionCandidates` + `AppRoute.Editor(owner, repo)`，宿主层 Hilt 解析 `mentions` |
+| 游客模式 mtime 列消耗 REST 配额 | 缺陷 | **已修（#291）**：`AuthState.Anonymous` 短路文件树 mtime 查询、不做负缓存 |
 
 > 备注：S1 D8（代码字体/行号设置项与 ui-design 冲突）随 #225 闭环；S1 D15–D20 的余额见 §3.3/§3.4。
 
@@ -276,10 +280,10 @@
 | ~~Wave B：Markdown~~ | MD-1/2/3 + KaTeX/Mermaid + 阅读密度 | ✅ 落地（#237/#251/#262/#269/#275/#281） |
 | ~~Wave C：UI 残余缺陷~~ | UI-1 / UI-4 / UI-6 / UI-7 | ✅ 落地（#284/#286/#289） |
 | ~~Wave D：测试 / 数据~~ | DATA-2 + 覆盖率口径 | ✅ 落地（#288 / #260 / #261 / #263） |
+| ~~Wave F：在途收尾~~ | #290（SPEC-3 @mention）、#291（游客 REST 配额守卫） | ✅ 均已合入（2026-09-14T02:12/02:23Z） |
 | **Wave E：真机 / 决策（先 grill）** | §3.2 真机项（用户已 defer）；§6 的 D-1/D-6/D-8；PROTO-1 / PERF-1 / PERF-2 | 🔶 剩余 |
-| **Wave F：在途收尾** | #290（SPEC-3 @mention）、#291（游客 REST 配额守卫），合并后关闭对应条目 | 🔶 两张 OPEN PR |
 
-**并行建议**：Wave F 两张 PR 互不冲突，可并行 review/合并；Wave E 的决策项优先产出。
+**并行建议**：Wave A–D/F 均已落地，剩余工作集中在 Wave E（真机验证 + 三项产品/设计决策）。
 
 ---
 
@@ -287,7 +291,7 @@
 
 ```bash
 # 核验基准（2026-09-14 设计系统/加固波后）
-git log -1 --format='%H %ci %s'        # 15d1092 ... (#287)
+git log -1 --format='%H %ci %s'        # 42821ef ... (#291)
 git merge-base --is-ancestor 423bc79 HEAD && echo "31 基线已在 main"
 
 # 报告 vs 现实快速对照
@@ -300,7 +304,7 @@ grep -n 'budget_bytes' .github/apk-size-budget.properties   # #271/#275 → 8424
 grep -n 'test.timeout' build.gradle.kts   # #283 → 15min 任务级
 grep -n '"":core:data"" to 0.99' build.gradle.kts   # #288 首次纳入
 grep -n "includeNoLocationClasses" build.gradle.kts   # #261 Robolectric 覆盖率修复
-gh pr list --repo yumiru11/AppDev --state open --json number,title   # #290/#291 在途
+gh pr list --repo yumiru11/AppDev --state open --json number,title   # 仅 #292（docs 对账）
 ```
 
 **边界声明**：本清单为只读核验产物，未改任何生产代码，未跑 Gradle；像素类争议在无新 CI 帧时标注为「无法离屏判定」，需截图链路复跑后由 §6 决策收敛。

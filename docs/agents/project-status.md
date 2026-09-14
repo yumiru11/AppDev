@@ -2,7 +2,7 @@
 
 > 本文件是当前进度的**权威快照**。每张票合并/关闭后更新。配合 `docs/agents/workflow.md`（流程）、`AGENTS.md`（环境）与 `docs/agents/task-audit-2026-09-06.md`（全量审计）阅读。
 > 本版修正 2026-09-06 审计发现的 §7 D01「文档三处失真」：AGENTS.md / project-status.md / FEEDBACK.md 已与 `gh` 票面 + git 历史对齐。
-> **基线**：`main@15d1092`（#287，2026-09-14T01:32:07Z 合入；main CI 最新 run `34796226194` = success）。本轮波次共合入 **58 张 PR（编号 #229–#289）**，全部 squash —— 分段：前半 #229–#255（26 张，§2.1）、中段 #256–#266（11 张，§2.1）、收尾 #267–#271（5 张，§2.2）、设计系统/渲染/加固 #272–#289（16 张，§2.3/§2.4）。计数口径：#250 是 issue 非 PR；#278/#279 不存在；**#290/#291 仍 OPEN（在途，未合入）**。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`。
+> **基线**：`main@42821ef`（#291，2026-09-14T02:23:50Z 合入；main CI 最新 run `34799068974` @42821ef 进行中）。本轮波次共合入 **60 张 PR（编号 #229–#291）**，全部 squash —— 分段：前半 #229–#255（26 张，§2.1）、中段 #256–#266（11 张，§2.1）、收尾 #267–#271（5 张，§2.2）、设计系统/渲染/加固 #272–#291（18 张，§2.3/§2.4）。计数口径：#250 是 issue 非 PR；#278/#279 不存在；**wave 内 PR 已全部合入，无 open PR（#292 是本 docs 对账 PR，不属 wave）**。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`。
 
 ## 1. 里程碑概览
 
@@ -16,7 +16,7 @@
 | M5 发布收尾（性能/签名 Release） | 🔶 进行中：Baseline Profile + i18n 覆盖断言 + RTL 基线 + 发布链路演练已落地（PR #186）；**冷启动实测 / macrobenchmark / 生产签名密钥仍需真机或 Secrets**（见 §3.2） |
 | M6 审计补全与 UI 打磨（2026-09-06 立项） | ✅ 9 张分类票 #163–#170 **全部关闭并合入**；#166/#167 的少数挂账项见 §3.1 |
 | M7 修复波 + 门禁/截图链路加固（2026-09-12/13） | ✅ **42 张 PR #229–#271 全部 squash 合入**：前半 26 张（#229–#255，明细见 §2.1）；中段 11 张（#256–#266，见 §2.1）；收尾 5 张（#267–#271，见 §2.2）—— AGP 9.1.1 迁移 + 全模块 lint 恢复（#270）、离线 KaTeX（#269）、设计系统落地计划 + ADR-0010（#268）、nightly APK 体积门禁（#271） |
-| M8 设计系统落地 + 离线 Mermaid + 证据链加固（2026-09-13/14） | ✅ **16 张 PR #272–#289 全部 squash 合入**（见 §2.3/§2.4）：设计系统 Batch 1–4（#273/#274/#280/#282，六类裸控件清零）、离线 Mermaid（#275）、阅读密度（#281）、截图证据链（#276/#277）、测试超时（#283）、UI-1/UI-4/UI-6/UI-7 + EDITOR-1 + DATA-2（#284/#286/#287/#288/#289）。**唯一在途 = #290/#291（OPEN）** |
+| M8 设计系统落地 + 离线 Mermaid + 证据链加固（2026-09-13/14） | ✅ **18 张 PR #272–#291 全部 squash 合入**（见 §2.3/§2.4）：设计系统 Batch 1–4（#273/#274/#280/#282，六类裸控件清零）、离线 Mermaid（#275）、阅读密度（#281）、截图证据链（#276/#277）、测试超时（#283）、UI-1/UI-4/UI-6/UI-7 + EDITOR-1 + DATA-2（#284/#286/#287/#288/#289）、SPEC-3 + 游客配额守卫（#290/#291）。**无 open PR** |
 
 ## 2. 已完成（T1–T26 中 25 票 + 计划外交付 + 2026-09-12/13/14 修复/加固波全部合入 main）
 
@@ -121,7 +121,7 @@
 
 > **CI 证据车道（真渲染 ≠ 截图 job）**：`mermaid-render-verify.yml` 两条腿 —— API 33（WebView Chromium 101）断言 `MermaidRender: engine=supported rendered>=1`（真渲染）；API 30（Chromium 83）断言 `engine=blocked rendered=0` 且无 `supported`（`<94` 门禁真回退）。`ci.yml` 截图 job 跑 API 30，**在那是回退路径**，不能当渲染证据。`glass-verify.yml` = `Glass verification (API 31+)`。
 
-### 2.4 2026-09-13/14 设计系统 + 加固波（#272–#289，全部 squash 合入）
+### 2.4 2026-09-13/14 设计系统 + 加固波（#272–#291，全部 squash 合入）
 
 | PR | 范围 | 交付 |
 |---|---|---|
@@ -141,8 +141,10 @@
 | #288 | data | **DATA-2**：`:core:data` 补测试基建 + 模型契约测试，**首次纳入覆盖率门禁，阈值 0.99**（实测 100%，`build.gradle.kts:139`） |
 | #289 | home | **UI-7**：feed 首载骨架屏（`feature/home/.../ui/FeedSkeleton.kt`） |
 | #285 | CI | 移除 `feature:profile` 的临时测试事件日志（#282 挂死诊断收尾，非功能性） |
+| #290 | editor | **SPEC-3**：`@mention` 接入真实候选 —— REST collaborators 数据源 + `AppRoute.Editor(owner, repo)` + `core:editor/MentionCandidates.kt`；屏接收 `mentions: List<String>`，Hilt 在宿主层（`AppNavHost`）解析（`EditorMentionsViewModel`）。合入 2026-09-14T02:12:53Z |
+| #291 | repo | 游客模式 REST 配额守卫：`AuthState.Anonymous` 短路文件树 mtime 列查询、**不做负缓存**（`RepoFilesViewModel.kt`）。合入 2026-09-14T02:23:50Z；main 头 |
 
-> §2.1/§2.2 的 #267–#271 仍有效；本波在其后。**#290（SPEC-3 @mention）/ #291（游客 REST 配额守卫）OPEN，未合入**，见 §3.3。
+> §2.1/§2.2 的 #267–#271 仍有效；本波在其后。**wave 内 PR 已全部合入，无 open PR**（#292 为本 docs 对账 PR）。
 
 ## 3. 进行中：审计补全波（2026-09-06 立项，9 张分类票 #163–#171）
 
@@ -193,15 +195,13 @@
 ### 3.3 修复波后仍剩余（2026-09-14 核验）
 
 > 完整可执行清单（含 file:line 证据与规模）见 `docs/agents/remaining-backlog-2026-09-12.md`；下列为该清单的收敛摘要。
-> **本轮（#272–#289）新闭环**：设计系统 SPEC-1 / SPEC-2 / UI-2（#273/#274/#280/#282，六类裸控件清零）、离线 Mermaid（#275）、UI-1（#284）、UI-4 / UI-6（#286）、UI-7（#289）、EDITOR-1（#287）、DATA-2（#288）。
+> **本轮（#272–#291）新闭环**：设计系统 SPEC-1 / SPEC-2 / UI-2（#273/#274/#280/#282，六类裸控件清零）、离线 Mermaid（#275）、UI-1（#284）、UI-4 / UI-6（#286）、UI-7（#289）、EDITOR-1（#287）、DATA-2（#288）、SPEC-3（#290）、游客 REST 配额守卫（#291）。
 > **更早闭环**：#256–#264（MD-1/2/3、TEST-1、GATE-1..5、DATA-1、DEAD-1/2、UI-3/UI-5、REPO-1）；#267–#271（AGP 9、KaTeX、APK 门禁、覆盖率真值）。**下表只列真开口**。
 
 | 项 | 状态 / 说明 |
 |---|---|
 | **真机项（用户已 defer）** | ⏳ 冷启动 <1.5s 实测、Baseline Profile macrobenchmark 采集、全屏 RTL 截图矩阵；本机纯 JVM 无法验（见 §3.2） |
 | **生产签名密钥** | 🔶 需用户在 Secrets 配 `KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` |
-| **SPEC-3 @mention 补全** | 🔶 实现 PR **#290 OPEN**（`@mention` 接入真实候选），未合入 main；旧缺口 `MarkdownComposer.mentions` 生产调用点不传值已在该 PR 修 |
-| **#291 游客 REST 配额守卫** | 🔶 PR **#291 OPEN**（游客模式不再为文件 mtime 列消耗 REST 配额），未合入 main |
 | **PROTO-1** | ⏳ 原型模块归档去留（需拍板，见 backlog §6 D-6） |
 | **PERF-2** | ⏳ 跨端像素 diff 管线（高成本独立票，需优先级拍板） |
 | ~~AGP 9.x / Q01 / 设计系统 SPEC-1 / SPEC-2 / UI-2 / EDITOR-1 / UI-1 / UI-4 / UI-6 / UI-7 / DATA-2 / 覆盖率空白~~ | ✅ 全部闭环（AGP 9 + Q01：#270；设计系统 + UI-2：#273/#274/#280/#282；EDITOR-1：#287；UI-1：#284；UI-4/UI-6：#286；UI-7：#289；DATA-2：#288） |
