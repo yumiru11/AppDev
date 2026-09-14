@@ -16,6 +16,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavHostController
 import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.githubauth.auth.AuthState
 import com.yumiru11.githubapp.feature.repo.FileCommitResult
 import com.yumiru11.githubapp.feature.repo.FileContentData
 import com.yumiru11.githubapp.feature.repo.FileEditState
@@ -24,8 +25,10 @@ import com.yumiru11.githubapp.feature.repo.FileViewState
 import com.yumiru11.githubapp.feature.repo.RepoFilesViewModel
 import com.yumiru11.githubapp.feature.repo.RepoRepository
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -173,6 +176,11 @@ class BlobRouteEditTest {
             savedStateHandle = SavedStateHandle(mapOf("owner" to OWNER, "repo" to REPO, "ref" to REF)),
             repoRepository = repoRepository,
             drafts = drafts,
+            // 游客配额守卫（UI-6 修改时间列）：以登录态构造，本测试与其无关。
+            sessionManager =
+                mockk {
+                    every { authState } returns MutableStateFlow<AuthState>(AuthState.PAT)
+                },
         )
 
     private fun repoRepository(content: FileContentData = fileContent()): RepoRepository =
