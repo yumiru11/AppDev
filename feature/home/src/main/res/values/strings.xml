@@ -3,6 +3,8 @@
     <string name="feed_require_login">Sign in to see your feed</string>
     <string name="feed_login">Sign in</string>
     <string name="feed_empty">No activity yet</string>
+    <!-- 首载骨架屏的读屏文案（UI-7；装饰条无独立语义，整块只播报一次） -->
+    <string name="feed_loading">Loading feed</string>
     <string name="feed_retry">Retry</string>
     <string name="feed_error_network">Network error. Check your connection.</string>
     <string name="feed_error_unknown">Something went wrong</string>

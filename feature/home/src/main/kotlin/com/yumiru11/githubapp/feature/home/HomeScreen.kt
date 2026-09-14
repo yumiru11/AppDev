@@ -74,6 +74,7 @@ import com.yumiru11.githubapp.core.ui.rememberStaggerEnterModifier
 import com.yumiru11.githubapp.feature.home.model.FeedItem
 import com.yumiru11.githubapp.feature.home.model.TrendItem
 import com.yumiru11.githubapp.feature.home.ui.FeedRow
+import com.yumiru11.githubapp.feature.home.ui.FeedSkeleton
 import com.yumiru11.githubapp.feature.home.ui.RepoPickerSheet
 import com.yumiru11.githubapp.feature.home.ui.TrendingSection
 import dev.chrisbanes.haze.hazeSource
@@ -452,6 +453,9 @@ private fun QuickActionsSection(
  *
  * issue #83 几何：**有 feed 条目时**快捷入口进列表首项（随内容滚走），列表视口顶到 y=0，
  * 条目才会物理穿过玻璃背后；**无条目时**（加载/空/错）没有可滚内容，快捷入口保持常驻。
+ *
+ * UI-7：无条目且 refresh 挂起 = **首载**，用 [FeedSkeleton] 内容骨架替代整页转圈；
+ * 空/错/后续刷新态不变（有内容的刷新走 `FeedList` 的 PullToRefresh 指示器）。
  */
 @Composable
 private fun FeedPage(
@@ -507,7 +511,10 @@ private fun FeedPage(
                     }
 
                     refreshState is LoadState.Loading -> {
-                        LoadingContent(modifier = Modifier.fillMaxSize())
+                        // UI-7：feed 首载 = 走不到 FeedList（itemCount == 0，见 hasFeedRows 判定），
+                        // 用内容骨架替代居中转圈；有内容的下拉刷新仍走 FeedList 的
+                        // PullToRefresh 指示器，本分支不可达。
+                        FeedSkeleton(modifier = Modifier.fillMaxSize())
                     }
 
                     else -> {

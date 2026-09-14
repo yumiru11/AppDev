@@ -72,6 +72,34 @@ class HomeScreenScreenshotTest {
     }
 
     @Test
+    fun homeScreen_feedSkeletonLightTheme_matchesBaseline() {
+        composeRule.captureScreenshotDeterministic(name = "HomeScreen_feedSkeleton_light", darkTheme = false) {
+            HomeScreen(
+                onSearchClick = {},
+                onNotificationClick = {},
+                onProfileClick = {},
+                bottomContentPadding = 80.dp,
+                viewModel = homeFirstLoadScreenshotViewModel(),
+                pickerViewModel = homePickerScreenshotViewModel(),
+            )
+        }
+    }
+
+    @Test
+    fun homeScreen_feedSkeletonDarkTheme_matchesBaseline() {
+        composeRule.captureScreenshotDeterministic(name = "HomeScreen_feedSkeleton_dark", darkTheme = true) {
+            HomeScreen(
+                onSearchClick = {},
+                onNotificationClick = {},
+                onProfileClick = {},
+                bottomContentPadding = 80.dp,
+                viewModel = homeFirstLoadScreenshotViewModel(),
+                pickerViewModel = homePickerScreenshotViewModel(),
+            )
+        }
+    }
+
+    @Test
     fun homeScreen_rtlLayout_matchesBaseline() {
         composeRule.captureScreenshotDeterministic(name = "HomeScreen_rtl", darkTheme = false) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {

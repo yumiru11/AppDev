@@ -3,6 +3,8 @@
     <string name="feed_require_login">登录后查看你的动态</string>
     <string name="feed_login">登录</string>
     <string name="feed_empty">暂无动态</string>
+    <!-- 首载骨架屏的读屏文案（UI-7；装饰条无独立语义，整块只播报一次） -->
+    <string name="feed_loading">正在加载动态</string>
     <string name="feed_retry">重试</string>
     <string name="feed_error_network">网络错误，请检查网络连接</string>
     <string name="feed_error_unknown">出错了，请重试</string>
