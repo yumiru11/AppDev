@@ -15,6 +15,8 @@ import com.yumiru11.githubapp.core.datastore.draft.DraftKey
 import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
 import com.yumiru11.githubapp.core.editor.FileFindState
 import com.yumiru11.githubapp.core.editor.TextFileFormat
+import com.yumiru11.githubapp.core.githubauth.auth.AuthState
+import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -55,6 +57,7 @@ class RepoFilesViewModel
         savedStateHandle: SavedStateHandle,
         private val repoRepository: RepoRepository,
         private val drafts: DraftAutoSaver,
+        private val sessionManager: OAuthSessionManager,
     ) : ViewModel() {
         private val owner: String = checkNotNull(savedStateHandle["owner"])
         private val repo: String = checkNotNull(savedStateHandle["repo"])
@@ -198,12 +201,18 @@ class RepoFilesViewModel
         /**
          * 文件树行**进入组合（≈ 滚到可见）**时请求该行的修改时间（UI-6）。
          *
+         * **游客配额守卫**：匿名态（[AuthState.Anonymous]）直接返回 —— 匿名 REST 配额仅
+         * 60 req/h，本列是装饰性元数据，浏览几个目录就会烧光配额、拖垮其余数据加载。
+         * 守卫在缓存读写之前返回，故**不写负缓存/哨兵值**：之后登录的用户在下一轮
+         * 行组合时照常可查（见 [requestLastCommitDate] 每次重读 [OAuthSessionManager.authState]）。
+         *
          * 惰性 + 会话缓存：同 (ref, path) 只查一次（含失败，见 [lastCommitDateCache]），
          * 失败/无提交的行走留空而不是重试风暴——列是装饰性元数据，不能让它在游客
          * 60 req/h 配额下把浏览打挂着。换分支/重载时缓存由 [loadRootTree] 整体作废。
          */
         fun requestLastCommitDate(path: String) {
             val ref = loadedRef ?: return
+            if (sessionManager.authState.value is AuthState.Anonymous) return
             val key = lastCommitKey(ref, path)
             if (key in lastCommitDateCache || !lastCommitDateInFlight.add(key)) return
             viewModelScope.launch {

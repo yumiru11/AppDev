@@ -18,9 +18,13 @@ import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferences
 import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferencesWriter
 import com.yumiru11.githubapp.core.editor.LineEnding
 import com.yumiru11.githubapp.core.editor.TextFileFormat
+import com.yumiru11.githubapp.core.githubauth.auth.AuthState
+import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -243,6 +247,10 @@ class FileEditScreenFindReplaceTest {
                 savedStateHandle = SavedStateHandle(mapOf("owner" to "octocat", "repo" to "Hello-World")),
                 repoRepository = repoRepository,
                 drafts = drafts,
+                sessionManager =
+                    mockk<OAuthSessionManager> {
+                        every { authState } returns MutableStateFlow<AuthState>(AuthState.PAT)
+                    },
             )
         viewModel.loadRootTree("main")
         viewModel.openFile(node, "main")

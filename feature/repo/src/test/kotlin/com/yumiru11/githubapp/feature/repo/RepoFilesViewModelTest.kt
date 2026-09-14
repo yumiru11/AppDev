@@ -13,12 +13,18 @@ import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
 import com.yumiru11.githubapp.core.editor.FileFindState
 import com.yumiru11.githubapp.core.editor.LineEnding
 import com.yumiru11.githubapp.core.editor.TextFileFormat
+import com.yumiru11.githubapp.core.githubauth.auth.AuthState
+import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
+import com.yumiru11.githubapp.core.githubauth.token.SessionData
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
@@ -48,14 +54,23 @@ class RepoFilesViewModelTest {
     private val savedStateHandle =
         SavedStateHandle(mapOf("owner" to "octocat", "repo" to "Hello-World"))
 
+    // 默认非 Anonymous（PAT）= 已认证：既有「修改时间」用例按登录态跑；不用 SignedIn(session)
+    // 避免构造无关 SessionData（同 ReposViewModelTest 先例）
+    private val defaultAuthFlow = MutableStateFlow<AuthState>(AuthState.PAT)
+
     private fun viewModel(
         repoRepository: RepoRepository,
         drafts: DraftAutoSaver = draftSaver(RecordingDraftRepository()),
+        authFlow: StateFlow<AuthState> = defaultAuthFlow,
     ): RepoFilesViewModel =
         RepoFilesViewModel(
             savedStateHandle = savedStateHandle,
             repoRepository = repoRepository,
             drafts = drafts,
+            sessionManager =
+                mockk(relaxed = true) {
+                    every { authState } returns authFlow
+                },
         )
 
     private fun treeNode(
@@ -1535,6 +1550,57 @@ class RepoFilesViewModelTest {
                 vm.uiState.value.lastCommitDates
                     .isEmpty(),
             )
+        }
+
+    @Test
+    fun requestLastCommitDate_guest_performsNoRepositoryCallAndLeavesColumnEmpty() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("app", "app")))
+                    coEvery { getLastCommitDate(any(), any(), any(), any()) } returns
+                        Result.success("2026-09-13T09:34:34Z")
+                }
+            val vm = viewModel(repoRepository, authFlow = MutableStateFlow(AuthState.Anonymous))
+            vm.loadRootTree("main")
+
+            vm.requestLastCommitDate("app")
+            vm.requestLastCommitDate("app")
+
+            assertTrue(
+                "游客不查修改时间（列留空）",
+                vm.uiState.value.lastCommitDates
+                    .isEmpty(),
+            )
+            coVerify(exactly = 0) { repoRepository.getLastCommitDate(any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun requestLastCommitDate_guestThenSignsIn_fetchesOnNextComposition() =
+        runTest {
+            val repoRepository =
+                mockk<RepoRepository> {
+                    coEvery { getTree(any(), any(), any()) } returns Result.success(listOf(treeNode("app", "app")))
+                    coEvery { getLastCommitDate(any(), any(), any(), any()) } returns
+                        Result.success("2026-09-13T09:34:34Z")
+                }
+            val authFlow = MutableStateFlow<AuthState>(AuthState.Anonymous)
+            val vm = viewModel(repoRepository, authFlow = authFlow)
+            vm.loadRootTree("main")
+
+            // 游客：不查（且不写负缓存/哨兵值）
+            vm.requestLastCommitDate("app")
+            coVerify(exactly = 0) { repoRepository.getLastCommitDate(any(), any(), any(), any()) }
+
+            // 登录后下一轮行组合：游客守卫不得残留 → 应恢复查询
+            authFlow.value = AuthState.SignedIn(SessionData(accessToken = "token"))
+            vm.requestLastCommitDate("app")
+
+            assertEquals(
+                mapOf("app" to "2026-09-13T09:34:34Z"),
+                vm.uiState.value.lastCommitDates,
+            )
+            coVerify(exactly = 1) { repoRepository.getLastCommitDate(any(), any(), any(), any()) }
         }
 }
 
