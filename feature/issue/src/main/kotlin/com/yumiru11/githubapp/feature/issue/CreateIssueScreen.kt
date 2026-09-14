@@ -39,6 +39,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.feature.issue.model.IssueErrorType
 
 /**
@@ -96,9 +97,9 @@ fun CreateIssueScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = AppDimens.spacing.l)
                     .imePadding(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.m),
         ) {
             Text(
                 text = "$owner/$repo",
@@ -132,8 +133,8 @@ fun CreateIssueScreen(
                 )
             } else {
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+                    verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.xs),
                 ) {
                     availableLabels.forEach { label ->
                         val selected = label.name in selectedLabels
@@ -164,7 +165,7 @@ fun CreateIssueScreen(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.xl))
         }
     }
 }

@@ -30,6 +30,7 @@ import com.yumiru11.githubapp.core.data.model.SearchIssue
 import com.yumiru11.githubapp.core.data.model.User
 import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.theme.extendedColors
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 
@@ -52,7 +53,7 @@ internal fun RepositoryRow(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
             Text(
                 text = repository.fullName,
                 style = MaterialTheme.typography.titleSmall,
@@ -62,7 +63,7 @@ internal fun RepositoryRow(
             )
             val description = repository.description
             if (!description.isNullOrEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
@@ -71,7 +72,7 @@ internal fun RepositoryRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.Star,
@@ -79,7 +80,7 @@ internal fun RepositoryRow(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(14.dp),
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
                 Text(
                     text = "${repository.stargazerCount}",
                     style = MaterialTheme.typography.labelSmall,
@@ -87,7 +88,7 @@ internal fun RepositoryRow(
                 )
                 val language = repository.language
                 if (!language.isNullOrEmpty()) {
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.m))
                     Text(
                         text = language,
                         style = MaterialTheme.typography.labelSmall,
@@ -114,7 +115,7 @@ internal fun UserRow(
             ),
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(AppDimens.spacing.m),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AsyncImage(
@@ -128,7 +129,7 @@ internal fun UserRow(
                             shape = CircleShape,
                         ),
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.m))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = user.login,
@@ -167,7 +168,7 @@ internal fun IssueRow(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
     ) {
-        Row(modifier = Modifier.padding(12.dp)) {
+        Row(modifier = Modifier.padding(AppDimens.spacing.m)) {
             Box(
                 modifier =
                     Modifier
@@ -183,7 +184,7 @@ internal fun IssueRow(
                             shape = CircleShape,
                         ),
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.m))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = issue.title,
@@ -191,7 +192,7 @@ internal fun IssueRow(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
                 Text(
                     text = issueMetaText(issue),
                     style = MaterialTheme.typography.bodySmall,
@@ -226,7 +227,7 @@ internal fun CodeRow(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
             Text(
                 text = item.name,
                 style = MaterialTheme.typography.titleSmall,
@@ -234,7 +235,7 @@ internal fun CodeRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
             Text(
                 text = item.path,
                 style = MaterialTheme.typography.bodySmall,

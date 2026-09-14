@@ -18,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.theme.extendedColors
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 
 /**
  * 搜索限流提示条（issue #165 / L13，plan.md §9.3「限流处理」）。
@@ -37,13 +38,13 @@ internal fun SearchRateLimitSection(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.extendedColors.warningContainer,
         contentColor = MaterialTheme.extendedColors.onWarningContainer,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = AppDimens.spacing.m, vertical = AppDimens.spacing.s),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -51,7 +52,7 @@ internal fun SearchRateLimitSection(
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.s))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.search_rate_limit_banner, warning.remaining),

@@ -29,7 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 
 /**
  * 搜索页顶栏：返回键 + 大号搜索框（自动聚焦，IME 搜索键提交）。
@@ -85,7 +85,7 @@ private fun SearchInput(
         modifier =
             modifier
                 .focusRequester(focusRequester)
-                .padding(vertical = 4.dp),
+                .padding(vertical = AppDimens.spacing.xs),
         placeholder = {
             Text(
                 text = stringResource(R.string.search_hint),
