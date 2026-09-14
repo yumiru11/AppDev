@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.feature.home.R
 import com.yumiru11.githubapp.feature.home.model.TrendItem
 
@@ -51,7 +52,7 @@ internal fun TrendingSection(
     if (items.isEmpty()) return
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
@@ -83,7 +84,7 @@ private fun TrendingRow(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
             Text(
                 text = item.fullName,
                 style = MaterialTheme.typography.titleSmall,
@@ -92,7 +93,7 @@ private fun TrendingRow(
             )
             val description = item.description
             if (description != null) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
@@ -112,7 +113,7 @@ private fun TrendingRow(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.m))
                 }
                 Icon(
                     imageVector = AppDevOcticons.Star,
@@ -120,7 +121,7 @@ private fun TrendingRow(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(14.dp),
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
                 Text(
                     text = item.stars.toString(),
                     style = MaterialTheme.typography.labelMedium,

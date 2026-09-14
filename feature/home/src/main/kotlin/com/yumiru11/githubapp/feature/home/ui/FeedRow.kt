@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.home.R
 import com.yumiru11.githubapp.feature.home.model.FeedEventType
@@ -56,7 +57,7 @@ internal fun FeedRow(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
     ) {
-        Row(modifier = Modifier.padding(12.dp)) {
+        Row(modifier = Modifier.padding(AppDimens.spacing.m)) {
             AsyncImage(
                 model = item.actorAvatarUrl,
                 contentDescription = item.actorLogin,
@@ -65,7 +66,7 @@ internal fun FeedRow(
                         .size(32.dp)
                         .clip(CircleShape),
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.m))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = feedActionText(item),
@@ -74,7 +75,7 @@ internal fun FeedRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (item.title.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
                     Text(
                         text = item.title,
                         style = MaterialTheme.typography.bodyMedium,
@@ -82,7 +83,7 @@ internal fun FeedRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = item.repoFullName,
@@ -94,7 +95,7 @@ internal fun FeedRow(
                     // #84：相对时间优先（"3 小时前"），解析失败/未来时间回退绝对日期（缺陷 #11 时间显示统一）
                     val date = feedTimestampText(item.createdAt)
                     if (date.isNotEmpty()) {
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                         Text(
                             text = date,
                             style = MaterialTheme.typography.labelSmall,
