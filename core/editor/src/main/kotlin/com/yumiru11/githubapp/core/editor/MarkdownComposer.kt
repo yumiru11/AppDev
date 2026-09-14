@@ -21,7 +21,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Checklist
 import com.composables.icons.materialsymbols.rounded.Code
@@ -34,6 +33,7 @@ import com.composables.icons.materialsymbols.rounded.Format_list_numbered
 import com.composables.icons.materialsymbols.rounded.Format_quote
 import com.composables.icons.materialsymbols.rounded.Image
 import com.composables.icons.materialsymbols.rounded.Link
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 
 /**
  * Markdown 组合器（#166 / UI05，ui-design §3.9 D2-3 用户拍板）。
@@ -150,7 +150,7 @@ private fun MarkdownToolbar(onAction: (MarkdownToolbarAction) -> Unit) {
             Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp),
+                .padding(horizontal = AppDimens.spacing.s),
     ) {
         ToolbarButton(MaterialSymbols.Rounded.Format_bold, R.string.editor_bold) { onAction(MarkdownToolbarAction.BOLD) }
         ToolbarButton(MaterialSymbols.Rounded.Format_italic, R.string.editor_italic) { onAction(MarkdownToolbarAction.ITALIC) }

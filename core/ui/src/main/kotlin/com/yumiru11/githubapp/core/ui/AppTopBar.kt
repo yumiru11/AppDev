@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
 import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
 import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.GlassScope
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 
@@ -80,7 +81,7 @@ fun AppTopBar(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            modifier = Modifier.padding(horizontal = AppDimens.spacing.l, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             AppIcon(
@@ -88,7 +89,7 @@ fun AppTopBar(
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(AppDimens.spacing.s))
                             Text(
                                 text = stringResource(R.string.search_hint),
                                 style = MaterialTheme.typography.bodyLarge,
