@@ -79,6 +79,7 @@ import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 import com.yumiru11.githubapp.core.ui.sharedTransitionElement
@@ -269,10 +270,10 @@ private fun ProfileHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.l),
     ) {
         ProfileAvatar(avatarUrl = user.avatarUrl)
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.m))
         Text(
             text = user.name ?: user.login,
             style = MaterialTheme.typography.headlineSmall,
@@ -286,7 +287,7 @@ private fun ProfileHeader(
         )
         val bio = user.bio
         if (!bio.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             Text(
                 text = bio,
                 style = MaterialTheme.typography.bodyMedium,
@@ -294,7 +295,7 @@ private fun ProfileHeader(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.l))
         // 统计数字变化用 AnimatedContent 滚动（#167 / UI09，§3.5「统计数字 AnimatedContent 滚动」）：
         // 关注/取关后 followers 会变，数字直接跳变会显得"闪"，滚动过渡更稳。
         Row {
@@ -302,12 +303,12 @@ private fun ProfileHeader(
                 value = user.publicRepos,
                 labelRes = R.string.profile_stats_repos,
             )
-            Spacer(modifier = Modifier.width(24.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.xl))
             StatNumber(
                 value = user.followers,
                 labelRes = R.string.profile_stats_followers,
             )
-            Spacer(modifier = Modifier.width(24.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.xl))
             StatNumber(
                 value = user.following,
                 labelRes = R.string.profile_stats_following,
@@ -315,7 +316,7 @@ private fun ProfileHeader(
             // Star 总数（#166 / UI21）：REST 资料端点不返回，取不到时**整项不渲染**——
             // 不拿 0 冒充（"0 stars" 与"未知"在用户眼里是两回事）。
             user.starredCount?.let { stars ->
-                Spacer(modifier = Modifier.width(24.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.xl))
                 StatNumber(
                     value = stars,
                     labelRes = R.string.profile_stats_stars,
@@ -323,7 +324,7 @@ private fun ProfileHeader(
             }
         }
         if (!isSelf) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.l))
             FilledTonalButton(onClick = onToggleFollow) {
                 Text(
                     text =
@@ -500,7 +501,7 @@ private fun RepositoryRow(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
@@ -514,7 +515,7 @@ private fun RepositoryRow(
                     .sharedTransitionElement(key = "repo-avatar-${repository.ownerLogin}"),
             contentScale = ContentScale.Crop,
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.m))
         Column {
             Text(
                 text = repository.name,
@@ -524,7 +525,7 @@ private fun RepositoryRow(
             )
             val description = repository.description
             if (!description.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodyMedium,
@@ -541,7 +542,7 @@ private fun RepositoryRow(
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
                 Text(
                     text = repository.stargazerCount.toString(),
                     style = MaterialTheme.typography.labelMedium,
@@ -549,7 +550,7 @@ private fun RepositoryRow(
                 )
                 val language = repository.language
                 if (!language.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.m))
                     Text(
                         text = language,
                         style = MaterialTheme.typography.labelMedium,
@@ -572,7 +573,7 @@ private fun UserRow(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
@@ -584,7 +585,7 @@ private fun UserRow(
                     .clip(CircleShape),
             contentScale = ContentScale.Crop,
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.m))
         Column {
             Text(
                 text = user.name ?: user.login,
@@ -609,7 +610,7 @@ private fun ListLoadingRow() {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 24.dp),
+                .padding(vertical = AppDimens.spacing.xl),
     )
 }
 
@@ -635,7 +636,7 @@ private fun ListErrorRow(onRetry: () -> Unit) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 24.dp),
+                .padding(vertical = AppDimens.spacing.xl),
     )
 }
 
@@ -646,7 +647,7 @@ private fun LoginGuide(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.padding(horizontal = 24.dp),
+        modifier = modifier.padding(horizontal = AppDimens.spacing.xl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -655,14 +656,14 @@ private fun LoginGuide(
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
         Text(
             text = stringResource(R.string.profile_login_guide_body),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.xl))
         Button(onClick = onLoginClick) {
             Text(stringResource(R.string.profile_sign_in))
         }

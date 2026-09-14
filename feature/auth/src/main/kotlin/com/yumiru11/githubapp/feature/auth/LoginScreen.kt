@@ -30,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 
 /**
  * T4 登录页 UI 骨架（静态版，不含 OAuth 逻辑）。
@@ -56,7 +57,7 @@ fun LoginScreen(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = AppDimens.spacing.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -67,14 +68,14 @@ fun LoginScreen(
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.m))
             Text(
                 text = stringResource(R.string.login_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.xxl))
 
             // 主按钮：使用 GitHub 登录
             Button(
@@ -83,7 +84,7 @@ fun LoginScreen(
             ) {
                 Text(text = stringResource(R.string.login_github_button))
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.m))
 
             // 副按钮：以游客身份浏览
             OutlinedButton(
@@ -147,7 +148,7 @@ private fun DeveloperModeSection(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp),
+                        .padding(top = AppDimens.spacing.l),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 OutlinedTextField(
@@ -158,14 +159,14 @@ private fun DeveloperModeSection(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.m))
                 Button(
                     onClick = onSave,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(text = stringResource(R.string.login_pat_save))
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 Text(
                     text = stringResource(R.string.login_pat_description),
                     style = MaterialTheme.typography.bodySmall,
