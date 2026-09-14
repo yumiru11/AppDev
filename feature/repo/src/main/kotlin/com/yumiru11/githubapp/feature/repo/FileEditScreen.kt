@@ -48,6 +48,7 @@ import com.composables.icons.materialsymbols.rounded.Edit
 import com.composables.icons.materialsymbols.rounded.Search
 import com.yumiru11.githubapp.core.designsystem.component.AppDialog
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.editor.CodeEditorController
 import com.yumiru11.githubapp.core.editor.CodeEditorView
 import com.yumiru11.githubapp.core.editor.CodeLanguageDetector
@@ -179,7 +180,7 @@ fun FileEditScreen(
                     }
                     if (isSubmitting) {
                         CircularProgressIndicator(
-                            modifier = Modifier.padding(12.dp).size(20.dp),
+                            modifier = Modifier.padding(AppDimens.spacing.m).size(20.dp),
                             strokeWidth = 2.dp,
                         )
                     } else {
@@ -195,7 +196,7 @@ fun FileEditScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             // Markdown 文件：编辑/预览切换（预览与查看器 Rendered 态共用渲染管线）
             if (isMarkdown && !isNew) {
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.xs)) {
                     TextButton(onClick = { showPreview = false }) {
                         Text(
                             text = stringResource(R.string.repo_file_edit),
@@ -236,7 +237,7 @@ fun FileEditScreen(
                         viewModel.closeFind()
                         editor?.clearFindText()
                     },
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = AppDimens.spacing.m, vertical = AppDimens.spacing.xs),
                 )
             }
             if (isMarkdown && showPreview && !isNew) {
@@ -291,7 +292,7 @@ fun FileEditScreen(
                             label = { Text(text = stringResource(R.string.repo_file_new_path)) },
                             singleLine = true,
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                     }
                     OutlinedTextField(
                         value = commitMessage,
@@ -300,7 +301,7 @@ fun FileEditScreen(
                         placeholder = { Text(text = stringResource(R.string.repo_file_commit_message_hint)) },
                         singleLine = true,
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = !useNewBranch, onClick = { useNewBranch = false })
                         Text(
@@ -316,7 +317,7 @@ fun FileEditScreen(
                         )
                     }
                     if (useNewBranch) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                         OutlinedTextField(
                             value = newBranchName,
                             onValueChange = { newBranchName = it },
@@ -359,27 +360,27 @@ fun FileEditScreen(
             Surface(
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                modifier = Modifier.fillMaxWidth().padding(AppDimens.spacing.xl),
             ) {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(
                         text = stringResource(R.string.repo_file_conflict_title),
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                     Text(
                         text = stringResource(R.string.repo_file_conflict_body),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     if (c.operation == ConflictOperation.UPDATE) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
                         Text(
                             text = stringResource(R.string.repo_file_conflict_overwrite_warning),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                     TextButton(onClick = { viewModel.reloadAfterConflict() }, modifier = Modifier.fillMaxWidth()) {
                         Text(text = stringResource(R.string.repo_file_conflict_reload))
                     }
@@ -433,7 +434,7 @@ fun FileEditScreen(
                         text = stringResource(R.string.repo_file_delete_confirm, displayPath),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                     OutlinedTextField(
                         value = deleteMessage,
                         onValueChange = { deleteMessage = it },

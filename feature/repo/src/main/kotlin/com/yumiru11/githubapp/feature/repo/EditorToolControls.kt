@@ -12,6 +12,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Wrap_text
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferences
 import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferencesWriter
 import com.yumiru11.githubapp.core.editor.LineEnding
@@ -66,7 +67,7 @@ internal fun TextFormatIndicator(
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,
-        modifier = modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+        modifier = modifier.padding(horizontal = AppDimens.spacing.m, vertical = 2.dp),
     )
 }
 

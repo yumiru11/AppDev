@@ -388,7 +388,7 @@ private fun DeleteRepoDialog(
                     text = stringResource(R.string.repo_delete_message, fullName),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.m))
                 OutlinedTextField(
                     value = typed,
                     onValueChange = { typed = it },
@@ -646,7 +646,7 @@ private fun RepoDetailContent(
                 .fillMaxSize()
                 // 水平 padding 移到各子段：README 段由 EnhancedMarkdownViewer 自带 37dp
                 // （用户实测目标边距）接管——全局 16 + 内层 37 = 53dp 太宽（2026-08-17 真机）
-                .padding(top = 16.dp),
+                .padding(top = AppDimens.spacing.l),
     ) {
         Box(
             modifier =
@@ -677,7 +677,7 @@ private fun RepoDetailContent(
                                 (-headerCollapse * placeable.height * HEADER_COLLAPSE_DRIFT).roundToInt(),
                             )
                         }
-                    }.padding(horizontal = 16.dp),
+                    }.padding(horizontal = AppDimens.spacing.l),
         ) {
             RepoHeader(
                 state = state,
@@ -691,7 +691,7 @@ private fun RepoDetailContent(
         // 头部收起时不再需要那段留白，否则会留下一块"空气隙"
         Spacer(modifier = Modifier.height(16.dp * (1f - headerCollapse)))
 
-        Box(Modifier.padding(horizontal = 16.dp)) {
+        Box(Modifier.padding(horizontal = AppDimens.spacing.l)) {
             TabRow(selectedTabIndex = tab) {
                 Tab(
                     selected = tab == 0,
@@ -711,7 +711,7 @@ private fun RepoDetailContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
 
         when (tab) {
             0 -> {
@@ -740,7 +740,7 @@ private fun RepoDetailContent(
             }
 
             else -> {
-                Box(Modifier.padding(horizontal = 16.dp)) {
+                Box(Modifier.padding(horizontal = AppDimens.spacing.l)) {
                     ReleasesSection(
                         state = state,
                         actions = actions,
@@ -765,7 +765,7 @@ private fun FilesTab(
     initialTreePath: String = "",
     onBranchesClick: () -> Unit,
 ) {
-    Box(Modifier.padding(horizontal = 16.dp)) {
+    Box(Modifier.padding(horizontal = AppDimens.spacing.l)) {
         Column(modifier = Modifier.fillMaxSize()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -786,7 +786,7 @@ private fun FilesTab(
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
                         Text(text = stringResource(R.string.repo_file_new))
                     }
                 }
@@ -821,7 +821,7 @@ private fun RepoHeader(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.l)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
                     model = "https://github.com/${repo.ownerLogin}.png",
@@ -834,7 +834,7 @@ private fun RepoHeader(
                             .sharedTransitionElement(key = "repo-avatar-${repo.ownerLogin}"),
                     contentScale = ContentScale.Crop,
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.m))
                 Column {
                     Text(
                         text = repo.name,
@@ -854,17 +854,17 @@ private fun RepoHeader(
 
             // L06：Topics chip 行（空列表不渲染该行；点击 → 搜索页 query=topic:xxx）
             if (state.topics.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 TopicsRow(topics = state.topics, onTopicClick = onTopicClick)
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.m))
 
             RepoStatsRow(repo = repo)
 
             // T12：登录态才显示操作按钮（游客只读）
             if (state.isLoggedIn) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.m))
                 ManagementButtons(
                     isStarred = state.isStarred,
                     isWatching = state.isWatching,
@@ -877,7 +877,7 @@ private fun RepoHeader(
 
             // T12：语言栏（Linguist 数据，按字节占比渲染）
             if (state.languages.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.m))
                 LanguageBar(languages = state.languages)
             }
         }
@@ -900,8 +900,8 @@ private fun TopicsRow(
 ) {
     val surface = MaterialTheme.colorScheme.surface
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.xs),
     ) {
         topics.forEach { topic ->
             val container = labelChipContainerColor(labelColor = MaterialTheme.colorScheme.primaryContainer, surface = surface)
@@ -930,7 +930,7 @@ private fun TopicsRow(
 /** 仓库统计行：Star 数 / Fork 数 / 主语言。 */
 @Composable
 private fun RepoStatsRow(repo: Repository) {
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.l)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = Icons.Filled.Star,
@@ -938,7 +938,7 @@ private fun RepoStatsRow(repo: Repository) {
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
             Text(
                 text = stringResource(R.string.repo_stars, repo.stargazerCount),
                 style = MaterialTheme.typography.labelMedium,
@@ -951,7 +951,7 @@ private fun RepoStatsRow(repo: Repository) {
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
             Text(
                 text = stringResource(R.string.repo_forks, repo.forkCount),
                 style = MaterialTheme.typography.labelMedium,
@@ -985,7 +985,7 @@ private fun ManagementButtons(
     onToggleWatch: () -> Unit,
     onFork: () -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
         // Star 微缩放 + 颜色过渡（UI07）：只在状态真正翻转时播一次，首次组合不播
         // （#167 / UI17 补齐：原实现首次组合也会弹一下——进详情页时星星无故自弹，
         //   且与「滚动/进场中不触发动画」的约束相悖；这里用 rememberSaveable 记账跳过首帧）
@@ -1019,7 +1019,7 @@ private fun ManagementButtons(
             onClick = onToggleStar,
             enabled = pendingAction == null,
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = AppDimens.spacing.m, vertical = AppDimens.spacing.s),
         ) {
             Icon(
                 imageVector = if (isStarred) Icons.Filled.Star else Icons.Outlined.Star,
@@ -1033,7 +1033,7 @@ private fun ManagementButtons(
                             scaleY = starScale.value
                         },
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
             Text(
                 text = stringResource(if (isStarred) R.string.repo_unstar else R.string.repo_star),
                 maxLines = 1,
@@ -1043,7 +1043,7 @@ private fun ManagementButtons(
             onClick = onToggleWatch,
             enabled = pendingAction == null,
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = AppDimens.spacing.m, vertical = AppDimens.spacing.s),
         ) {
             Icon(
                 imageVector =
@@ -1055,7 +1055,7 @@ private fun ManagementButtons(
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
             Text(
                 text = stringResource(if (isWatching) R.string.repo_unwatch else R.string.repo_watch),
                 maxLines = 1,
@@ -1065,7 +1065,7 @@ private fun ManagementButtons(
             onClick = onFork,
             enabled = pendingAction == null,
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = AppDimens.spacing.m, vertical = AppDimens.spacing.s),
         ) {
             if (pendingAction == RepoAction.FORK) {
                 CircularProgressIndicator(
@@ -1079,7 +1079,7 @@ private fun ManagementButtons(
                     modifier = Modifier.size(18.dp),
                 )
             }
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
             Text(
                 text = stringResource(R.string.repo_fork),
                 maxLines = 1,
@@ -1118,9 +1118,9 @@ private fun LanguageBar(languages: Map<String, Long>) {
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.m)) {
             languages.entries.forEachIndexed { index, (name, bytes) ->
                 val percent = (bytes * 100 / total).toInt()
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1208,7 +1208,7 @@ private fun ReleasesSection(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
                 AppFilterChip(
                     selected = subTab == 0,
                     onClick = { subTab = 0 },
@@ -1228,13 +1228,13 @@ private fun ReleasesSection(
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
                     Text(text = stringResource(R.string.repo_release_new))
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
 
         when (subTab) {
             0 -> {
@@ -1280,7 +1280,7 @@ private fun ReleasesList(
             if (state.releases.isEmpty()) {
                 EmptyHint(text = stringResource(R.string.repo_releases_empty))
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
                     items(state.releases, key = { it.id }) { release ->
                         ReleaseCard(release = release, onClick = { onReleaseClick(release.id) })
                     }
@@ -1303,7 +1303,7 @@ private fun ReleaseCard(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.l)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = release.tagName,
@@ -1311,16 +1311,16 @@ private fun ReleaseCard(
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 if (release.prerelease) {
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                     ReleaseBadge(text = stringResource(R.string.repo_release_prerelease))
                 }
                 if (release.draft) {
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                     ReleaseBadge(text = stringResource(R.string.repo_release_draft))
                 }
             }
             release.name?.let { name ->
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
                 Text(
                     text = name,
                     style = MaterialTheme.typography.bodyMedium,
@@ -1329,7 +1329,7 @@ private fun ReleaseCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
             Text(
                 text = releaseMetaText(release),
                 style = MaterialTheme.typography.labelMedium,
@@ -1397,7 +1397,7 @@ private fun TagsList(
             if (state.tags.isEmpty()) {
                 EmptyHint(text = stringResource(R.string.repo_tags_empty))
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
                     items(state.tags, key = { it.name }) { tag ->
                         AppCard(
                             modifier = Modifier.fillMaxWidth(),
@@ -1407,7 +1407,7 @@ private fun TagsList(
                                 ),
                         ) {
                             Row(
-                                modifier = Modifier.padding(16.dp),
+                                modifier = Modifier.padding(AppDimens.spacing.l),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
@@ -1416,7 +1416,7 @@ private fun TagsList(
                                     modifier = Modifier.size(18.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                                 Text(
                                     text = tag.name,
                                     style = MaterialTheme.typography.bodyLarge,
@@ -1461,7 +1461,7 @@ private fun ReleaseDetailView(
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
 
         when (detailState) {
             is ReleaseDetailState.Idle, is ReleaseDetailState.Loading -> {
@@ -1519,30 +1519,30 @@ private fun ReleaseDetailContent(
                 modifier = Modifier.weight(1f, fill = false),
             )
             if (release.prerelease) {
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 ReleaseBadge(text = stringResource(R.string.repo_release_prerelease))
             }
             if (release.draft) {
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 ReleaseBadge(text = stringResource(R.string.repo_release_draft))
             }
         }
         release.name?.let { name ->
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
             Text(
                 text = name,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
         Text(
             text = releaseMetaText(release),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.m))
 
         val body = release.body
         if (body.isNullOrBlank()) {
@@ -1559,7 +1559,7 @@ private fun ReleaseDetailContent(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.l))
 
         ReleaseAssetsSection(
             assets = detail.assets,
@@ -1619,13 +1619,13 @@ private fun ReleaseAssetsSection(
                             modifier = Modifier.size(18.dp),
                         )
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
                     Text(text = stringResource(R.string.repo_release_asset_upload))
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
 
         if (assets.isEmpty()) {
             EmptyHint(text = stringResource(R.string.repo_release_assets_empty))
@@ -1635,13 +1635,13 @@ private fun ReleaseAssetsSection(
                     onClick = { asset.downloadUrl?.let(actions.onOpenExternal) },
                     // 无直链（异常数据）时不可点，避免"点了没反应"
                     enabled = asset.downloadUrl != null,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = AppDimens.spacing.s),
                     colors =
                         CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         ),
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
                         Text(
                             text = asset.name,
                             style = MaterialTheme.typography.bodyMedium,
@@ -1720,7 +1720,7 @@ internal fun EmptyHint(text: String) {
     ) {
         Text(
             text = text,
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(AppDimens.spacing.l),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -1899,7 +1899,7 @@ internal fun ErrorContent(
                 color = MaterialTheme.colorScheme.error,
             )
             if (errorType.isRetryable) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.l))
                 Button(onClick = onRetry) {
                     Text(text = stringResource(R.string.repo_retry))
                 }

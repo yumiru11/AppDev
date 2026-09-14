@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 
 /**
@@ -106,8 +107,8 @@ fun ReleaseCreateScreen(
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
                     .imePadding()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.l),
         ) {
             OutlinedTextField(
                 value = uiState.tagName,
@@ -163,7 +164,7 @@ fun ReleaseCreateScreen(
                 onCheckedChange = viewModel::onPrereleaseChange,
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
 
             Button(
                 onClick = viewModel::submit,
@@ -172,7 +173,7 @@ fun ReleaseCreateScreen(
             ) {
                 if (uiState.isSubmitting) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Spacer(modifier = Modifier.size(8.dp))
+                    Spacer(modifier = Modifier.size(AppDimens.spacing.s))
                 }
                 Text(
                     text =

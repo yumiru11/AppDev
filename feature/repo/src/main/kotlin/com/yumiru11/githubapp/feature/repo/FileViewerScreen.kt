@@ -68,6 +68,7 @@ import com.composables.icons.materialsymbols.rounded.Search
 import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppDialog
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.editor.CodeEditorController
 import com.yumiru11.githubapp.core.editor.CodeEditorView
 import com.yumiru11.githubapp.core.editor.CodeLanguageDetector
@@ -307,7 +308,7 @@ private fun FileViewerTools(
         modifier =
             modifier
                 .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
-                .padding(16.dp),
+                .padding(AppDimens.spacing.l),
         horizontalAlignment = Alignment.End,
     ) {
         if (isFindOpen) {
@@ -399,7 +400,7 @@ private fun MarkdownFileContent(
     var showSource by rememberSaveable { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.xs)) {
             TextButton(onClick = { showSource = false }) {
                 Text(
                     text = stringResource(R.string.repo_file_rendered),
@@ -438,16 +439,16 @@ private fun FilePromptCard(
     text: String,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+    Box(modifier = modifier.fillMaxSize().padding(AppDimens.spacing.xl), contentAlignment = Alignment.Center) {
         AppCard(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(AppDimens.spacing.xl),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 icon(MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.m))
                 Text(
                     text = text,
                     style = MaterialTheme.typography.bodyMedium,
