@@ -167,19 +167,27 @@ class CodeEditorReplaceTest {
      * 扫描线程与测试线程并发读写 Content/布局时，Robolectric 下 `LineBreakLayout.afterDelete`
      * 会偶发越界（CI 与本地各复现过一次）。停掉 pattern 只影响 Sora 的高亮/计数，
      * 控制器自己的查询词镜像保留 → 替换路径照常生效（替换不依赖 Sora 的匹配表）。
+     *
+     * 等待用「扫描完成回灌」这一真实完成信号（`onFindResult`），不是猜测派生计数：
+     * 无匹配的查询（本类多例用 "z"）计数恒为 0，等计数非零必然空转满超时。
+     * 回灌是主 looper 消息 —— 普通 `Thread.sleep` 在 Robolectric（LooperMode.PAUSED）下
+     * 不会执行它，必须 `idle()` 排空（实测）。
      */
     private fun armReplaceQuery(
         editor: CodeEditor,
         controller: CodeEditorController,
         query: String,
     ) {
+        var settled = false
+        controller.onFindResult = { settled = true }
         controller.findText(query)
         val deadline = System.currentTimeMillis() + searchSettleTimeoutMs
-        while (controller.currentFindState().matchCount == 0 && System.currentTimeMillis() < deadline) {
-            Thread.sleep(10)
+        while (!settled && System.currentTimeMillis() < deadline) {
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(5)
         }
-        // 排空主 looper 上的回灌，再停掉 pattern（此后内容变更不再触发重扫）
-        Shadows.shadowOf(Looper.getMainLooper()).idle()
+        controller.onFindResult = {}
+        // 扫描完成后停掉 pattern（此后内容变更不再触发重扫）
         editor.searcher.stopSearch()
     }
 

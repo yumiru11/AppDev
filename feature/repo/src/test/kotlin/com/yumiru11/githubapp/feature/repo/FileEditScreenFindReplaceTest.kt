@@ -204,9 +204,14 @@ class FileEditScreenFindReplaceTest {
     /**
      * 等 Sora 异步查找回灌（匹配数 > 0）。
      *
-     * Sora 在后台线程扫描完成后经 `postInLifecycle` 回主线程派发；Robolectric 的主 looper 是
-     * 暂停态，必须**显式排空**才会执行队列里的回灌。（CI 实测：`waitUntil` 自身的轮询不驱动
-     * looper，10s 超时偶发；这里改成「waitForIdle + 小睡」的有界轮询，失败信息自带状态。）
+     * Sora 在后台线程扫描完成后经 `postInLifecycle` 回主线程派发；控制器把回灌交付再推迟一个
+     * 主线程消息（避开「派发期间读匹配表得 0」的竞态，见 `CodeEditorController.findReceipt`）。
+     * Robolectric 的主 looper 是暂停态：`composeRule.waitForIdle()` 会排空它（实测；普通
+     * `Thread.sleep` **不会**，只有排空 looper 才会执行队列里的回灌）。因此这里是有界轮询，
+     * 正常一两轮即满足；30s 上限只是 CI 慢机的安全网，不再承担掩盖缺陷的角色。
+     *
+     * 该 helper 曾经承载的 CI 偶发超时根因在**生产侧**（延迟交付缺失），回归防线见
+     * `core:editor` 的 `CodeEditorFindResultDeliveryTest`（逐条推进消息锁定时序）。
      */
     private fun awaitMatches(viewModel: RepoFilesViewModel) {
         val deadline = System.currentTimeMillis() + ASYNC_SEARCH_TIMEOUT_MS
