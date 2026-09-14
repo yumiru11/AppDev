@@ -53,6 +53,7 @@ import com.composables.icons.materialsymbols.rounded.Delete
 import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppDialog
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 import com.yumiru11.githubapp.feature.repo.R
 
@@ -145,7 +146,7 @@ fun BranchesScreen(
 
                 is BranchesUiState.Error -> {
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(24.dp),
+                        modifier = Modifier.fillMaxSize().padding(AppDimens.spacing.xl),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
@@ -154,7 +155,7 @@ fun BranchesScreen(
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(AppDimens.spacing.m))
                         TextButton(onClick = viewModel::retry) {
                             Text(text = stringResource(R.string.repo_branch_retry))
                         }
@@ -240,8 +241,8 @@ private fun BranchList(
 ) {
     LazyColumn(
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
         items(branches, key = { it.name }) { branch ->
             val isCurrent = branch.name == currentRef
@@ -256,7 +257,7 @@ private fun BranchList(
                     ),
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(AppDimens.spacing.m),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -324,7 +325,7 @@ private fun CreateBranchDialog(
                     placeholder = { Text(text = stringResource(R.string.repo_branch_name_hint)) },
                     singleLine = true,
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 Text(
                     text = stringResource(R.string.repo_branch_from_base, defaultBranch ?: "main"),
                     style = MaterialTheme.typography.bodySmall,

@@ -668,7 +668,7 @@ private fun RepoMetaRow(repository: Repository) {
             modifier = Modifier.size(14.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
         Text(
             text = repository.stargazerCount.toString(),
             style = MaterialTheme.typography.labelMedium,

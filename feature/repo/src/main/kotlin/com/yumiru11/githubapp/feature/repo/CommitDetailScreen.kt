@@ -54,6 +54,7 @@ import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Content_copy
 import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import kotlinx.coroutines.launch
@@ -153,8 +154,8 @@ private fun CommitSection(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(AppDimens.spacing.l),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
         item(key = COMMIT_HEADER_KEY) {
             CommitHeader(commit = commit, onCopySha = onCopySha)
@@ -163,7 +164,7 @@ private fun CommitSection(
             Text(
                 text = stringResource(R.string.repo_commit_files),
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = AppDimens.spacing.s),
             )
         }
         if (commit.files.isEmpty()) {
@@ -188,7 +189,7 @@ private fun CommitHeader(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.l)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = commit.shortSha,
@@ -206,7 +207,7 @@ private fun CommitHeader(
                 CommitStats(additions = commit.additions, deletions = commit.deletions)
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
 
             commit.authorDate?.let { date ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -223,14 +224,14 @@ private fun CommitHeader(
                         text = commit.authorLogin ?: commit.authorName.orEmpty(),
                         style = MaterialTheme.typography.labelMedium,
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                     Text(
                         text = relativeTimeText(date) ?: date,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             }
 
             CommitMessage(message = commit.message)
@@ -250,7 +251,7 @@ private fun CommitMessage(message: String) {
             style = MaterialTheme.typography.titleMedium,
         )
         if (body.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
             Text(
                 text = body,
                 style = MaterialTheme.typography.bodyMedium,
@@ -267,7 +268,7 @@ private fun CommitStats(
     deletions: Int,
 ) {
     val scheme = MaterialTheme.colorScheme
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
         Text(
             text = stringResource(R.string.repo_commit_additions, additions),
             style = MaterialTheme.typography.labelMedium,
@@ -292,11 +293,11 @@ private fun CommitFileRow(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.m),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             CommitStatusBadge(status = file.status)
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.s))
             Text(
                 text = file.filename,
                 style = MaterialTheme.typography.bodyMedium,
@@ -304,7 +305,7 @@ private fun CommitFileRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.s))
             CommitStats(additions = file.additions, deletions = file.deletions)
         }
     }
@@ -337,7 +338,7 @@ private fun CommitDiffSection(
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.spacing.s, vertical = AppDimens.spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
@@ -355,7 +356,7 @@ private fun CommitDiffSection(
             )
         }
         if (lines.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Box(modifier = Modifier.fillMaxSize().padding(AppDimens.spacing.l)) {
                 EmptyHint(text = stringResource(R.string.repo_commit_diff_empty))
             }
         } else {
@@ -377,7 +378,7 @@ private fun CommitDiffRow(line: CommitDiffLine) {
             Modifier
                 .fillMaxWidth()
                 .background(diffBackground(line.kind, scheme))
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .padding(horizontal = AppDimens.spacing.s, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (line.kind == CommitDiffLineKind.ADDED ||
@@ -408,7 +409,7 @@ private fun DiffNumberCell(number: Int?) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.End,
         maxLines = 1,
-        modifier = Modifier.width(36.dp).padding(end = 8.dp),
+        modifier = Modifier.width(36.dp).padding(end = AppDimens.spacing.s),
     )
 }
 

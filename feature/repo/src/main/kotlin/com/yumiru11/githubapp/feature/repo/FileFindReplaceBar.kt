@@ -35,6 +35,7 @@ import com.composables.icons.materialsymbols.rounded.Close
 import com.composables.icons.materialsymbols.rounded.Keyboard_arrow_down
 import com.composables.icons.materialsymbols.rounded.Keyboard_arrow_up
 import com.composables.icons.materialsymbols.rounded.Search
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.editor.CodeEditorController
 import com.yumiru11.githubapp.core.editor.FileFindState
 
@@ -70,7 +71,9 @@ internal fun FileFindReplaceBar(
         tonalElevation = 3.dp,
         shadowElevation = 6.dp,
     ) {
-        Column(modifier = Modifier.padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 4.dp)) {
+        Column(
+            modifier = Modifier.padding(start = AppDimens.spacing.m, end = AppDimens.spacing.xs, top = 2.dp, bottom = AppDimens.spacing.xs),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = MaterialSymbols.Rounded.Search,
@@ -84,7 +87,7 @@ internal fun FileFindReplaceBar(
                     modifier =
                         Modifier
                             .weight(1f)
-                            .padding(start = 8.dp)
+                            .padding(start = AppDimens.spacing.s)
                             .focusRequester(focusRequester)
                             .testTag(FileFindReplaceBarTags.QUERY),
                     placeholder = { Text(text = stringResource(R.string.repo_file_find_hint)) },
@@ -130,7 +133,7 @@ internal fun FileFindReplaceBar(
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    modifier = Modifier.padding(start = 4.dp, end = 12.dp),
+                    modifier = Modifier.padding(start = AppDimens.spacing.xs, end = AppDimens.spacing.m),
                 )
             }
         }
@@ -158,7 +161,7 @@ private fun ReplaceSection(
             value = replaceQuery,
             onValueChange = onReplaceQueryChange,
             enabled = hasQuery,
-            modifier = Modifier.weight(1f).padding(start = 8.dp).testTag(FileFindReplaceBarTags.REPLACE),
+            modifier = Modifier.weight(1f).padding(start = AppDimens.spacing.s).testTag(FileFindReplaceBarTags.REPLACE),
             placeholder = { Text(text = stringResource(R.string.repo_file_replace_hint)) },
             singleLine = true,
             shape = MaterialTheme.shapes.large,
