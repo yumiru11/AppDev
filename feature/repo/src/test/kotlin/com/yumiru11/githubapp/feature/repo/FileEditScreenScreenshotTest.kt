@@ -5,9 +5,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
+import com.yumiru11.githubapp.core.githubauth.auth.AuthState
+import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.core.testing.screenshot.ScreenshotTest
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test
 
@@ -26,6 +30,10 @@ class FileEditScreenScreenshotTest : ScreenshotTest() {
             SavedStateHandle(mapOf("owner" to "octocat", "repo" to "Hello-World")),
             mockk<RepoRepository>(relaxed = true),
             drafts = mockk(relaxed = true),
+            sessionManager =
+                mockk<OAuthSessionManager> {
+                    every { authState } returns MutableStateFlow<AuthState>(AuthState.PAT)
+                },
         )
 
     @Test

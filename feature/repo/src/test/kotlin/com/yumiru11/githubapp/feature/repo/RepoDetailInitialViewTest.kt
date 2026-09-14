@@ -14,6 +14,8 @@ import com.yumiru11.githubapp.core.data.model.Repository
 import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
 import com.yumiru11.githubapp.core.datastore.draft.DraftRepository
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.githubauth.auth.AuthState
+import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
 import io.mockk.coEvery
 import io.mockk.every
@@ -68,6 +70,10 @@ class RepoDetailInitialViewTest {
             savedStateHandle = SavedStateHandle(mapOf("owner" to "octocat", "repo" to "Hello-World")),
             repoRepository = repoRepository,
             drafts = DraftAutoSaver(mockk<DraftRepository>(relaxed = true)),
+            sessionManager =
+                mockk<OAuthSessionManager> {
+                    every { authState } returns MutableStateFlow<AuthState>(AuthState.PAT)
+                },
         )
 
     private fun setScreen(
