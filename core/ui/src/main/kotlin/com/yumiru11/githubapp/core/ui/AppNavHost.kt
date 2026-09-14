@@ -178,7 +178,8 @@ fun AppNavHost(
                                 },
                                 onEditMarkdown = { content ->
                                     EditorContentHolder.initialContent = content
-                                    navController.navigate(AppRoute.Editor)
+                                    // SPEC-3：owner/repo 进 route —— 编辑器据此拉仓库协作者喂 @mention
+                                    navController.navigate(AppRoute.Editor(owner = route.owner, repo = route.repo))
                                 },
                             ),
                     ) {

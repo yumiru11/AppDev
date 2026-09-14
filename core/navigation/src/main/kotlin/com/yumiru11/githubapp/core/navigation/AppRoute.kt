@@ -39,9 +39,15 @@ sealed interface AppRoute {
     @SerialName("settings")
     data object Settings : AppRoute
 
+    // SPEC-3：Markdown 编辑器需要 owner/repo 才能拉仓库协作者喂 @mention 补全候选；
+    // 大文档正文仍走 EditorContentHolder（不适合放 route）。带默认参数的 data class：
+    // Navigation pattern = `editor?owner={owner}&repo={repo}`，空串 = 无仓库语境（无候选）。
     @Serializable
     @SerialName("editor")
-    data object Editor : AppRoute
+    data class Editor(
+        val owner: String = "",
+        val repo: String = "",
+    ) : AppRoute
 
     // L04 新建仓库页（Home 第三条长条按钮 / 未登录则先引导登录）
     @Serializable
