@@ -4,6 +4,7 @@ import com.apollographql.apollo.ApolloClient
 import com.apollographql.cache.normalized.FetchPolicy
 import com.apollographql.cache.normalized.fetchPolicy
 import com.yumiru11.githubapp.core.data.model.Repository
+import com.yumiru11.githubapp.core.data.model.User
 import com.yumiru11.githubapp.core.githubauth.session.isRestOnly
 import com.yumiru11.githubapp.core.githubauth.token.TokenStorage
 import com.yumiru11.githubapp.core.githubdata.error.GitHubRequestException
@@ -49,6 +50,21 @@ class DefaultRepositoryRepository
 
             return restRepository(owner, name)
         }
+
+        override suspend fun listCollaborators(
+            owner: String,
+            name: String,
+        ): List<User> =
+            try {
+                repositoryApi.listCollaborators(owner, name).map { it.toDomain() }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (
+                @Suppress("TooGenericExceptionCaught") t: Throwable,
+            ) {
+                // 与 REST 仓库概览同款归一化：HttpException/IOException/未知 → GitHubRequestException
+                throw GitHubRequestException(t.asGitHubError(), t)
+            }
 
         /** REST 兜底通道（PAT 降级主通道）：GET /repos/{owner}/{repo} */
         private suspend fun restRepository(

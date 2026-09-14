@@ -249,6 +249,57 @@ class DefaultRepositoryRepositoryTest {
             assertFailsWith<CancellationException> { repoUnderTest.getRepository("octocat", "Hello-World") }
         }
 
+    @Test
+    fun listCollaborators_success_mapsLoginsAndSendsSinglePageQuery() =
+        runTest {
+            responsesByPath["/repos/octocat/Hello-World/collaborators"] =
+                MockResponse
+                    .Builder()
+                    .body(
+                        """
+                        [{"login":"octocat","id":1,"avatar_url":"https://a/o.png"},
+                         {"login":"hubot","id":2}]
+                        """.trimIndent(),
+                    ).build()
+
+            val collaborators = repository.listCollaborators("octocat", "Hello-World")
+
+            assertEquals(listOf("octocat", "hubot"), collaborators.map { it.login })
+            assertEquals("https://a/o.png", collaborators.first().avatarUrl)
+            val request = server.takeRequest()
+            assertEquals("/repos/octocat/Hello-World/collaborators", request.url.encodedPath)
+            // 单页 100 条足够覆盖候选上限（50），不引入分页复杂度
+            assertEquals("100", request.url.queryParameter("per_page"))
+        }
+
+    @Test
+    fun listCollaborators_forbidden_throwsForbidden() =
+        runTest {
+            responsesByPath["/repos/octocat/Hello-World/collaborators"] =
+                MockResponse
+                    .Builder()
+                    .status("HTTP/1.1 403 Forbidden")
+                    .body("{}")
+                    .build()
+
+            val exception =
+                assertFailsWith<GitHubRequestException> { repository.listCollaborators("octocat", "Hello-World") }
+
+            assertEquals(GitHubError.Forbidden, exception.error)
+        }
+
+    @Test
+    fun listCollaborators_cancelled_rethrowsCancellation() =
+        runTest {
+            val restApi =
+                mockk<RepositoryApi> {
+                    coEvery { listCollaborators(any(), any(), any()) } throws CancellationException("cancelled")
+                }
+            val repoUnderTest = DefaultRepositoryRepository(apolloClient, restApi, tokenStorage)
+
+            assertFailsWith<CancellationException> { repoUnderTest.listCollaborators("octocat", "Hello-World") }
+        }
+
     /** REST GET /repos/{owner}/{repo} 最小合法响应（与既有用例同款载荷） */
     private fun restRepositoryResponse(): MockResponse =
         MockResponse

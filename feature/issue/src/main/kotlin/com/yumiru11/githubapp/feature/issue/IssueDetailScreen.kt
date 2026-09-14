@@ -270,6 +270,7 @@ fun IssueDetailScreen(
     if (showCommentSheet && state?.canComment == true) {
         CommentInputSheet(
             text = commentDraftText,
+            mentions = remember(state) { mentionCandidatesFor(state) },
             onTextChange = viewModel.commentDraft::onChanged,
             onDismiss = {
                 viewModel.commentDraft.saveNow()
@@ -1192,6 +1193,7 @@ private fun MilestoneOptionCard(
 @Composable
 private fun CommentInputSheet(
     text: String,
+    mentions: List<String>,
     onTextChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onSubmit: (String) -> Unit,
@@ -1233,6 +1235,7 @@ private fun CommentInputSheet(
                     onEditorReady = { editorController = it },
                     onToolbarAction = { editorController?.applySyntax(it) },
                     themeTokens = editorTokens,
+                    mentions = mentions,
                     preview = {
                         MarkdownViewer(
                             markdown = text.ifBlank { previewPlaceholder },

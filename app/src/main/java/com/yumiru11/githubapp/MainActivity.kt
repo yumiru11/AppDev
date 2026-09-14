@@ -63,6 +63,7 @@ import com.yumiru11.githubapp.core.ui.openExternalBrowser
 import com.yumiru11.githubapp.feature.auth.AuthNavigation
 import com.yumiru11.githubapp.feature.auth.AuthViewModel
 import com.yumiru11.githubapp.feature.auth.LoginScreen
+import com.yumiru11.githubapp.feature.editor.EditorMentionsViewModel
 import com.yumiru11.githubapp.feature.editor.MarkdownEditorScreen
 import com.yumiru11.githubapp.feature.home.HomeScreen
 import com.yumiru11.githubapp.feature.issue.CreateIssueScreen
@@ -430,9 +431,16 @@ class MainActivity : ComponentActivity() {
                                     )
                                 },
                                 editorScreen = { initialContent, onClose ->
+                                    // SPEC-3：@mention 候选在 route 层解析（owner/repo 来自 editor route
+                                    // 参数，经 destination 的 SavedStateHandle 注入 VM）；屏幕只收数据，
+                                    // 保持无 Hilt 依赖，非 Hilt 组合测试可直接渲染。
+                                    val mentionsViewModel: EditorMentionsViewModel = hiltViewModel()
+                                    val editorMentions by mentionsViewModel.candidates
+                                        .collectAsStateWithLifecycle()
                                     MarkdownEditorScreen(
                                         initialContent = initialContent,
                                         onClose = onClose,
+                                        mentions = editorMentions,
                                         onInternalLink = { parsed -> navigateToParsedUrl(navController, parsed) },
                                         onExternalLink = { url ->
                                             openExternalBrowser(context, url)

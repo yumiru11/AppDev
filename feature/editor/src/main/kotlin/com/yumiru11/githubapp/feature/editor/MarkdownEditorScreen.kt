@@ -69,6 +69,9 @@ import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
  * @param onClose 返回回调
  * @param onInternalLink 预览内 GitHub 内部链接分发（默认忽略）
  * @param onExternalLink 预览内外部链接分发（默认忽略）
+ * @param mentions `@mention` 补全候选（SPEC-3）。屏幕只消费数据，**不做 Hilt 解析**——
+ *   候选由 route 层（`editorScreen` 宿主 lambda，owner/repo 来自 editor route 参数）解析
+ *   后传入；无仓库语境的调用点省略即为空。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +81,7 @@ fun MarkdownEditorScreen(
     onInternalLink: (ParsedUrl) -> Unit = {},
     onExternalLink: (String) -> Unit = {},
     modifier: Modifier = Modifier,
+    mentions: List<String> = emptyList(),
 ) {
     val viewModel: MarkdownEditorViewModel =
         viewModel(
@@ -149,6 +153,7 @@ fun MarkdownEditorScreen(
             onEditorReady = { viewModel.onEditorReady(it) },
             onToolbarAction = { viewModel.applySyntax(it) },
             themeTokens = editorTokens,
+            mentions = mentions,
             preview = {
                 WebViewMarkdownRenderer(
                     sanitizedHtml = uiState.text,
