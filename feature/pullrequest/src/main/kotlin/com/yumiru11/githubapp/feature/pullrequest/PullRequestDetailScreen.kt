@@ -81,6 +81,7 @@ import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 import com.yumiru11.githubapp.core.ui.appTransientEnterAlpha
@@ -596,7 +597,7 @@ private fun EditPullRequestDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 OutlinedTextField(
                     value = body,
                     onValueChange = draft::onChanged,
@@ -775,10 +776,10 @@ private fun PrHeader(
     Column(
         modifier =
             modifier.padding(
-                start = 16.dp,
-                end = 16.dp,
-                top = 12.dp,
-                bottom = 12.dp,
+                start = AppDimens.spacing.l,
+                end = AppDimens.spacing.l,
+                top = AppDimens.spacing.m,
+                bottom = AppDimens.spacing.m,
             ),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -790,16 +791,16 @@ private fun PrHeader(
             // 这句待检查文案的「死状态」——那才是"死文案"的根因。这里直接不渲染，
             // 与网页端一致（已合并的 PR 没有合并性可谈）。
             if (pullRequest.state == PullRequestState.OPEN || pullRequest.state == PullRequestState.DRAFT) {
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 MergeableChip(mergeableState = pullRequest.mergeableState)
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
         Text(
             text = pullRequest.title,
             style = MaterialTheme.typography.headlineSmall,
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
         val author = pullRequest.author?.login.orEmpty()
         val relativeTime = pullRequest.createdAt?.let { relativeTimeText(it) }
         Text(
@@ -815,7 +816,7 @@ private fun PrHeader(
         val head = pullRequest.head?.ref
         val base = pullRequest.base?.ref
         if (!head.isNullOrBlank() && !base.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             Text(
                 text = stringResource(R.string.pull_request_branch_base_head, base, head),
                 style = MaterialTheme.typography.bodyMedium,
@@ -823,17 +824,17 @@ private fun PrHeader(
             )
         }
         if (pullRequest.labels.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 pullRequest.labels.forEach { LabelChip(label = it) }
             }
         }
         if (pullRequest.requestedReviewers.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             ReviewerRow(reviewers = pullRequest.requestedReviewers)
         }
         if (combinedStatus != null) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             ChecksSummaryRow(combinedStatus = combinedStatus)
         }
     }
@@ -908,7 +909,7 @@ private fun MergeableChip(mergeableState: MergeableState) {
         color = container,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = AppDimens.spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (mergeableState == MergeableState.UNKNOWN) {
@@ -949,7 +950,7 @@ private fun LabelChip(label: PullRequestLabel) {
             text = label.name,
             style = MaterialTheme.typography.labelMedium,
             color = contentColor,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            modifier = Modifier.padding(horizontal = AppDimens.spacing.s, vertical = 3.dp),
         )
     }
 }
@@ -963,7 +964,7 @@ private fun ReviewerRow(reviewers: List<PullRequestUser>) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.s))
         reviewers.forEach { user ->
             AsyncImage(
                 model = user.avatarUrl,
@@ -979,7 +980,7 @@ private fun ReviewerRow(reviewers: List<PullRequestUser>) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.m))
         }
     }
 }
@@ -1108,7 +1109,7 @@ private val INLINE_PROGRESS_STROKE = 2.dp
  * 「此行可横向滚动」的视觉提示（`PrimaryScrollableTabRow` 的 `edgePadding` 文档原话）。
  * 与全 app 内容边距（AppDimens.contentPadding）同量级，与 SearchScreen 结果 Tab 行对齐。
  */
-private val TAB_ROW_EDGE_PADDING = 16.dp
+private val TAB_ROW_EDGE_PADDING = AppDimens.spacing.l
 
 /**
  * 四 Tab 行 tab 最小宽度（C1）。
@@ -1144,14 +1145,14 @@ private fun CommentBottomSheet(
                     Modifier
                         .fillMaxWidth()
                         .imePadding() // 键盘弹出时抬升内容，避免输入框/按钮被遮挡
-                        .padding(16.dp),
+                        .padding(AppDimens.spacing.l),
             ) {
                 Text(
                     text = stringResource(R.string.pull_request_add_comment),
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.l))
 
                 OutlinedTextField(
                     value = text,
@@ -1163,7 +1164,7 @@ private fun CommentBottomSheet(
                     placeholder = { Text(text = stringResource(R.string.pull_request_comment_placeholder)) },
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.l))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1172,7 +1173,7 @@ private fun CommentBottomSheet(
                     TextButton(onClick = onDismiss) {
                         Text(text = stringResource(R.string.cancel))
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                     Button(
                         onClick = { onSubmit(text) },
                         enabled = text.isNotBlank(),

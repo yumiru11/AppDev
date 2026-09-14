@@ -83,7 +83,7 @@ internal fun pullRequestTabContentPadding(): PaddingValues =
     PaddingValues(
         start = AppDimens.contentPadding,
         end = AppDimens.contentPadding,
-        top = 8.dp,
+        top = AppDimens.spacing.s,
         bottom = AppDimens.fabContentClearance,
     )
 
@@ -104,7 +104,7 @@ internal fun ConversationTab(
     LazyColumn(
         modifier = modifier,
         contentPadding = pullRequestTabContentPadding(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.m),
     ) {
         if (!pullRequest.body.isNullOrBlank()) {
             item(key = "body") {
@@ -259,7 +259,7 @@ internal fun CommitsTab(
     LazyColumn(
         modifier = modifier,
         contentPadding = pullRequestTabContentPadding(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
         items(items = commits, key = { it.sha }) { commit ->
             CommitRow(
@@ -290,7 +290,7 @@ internal fun ChecksTab(
     LazyColumn(
         modifier = modifier,
         contentPadding = pullRequestTabContentPadding(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
         items(items = checkRuns, key = { it.id }) { checkRun ->
             CheckRunRow(
@@ -324,7 +324,7 @@ internal fun FilesTab(
     LazyColumn(
         modifier = modifier,
         contentPadding = pullRequestTabContentPadding(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
         items(items = files, key = { it.filename }) { file ->
             FileRow(
@@ -352,7 +352,7 @@ private fun CommitRow(
         shape = MaterialTheme.shapes.medium,
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
                     model = commit.author?.avatarUrl,
@@ -362,7 +362,7 @@ private fun CommitRow(
                             .size(32.dp)
                             .clip(CircleShape),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text =
@@ -380,7 +380,7 @@ private fun CommitRow(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                         commit.createdAt?.let {
                             Text(
                                 text = relativeTimeText(it) ?: it,
@@ -403,9 +403,9 @@ private fun CommitRow(
                 }
             }
             if (expanded && commit.files.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 HorizontalDivider()
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 commit.files.forEach { file ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -418,13 +418,13 @@ private fun CommitRow(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                         Text(
                             text = stringResource(R.string.pull_request_additions, file.additions),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
                         Text(
                             text = stringResource(R.string.pull_request_deletions, file.deletions),
                             style = MaterialTheme.typography.labelSmall,
@@ -453,7 +453,7 @@ private fun CheckRunRow(
         shape = MaterialTheme.shapes.medium,
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = icon,
@@ -461,7 +461,7 @@ private fun CheckRunRow(
                     tint = tint,
                     modifier = Modifier.size(20.dp),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = checkRun.name.orEmpty(),
@@ -476,7 +476,7 @@ private fun CheckRunRow(
                             color = tint,
                         )
                         checkRun.appName?.let {
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                             Text(
                                 text = it,
                                 style = MaterialTheme.typography.labelSmall,
@@ -498,9 +498,9 @@ private fun CheckRunRow(
                 }
             }
             if (expanded) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 HorizontalDivider()
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 val title = checkRun.outputTitle
                 val summary = checkRun.outputSummary
                 val text = checkRun.outputText
@@ -519,14 +519,14 @@ private fun CheckRunRow(
                                 text = it,
                                 style = MaterialTheme.typography.titleSmall,
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
                         }
                         summary?.takeIf { it.isNotBlank() }?.let {
                             Text(
                                 text = it,
                                 style = MaterialTheme.typography.bodySmall,
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
                         }
                         text?.takeIf { it.isNotBlank() }?.let {
                             Text(
@@ -559,7 +559,7 @@ private fun FileRow(
         shape = MaterialTheme.shapes.medium,
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -574,13 +574,13 @@ private fun FileRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 Text(
                     text = stringResource(R.string.pull_request_additions, file.additions),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
                 Text(
                     text = stringResource(R.string.pull_request_deletions, file.deletions),
                     style = MaterialTheme.typography.labelMedium,
@@ -599,9 +599,9 @@ private fun FileRow(
                 }
             }
             if (expanded) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 HorizontalDivider()
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 val patch = file.patch
                 if (patch.isNullOrBlank()) {
                     Text(
