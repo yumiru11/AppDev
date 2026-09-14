@@ -50,14 +50,9 @@ import org.intellij.markdown.MarkdownElementTypes
  * B「原生增强版」Markdown 渲染组件（prototype/readme-comparison）。
  *
  * 基于 mikepenz 0.38.1 扩展，不重写解析链路：
- * - 阅读密度（左右间距 / 段间距 / 行高 / 每层缩进）一律来自 [MarkdownDensity.current]
- *   （[MarkdownDensityTokens]），与 WebView 通道（`--md-reading-*` CSS 变量）同一事实来源。
- * - 标题 H1 32 / H2 24 / H3 20 / H4 16（标题字级与行高不随阅读密度变化）
+ * - GitHub 排版基准：正文 16sp/1.6，标题 H1 32 / H2 24 / H3 20 / H4 16
  * - 增强表格、代码块（复制 + GitHub 原色高亮）、Alert、details、图片预览、分隔线
  * - 链接仍统一走 [dispatchMarkdownLink] → 上层应用内导航
- *
- * @param density 阅读密度令牌；默认 [MarkdownDensity.current]。测试/证据截图可显式传入
- *   其它预设（如 [MarkdownDensity.Conservative]）在同一组件上对比。
  */
 @Composable
 fun EnhancedMarkdownViewer(
@@ -67,7 +62,6 @@ fun EnhancedMarkdownViewer(
     modifier: Modifier = Modifier,
     imageTransformer: ImageTransformer = Coil3ImageTransformerImpl,
     darkTheme: Boolean = isSystemInDarkTheme(),
-    density: MarkdownDensityTokens = MarkdownDensity.current,
 ) {
     // 渲染前预处理（缺陷 #1/#4）：删除 <script> 元素正文、把 <details> 区域折叠成单块，
     // 避免外层解析重复渲染折叠正文。preparedMarkdown 是解析链路的唯一文本来源，
@@ -96,14 +90,14 @@ fun EnhancedMarkdownViewer(
             h4 = TextStyle(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium, color = scheme.onSurface),
             h5 = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, color = scheme.onSurface),
             h6 = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, color = scheme.onSurfaceVariant),
-            text = density.bodyTextStyle(scheme.onSurface),
+            text = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
             code = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 14.sp, lineHeight = 20.sp, color = scheme.onSurface),
             inlineCode = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 14.sp, lineHeight = 20.sp, color = scheme.primary),
-            quote = density.bodyTextStyle(scheme.onSurface),
-            paragraph = density.bodyTextStyle(scheme.onSurface),
-            ordered = density.bodyTextStyle(scheme.onSurface),
-            bullet = density.bodyTextStyle(scheme.onSurface),
-            list = density.bodyTextStyle(scheme.onSurface),
+            quote = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
+            paragraph = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
+            ordered = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
+            bullet = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
+            list = TextStyle(fontSize = 16.sp, lineHeight = 25.6.sp, color = scheme.onSurface),
             textLink =
                 TextLinkStyles(
                     style =
@@ -122,17 +116,17 @@ fun EnhancedMarkdownViewer(
             tableBackground = scheme.surfaceContainerLow,
         )
 
-    androidx.compose.foundation.layout.Box(modifier = modifier.padding(horizontal = density.sides)) {
+    androidx.compose.foundation.layout.Box(modifier = modifier.padding(horizontal = 37.dp)) {
         CompositionLocalProvider(LocalUriHandler provides linkUriHandler) {
             Markdown(
                 state,
                 annotator = inlineSemantics,
                 padding =
                     markdownPadding(
-                        block = density.paragraphGap,
+                        block = 16.dp,
                         listItemTop = 8.dp,
                         listItemBottom = 8.dp,
-                        listIndent = density.indentPerLevel,
+                        listIndent = 20.dp,
                     ),
                 extendedSpans =
                     markdownExtendedSpans {
@@ -185,8 +179,8 @@ fun EnhancedMarkdownViewer(
                                 dividerColor = MaterialTheme.colorScheme.outlineVariant,
                             )
                         },
-                        unorderedList = { model -> EnhancedUnorderedList(model, density.indentPerLevel) },
-                        orderedList = { model -> EnhancedOrderedList(model, density.indentPerLevel) },
+                        unorderedList = { model -> EnhancedUnorderedList(model) },
+                        orderedList = { model -> EnhancedOrderedList(model) },
                         checkbox = { model -> MarkdownCheckBox(model.content, model.node, model.typography.text) },
                         image = { model -> EnhancedMarkdownImage(model, baseRepoUrl = baseRepoUrl) },
                         table = { model ->

@@ -11,7 +11,7 @@
 **本波已落地（均已在 main 复核）**：
 - **设计系统 Batch 1–4**（#273/#274/#280/#282）：`AppCard` / `AppChip` / `AppFilterChip` / `AppDialog` / `AppSegmentedButton` / `AppStateViews`（Empty/Error/Loading） / `AppScaffold` / `AppBottomSheet` + debug 画廊屏 Roborazzi 基线（`core:designsystem` 28 张 `DesignSystemGallery_*`）；间距 scale `AppDimens.spacing`（#280）；**六类裸控件门禁棘轮到 0**（`.github/bare-controls-baseline.txt` 全 0 + `.github/scripts/forbid-bare-controls.sh`）。
 - **离线渲染**：KaTeX（#269）+ Mermaid（#275）；CI 证据车道 `Mermaid render verify (emulator)`（API 33 断言 `engine=supported` + `rendered>0`；API 30 断言 `<94` 回退 `engine=blocked` + `rendered=0`，`mermaid-render-verify.yml`）与 `Glass verification (API 31+)`（`glass-verify.yml`）。**APK 体积门禁**（#271）：`.github/scripts/check-apk-size.sh` + `.github/apk-size-budget.properties`。
-- **Markdown 阅读密度**（#281）：`MarkdownDensity` 单一事实来源（`Literal` 默认 / `Conservative` 备选），`core:markdown` 基线重录。
+- **Markdown 阅读密度**（#281 → **已回滚**）：曾引入 `MarkdownDensity` 令牌并把默认切到 `Literal`（0.7/0.6/0.3/0.4 cm 直译）；产品负责人 2026-09-14 对比三方案后明确选择**现状（紧凑）**密度 → 令牌/默认值已回滚，`core:markdown` 基线恢复为 #281 之前的 CI 权威帧。（若日后要调密度，从 #281 的提交里取回令牌实现即可。）
 - **截图证据链**（#276/#277）：拼板取帧契约（`base=${f%.png}`）+ 逐帧 critical 严重度（`FRAME_SEVERITIES`）+ `lookup_mismatch` 防回归闸门；`readme-mermaid` 探针改视口内短滑 + 先取帧后断言。
 - **加固/功能**：#283（Test 任务级 15min 超时 `build.gradle.kts:297` + verify 步骤级 30min 上限）、#284（UI-1 窄屏 diff unified-only + 超长行横向滚动）、#286（UI-4 无 README 空态 + UI-6 文件树 mtime 列）、#287（EDITOR-1 软换行 / 查找替换 / 显式 CRLF+编码）、#288（DATA-2 `:core:data` 首次纳入覆盖率门禁 0.99）、#289（UI-7 feed 首载骨架）。
 - **在途收尾（已合入）**：#290（SPEC-3 `@mention` 接入真实候选：REST collaborators + `AppRoute.Editor(owner, repo)`，`MentionCandidates` 由宿主层 Hilt 解析 `mentions: List<String>`）、#291（游客模式 REST 配额守卫：`AuthState.Anonymous` 短路 mtime 列查询、不做负缓存）。

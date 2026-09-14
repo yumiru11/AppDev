@@ -133,7 +133,7 @@
 | #275 | markdown | 离线 Mermaid（详见 §2.3） |
 | #276 | CI 截图链 | 拼板取帧契约修复（`montage_board` 内 `base=${f%.png}`；此前每格恒为 `NOT CAPTURED` 占位）+ 坏帧水印标注真实 kind + **逐帧 critical 严重度**（`FRAME_SEVERITIES` 按帧名存，防 critical 降级成 warn）+ `lookup_mismatch` 防回归闸门（`::error::` + `exit 1`） |
 | #277 | CI 截图链 | `readme-mermaid` 探针修复：**视口内短滑**（起点/终点都在 WebView 视口）+ 先取帧后断言（`settle=now`）+ 滚不到显式判坏；修此前「假帧/偶发 DUPLICATE」 |
-| #281 | markdown | **阅读密度令牌单一事实来源** `MarkdownDensity`（`Literal` 默认 / `Conservative` 备选，`current = Literal`）+ `core:markdown` 基线重录 |
+| #281 | markdown | **阅读密度令牌单一事实来源** `MarkdownDensity`（`Literal` 默认 / `Conservative` 备选，`current = Literal`）+ `core:markdown` 基线重录 · **2026-09-14 已回滚**：产品负责人选择现状（紧凑）密度，令牌与默认值移除、基线恢复为 #281 之前的 CI 权威帧 |
 | #283 | 构建/CI | 单测**任务级 15min 超时**（`build.gradle.kts:297` `test.timeout.set(Duration.ofMinutes(15))`）+ `ci.yml` verify 步骤级 **30min** 上限（超时只红一个任务/步骤，不吃满 60min Quality Gate 配额） |
 | #284 | pullrequest | **UI-1**：窗口 `< 600dp` 不提供 side-by-side（强制 unified），unified 超长行整块 `horizontalScroll`（`PullRequestDiffView.kt:62-65,193-203`）；截图侧对应帧按设计 `SKIPPED`（pixel_6 = 411dp） |
 | #286 | repo | **UI-6** 文件树「修改时间」列 + **UI-4** 无 README 空态收编 `AppEmptyState`（`RepoDetailScreen.kt:1759`） |

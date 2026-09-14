@@ -4,10 +4,7 @@
  * Design rules (docs/ui-design.md §3.11, user decisions):
  * - Containers follow MaterialTheme tokens injected by MaterialYouFusionMapper.
  * - Syntax colors stay GitHub original (prettylights tokens, half-fusion C).
- * - GitHub typography baseline: 16px body; reading density (sides / paragraph gap /
- *   line height / indent) comes from --md-reading-* variables injected by WebViewHtmlBuilder
- *   from MarkdownDensityTokens (single source of truth shared with the native viewer).
- *   Fallbacks below match MarkdownDensity.Literal.
+ * - GitHub typography baseline: 16px body / 1.6 line height.
  * - This file is loaded after github-markdown.css and before the injected theme-vars style.
  */
 
@@ -25,16 +22,13 @@ body {
   color: var(--fgColor-default);
   font-family: var(--fontStack-sansSerif);
   font-size: 16px;
-  /* 阅读密度：行高倍数（来源：MarkdownDensityTokens.lineHeightMultiplier）。 */
-  line-height: var(--md-reading-line-height, 2.125);
-  /* 阅读密度：左右间距（每侧）。 */
-  padding: var(--md-reading-sides, 43px);
+  line-height: 1.6;
+  padding: 16px;
   word-wrap: break-word;
 }
 
 .markdown-body p {
-  /* 阅读密度：段间距。 */
-  margin: 0 0 var(--md-reading-paragraph-gap, 37px);
+  margin: 0 0 16px;
 }
 
 /* GitHub heading proportions are kept; only body density is aligned with the spec. */
@@ -99,8 +93,7 @@ body {
   border-radius: var(--md-sys-shape-corner-medium);
   padding: 12px;
   overflow-x: auto;
-  /* 阅读密度：段间距（块级元素同节奏）。 */
-  margin: 0 0 var(--md-reading-paragraph-gap, 37px);
+  margin: 0 0 16px;
 }
 
 [data-theme="dark"] .markdown-body pre {
@@ -115,20 +108,12 @@ body {
 
 /* Blockquote: 3dp primary left bar + soft surface tint. */
 .markdown-body blockquote {
-  /* 阅读密度：段间距（块级元素同节奏）。 */
-  margin: 0 0 var(--md-reading-paragraph-gap, 37px);
-  /* 阅读密度：每层缩进（引用文本内缩）。 */
-  padding: 4px var(--md-reading-indent, 24px);
+  margin: 0 0 16px;
+  padding: 4px 16px;
   background: var(--md-sys-color-surface-container-low);
   border-left: 3px solid var(--md-sys-color-primary);
   border-radius: var(--md-sys-shape-corner-small);
   color: var(--fgColor-default);
-}
-
-/* Lists: 阅读密度：每层缩进（覆盖 github-markdown-css 的 2em；本文件后加载，同特异性胜出）。 */
-.markdown-body ul,
-.markdown-body ol {
-  padding-left: var(--md-reading-indent, 24px);
 }
 
 /* Tables: GitHub layout plus a Material outline and rounded overflow clip. */
