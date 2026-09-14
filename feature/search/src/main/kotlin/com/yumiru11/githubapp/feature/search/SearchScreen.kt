@@ -67,6 +67,7 @@ import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.appFadeThroughTransform
@@ -326,8 +327,8 @@ private fun IdleContent(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
         if (history.isNotEmpty()) {
             item {
@@ -367,7 +368,7 @@ private fun HistorySection(
                 Text(text = stringResource(R.string.search_history_clear))
             }
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
             history.forEach { query ->
                 SuggestionChip(
                     onClick = { onHistoryClick(query) },
@@ -389,13 +390,13 @@ private fun QualifierSection(
     onQualifierClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.padding(top = 16.dp)) {
+    Column(modifier = modifier.padding(top = AppDimens.spacing.l)) {
         Text(
             text = stringResource(R.string.search_qualifier_title),
             style = MaterialTheme.typography.titleSmall,
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
             QUALIFIER_SUGGESTIONS.forEach { qualifier ->
                 SuggestionChip(
                     onClick = { onQualifierClick(qualifier.value) },
@@ -577,8 +578,8 @@ private fun <T : Any> SearchPagingList(
     LaunchedEffect(refreshing) { onRefreshingChange(refreshing) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
         val refreshError = lazyItems.loadState.refresh as? LoadState.Error
         when {
@@ -635,7 +636,7 @@ private fun CodeLoginGateContent(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.l))
             Button(onClick = onLoginClick) {
                 Text(text = stringResource(R.string.search_login))
             }
@@ -677,7 +678,7 @@ private fun AppendErrorRow(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
+                .padding(vertical = AppDimens.spacing.s),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -686,7 +687,7 @@ private fun AppendErrorRow(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.s))
         TextButton(onClick = onRetry) {
             Text(text = stringResource(R.string.search_retry))
         }
@@ -739,7 +740,7 @@ private fun errorMessage(errorType: SearchErrorType): String =
  * （M3 `PrimaryScrollableTabRow` 的 `edgePadding` 文档原话）。16.dp 与全 app 内容
  * 边距（AppDimens.contentPadding）同量级，避免与上方搜索框视觉错位。
  */
-private val TAB_ROW_EDGE_PADDING = 16.dp
+private val TAB_ROW_EDGE_PADDING = AppDimens.spacing.l
 
 /**
  * 结果 Tab 行 tab 最小宽度（C1）。

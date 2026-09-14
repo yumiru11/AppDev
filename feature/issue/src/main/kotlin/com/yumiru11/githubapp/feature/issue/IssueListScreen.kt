@@ -33,7 +33,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
@@ -48,6 +47,7 @@ import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.feature.issue.model.Issue
 import com.yumiru11.githubapp.feature.issue.model.IssueFilter
 import com.yumiru11.githubapp.feature.issue.model.IssueState
@@ -163,8 +163,8 @@ private fun FilterRow(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
         AppFilterChip(
             selected = filter == IssueFilter.OPEN,
@@ -245,8 +245,8 @@ private fun IssueList(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
         ) {
             items(
                 count = lazyItems.itemCount,
@@ -275,21 +275,21 @@ private fun IssueRow(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
             ),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
             Text(
                 text = issue.title,
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = statusText(issue.state),
                     style = MaterialTheme.typography.labelSmall,
                     color = statusColor(issue.state),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 val author = issue.author?.login
                 if (!author.isNullOrEmpty()) {
                     Text(
@@ -297,7 +297,7 @@ private fun IssueRow(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 }
                 Text(
                     text = pluralStringResource(R.plurals.issue_comment_count, issue.commentCount, issue.commentCount),

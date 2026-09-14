@@ -413,7 +413,7 @@ internal fun issueDetailContentPadding(): PaddingValues =
     PaddingValues(
         start = AppDimens.contentPadding,
         end = AppDimens.contentPadding,
-        top = 8.dp,
+        top = AppDimens.spacing.s,
         bottom = AppDimens.fabContentClearance,
     )
 
@@ -437,7 +437,7 @@ private fun SuccessContent(
     LazyColumn(
         modifier = modifier,
         contentPadding = issueDetailContentPadding(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.m),
     ) {
         item(key = "header") {
             IssueHeader(
@@ -601,8 +601,8 @@ private fun IssueHeader(
     Column(modifier = modifier) {
         // 操作区随权限增减按钮，窄屏自动换行（FlowRow；RTL 由 start/end 语义保证）
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
         ) {
             StatusChip(state = issue.state)
             if (canCloseReopen) {
@@ -624,7 +624,7 @@ private fun IssueHeader(
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
                     Text(text = stringResource(R.string.issue_edit))
                 }
             }
@@ -635,7 +635,7 @@ private fun IssueHeader(
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
                     Text(text = stringResource(R.string.issue_edit_meta))
                 }
             }
@@ -647,12 +647,12 @@ private fun IssueHeader(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
         Text(
             text = issue.title,
             style = MaterialTheme.typography.headlineSmall,
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
         val author = issue.author?.login.orEmpty()
         val relativeTime = issue.createdAt?.let { relativeTimeText(it) }
         Text(
@@ -666,17 +666,17 @@ private fun IssueHeader(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (issue.labels.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 issue.labels.forEach { LabelChip(label = it) }
             }
         }
         if (issue.assignees.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             AssigneeRow(assignees = issue.assignees)
         }
         if (issue.milestone != null) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             Text(
                 text = issue.milestone.title,
                 style = MaterialTheme.typography.bodyMedium,
@@ -684,7 +684,7 @@ private fun IssueHeader(
             )
         }
         if (canReact) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             ReactionBar(
                 reactions = issue.reactions,
                 myReactions = myReactions,
@@ -723,7 +723,7 @@ private fun IssueSubscriptionButton(
                 modifier = Modifier.size(16.dp),
             )
         }
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
         Text(text = label)
     }
     if (isSubscribed) {
@@ -784,7 +784,7 @@ private fun LabelChip(label: IssueLabel) {
             text = label.name,
             style = MaterialTheme.typography.labelMedium,
             color = contentColor,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            modifier = Modifier.padding(horizontal = AppDimens.spacing.s, vertical = 3.dp),
         )
     }
 }
@@ -808,7 +808,7 @@ private fun AssigneeRow(assignees: List<IssueUser>) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.m))
         }
     }
 }
@@ -865,7 +865,7 @@ private fun CommentItem(
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
                     model = item.author?.avatarUrl,
@@ -875,7 +875,7 @@ private fun CommentItem(
                             .size(32.dp)
                             .clip(CircleShape),
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = item.author?.login.orEmpty(),
@@ -894,7 +894,7 @@ private fun CommentItem(
                 }
             }
             if (!item.body.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 MarkdownViewer(
                     markdown = item.body,
                     onInternalLink = onInternalLink,
@@ -903,7 +903,7 @@ private fun CommentItem(
                 )
             }
             if (canReact) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 ReactionBar(
                     reactions = item.reactions,
                     myReactions = myReactions,
@@ -980,9 +980,9 @@ private fun IssueMetaEditSheet(
                     Modifier
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp)
-                        .padding(bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                        .padding(horizontal = AppDimens.spacing.l)
+                        .padding(bottom = AppDimens.spacing.xl),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.m),
             ) {
                 Text(
                     text = stringResource(R.string.issue_meta_sheet_title),
@@ -995,7 +995,7 @@ private fun IssueMetaEditSheet(
                                 modifier = Modifier.size(18.dp),
                                 strokeWidth = 2.dp,
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                             Text(
                                 text = stringResource(R.string.issue_loading),
                                 style = MaterialTheme.typography.bodyMedium,
@@ -1021,8 +1021,8 @@ private fun IssueMetaEditSheet(
                                 MetaEmptyHint()
                             } else {
                                 FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+                                    verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.xs),
                                 ) {
                                     state.labels.forEach { label ->
                                         val selected = label.name in state.selectedLabels
@@ -1091,7 +1091,7 @@ private fun IssueMetaEditSheet(
                                     modifier = Modifier.size(18.dp),
                                     strokeWidth = 2.dp,
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                             }
                             Text(text = stringResource(R.string.issue_save))
                         }
@@ -1111,7 +1111,7 @@ private fun MetaSection(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.xs),
     ) {
         Text(
             text = title,
@@ -1154,7 +1154,7 @@ private fun MilestoneOptionCard(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = AppDimens.spacing.m, vertical = AppDimens.spacing.xs),
         ) {
             RadioButton(selected = selected, onClick = null)
             Column(modifier = Modifier.weight(1f)) {
@@ -1289,7 +1289,7 @@ private fun EditIssueDialog(
                     label = { Text(text = stringResource(R.string.issue_edit_title_label)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 OutlinedTextField(
                     value = body,
                     onValueChange = draft::onChanged,
