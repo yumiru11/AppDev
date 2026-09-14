@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.feature.pullrequest.model.MergeableState
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestMergeMethod
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestState
@@ -89,7 +90,7 @@ internal fun PullRequestActionItems(
     if (!actions.hasVisibleContent) return
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.m),
     ) {
         when (actions.state) {
             PullRequestState.MERGED -> {
@@ -130,12 +131,12 @@ private fun MergeBoxCard(
         shape = MaterialTheme.shapes.medium,
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
             Text(
                 text = stringResource(R.string.pull_request_merge_box_title),
                 style = MaterialTheme.typography.titleMedium,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.m))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Button(
                     onClick = { actions.onMerge(method, commitTitle, commitMessage, deleteBranch) },
@@ -145,7 +146,7 @@ private fun MergeBoxCard(
                 ) {
                     Text(text = stringResource(R.string.pull_request_merge_box_title))
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 Box {
                     FilledTonalIconButton(
                         onClick = { methodMenuExpanded = true },
@@ -171,7 +172,7 @@ private fun MergeBoxCard(
             }
             when {
                 !open -> {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                     Text(
                         text = stringResource(R.string.pull_request_merge_closed_hint),
                         style = MaterialTheme.typography.bodySmall,
@@ -180,7 +181,7 @@ private fun MergeBoxCard(
                 }
 
                 actions.mergeableState == MergeableState.CONFLICTING -> {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                     Text(
                         text = stringResource(R.string.pull_request_merge_conflict_hint),
                         style = MaterialTheme.typography.bodySmall,
@@ -189,7 +190,7 @@ private fun MergeBoxCard(
                 }
 
                 !mergeable -> {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                     Text(
                         text = stringResource(R.string.pull_request_merge_checking_hint),
                         style = MaterialTheme.typography.bodySmall,
@@ -197,14 +198,14 @@ private fun MergeBoxCard(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.m))
             OutlinedTextField(
                 value = commitTitle,
                 onValueChange = { commitTitle = it },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(text = stringResource(R.string.pull_request_merge_commit_title)) },
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             OutlinedTextField(
                 value = commitMessage,
                 onValueChange = { commitMessage = it },
@@ -212,7 +213,7 @@ private fun MergeBoxCard(
                 label = { Text(text = stringResource(R.string.pull_request_merge_commit_message)) },
             )
             if (open && actions.canDeleteHeadBranch) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
                         checked = deleteBranch,
@@ -222,7 +223,7 @@ private fun MergeBoxCard(
                 }
             }
             if (open && actions.headSameRepo) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 OutlinedButton(
                     onClick = actions.onUpdateBranch,
                     enabled = !busy,
@@ -233,7 +234,7 @@ private fun MergeBoxCard(
                             modifier = Modifier.size(18.dp),
                             strokeWidth = 2.dp,
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                     }
                     Text(text = stringResource(R.string.pull_request_merge_update_branch))
                 }
@@ -259,14 +260,14 @@ private fun MergedBranchActionsRow(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(AppDimens.spacing.s),
         ) {
             if (actions.pendingAction == PullRequestWriteAction.DELETE_BRANCH) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(18.dp),
                     strokeWidth = 2.dp,
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
             }
             Text(text = stringResource(R.string.pull_request_delete_branch))
         }

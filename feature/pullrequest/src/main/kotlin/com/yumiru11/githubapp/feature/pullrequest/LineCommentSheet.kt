@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.designsystem.component.AppBottomSheet
 import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.ui.appTransientEnterAlpha
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
@@ -65,17 +66,17 @@ internal fun LineCommentSheet(
                     Modifier
                         .fillMaxWidth()
                         .imePadding()
-                        .padding(16.dp),
+                        .padding(AppDimens.spacing.l),
             ) {
                 Text(
                     text = stringResource(R.string.pull_request_review_comment_at, target.anchor.path, target.anchor.line),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 if (target.comments.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                     target.comments.forEach { comment ->
                         LineCommentCard(comment = comment)
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                     }
                     if (canResolve && target.thread != null) {
                         Row(
@@ -97,7 +98,7 @@ internal fun LineCommentSheet(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.l))
                 OutlinedTextField(
                     value = text,
                     onValueChange = onTextChange,
@@ -119,7 +120,7 @@ internal fun LineCommentSheet(
                     },
                     placeholder = { Text(text = stringResource(R.string.pull_request_line_comment_placeholder)) },
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.l))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
@@ -127,7 +128,7 @@ internal fun LineCommentSheet(
                     TextButton(onClick = onDismiss) {
                         Text(text = stringResource(R.string.cancel))
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                     Button(
                         onClick = { onSubmit(target.anchor, text, target.comments.firstOrNull()?.id) },
                         enabled = text.isNotBlank(),
@@ -151,7 +152,7 @@ private fun LineCommentCard(
         shape = MaterialTheme.shapes.medium,
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 comment.author?.let { author ->
                     AsyncImage(
@@ -162,7 +163,7 @@ private fun LineCommentCard(
                                 .size(24.dp)
                                 .clip(CircleShape),
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 }
                 Text(
                     text = comment.author?.login.orEmpty(),

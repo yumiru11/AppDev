@@ -42,10 +42,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 import com.yumiru11.githubapp.feature.pullrequest.R
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestErrorType
@@ -131,7 +131,7 @@ fun PullRequestCreateScreen(
 
                 is PullRequestCreateUiState.Error -> {
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(24.dp),
+                        modifier = Modifier.fillMaxSize().padding(AppDimens.spacing.xl),
                         verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
@@ -140,7 +140,7 @@ fun PullRequestCreateScreen(
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(AppDimens.spacing.m))
                         TextButton(onClick = viewModel::retry) {
                             Text(text = stringResource(R.string.pull_request_retry))
                         }
@@ -177,7 +177,7 @@ private fun CreatePullRequestForm(
         modifier =
             modifier
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(AppDimens.spacing.l),
     ) {
         OutlinedTextField(
             value = state.title,
@@ -187,7 +187,7 @@ private fun CreatePullRequestForm(
             singleLine = true,
             enabled = !state.isSubmitting,
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.m))
         OutlinedTextField(
             value = body,
             onValueChange = onBodyChange,
@@ -196,7 +196,7 @@ private fun CreatePullRequestForm(
             minLines = 5,
             enabled = !state.isSubmitting,
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.l))
         BranchDropdown(
             label = stringResource(R.string.pull_request_create_base),
             branches = state.branches,
@@ -205,7 +205,7 @@ private fun CreatePullRequestForm(
             enabled = !state.isSubmitting,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.m))
         BranchDropdown(
             label = stringResource(R.string.pull_request_create_head),
             branches = state.branches,
@@ -215,7 +215,7 @@ private fun CreatePullRequestForm(
             modifier = Modifier.fillMaxWidth(),
         )
         if (state.headBranch.isNotBlank() && state.headBranch == state.baseBranch) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             Text(
                 text = stringResource(R.string.pull_request_create_same_branch_hint),
                 style = MaterialTheme.typography.bodySmall,
@@ -223,7 +223,7 @@ private fun CreatePullRequestForm(
             )
         }
         if (!state.canCreate) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             Text(
                 text = stringResource(R.string.pull_request_create_no_permission_hint),
                 style = MaterialTheme.typography.bodySmall,
@@ -263,7 +263,7 @@ private fun BranchDropdown(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.s))
             Icon(
                 imageVector = Icons.Filled.KeyboardArrowDown,
                 contentDescription = null,

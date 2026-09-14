@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.AppBottomSheet
 import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
 import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.ui.appTransientEnterAlpha
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewConclusion
 
@@ -52,7 +53,7 @@ internal fun ReviewEntryRow(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(AppDimens.spacing.s),
         ) {
             Text(text = stringResource(R.string.pull_request_review_changes))
         }
@@ -89,15 +90,15 @@ internal fun ReviewSheet(
                     Modifier
                         .fillMaxWidth()
                         .imePadding()
-                        .padding(16.dp),
+                        .padding(AppDimens.spacing.l),
             ) {
                 Text(
                     text = stringResource(R.string.pull_request_review_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.m))
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                 ) {
                     AppFilterChip(
@@ -118,7 +119,7 @@ internal fun ReviewSheet(
                         label = stringResource(R.string.pull_request_review_comment_option),
                     )
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.l))
                 OutlinedTextField(
                     value = body,
                     onValueChange = onBodyChange,
@@ -129,7 +130,7 @@ internal fun ReviewSheet(
                     label = { Text(text = stringResource(R.string.pull_request_review_body_label)) },
                     placeholder = { Text(text = stringResource(R.string.pull_request_comment_placeholder)) },
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.l))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -137,7 +138,7 @@ internal fun ReviewSheet(
                     TextButton(onClick = onDismiss) {
                         Text(text = stringResource(R.string.cancel))
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                     Button(
                         onClick = { conclusion?.let { onSubmit(it, body) } },
                         enabled = conclusion != null && (conclusion != ReviewConclusion.COMMENT || body.isNotBlank()),

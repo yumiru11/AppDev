@@ -301,7 +301,7 @@ private fun DiffLineRow(
                 Modifier
                     .fillMaxWidth()
                     .then(if (anchor != null) Modifier.clickable { onLineComment(path, anchor.side, anchor.line) } else Modifier)
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                    .padding(horizontal = AppDimens.spacing.s, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             when (line.kind) {
@@ -369,7 +369,7 @@ private fun SideBySideCell(
                     modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                        .padding(horizontal = AppDimens.spacing.xs, vertical = 2.dp),
             ) {
                 Text(
                     text = if (isOldSide) line.text else "",
@@ -399,7 +399,7 @@ private fun SideBySideCell(
                 Modifier
                     .fillMaxWidth()
                     .then(if (anchor != null) Modifier.clickable { onLineComment(path, anchor.side, anchor.line) } else Modifier)
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                    .padding(horizontal = AppDimens.spacing.xs, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             LineNumberCell(number = if (isOldSide) line.oldNumber else line.newNumber, width = 36.dp)
@@ -435,7 +435,7 @@ private fun LineNumberCell(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         textAlign = TextAlign.End,
         maxLines = 1,
-        modifier = Modifier.width(width).padding(end = 8.dp),
+        modifier = Modifier.width(width).padding(end = AppDimens.spacing.s),
     )
 }
 
@@ -450,7 +450,7 @@ private fun FoldRow(
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+                .padding(horizontal = AppDimens.spacing.s, vertical = AppDimens.spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -459,7 +459,7 @@ private fun FoldRow(
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(14.dp),
         )
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
         Text(
             text = stringResource(R.string.pull_request_diff_fold_expand, count),
             style = MaterialTheme.typography.labelSmall,

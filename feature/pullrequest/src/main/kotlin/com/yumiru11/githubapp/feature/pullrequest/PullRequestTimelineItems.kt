@@ -31,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
@@ -63,7 +64,7 @@ internal fun CommentItem(
                 },
         )
         if (!item.body.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             MarkdownViewer(
                 markdown = item.body,
                 onInternalLink = onInternalLink,
@@ -92,7 +93,7 @@ internal fun ReviewCard(
             trailingColor = stateColor,
         )
         if (!item.body.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             MarkdownViewer(
                 markdown = item.body,
                 onInternalLink = onInternalLink,
@@ -119,7 +120,7 @@ internal fun ReviewCommentItem(
         val path = item.path
         val line = item.line
         if (!path.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
             Text(
                 text =
                     if (line != null) {
@@ -134,7 +135,7 @@ internal fun ReviewCommentItem(
             )
         }
         if (!item.body.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             MarkdownViewer(
                 markdown = item.body,
                 onInternalLink = onInternalLink,
@@ -160,14 +161,14 @@ internal fun CommitReferenceItem(item: PullRequestTimelineItem.CommitReference) 
             login = item.author?.login,
             timestamp = item.createdAt,
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
         Text(
             text = stringResource(R.string.pull_request_event_committed, item.author?.login.orEmpty(), sha),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (message.isNotBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodySmall,
@@ -338,7 +339,7 @@ private fun TimelineCard(content: @Composable () -> Unit) {
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
             content()
         }
     }
@@ -364,7 +365,7 @@ private fun TimelineHeader(
                     .size(32.dp)
                     .clip(CircleShape),
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.s))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = login.orEmpty(),
@@ -379,7 +380,7 @@ private fun TimelineHeader(
             }
         }
         if (trailingText != null) {
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(AppDimens.spacing.s))
             Text(
                 text = trailingText,
                 style = MaterialTheme.typography.labelMedium,
