@@ -35,6 +35,23 @@
     <!-- 文件内查找计数（第 n / 共 m 项）；占位符顺序：当前序号、匹配总数 -->
     <string name="repo_file_find_counter">%1$d of %2$d</string>
     <string name="repo_file_find_no_results">No matches</string>
+    <!-- EDITOR-1 查找替换 -->
+    <string name="repo_file_replace_hint">Replace with</string>
+    <string name="repo_file_replace">Replace</string>
+    <string name="repo_file_replace_all">Replace all</string>
+    <!-- EDITOR-1 软换行开关（contentDescription 随状态切换） -->
+    <string name="repo_file_soft_wrap_on">Soft wrap: on</string>
+    <string name="repo_file_soft_wrap_off">Soft wrap: off</string>
+    <!-- EDITOR-1 文件格式状态（行尾 · 字符集；行尾/字符集名称为技术名，两语言同值） -->
+    <string name="repo_file_format_indicator">%1$s · %2$s</string>
+    <string name="repo_file_eol_lf">LF</string>
+    <string name="repo_file_eol_crlf">CRLF</string>
+    <string name="repo_file_eol_cr">CR</string>
+    <string name="repo_file_charset_utf8">UTF-8</string>
+    <string name="repo_file_charset_utf16le">UTF-16 LE</string>
+    <string name="repo_file_charset_utf16be">UTF-16 BE</string>
+    <string name="repo_file_charset_latin1">ISO-8859-1</string>
+    <string name="repo_file_charset_unknown">Unknown encoding</string>
     <string name="repo_file_jump_to_line">Jump to line</string>
     <string name="repo_file_line_number">Line number</string>
     <string name="repo_file_go">Go</string>

@@ -676,6 +676,47 @@ class UserPreferencesRepositoryTest {
             assertEquals(ThemeMode.SYSTEM, repository.themeMode.first())
         }
 
+    @Test
+    fun codeEditorSoftWrap_byDefault_emitsFalse() =
+        runTest {
+            val repository = createRepository()
+
+            assertEquals(false, repository.codeEditorSoftWrap.first())
+        }
+
+    @Test
+    fun setCodeEditorSoftWrap_true_persistsAndEmits() =
+        runTest {
+            val file = newPreferencesFile()
+            val scope = newScope()
+            val repository = createRepository(scope, file)
+
+            repository.setCodeEditorSoftWrap(true)
+            assertEquals(true, repository.codeEditorSoftWrap.first())
+
+            scope.cancel()
+            val reloaded = createRepository(newScope(), file)
+            assertEquals(true, reloaded.codeEditorSoftWrap.first())
+        }
+
+    @Test
+    fun markdownEditorSoftWrap_byDefault_emitsTrue() =
+        runTest {
+            val repository = createRepository()
+
+            assertEquals(true, repository.markdownEditorSoftWrap.first())
+        }
+
+    @Test
+    fun setMarkdownEditorSoftWrap_false_persistsAndEmits() =
+        runTest {
+            val repository = createRepository()
+
+            repository.setMarkdownEditorSoftWrap(false)
+
+            assertEquals(false, repository.markdownEditorSoftWrap.first())
+        }
+
     private fun createRepository(): DefaultUserPreferencesRepository = createRepository(newScope(), newPreferencesFile())
 
     private fun createRepository(

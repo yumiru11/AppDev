@@ -43,6 +43,7 @@ import org.eclipse.tm4e.core.registry.IThemeSource
  * @param emojis emoji 补全候选（默认 [DEFAULT_MARKDOWN_EMOJIS]）
  * @param codeFont 代码字体（默认跟随设置页偏好 [LocalCodeEditorPreferences]）
  * @param lineNumbers 是否显示行号（默认跟随设置页偏好 [LocalCodeEditorPreferences]）
+ * @param softWrap 软换行（EDITOR-1；默认跟随偏好，开 = 长行阅读友好）
  * @param onEditorReady 控制句柄就绪回调（工具栏/撤销重做等外部控制用）
  * @param onTextChanged 文本变更回调（预览/状态同步用）
  */
@@ -54,6 +55,7 @@ fun MarkdownEditorView(
     emojis: List<MarkdownEmoji>,
     codeFont: CodeFont = LocalCodeEditorPreferences.current.codeFont,
     lineNumbers: Boolean = LocalCodeEditorPreferences.current.lineNumbers,
+    softWrap: Boolean = LocalCodeEditorPreferences.current.markdownSoftWrap,
     onEditorReady: (MarkdownEditorController) -> Unit = {},
     onTextChanged: (String) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -87,17 +89,16 @@ fun MarkdownEditorView(
         factory = { ctx ->
             CodeEditor(ctx).apply {
                 setEditable(true)
-                isWordwrap = true
                 setTabWidth(4)
                 setTextSize(EDITOR_TEXT_SIZE_SP)
                 setUndoEnabled(true)
                 // 首帧就按偏好建视图（同 CodeEditorView：避免先画默认态再纠正的闪动）
-                applyCodeEditorPreferences(codeFont = codeFont, lineNumbers = lineNumbers)
+                applyCodeEditorPreferences(codeFont = codeFont, lineNumbers = lineNumbers, softWrap = softWrap)
             }
         },
         update = { editor ->
             // 偏好同步（T24）：每次重组即时下发到已存在的实例（幂等，见 helper KDoc）
-            editor.applyCodeEditorPreferences(codeFont = codeFont, lineNumbers = lineNumbers)
+            editor.applyCodeEditorPreferences(codeFont = codeFont, lineNumbers = lineNumbers, softWrap = softWrap)
             if (editor.text.toString() != content) {
                 editor.setText(content)
             }

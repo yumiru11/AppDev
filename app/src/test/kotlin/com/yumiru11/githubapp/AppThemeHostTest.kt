@@ -20,9 +20,11 @@ import com.yumiru11.githubapp.core.designsystem.theme.highContrastLightPalette
 import com.yumiru11.githubapp.core.designsystem.theme.lightPalette
 import com.yumiru11.githubapp.core.designsystem.theme.oledPalette
 import com.yumiru11.githubapp.core.designsystem.token.CodeEditorPreferences
+import com.yumiru11.githubapp.core.designsystem.token.CodeEditorPreferencesWriter
 import com.yumiru11.githubapp.core.designsystem.token.GlassScope
 import com.yumiru11.githubapp.core.designsystem.token.GlassSettings
 import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferences
+import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferencesWriter
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import com.yumiru11.githubapp.core.designsystem.token.LocalIconStyle
 import kotlinx.coroutines.flow.Flow
@@ -373,6 +375,54 @@ class AppThemeHostTest {
 
         assertEquals(darkPalette().colorScheme.background, capturedBackground)
     }
+
+    @Test
+    fun themeHost_softWrapPreferences_provideLocalCodeEditorPreferences() {
+        // EDITOR-1：软换行偏好（代码视图 / Markdown 编辑器）经 LocalCodeEditorPreferences 下发
+        var captured: CodeEditorPreferences? = null
+
+        composeRule.setContent {
+            val lifecycleOwner = remember { TestLifecycleOwner() }
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                AppThemeHost(
+                    repository =
+                        FakeUserPreferencesRepository(codeSoftWrap = true, markdownSoftWrap = false),
+                ) {
+                    captured = LocalCodeEditorPreferences.current
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(true, captured!!.codeSoftWrap)
+        assertEquals(false, captured!!.markdownSoftWrap)
+    }
+
+    @Test
+    fun themeHost_writer_writesSoftWrapThroughRepository() {
+        // EDITOR-1：编辑器换行按钮经 LocalCodeEditorPreferencesWriter 写回仓库（单一数据源）
+        val repository = FakeUserPreferencesRepository(codeSoftWrap = false, markdownSoftWrap = true)
+        var writer: CodeEditorPreferencesWriter? = null
+
+        composeRule.setContent {
+            val lifecycleOwner = remember { TestLifecycleOwner() }
+            CompositionLocalProvider(LocalLifecycleOwner provides lifecycleOwner) {
+                AppThemeHost(repository = repository) {
+                    writer = LocalCodeEditorPreferencesWriter.current
+                }
+            }
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnIdle {
+            writer!!.setCodeSoftWrap(true)
+            writer!!.setMarkdownSoftWrap(false)
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(true, repository.codeSoftWrapFlow.value)
+        assertEquals(false, repository.markdownEditorSoftWrapFlow.value)
+    }
 }
 
 /**
@@ -385,6 +435,8 @@ private class FakeUserPreferencesRepository(
     iconStyle: IconStyle = IconStyle.ROUNDED,
     codeFont: CodeFont = CodeFont.MONO,
     codeLineNumbers: Boolean = true,
+    codeSoftWrap: Boolean = false,
+    markdownSoftWrap: Boolean = true,
 ) : UserPreferencesRepository {
     val themeModeFlow = MutableStateFlow(themeMode)
 
@@ -403,6 +455,8 @@ private class FakeUserPreferencesRepository(
     val iconStyleFlow = MutableStateFlow(iconStyle)
     val codeFontFlow = MutableStateFlow(codeFont)
     val codeLineNumbersFlow = MutableStateFlow(codeLineNumbers)
+    val codeSoftWrapFlow = MutableStateFlow(codeSoftWrap)
+    val markdownEditorSoftWrapFlow = MutableStateFlow(markdownSoftWrap)
 
     override val themeMode: Flow<ThemeMode> = themeModeFlow
 
@@ -435,6 +489,10 @@ private class FakeUserPreferencesRepository(
     override val codeFont: Flow<CodeFont> = codeFontFlow
 
     override val codeLineNumbers: Flow<Boolean> = codeLineNumbersFlow
+
+    override val codeEditorSoftWrap: Flow<Boolean> = codeSoftWrapFlow
+
+    override val markdownEditorSoftWrap: Flow<Boolean> = markdownEditorSoftWrapFlow
 
     override val repoLayout: Flow<RepoLayoutMode> = MutableStateFlow(RepoLayoutMode.LIST)
 
@@ -511,6 +569,14 @@ private class FakeUserPreferencesRepository(
 
     override suspend fun setCodeLineNumbers(enabled: Boolean) {
         codeLineNumbersFlow.value = enabled
+    }
+
+    override suspend fun setCodeEditorSoftWrap(enabled: Boolean) {
+        codeSoftWrapFlow.value = enabled
+    }
+
+    override suspend fun setMarkdownEditorSoftWrap(enabled: Boolean) {
+        markdownEditorSoftWrapFlow.value = enabled
     }
 
     override suspend fun setStaggerEnabled(enabled: Boolean) {

@@ -17,7 +17,7 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * 代码编辑器偏好 → Sora 实例的应用测试（T24 死设置接线）。
  *
- * 断言的是**API 效果**（写入的 typeface / 行号开关状态 / 幂等性），不是字体渲染 ——
+ * 断言的是**API 效果**（写入的 typeface / 行号开关状态 / 软换行开关状态 / 幂等性），不是字体渲染 ——
  * 渲染依赖平台字体资产，截图与真机走查才是它的裁判（AGENTS：「不要在 Robolectric 里断言
  * 真实字体渲染」）。用 `assertEquals` 而非 `assertSame`：等值断言在真机与 Robolectric 下
  * 都成立，不会把测试绑死在某一实现的实例缓存策略上。
@@ -40,7 +40,7 @@ class CodeFontTypefaceTest {
     fun applyCodeEditorPreferences_mono_setsMonospaceOnTextAndLineNumbers() {
         val editor = CodeEditor(context)
 
-        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true, softWrap = false)
 
         // 行号槽与正文同档：两处字体不同会让行号与代码列错位
         assertEquals(Typeface.MONOSPACE, editor.typefaceText)
@@ -51,7 +51,7 @@ class CodeFontTypefaceTest {
     fun applyCodeEditorPreferences_system_setsDefaultTypeface() {
         val editor = CodeEditor(context)
 
-        editor.applyCodeEditorPreferences(codeFont = CodeFont.SYSTEM, lineNumbers = true)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.SYSTEM, lineNumbers = true, softWrap = false)
 
         assertEquals(Typeface.DEFAULT, editor.typefaceText)
         assertEquals(Typeface.DEFAULT, editor.typefaceLineNumber)
@@ -61,8 +61,8 @@ class CodeFontTypefaceTest {
     fun applyCodeEditorPreferences_fontChanged_rewritesTypeface() {
         val editor = CountingCodeEditor(context)
 
-        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true)
-        editor.applyCodeEditorPreferences(codeFont = CodeFont.SYSTEM, lineNumbers = true)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true, softWrap = false)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.SYSTEM, lineNumbers = true, softWrap = false)
 
         // 一档一次：MONO → SYSTEM 必须真的改写（否则设置页切换后字体不跟着变）
         assertEquals(2, editor.typefaceWriteCount)
@@ -73,8 +73,8 @@ class CodeFontTypefaceTest {
         // 幂等是性能刚需：update 块每次重组都会跑，无条件写入会每次触发 Sora 的 createLayout()
         val editor = CountingCodeEditor(context)
 
-        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true)
-        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true, softWrap = false)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true, softWrap = false)
 
         assertEquals(1, editor.typefaceWriteCount)
     }
@@ -85,7 +85,7 @@ class CodeFontTypefaceTest {
 
         // Sora 构造期默认开行号（见 CodeFontFamily 文件头的 API 核实）→ 关掉必须有真实状态变化
         assertTrue("前置条件：Sora 默认开行号", editor.isLineNumberEnabled)
-        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = false)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = false, softWrap = false)
 
         assertFalse(editor.isLineNumberEnabled)
     }
@@ -94,8 +94,8 @@ class CodeFontTypefaceTest {
     fun applyCodeEditorPreferences_lineNumbersOn_reenablesGutter() {
         val editor = CodeEditor(context)
 
-        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = false)
-        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = false, softWrap = false)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true, softWrap = false)
 
         assertTrue(editor.isLineNumberEnabled)
     }
@@ -104,27 +104,59 @@ class CodeFontTypefaceTest {
     fun applyCodeEditorPreferences_sameLineNumberPreferenceTwice_doesNotRewriteSwitch() {
         val editor = CountingCodeEditor(context)
 
-        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = false)
-        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = false)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = false, softWrap = false)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = false, softWrap = false)
 
         assertEquals(1, editor.lineNumberWriteCount)
+    }
+
+    @Test
+    fun applyCodeEditorPreferences_softWrapOn_enablesWordWrap() {
+        val editor = CodeEditor(context)
+
+        assertFalse("前置条件：Sora 默认关软换行", editor.isWordwrap)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true, softWrap = true)
+
+        assertTrue(editor.isWordwrap)
+    }
+
+    @Test
+    fun applyCodeEditorPreferences_softWrapOff_afterOn_disablesWordWrap() {
+        val editor = CodeEditor(context)
+
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true, softWrap = true)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true, softWrap = false)
+
+        assertFalse(editor.isWordwrap)
+    }
+
+    @Test
+    fun applyCodeEditorPreferences_sameSoftWrapPreferenceTwice_doesNotRewriteSwitch() {
+        val editor = CountingCodeEditor(context)
+
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true, softWrap = true)
+        editor.applyCodeEditorPreferences(codeFont = CodeFont.MONO, lineNumbers = true, softWrap = true)
+
+        assertEquals(1, editor.softWrapWriteCount)
     }
 
     /**
      * 计数用编辑器：只统计**构造之后**的写入次数，用来验证幂等判据真的跳过了重复写入。
      *
-     * Sora 的 `setTypefaceText` / `setLineNumberEnabled` 都是非 final 的 public 方法，可覆写；
-     * 构造期父类自身也会调用它们，故构造完成后先清零。
+     * Sora 的 `setTypefaceText` / `setLineNumberEnabled` / `setWordwrap(boolean)` 都是非 final 的
+     * public 方法，可覆写；构造期父类自身也会调用它们，故构造完成后先清零。
      */
     private class CountingCodeEditor(
         context: Context,
     ) : CodeEditor(context) {
         var typefaceWriteCount = 0
         var lineNumberWriteCount = 0
+        var softWrapWriteCount = 0
 
         init {
             typefaceWriteCount = 0
             lineNumberWriteCount = 0
+            softWrapWriteCount = 0
         }
 
         override fun setTypefaceText(typeface: Typeface?) {
@@ -135,6 +167,11 @@ class CodeFontTypefaceTest {
         override fun setLineNumberEnabled(enabled: Boolean) {
             lineNumberWriteCount++
             super.setLineNumberEnabled(enabled)
+        }
+
+        override fun setWordwrap(wordwrap: Boolean) {
+            softWrapWriteCount++
+            super.setWordwrap(wordwrap)
         }
     }
 }

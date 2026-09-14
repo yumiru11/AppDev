@@ -14,6 +14,7 @@ import com.yumiru11.githubapp.core.datastore.draft.DraftAutoSaver
 import com.yumiru11.githubapp.core.datastore.draft.DraftKey
 import com.yumiru11.githubapp.core.datastore.draft.DraftTargets
 import com.yumiru11.githubapp.core.editor.FileFindState
+import com.yumiru11.githubapp.core.editor.TextFileFormat
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -478,6 +479,13 @@ class RepoFilesViewModel
         }
 
         /**
+         * 当前文件的保存格式（EDITOR-1）：取查看器已加载文件的探测结果；
+         * 新建文件 / 未加载（Idle）→ 默认 UTF-8 + LF。
+         */
+        private fun currentTextFormat(): TextFileFormat =
+            (_uiState.value.fileState as? FileViewState.Loaded)?.data?.textFormat ?: TextFileFormat.DEFAULT
+
+        /**
          * 提交编辑/新建（提交对话框确认）。
          *
          * @param message 提交信息（必填；UI 校验，本层兜底放行校验场景）
@@ -513,36 +521,47 @@ class RepoFilesViewModel
                         },
                     )
                 }
-                repoRepository.updateFileContent(owner, repo, path, editing.text, editing.sha, message, targetBranch).fold(
-                    onSuccess = { result ->
-                        when (result) {
-                            is FileCommitResult.Success -> {
-                                _editEvents.trySend(FileEditEvent.Committed(path, targetBranch, isNewBranch))
-                                finishEditAndRefresh(targetBranch)
-                            }
+                repoRepository
+                    .updateFileContent(
+                        owner,
+                        repo,
+                        path,
+                        editing.text,
+                        editing.sha,
+                        message,
+                        targetBranch,
+                        // EDITOR-1：按打开时探测到的格式还原行尾/字符集/BOM（新建文件 = 默认 UTF-8 + LF）
+                        format = currentTextFormat(),
+                    ).fold(
+                        onSuccess = { result ->
+                            when (result) {
+                                is FileCommitResult.Success -> {
+                                    _editEvents.trySend(FileEditEvent.Committed(path, targetBranch, isNewBranch))
+                                    finishEditAndRefresh(targetBranch)
+                                }
 
-                            is FileCommitResult.Conflict -> {
-                                _uiState.update {
-                                    it.copy(
-                                        editState =
-                                            FileEditState.Conflict(
-                                                operation = ConflictOperation.UPDATE,
-                                                latestSha = result.latestSha,
-                                                localText = editing.text,
-                                                message = message,
-                                                branch = targetBranch,
-                                                isMarkdown = editing.isMarkdown,
-                                            ),
-                                    )
+                                is FileCommitResult.Conflict -> {
+                                    _uiState.update {
+                                        it.copy(
+                                            editState =
+                                                FileEditState.Conflict(
+                                                    operation = ConflictOperation.UPDATE,
+                                                    latestSha = result.latestSha,
+                                                    localText = editing.text,
+                                                    message = message,
+                                                    branch = targetBranch,
+                                                    isMarkdown = editing.isMarkdown,
+                                                ),
+                                        )
+                                    }
                                 }
                             }
-                        }
-                    },
-                    onFailure = { e ->
-                        _editEvents.trySend(FileEditEvent.Failed(mapError(e)))
-                        _uiState.update { it.copy(editState = editing) }
-                    },
-                )
+                        },
+                        onFailure = { e ->
+                            _editEvents.trySend(FileEditEvent.Failed(mapError(e)))
+                            _uiState.update { it.copy(editState = editing) }
+                        },
+                    )
             }
         }
 
@@ -678,24 +697,34 @@ class RepoFilesViewModel
                 it.copy(editState = FileEditState.Submitting(localText, false, conflict.isMarkdown))
             }
             viewModelScope.launch {
-                repoRepository.updateFileContent(owner, repo, path, localText, conflict.latestSha, conflict.message, conflict.branch).fold(
-                    onSuccess = { result ->
-                        when (result) {
-                            is FileCommitResult.Success -> {
-                                _editEvents.trySend(FileEditEvent.Committed(path, conflict.branch, isNewBranch = false))
-                                finishEditAndRefresh(conflict.branch)
-                            }
+                repoRepository
+                    .updateFileContent(
+                        owner,
+                        repo,
+                        path,
+                        localText,
+                        conflict.latestSha,
+                        conflict.message,
+                        conflict.branch,
+                        format = currentTextFormat(),
+                    ).fold(
+                        onSuccess = { result ->
+                            when (result) {
+                                is FileCommitResult.Success -> {
+                                    _editEvents.trySend(FileEditEvent.Committed(path, conflict.branch, isNewBranch = false))
+                                    finishEditAndRefresh(conflict.branch)
+                                }
 
-                            is FileCommitResult.Conflict -> {
-                                _uiState.update { it.copy(editState = conflict.copy(latestSha = result.latestSha)) }
+                                is FileCommitResult.Conflict -> {
+                                    _uiState.update { it.copy(editState = conflict.copy(latestSha = result.latestSha)) }
+                                }
                             }
-                        }
-                    },
-                    onFailure = { e ->
-                        _editEvents.trySend(FileEditEvent.Failed(mapError(e)))
-                        _uiState.update { it.copy(editState = conflict) }
-                    },
-                )
+                        },
+                        onFailure = { e ->
+                            _editEvents.trySend(FileEditEvent.Failed(mapError(e)))
+                            _uiState.update { it.copy(editState = conflict) }
+                        },
+                    )
             }
         }
 

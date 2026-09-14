@@ -29,22 +29,29 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Delete
 import com.composables.icons.materialsymbols.rounded.Edit
+import com.composables.icons.materialsymbols.rounded.Search
 import com.yumiru11.githubapp.core.designsystem.component.AppDialog
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.editor.CodeEditorController
 import com.yumiru11.githubapp.core.editor.CodeEditorView
 import com.yumiru11.githubapp.core.editor.CodeLanguageDetector
+import com.yumiru11.githubapp.core.editor.TextFileFormat
 import com.yumiru11.githubapp.core.editor.rememberM3EditorThemeTokens
 import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
 import com.yumiru11.githubapp.core.ui.LocalRepoDetailActions
@@ -94,6 +101,22 @@ fun FileEditScreen(
     var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
     var showPreview by rememberSaveable { mutableStateOf(false) }
 
+    // EDITOR-1：查找/替换（替换必须落在可编辑缓冲区 → 入口在编辑页；查看器保持只读 + 仅查找）；
+    // 查找状态机与查询词由 RepoFilesViewModel 持有（与查看器同源），替换词是本页会话状态
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var editor by remember { mutableStateOf<CodeEditorController?>(null) }
+    var replaceQuery by rememberSaveable { mutableStateOf("") }
+    val findFocusRequester = remember { FocusRequester() }
+    // 编辑器可见（Markdown 预览态的查找/替换栏无意义：编辑器不在屏上）
+    val isEditing = !(isMarkdown && showPreview && !isNew)
+    // EDITOR-1 状态行：打开时探测的原始格式（新建文件 = 默认 UTF-8 + LF）
+    val textFormat = (uiState.fileState as? FileViewState.Loaded)?.data?.textFormat ?: TextFileFormat.DEFAULT
+
+    // 展开查找栏即聚焦查询框（键盘随之上推面板）
+    LaunchedEffect(uiState.isFindOpen) {
+        if (uiState.isFindOpen) findFocusRequester.requestFocus()
+    }
+
     // 提交表单（每次打开清空由关闭时重置）
     var commitPath by rememberSaveable { mutableStateOf("") }
     var commitMessage by rememberSaveable { mutableStateOf("") }
@@ -121,6 +144,31 @@ fun FileEditScreen(
                     }
                 },
                 actions = {
+                    // EDITOR-1：查找/替换面板（可编辑面）+ 软换行开关
+                    if (isEditing && !isSubmitting) {
+                        IconButton(
+                            onClick = {
+                                if (uiState.isFindOpen) {
+                                    viewModel.closeFind()
+                                    editor?.clearFindText()
+                                } else {
+                                    viewModel.openFind()
+                                }
+                            },
+                        ) {
+                            Icon(
+                                imageVector = MaterialSymbols.Rounded.Search,
+                                contentDescription = stringResource(R.string.repo_file_search),
+                                tint =
+                                    if (uiState.isFindOpen) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                            )
+                        }
+                        SoftWrapToggleButton()
+                    }
                     if (!isNew && !isSubmitting) {
                         IconButton(onClick = { showDeleteDialog = true }) {
                             Icon(
@@ -162,6 +210,35 @@ fun FileEditScreen(
                     }
                 }
             }
+            // EDITOR-1：查找/替换栏（面板可编辑面才有替换行；查询词变更 → Sora 异步重扫）
+            if (isEditing && uiState.isFindOpen) {
+                FileFindReplaceBar(
+                    state = uiState.findState,
+                    replaceQuery = replaceQuery,
+                    showReplace = true,
+                    focusRequester = findFocusRequester,
+                    onQueryChange = { query ->
+                        viewModel.onFindQueryChanged(query)
+                        editor?.findText(query)
+                    },
+                    onReplaceQueryChange = { replaceQuery = it },
+                    onReplace = { editor?.replaceCurrent(replaceQuery) },
+                    onReplaceAll = { editor?.replaceAll(replaceQuery) },
+                    onPrevious = {
+                        viewModel.onFindPrevious()
+                        editor?.let { viewModel.onFindResults(it.findPrevious()) }
+                    },
+                    onNext = {
+                        viewModel.onFindNext()
+                        editor?.let { viewModel.onFindResults(it.findNext()) }
+                    },
+                    onClose = {
+                        viewModel.closeFind()
+                        editor?.clearFindText()
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                )
+            }
             if (isMarkdown && showPreview && !isNew) {
                 EnhancedMarkdownViewer(
                     markdown = displayText,
@@ -179,8 +256,19 @@ fun FileEditScreen(
                     themeTokens = editorTokens,
                     editable = !isSubmitting,
                     onTextChanged = { viewModel.onEditorTextChanged(it) },
-                    modifier = Modifier.fillMaxSize(),
+                    onEditorReady = { controller ->
+                        editor = controller
+                        bindFindResults(viewModel, controller)
+                        // 从查看器带入的查询词在新编辑器实例上重放（否则计数残留、高亮为空）
+                        viewModel.uiState.value.findState.query
+                            .takeIf { it.isNotEmpty() }
+                            ?.let(controller::findText)
+                    },
+                    // weight：编辑器吃掉剩余高度，给下方格式状态行留位（fillMaxSize 会把状态行挤成 0 高）
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
                 )
+                // EDITOR-1 状态行：文件格式（保存按它还原行尾/字符集）
+                TextFormatIndicator(textFormat)
             }
         }
     }

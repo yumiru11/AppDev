@@ -5,4 +5,7 @@
     <string name="editor_back">返回</string>
     <string name="editor_undo">撤销</string>
     <string name="editor_redo">重做</string>
+    <!-- EDITOR-1 软换行开关（contentDescription 随状态切换） -->
+    <string name="editor_soft_wrap_on">软换行：开</string>
+    <string name="editor_soft_wrap_off">软换行：关</string>
 </resources>

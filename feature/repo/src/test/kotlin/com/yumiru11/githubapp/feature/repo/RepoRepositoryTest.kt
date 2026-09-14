@@ -1,9 +1,14 @@
-@file:Suppress("LargeClass") // README 渲染/文件树/文件读写/分支/UI-6 行级修改时间映射聚在同一仓库类测试（文件内按主题分段），拆分反损可读性（RepoFilesViewModelTest 同款先例）
+@file:Suppress("LargeClass")
+// 仓库数据仓库为单一被测类（树/文件读写/编辑提交/README 渲染/UI-6 行级修改时间映射/编辑器 CRLF
+// 往返），拆文件会把同一组 MockK 桩与构造分散到多处；测试膨胀到需要拆分时再按子域拆
+// （同 RepoFilesViewModelTest 先例）。
 
 package com.yumiru11.githubapp.feature.repo
 
 import com.yumiru11.githubapp.core.database.dao.CachedReadmeDao
 import com.yumiru11.githubapp.core.database.entity.CachedReadmeEntity
+import com.yumiru11.githubapp.core.editor.LineEnding
+import com.yumiru11.githubapp.core.editor.TextFileFormat
 import com.yumiru11.githubapp.core.githubrest.api.CommitApi
 import com.yumiru11.githubapp.core.githubrest.api.ContentApi
 import com.yumiru11.githubapp.core.githubrest.api.GitRefApi
@@ -17,6 +22,7 @@ import com.yumiru11.githubapp.core.githubrest.model.CommitInfoDto
 import com.yumiru11.githubapp.core.githubrest.model.CommitListItemDto
 import com.yumiru11.githubapp.core.githubrest.model.ContentWriteResponseDto
 import com.yumiru11.githubapp.core.githubrest.model.FileContentDto
+import com.yumiru11.githubapp.core.githubrest.model.FileWriteRequest
 import com.yumiru11.githubapp.core.githubrest.model.GitRefCreateRequest
 import com.yumiru11.githubapp.core.githubrest.model.GitRefDto
 import com.yumiru11.githubapp.core.githubrest.model.GitTreeResponseDto
@@ -39,6 +45,7 @@ import org.junit.Test
 import retrofit2.HttpException
 import retrofit2.Response
 import java.io.IOException
+import java.nio.charset.StandardCharsets
 import java.util.Base64
 
 /**
@@ -418,6 +425,77 @@ class RepoRepositoryTest {
             assertTrue(result.isSuccess)
             assertEquals(FileKind.MARKDOWN, result.getOrThrow().kind)
             assertEquals(source, result.getOrThrow().text)
+        }
+
+    @Test
+    fun getFileContent_crlfFile_normalizesTextToLfAndKeepsOriginalFormat() =
+        runTest {
+            // EDITOR-1：打开 CRLF 文件 → 编辑器拿 LF 文本，原始格式随 data 传给保存路径
+            val source = "fun main() {\r\n    println(\"hi\")\r\n}\r\n"
+            coEvery { contentApi.getFileContent(any(), any(), any(), any()) } returns
+                FileContentDto(
+                    name = "Main.kt",
+                    path = "src/Main.kt",
+                    size = source.toByteArray().size.toLong(),
+                    content = Base64.getEncoder().encodeToString(source.toByteArray()),
+                    encoding = "base64",
+                )
+
+            val data = repository.getFileContent("octocat", "Hello-World", "src/Main.kt", "main").getOrThrow()
+
+            assertEquals("fun main() {\n    println(\"hi\")\n}\n", data.text)
+            assertEquals(LineEnding.CRLF, data.textFormat.lineEnding)
+            assertEquals(StandardCharsets.UTF_8, data.textFormat.charset)
+        }
+
+    @Test
+    fun updateFileContent_crlfFormat_sendsCrlfEncodedBase64() =
+        runTest {
+            // EDITOR-1：保存按打开时的格式还原行尾（CRLF 文件绝不静默写回 LF）
+            coEvery { contentApi.updateFileContent(any(), any(), any(), any()) } returns ContentWriteResponseDto()
+
+            val result =
+                repository.updateFileContent(
+                    owner = "octocat",
+                    repo = "Hello-World",
+                    path = "src/Main.kt",
+                    text = "a\nb",
+                    sha = "blob-1",
+                    message = "fix",
+                    branch = "main",
+                    format = TextFileFormat(lineEnding = LineEnding.CRLF),
+                )
+
+            assertTrue(result.isSuccess)
+            coVerify {
+                contentApi.updateFileContent(
+                    "octocat",
+                    "Hello-World",
+                    "src/Main.kt",
+                    match<FileWriteRequest> {
+                        it.content == Base64.getEncoder().encodeToString("a\r\nb".toByteArray())
+                    },
+                )
+            }
+        }
+
+    @Test
+    fun updateFileContent_defaultFormat_sendsLfUtf8Bytes() =
+        runTest {
+            coEvery { contentApi.updateFileContent(any(), any(), any(), any()) } returns ContentWriteResponseDto()
+
+            repository.updateFileContent("octocat", "Hello-World", "src/Main.kt", "a\nb", "blob-1", "fix", "main")
+
+            coVerify {
+                contentApi.updateFileContent(
+                    "octocat",
+                    "Hello-World",
+                    "src/Main.kt",
+                    match<FileWriteRequest> {
+                        it.content == Base64.getEncoder().encodeToString("a\nb".toByteArray())
+                    },
+                )
+            }
         }
 
     @Test
