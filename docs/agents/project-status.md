@@ -2,7 +2,7 @@
 
 > 本文件是当前进度的**权威快照**。每张票合并/关闭后更新。配合 `docs/agents/workflow.md`（流程）、`AGENTS.md`（环境）与 `docs/agents/task-audit-2026-09-06.md`（全量审计）阅读。
 > 本版修正 2026-09-06 审计发现的 §7 D01「文档三处失真」：AGENTS.md / project-status.md / FEEDBACK.md 已与 `gh` 票面 + git 历史对齐。
-> **基线**：`main@42821ef`（#291，2026-09-14T02:23:50Z 合入；main CI 最新 run `34799068974` @42821ef 进行中）。本轮波次共合入 **60 张 PR（编号 #229–#291）**，全部 squash —— 分段：前半 #229–#255（26 张，§2.1）、中段 #256–#266（11 张，§2.1）、收尾 #267–#271（5 张，§2.2）、设计系统/渲染/加固 #272–#291（18 张，§2.3/§2.4）。计数口径：#250 是 issue 非 PR；#278/#279 不存在；**wave 内 PR 已全部合入，无 open PR（#292 是本 docs 对账 PR，不属 wave）**。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`。
+> **基线**：`main@3b43c74`（#293 阅读密度回滚，本轮最后一合；main CI 全绿 run `34807483090`）。本轮共合入 **62 张 PR**：波次 **#229–#291（60 张）** 全部 squash + 收尾 **#292**（docs 对账）/ **#293**（阅读密度回滚）—— 分段：前半 #229–#255（26 张，§2.1）、中段 #256–#266（11 张，§2.1）、收尾 #267–#271（5 张，§2.2）、设计系统/渲染/加固 #272–#291（18 张，§2.3/§2.4）。计数口径：#250 是 issue 非 PR；**#278 / #279 是 issue**（#278 = 全量 `.dp` 扫荡跟踪票，**开启中**；#279 = 其重复票，已关闭）；**无 open PR**。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`。
 
 ## 1. 里程碑概览
 
@@ -142,9 +142,11 @@
 | #289 | home | **UI-7**：feed 首载骨架屏（`feature/home/.../ui/FeedSkeleton.kt`） |
 | #285 | CI | 移除 `feature:profile` 的临时测试事件日志（#282 挂死诊断收尾，非功能性） |
 | #290 | editor | **SPEC-3**：`@mention` 接入真实候选 —— REST collaborators 数据源 + `AppRoute.Editor(owner, repo)` + `core:editor/MentionCandidates.kt`；屏接收 `mentions: List<String>`，Hilt 在宿主层（`AppNavHost`）解析（`EditorMentionsViewModel`）。合入 2026-09-14T02:12:53Z |
-| #291 | repo | 游客模式 REST 配额守卫：`AuthState.Anonymous` 短路文件树 mtime 列查询、**不做负缓存**（`RepoFilesViewModel.kt`）。合入 2026-09-14T02:23:50Z；main 头 |
+| #291 | repo | 游客模式 REST 配额守卫：`AuthState.Anonymous` 短路文件树 mtime 列查询、**不做负缓存**（`RepoFilesViewModel.kt`）。合入 2026-09-14T02:23:50Z |
+| #292 | docs | 波次对账：AGENTS.md / project-status / remaining-backlog 收敛到 60 PR / `main@42821ef`（docs-only，无 CI 检查） |
+| #293 | markdown | **阅读密度回滚（本轮 last）**：产品负责人选定「现状（紧凑）」密度 → 移除 `MarkdownDensity` 令牌（回滚 #281 的 `Literal` 默认），`markdown-you.css` 与原生 Viewer 恢复改动前取值；`core:markdown` **37 帧基线直接取回 #281 之前的 CI 权威帧**（零本机录制）；补 `EnhancedListTest`（原生列表 marker/嵌套分支）使 diff 覆盖率 **76.9% → 100%**。合入 2026-09-14（main 头） |
 
-> §2.1/§2.2 的 #267–#271 仍有效；本波在其后。**wave 内 PR 已全部合入，无 open PR**（#292 为本 docs 对账 PR）。
+> §2.1/§2.2 的 #267–#271 仍有效；本波在其后。**wave 内 PR 与 #292/#293 均已合入，无 open PR**。
 
 ## 3. 进行中：审计补全波（2026-09-06 立项，9 张分类票 #163–#171）
 
