@@ -17,8 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.R
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 
 /**
  * 游客模式空状态 / 登录引导占位页（T2 首个 Roborazzi 截图基准的被测画面）。
@@ -45,7 +45,7 @@ fun GuestWelcomeScreen(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = AppDimens.spacing.xl),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -55,21 +55,21 @@ fun GuestWelcomeScreen(
                 color = MaterialTheme.colorScheme.onBackground,
                 textAlign = TextAlign.Center,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.m))
             Text(
                 text = stringResource(R.string.guest_welcome_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.xxl))
             Button(
                 onClick = onSignIn,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(text = stringResource(R.string.guest_sign_in))
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.m))
             OutlinedButton(
                 onClick = onBrowseAsGuest,
                 modifier = Modifier.fillMaxWidth(),

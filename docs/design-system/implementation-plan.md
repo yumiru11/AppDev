@@ -132,13 +132,25 @@
 
 ### 1.5 裸 `.dp` 计数
 
-| 口径 | 实测 | 审计原值 | 说明 |
-|---|---|---|---|
-| `feature/*/src/main` 裸 `\.dp` | **594** | 639 | 差额 45 来自注释/KDoc 中的 `.dp` 提及与排除规则差异 |
-| `feature/ + core/ + app/`（主源，excl test） | **714** | 无 | 全量口径，含 core 与 app |
-| `AppDimens.` 引用（主源） | **66** | 无 | 令牌化率约 10% |
+**2026-09-14 复测**（口径：`grep -rEo "[0-9]+\.dp" <module>/src/main | wc -l`，**含 KDoc/注释提及**，高于可转换口径；已含 #295–#297 各 feature 批的扫荡结果）：
 
-**结论**：594 处量级的全量扫荡**不在本波**（决策 7）。本波只做「定义 scale + 新代码强制 + 按 feature 机会主义迁移」，全量作为独立票。
+| 模块 | 裸 `.dp` | 说明 |
+|---|---|---|
+| feature/repo | 72 | 结构间距已扫（#295–#297）；余量 = 图标尺寸 / 画布绘制 / 动效等非间距值 |
+| core/markdown | 50 | **有意排除**——阅读密度/排版尺度（2026-09-14 产品决策保持现状密度），非 UI 结构间距（决策 8） |
+| feature/pullrequest | 49 | 结构间距已扫（#295） |
+| feature/profile · feature/home | 40 · 40 | 批量扫荡在途（#298–#300） |
+| core/designsystem | 36 | 含 `token/**` 定义本体与 `icon/AppDevOcticons`（永不迁移）；`component/**` 余量无结构间距 |
+| feature/settings | 28 | 批量扫荡在途（#298–#300） |
+| feature/search · feature/issue | 22 · 22 | 结构间距已扫（#296） |
+| feature/auth | 8 | 批量扫荡在途（#298–#300） |
+| core/ui | 6 | 收尾批已扫；余量 = `WindowInsets(0.dp)` / 非 scale 值（10dp）/ 动效 24dp |
+| feature/notifications | 4 | 批量扫荡在途（#298–#300） |
+| core/testing | 1 | KDoc 中的 `.dp` 提及，非代码 |
+| core/editor · app | 0 · 0 | 收尾批已清零（`MarkdownComposer` / `GuestWelcomeScreen`） |
+| **主源合计**（feature + core + app） | **378** | 原全量口径 714；`AppDimens.` 引用 448 处（§1.4 的 66/594 为扫荡前快照） |
+
+**结论**：全量扫荡由跟踪票 **#278** 分批推进（feature 各批 #295–#300 + core/app 收尾批）。**`core:markdown` 明确不在扫荡范围**：其 dp 值是阅读密度/排版尺度，不是布局间距。
 
 ### 1.6 `plan.md §5.5` 21 个通用组件 vs 仓库现状
 
