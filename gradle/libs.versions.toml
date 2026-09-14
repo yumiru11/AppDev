@@ -1,10 +1,10 @@
 [versions]
-agp = "9.1.1"
+agp = "9.4.0"
 kotlin = "2.3.21"
 # KSP2 纯版本号；2.3.8 起调用 AGP 9 才有的 addKspConfigurations(boolean)，
 # AGP 9 迁移完成后解锁到 2.3.12（AGP 官方 skill 要求 AGP 9 下 KSP ≥ 2.3.6）。
 ksp = "2.3.12"
-compose-bom = "2026.06.01"
+compose-bom = "2026.09.00"
 # ⚠️ M3 Expressive 临时 pin（技术债，决策与撤除条件见 docs/adr/0008-material3-alpha18-pin.md）
 # 为什么 pin alpha：Expressive 的组件（LoadingIndicator / Circular·LinearWavyProgressIndicator /
 #   SplitButtonLayout / ButtonGroup / Medium·LargeFlexibleTopAppBar）与公开的
@@ -19,64 +19,64 @@ compose-bom = "2026.06.01"
 # 何时撤掉：material3 1.5.0 stable 发布且回归某个 compose-bom 后，删除本 version 与
 #   compose-material3 的 version.ref（回到纯 BOM 托管）；若届时已升 AGP 9 + compileSdk 37，
 #   也可直接跟到当时的 stable/BOM。撤除前必须重跑全门禁 + 重录截图基线。
-compose-material3 = "1.5.0-alpha18"
+compose-material3 = "1.5.0-alpha28"
 # Hilt：AGP 9 移除旧 variant API（applicationVariants 等）→ 2.57.2 插件直接报
 # "Android BaseExtension not found."，必须 ≥ 2.59.2（AGP 官方 skill 要求）。
 hilt = "2.59.2"
-apollo = "5.0.1"
+apollo = "5.1.0"
 retrofit = "3.0.0"
-okhttp = "5.4.0"
-okio = "3.18.1"
+okhttp = "5.5.0"
+okio = "3.18.2"
 coil = "3.4.0"
 # Haze（chrisbanes/haze）：毛玻璃 backdrop blur（issue #83，ui-audit 缺陷 #1 修复载体）
 # 1.7.2 传递 androidx.activity 1.12.2 需 AGP≥8.9.1，与锁定基线 AGP 8.7.3 冲突 → 取 1.6.10
-haze = "1.6.10"
+haze = "1.7.3"
 jacoco = "0.8.13"
 lifecycle = "2.8.7"
 activity-compose = "1.9.3"
 datastore = "1.1.3"
-navigation-compose = "2.8.4"
-androidx-browser = "1.8.0"
+navigation-compose = "2.10.1"
+androidx-browser = "1.10.0"
 androidx-webkit = "1.12.1"
-core-ktx = "1.13.1"
+core-ktx = "1.19.0"
 # 品牌化启动屏（D3 修复）：消除冷启动"白屏空窗"，并把应用图标带进启动画面
-core-splashscreen = "1.0.1"
+core-splashscreen = "1.2.0"
 # ProfileInstaller（T25）：API 24-30 上把打包进 APK 的 baseline profile 安装到 ART
 # （API 31+ 由编译期 baseline.profm 直接生效，无需运行时安装）
 profileinstaller = "1.4.1"
-security-crypto = "1.1.0-alpha06"
+security-crypto = "1.1.0"
 kotlinx-serialization = "1.7.3"
 kotlinx-coroutines = "1.9.0"
-markdown = "0.38.1"
+markdown = "0.45.0"
 # KotlinTextMate（VS Code 同款语法高亮，替换 deprecated 的 markdown-code 高亮；坐标来自 prototype 分支实测）
 textmate = "0.2.0"
 icons = "2.2.1"
 sora = "0.23.6"
 appauth = "0.11.1"
-room = "2.8.4"
-paging = "3.5.0"
+room = "2.8.5"
+paging = "3.5.1"
 # Apollo Kotlin 5 的新版 Normalized Cache（独立仓库 apollo-kotlin-normalized-cache）
-apollo-normalized-cache = "1.0.6"
-hilt-navigation-compose = "1.2.0"
+apollo-normalized-cache = "1.0.7"
+hilt-navigation-compose = "1.4.0"
 
 # Quality（T1 质量门禁）
-spotless = "8.9.0"
+spotless = "8.10.2"
 detekt = "1.23.8"
 ktlint = "1.8.0"
 konsist = "0.17.3"
 
 # 调试工具链（#169 / L14）：Timber 日志、Chucker 网络面板、LeakCanary 内存泄漏
 timber = "5.0.1"
-chucker = "4.0.0"
+chucker = "4.3.1"
 leakcanary = "2.14"
 
 # Testing
-robolectric = "4.16.1"
-roborazzi = "1.71.0"
+robolectric = "4.17"
+roborazzi = "1.74.0"
 junit = "4.13.2"
 mockk = "1.14.11"
 turbine = "1.2.1"
-mockwebserver = "5.4.0"
+mockwebserver = "5.5.0"
 
 [libraries]
 # Compose BOM
