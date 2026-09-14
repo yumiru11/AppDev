@@ -3,9 +3,6 @@
 
 package com.yumiru11.githubapp.core.markdown.webview
 
-import com.yumiru11.githubapp.core.markdown.MarkdownDensity
-import com.yumiru11.githubapp.core.markdown.MarkdownDensityTokens
-
 /**
  * WebView 渲染模式（plan.md §2.9）。
  *
@@ -120,9 +117,6 @@ object WebViewHtmlBuilder {
      *   由 [WebViewMermaidSupport] 按设备 UA 判定）。为 false 时即使内容含图也**不注入**
      *   脚本（mermaid.tiny.js 的 class static block 在老引擎上是不可捕获的语法级失败）。
      *   默认 true 仅服务纯 JVM 测试与能力未知场景：WebView 内 renderer.js 仍有独立探测兜底。
-     * @param density 阅读密度令牌（[MarkdownDensity.current] 默认）。注入
-     *   `<style id="reading-density">` 的 `--md-reading-*` 变量，`markdown-you.css` 消费；
-     *   与原生 `EnhancedMarkdownViewer` / `MarkdownViewer` 同源（[MarkdownDensityTokens]）。
      */
     fun build(
         sanitizedHtml: String,
@@ -132,7 +126,6 @@ object WebViewHtmlBuilder {
         baseRepoUrl: String? = null,
         inlineCss: Map<String, String> = emptyMap(),
         mermaidRuntimeSupported: Boolean = true,
-        density: MarkdownDensityTokens = MarkdownDensity.current,
     ): String {
         val themeMarker = if (isDark) "dark" else "light"
         val contentBlock = buildContentBlock(sanitizedHtml, renderMode, baseRepoUrl)
@@ -164,10 +157,6 @@ object WebViewHtmlBuilder {
             // 的变量声明会被后声明同特异性规则覆盖，保证 Material You 融合生效。
             append("\n  <style id=\"theme-vars\">\n")
             append(themeVariables)
-            append("  </style>\n")
-            // 阅读密度（与主题无关，独立块；两个渲染通道同一事实来源 MarkdownDensity）。
-            append("  <style id=\"reading-density\">\n")
-            append(density.toCssVariables())
             append("  </style>\n")
             append(runtimeScripts)
             append("\n  <script src=\"${ASSET_BASE}purify.min.js\"></script>\n")
