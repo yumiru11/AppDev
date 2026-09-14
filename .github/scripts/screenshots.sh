@@ -333,7 +333,12 @@ readme_mermaid_position_once() {
   # `target` 不重置：前者本就在目标之前，后者已在位。
   read -r state _ <<<"$(readme_mermaid_target_state)"
   case "$state" in
-    overshoot | below) readme_mermaid_open_readme ;;
+    overshoot | below)
+      readme_mermaid_open_readme
+      # 清掉 open_readme 置起的 RESET 标志：入口本身就是「重置后推 14 次」，
+      # 留着它会让循环首轮再推一次 14 次（共 28 次）→ 重置完立刻又冲过头。
+      README_MERMAID_RESET=0
+      ;;
     *) : ;;
   esac
   readme_mermaid_swipe 14
