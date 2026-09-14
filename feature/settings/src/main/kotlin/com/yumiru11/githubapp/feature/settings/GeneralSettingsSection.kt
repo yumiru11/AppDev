@@ -24,6 +24,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
 import com.yumiru11.githubapp.core.designsystem.component.CardGroup
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 
 /**
  * 通用分组（ui-design §3.6，#87 分组卡化）：语言（System/English/中文）+ 关于；
@@ -53,7 +54,7 @@ private fun AboutRow() {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
@@ -61,7 +62,7 @@ private fun AboutRow() {
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.l))
         Text(
             text = stringResource(R.string.settings_about),
             style = MaterialTheme.typography.bodyLarge,
@@ -89,7 +90,7 @@ private fun LanguageRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
     ) {
         Text(
             text = stringResource(R.string.settings_language),
@@ -103,8 +104,8 @@ private fun LanguageRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
+        Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
             options.forEach { (tag, label) ->
                 AppFilterChip(
                     selected = languageTag == tag,

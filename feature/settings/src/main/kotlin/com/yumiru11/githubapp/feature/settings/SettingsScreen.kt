@@ -25,11 +25,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yumiru11.githubapp.core.datastore.model.resolveEffectiveThemeMode
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.designsystem.token.rememberSystemMotionScale
 import com.yumiru11.githubapp.core.designsystem.token.resolveEffectiveMotionScale
@@ -91,7 +91,7 @@ fun SettingsScreen(
                         Modifier
                             .fillMaxSize()
                             .padding(paddingValues),
-                    contentPadding = PaddingValues(vertical = 8.dp),
+                    contentPadding = PaddingValues(vertical = AppDimens.spacing.s),
                 ) {
                     item {
                         SectionHeader(text = stringResource(R.string.settings_appearance_group))
@@ -153,7 +153,7 @@ internal fun SectionHeader(text: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier =
             Modifier
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s)
                 .semantics { heading() },
     )
 }

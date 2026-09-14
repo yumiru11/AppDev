@@ -75,7 +75,7 @@ private fun PatEntrySection(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -102,7 +102,7 @@ private fun PatEntrySection(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = AppDimens.spacing.l),
         ) {
             OutlinedTextField(
                 value = patValue,
@@ -129,14 +129,14 @@ private fun PatEntrySection(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.m))
             Button(
                 onClick = { onSave(patValue) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(text = stringResource(R.string.settings_pat_save))
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
             Text(
                 text = stringResource(R.string.settings_pat_desc),
                 style = MaterialTheme.typography.bodySmall,
@@ -155,13 +155,13 @@ private fun RestOnlyNotice() {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = AppDimens.spacing.l),
     ) {
         Text(
             text = stringResource(R.string.settings_rest_only_notice),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onTertiaryContainer,
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(AppDimens.spacing.m),
         )
     }
 }
@@ -179,7 +179,7 @@ internal fun RateLimitRow(rateLimit: RateLimitSnapshot?) {
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
