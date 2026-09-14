@@ -1,8 +1,8 @@
-# AppDev 项目状态（2026-09-13）
+# AppDev 项目状态（2026-09-14）
 
 > 本文件是当前进度的**权威快照**。每张票合并/关闭后更新。配合 `docs/agents/workflow.md`（流程）、`AGENTS.md`（环境）与 `docs/agents/task-audit-2026-09-06.md`（全量审计）阅读。
 > 本版修正 2026-09-06 审计发现的 §7 D01「文档三处失真」：AGENTS.md / project-status.md / FEEDBACK.md 已与 `gh` 票面 + git 历史对齐。
-> **基线**：`main@db1b696`（2026-09-13 修复波末，42 张 PR #229–#271 全部 squash 合入，其中 #250 是 issue 非 PR；中段 #256–#266 见 §2.1，收尾 #267–#271 见 §2.2）。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`。
+> **基线**：`main@15d1092`（#287，2026-09-14T01:32:07Z 合入；main CI 最新 run `34796226194` = success）。本轮波次共合入 **58 张 PR（编号 #229–#289）**，全部 squash —— 分段：前半 #229–#255（26 张，§2.1）、中段 #256–#266（11 张，§2.1）、收尾 #267–#271（5 张，§2.2）、设计系统/渲染/加固 #272–#289（16 张，§2.3/§2.4）。计数口径：#250 是 issue 非 PR；#278/#279 不存在；**#290/#291 仍 OPEN（在途，未合入）**。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`。
 
 ## 1. 里程碑概览
 
@@ -15,9 +15,10 @@
 | M4 全功能（PR 深化/编辑提交/分支） | ✅ 完成（T16/T17/T23 已合入） |
 | M5 发布收尾（性能/签名 Release） | 🔶 进行中：Baseline Profile + i18n 覆盖断言 + RTL 基线 + 发布链路演练已落地（PR #186）；**冷启动实测 / macrobenchmark / 生产签名密钥仍需真机或 Secrets**（见 §3.2） |
 | M6 审计补全与 UI 打磨（2026-09-06 立项） | ✅ 9 张分类票 #163–#170 **全部关闭并合入**；#166/#167 的少数挂账项见 §3.1 |
-| M7 修复波 + 门禁/截图链路加固（2026-09-12/13） | ✅ **42 张 PR #229–#271 全部 squash 合入**：前半 26 张（#229–#255，明细见 §2.1）；中段 11 张（#256–#266，见 §2.1）；收尾 5 张（#267–#271，见 §2.2）—— AGP 9.1.1 迁移 + 全模块 lint 恢复（#270）、离线 KaTeX（#269）、设计系统落地计划 + ADR-0010（#268）、nightly APK 体积门禁（#271）。**已无 open PR** |
+| M7 修复波 + 门禁/截图链路加固（2026-09-12/13） | ✅ **42 张 PR #229–#271 全部 squash 合入**：前半 26 张（#229–#255，明细见 §2.1）；中段 11 张（#256–#266，见 §2.1）；收尾 5 张（#267–#271，见 §2.2）—— AGP 9.1.1 迁移 + 全模块 lint 恢复（#270）、离线 KaTeX（#269）、设计系统落地计划 + ADR-0010（#268）、nightly APK 体积门禁（#271） |
+| M8 设计系统落地 + 离线 Mermaid + 证据链加固（2026-09-13/14） | ✅ **16 张 PR #272–#289 全部 squash 合入**（见 §2.3/§2.4）：设计系统 Batch 1–4（#273/#274/#280/#282，六类裸控件清零）、离线 Mermaid（#275）、阅读密度（#281）、截图证据链（#276/#277）、测试超时（#283）、UI-1/UI-4/UI-6/UI-7 + EDITOR-1 + DATA-2（#284/#286/#287/#288/#289）。**唯一在途 = #290/#291（OPEN）** |
 
-## 2. 已完成（T1–T26 中 25 票 + 计划外交付 + 2026-09-12/13 修复波全部合入 main）
+## 2. 已完成（T1–T26 中 25 票 + 计划外交付 + 2026-09-12/13/14 修复/加固波全部合入 main）
 
 | Ticket | Issue | 内容 | 合入 |
 |---|---|---|---|
@@ -106,16 +107,42 @@
 | PR | 范围 | 交付 |
 |---|---|---|
 | #267 | 文档 | 状态对账到 #266（37 张 PR / `main@54eba10` / 114 张基线）；即 #265 之后的追齐 |
-| #268 | 设计系统 | 落地计划 `docs/design-system/implementation-plan.md`（组件契约 / 批次表 / 门禁 / DoD）+ ADR-0010；实现严格排在 AGP 9 之后（现已解除阻塞，本地 `feat/design-system-batch1` 开工未合入） |
+| #268 | 设计系统 | 落地计划 `docs/design-system/implementation-plan.md`（组件契约 / 批次表 / 门禁 / DoD）+ ADR-0010；实现严格排在 AGP 9 之后 —— **Batch 1–4 已随 #273/#274/#280/#282 落地（见 §2.4）** |
 | #269 | markdown | **离线 KaTeX 0.18.7**（post-sanitize 渲染、仅 woff2 字体、`assets/webview/katex/` 共 556,268 B raw / ≈ +0.32 MiB；`FeatureDetector.containsMath` gate + SERVER_HTML `<math-renderer>` 检测 + JS 独立更严扫描；`trust:false` + 三上限；错误色读 `--md-sys-color-error`）。**Mermaid 随后落地（#275）** |
 | #270 | 构建/lint | **AGP 9.1.1 迁移**：Gradle 8.12 → 9.3.1；AGP 8.7.3 → 9.1.1；built-in Kotlin（不再应用 `org.jetbrains.kotlin.android`）；compileSdk 36 → 37 / buildTools 36.0.0 / KSP 2.3.12 / Hilt 2.59.2；`targetSdk` 保 35 + `android.sdk.defaultTargetSdkToCompileSdkIfUnset=false`（Robolectric 约束）；**全模块 lint 恢复**：31 条 disable 删除、48 个 error 源码修复、0 disable；`com.composables` namespace 撞车根治（删空壳 base artifact，无 `uniquePackageNames` 逃生开关）；删 `AarMetadata` 禁用 hack；CI lint guard 三断言（0 跳过 registry / 0 `UnknownIssueId` / 0 disable） |
 | #271 | CI | **nightly APK 体积回归门禁**：`.github/scripts/check-apk-size.sh` + `.github/apk-size-budget.properties`（baseline 7,585,167 B @ `2a44912`；budget = baseline + 256 KiB = 7,847,311 B）；超预算/缺配置/缺产物一律硬失败（#260 纪律）；红→绿实证含用 KaTeX 前预算拦住 KaTeX 后 APK |
 
-### 2.3 2026-09-13 离线 Mermaid（Phase 2，PR #275，待合入）
+### 2.3 2026-09-13 离线 Mermaid（PR #275，已合入）
 
 | PR | 范围 | 交付 |
 |---|---|---|
-| #275 | markdown | **离线 Mermaid Tiny 11.17.2**（`assets/webview/mermaid/` 2,555,146 B raw / deflate 672,490 B，IIFE 单文件 0 动态 import；post-sanitize 渲染，`securityLevel:'strict'` + `htmlLabels:false` + 图数上限 10；**Chromium ≥94 门禁**（class static block）Kotlin UA 判定 + JS 语法探针 + `window.mermaid` 三层兜底，不满足回退代码块）。同树 APK 实测 7,486,103 → 8,162,579 B（**+676,476 B ≈ +0.65 MiB**），`apk-size-budget.properties` 基线 7,585,167 → 8,162,579 / 预算 7,847,311 → 8,424,723。测试：`MermaidRenderExecutionTest`（12）+ `WebViewMermaidSupportTest`（7）+ FeatureDetector/WebViewHtmlBuilder 扩展；fixtures 34 登记双通道，未实现集合清零；Roborazzi 零漂移 |
+| #275 | markdown | **离线 Mermaid Tiny 11.17.2**（`assets/webview/mermaid/` 实测 2,556,235 B raw / deflate 672,490 B（2 文件：`mermaid.tiny.js` + `LICENSE`），IIFE 单文件 0 动态 import；post-sanitize 渲染，`securityLevel:'strict'` + `htmlLabels:false` + 图数上限 10；**Chromium ≥94 门禁**（class static block）Kotlin UA 判定 + JS 语法探针 + `window.mermaid` 三层兜底，不满足回退普通代码块）。同树 APK 实测 7,486,103 → 8,162,579 B（**+676,476 B ≈ +0.65 MiB**），`apk-size-budget.properties` 基线 7,585,167 → 8,162,579 / 预算 7,847,311 → 8,424,723。测试：`MermaidRenderExecutionTest`（12）+ `WebViewMermaidSupportTest`（7）+ FeatureDetector/WebViewHtmlBuilder 扩展；fixtures 34 登记双通道，未实现集合清零；Roborazzi 零漂移 |
+| #269 | markdown | **离线 KaTeX 0.18.7**（`assets/webview/katex/` 实测 556,268 B raw / 23 文件，仅 woff2 字体；post-sanitize 渲染 `renderer.js:187,351`，`trust:false` + 三上限；错误色读 `--md-sys-color-error`）。同 #271 门禁记录：KaTeX 级 APK 增重 ≈ +0.32 MiB（研究 R11 与体积门禁实证） |
+
+> **CI 证据车道（真渲染 ≠ 截图 job）**：`mermaid-render-verify.yml` 两条腿 —— API 33（WebView Chromium 101）断言 `MermaidRender: engine=supported rendered>=1`（真渲染）；API 30（Chromium 83）断言 `engine=blocked rendered=0` 且无 `supported`（`<94` 门禁真回退）。`ci.yml` 截图 job 跑 API 30，**在那是回退路径**，不能当渲染证据。`glass-verify.yml` = `Glass verification (API 31+)`。
+
+### 2.4 2026-09-13/14 设计系统 + 加固波（#272–#289，全部 squash 合入）
+
+| PR | 范围 | 交付 |
+|---|---|---|
+| #272 | 文档 | 回写 2026-09-12/13 修复波（AGP9 / KaTeX / 设计系统 / 门禁）+ 全量对账（#229–#271 段） |
+| #273 | 设计系统 | **Batch 1**：`AppCard` / `AppChip` / `AppFilterChip` / `AppDialog` / `AppSegmentedButton` + debug 画廊屏 + 首批迁移（`core/designsystem/.../component/` + `.../gallery/`） |
+| #274 | 设计系统 | **Batch 2**：状态视图三态组件（`AppStateViews`：Empty/Error/Loading）逃生舱 + 5 个 feature 私有实现收编 |
+| #280 | 设计系统 | **Batch 3**：间距 scale `AppDimens.spacing`（`token/AppDimens.kt:39` `SpacingScale`；`contentPadding` 为 `spacing.l` 别名）+ **禁新增裸控件门禁**（`forbid-bare-controls.sh` + `bare-controls-baseline.txt`） |
+| #282 | 设计系统 | **Batch 4**：`AppScaffold` / `AppBottomSheet` + **六类裸控件清零**，门禁基线棘轮到 **0**（Card/Scaffold/FilterChip/AlertDialog/ModalBottomSheet/SnackbarHost） |
+| #275 | markdown | 离线 Mermaid（详见 §2.3） |
+| #276 | CI 截图链 | 拼板取帧契约修复（`montage_board` 内 `base=${f%.png}`；此前每格恒为 `NOT CAPTURED` 占位）+ 坏帧水印标注真实 kind + **逐帧 critical 严重度**（`FRAME_SEVERITIES` 按帧名存，防 critical 降级成 warn）+ `lookup_mismatch` 防回归闸门（`::error::` + `exit 1`） |
+| #277 | CI 截图链 | `readme-mermaid` 探针修复：**视口内短滑**（起点/终点都在 WebView 视口）+ 先取帧后断言（`settle=now`）+ 滚不到显式判坏；修此前「假帧/偶发 DUPLICATE」 |
+| #281 | markdown | **阅读密度令牌单一事实来源** `MarkdownDensity`（`Literal` 默认 / `Conservative` 备选，`current = Literal`）+ `core:markdown` 基线重录 |
+| #283 | 构建/CI | 单测**任务级 15min 超时**（`build.gradle.kts:297` `test.timeout.set(Duration.ofMinutes(15))`）+ `ci.yml` verify 步骤级 **30min** 上限（超时只红一个任务/步骤，不吃满 60min Quality Gate 配额） |
+| #284 | pullrequest | **UI-1**：窗口 `< 600dp` 不提供 side-by-side（强制 unified），unified 超长行整块 `horizontalScroll`（`PullRequestDiffView.kt:62-65,193-203`）；截图侧对应帧按设计 `SKIPPED`（pixel_6 = 411dp） |
+| #286 | repo | **UI-6** 文件树「修改时间」列 + **UI-4** 无 README 空态收编 `AppEmptyState`（`RepoDetailScreen.kt:1759`） |
+| #287 | editor | **EDITOR-1**：软换行开关（`MarkdownEditorScreen.kt:107-117`）+ 查找替换 + **显式 CRLF/编码策略**（`core/editor/.../TextFileFormat.kt`：内部归一 LF，按原 `lineEnding` + charset 回写，已存在 CRLF 不被静默转 LF） |
+| #288 | data | **DATA-2**：`:core:data` 补测试基建 + 模型契约测试，**首次纳入覆盖率门禁，阈值 0.99**（实测 100%，`build.gradle.kts:139`） |
+| #289 | home | **UI-7**：feed 首载骨架屏（`feature/home/.../ui/FeedSkeleton.kt`） |
+| #285 | CI | 移除 `feature:profile` 的临时测试事件日志（#282 挂死诊断收尾，非功能性） |
+
+> §2.1/§2.2 的 #267–#271 仍有效；本波在其后。**#290（SPEC-3 @mention）/ #291（游客 REST 配额守卫）OPEN，未合入**，见 §3.3。
 
 ## 3. 进行中：审计补全波（2026-09-06 立项，9 张分类票 #163–#171）
 
@@ -150,10 +177,11 @@
 | **PR 评论 Sheet 与 Issue 统一** | #166 | 两边各有一份 Sheet 实现，宜连带上面那条一起抽共享组件，一次消除重复 |
 | ~~**Q01 Compose lint 15 项检查失效**~~ | #170 | ✅ **已闭环（#270）**：AGP 9.1.1 内置 lint 32.1.1 使检测器全部恢复；31 条 disable 删除、48 个 error 在源码修复、0 disable；守卫升级为 0 跳过 registry / 0 `UnknownIssueId` / 0 disable |
 
-### 3.2 T25 剩余（均为"本机无法验证"类）
+### 3.2 T25 剩余（均为"本机无法验证"类；**用户已明确 defer，不阻塞其它工作**）
 
 | 项 | 状态 |
 |---|---|
+| OAuth client id（真机 PKCE） | 🔶 注入点已解（#239，`app/build.gradle.kts` 三级解析 `-PoauthClientId` / `local.properties:oauthClientId` / `OAUTH_CLIENT_ID` → `BuildConfig`）；**只剩用户填一次真实值**。未配置回落 `PLACEHOLDER_CLIENT_ID`，仅真机 PKCE 失败，不影响构建/测试/截图 |
 | Baseline Profile + ProfileInstaller | ✅ APK 内 `assets/dexopt/baseline.prof`(7886B) + `.profm`(1107B) 实测存在 |
 | zh 文案全覆盖 | ✅ 已是硬断言测试（`I18nParityTest`），全模块通过 |
 | 签名发布链路 | 🔶 用临时 keystore 在本地与 `release-dry-run.yml` 演练跑通；**生产密钥需你在 Secrets 配置** `KEYSTORE_BASE64`/`KEYSTORE_PASSWORD`/`KEY_ALIAS`/`KEY_PASSWORD` |
@@ -162,25 +190,23 @@
 | Baseline Profile macrobenchmark 采集 | ⏳ 同上；当前是人工推导的启动热路径，接入路径已写在 `baseline-prof.txt` 文件头 |
 | 全屏 RTL 截图矩阵 | 🔶 方向性已验证（顶栏 RTL 基线）；全屏矩阵需模拟器截图 job |
 
-### 3.3 修复波后仍剩余（2026-09-12 核验）
+### 3.3 修复波后仍剩余（2026-09-14 核验）
 
 > 完整可执行清单（含 file:line 证据与规模）见 `docs/agents/remaining-backlog-2026-09-12.md`；下列为该清单的收敛摘要。
-> **2026-09-12 后半波（#256–#264）已闭环**：MD-1 / MD-2 / MD-3（#237/#251/#262）、TEST-1（#249）、GATE-1（#247）、GATE-2（#253）、GATE-3 / GATE-5（#255/#260/#261/#263）、GATE-4（#247 nightly 汇总补 needs）、DATA-1（#264）、DEAD-1 / DEAD-2（#254）、UI-3 / UI-5（#259）、REPO-1（#248）、覆盖率假值（#261/#263）；TEST-2 已大幅收敛（#249/#256）。剩余仍为真开口的见下表。
+> **本轮（#272–#289）新闭环**：设计系统 SPEC-1 / SPEC-2 / UI-2（#273/#274/#280/#282，六类裸控件清零）、离线 Mermaid（#275）、UI-1（#284）、UI-4 / UI-6（#286）、UI-7（#289）、EDITOR-1（#287）、DATA-2（#288）。
+> **更早闭环**：#256–#264（MD-1/2/3、TEST-1、GATE-1..5、DATA-1、DEAD-1/2、UI-3/UI-5、REPO-1）；#267–#271（AGP 9、KaTeX、APK 门禁、覆盖率真值）。**下表只列真开口**。
 
 | 项 | 状态 / 说明 |
 |---|---|
-| T25 真机项 | ⏳ 冷启动 <1.5s 实测、Baseline Profile macrobenchmark 采集；本机纯 JVM 无法验（见 §3.2） |
-| 生产签名密钥 | 🔶 需用户在 Secrets 配 `KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` |
-| ~~AGP 9.x 迁移~~ | ✅ **已闭环（#270）**：AGP 9.1.1 / Gradle 9.3.1 / compileSdk 37 / buildTools 36.0.0 / KSP 2.3.12 / Hilt 2.59.2 / built-in Kotlin；targetSdk 35 保留；Q01 lint 根因随之消除（可行性报告 `docs/agents/agp9-feasibility-2026-09-11.md`） |
-| 设计系统 SPEC-1 / SPEC-2 | 🔶 计划已入库（#268）：`docs/design-system/implementation-plan.md` + ADR-0010；**Batch 1（Card/Chip 家族/Dialog/Snackbar）本地分支 `feat/design-system-batch1` 开工未合入**；间距仍未令牌化（`AppDimens` 只有圆角 + contentPadding，裸 `.dp` 待迁移） |
-| EDITOR-1 | ⏳ 软换行不可切、replace 缺失、CRLF/编码未显式处理 |
-| UI-1 窄屏 side-by-side diff | ⏳ 每栏 ~40 字符且无横向滚动（需 §6 决策） |
-| SPEC-3 @mention 补全 | ⏳ `MarkdownComposer.mentions` 生产调用点仍不传值 |
-| UI-2 / UI-4 / UI-6 / UI-7 | ⏳ 选中态对比 / No-README 空态 / 文件树时间列 / feed 骨架——均未动 |
-| PROTO-1 / PERF-1 / PERF-2 | ⏳ 原型归档决策 / 冷启动+macrobenchmark（真机）/ 跨端像素 diff——见 backlog §3.3（DATA-2 已闭环：`core:data` 补测试配置 + 契约测试并首次设阈，2026-09-14） |
-| ~~覆盖率剩余模块~~ | ✅ 已闭环：23 个有阈值模块全量棘轮到 #261 后的真实值（#263）+ `core:data` 首次纳入（DATA-2）；声明了阈值却无 exec 数据的模块**硬失败**（#260）；仍豁免 = `core:testing` / `core:ui` / `prototype`（理由见 `build.gradle.kts` 注释） |
+| **真机项（用户已 defer）** | ⏳ 冷启动 <1.5s 实测、Baseline Profile macrobenchmark 采集、全屏 RTL 截图矩阵；本机纯 JVM 无法验（见 §3.2） |
+| **生产签名密钥** | 🔶 需用户在 Secrets 配 `KEYSTORE_BASE64` / `KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` |
+| **SPEC-3 @mention 补全** | 🔶 实现 PR **#290 OPEN**（`@mention` 接入真实候选），未合入 main；旧缺口 `MarkdownComposer.mentions` 生产调用点不传值已在该 PR 修 |
+| **#291 游客 REST 配额守卫** | 🔶 PR **#291 OPEN**（游客模式不再为文件 mtime 列消耗 REST 配额），未合入 main |
+| **PROTO-1** | ⏳ 原型模块归档去留（需拍板，见 backlog §6 D-6） |
+| **PERF-2** | ⏳ 跨端像素 diff 管线（高成本独立票，需优先级拍板） |
+| ~~AGP 9.x / Q01 / 设计系统 SPEC-1 / SPEC-2 / UI-2 / EDITOR-1 / UI-1 / UI-4 / UI-6 / UI-7 / DATA-2 / 覆盖率空白~~ | ✅ 全部闭环（AGP 9 + Q01：#270；设计系统 + UI-2：#273/#274/#280/#282；EDITOR-1：#287；UI-1：#284；UI-4/UI-6：#286；UI-7：#289；DATA-2：#288） |
 
-> 另有若干需产品/设计先 grill 的决策（窄屏 diff、feed 骨架、KaTeX/Mermaid、原型去留等，D-5/D-7 已闭环），见 `remaining-backlog-2026-09-12.md` §6。
+> 仍需产品/设计先 grill 的决策：D-1（主题命名 vs ADR）、D-6（prototype 去留）、D-8（跨端像素 diff）——见 `remaining-backlog-2026-09-12.md` §6。**窄屏 diff（D-3，已按统一 unified + 横向滚动落地 #284）、feed 骨架（D-4，已落地 #289）、KaTeX/Mermaid（D-2，已落地 #269/#275）均已关闭。**
 
 
 ## 4. 遗留事项（未闭环）
@@ -198,7 +224,7 @@
 | diffCoverage 软门禁从未实测 | ✅ 已修两个真缺陷并转**硬门禁**（PR #181）：① 阈值口径把 80 当 8000%；② 非可执行行计入分母造成假失败 |
 | Nightly 全量截图/多设备/性能基线 | ✅ 已落地（PR #181 的 nightly.yml：verify / 全模块 record+diff / release 体积 / 失败汇总） |
 | 应用图标缺失 / Bundle 语言拆分 | ✅ 已闭环（PR #174：自适应+主题化单色层图标、Bundle 语言拆分） |
-| **截图基线覆盖（2026-09-12/13 修复波）** | ✅ 大幅补齐：模块级基线纳入 CI verify（app + 13 模块，PR #188/#256）；#245 补 OLED/高对比/zh + RTL；#249 补 `:feature:pullrequest`；#256 补 9 屏/20 帧（Home/RepoDetail/FileViewer/Branches/Search/MarkdownEditor/Profile/Gists/Settings）+ 离线 ImageLoader 确定性；#252 修探针；#260 加帧闭包断言。当前入库 **114 张 PNG（含 `prototype/readme-comparison` 4 张，非 prototype = 110）**（#266 再补 6 屏/15 帧：Repos 3 + CreateRepo/ReleaseCreate/CreateIssue/PullRequestCreate 各 2 + CommitDetail 3）；TEST-2 仅余少量低 ROI 屏 |
+| **截图基线覆盖（2026-09-12/13/14 修复波）** | ✅ 大幅补齐：模块级基线纳入 CI verify（app + 13 模块，PR #188/#256）；#245 补 OLED/高对比/zh + RTL；#249 补 `:feature:pullrequest`；#256 补 9 屏/20 帧 + 离线 ImageLoader 确定性；#252 修探针；#260 加帧闭包断言；#266 补 6 屏/15 帧；#273/#274/#280/#282 补设计系统画廊屏。**当前入库 148 张 PNG（含 `prototype/readme-comparison` 4 张；非 prototype = 144）**，其中 `core:designsystem` 32 张（含 28 张 `DesignSystemGallery_*`）；TEST-2 仅余少量低 ROI 屏 |
 | **RepoDetail 仓库头整块不渲染（UI-C01）** | ✅ 已修复（#258）：根因 `headerHeightPx` 自锁，改 `Modifier.layout` 量自然高度；回归测试 + `repo-star`/`repo-actions` 帧转绿（坏帧 2→0）。已知真实缺陷清单**已清空** |
 
 ## 5. 更新规则
@@ -234,7 +260,10 @@
 | **`captureRoboImage` 在普通测试模式下静默返回、不落盘**：测试绿 ≠ 拍了帧；无限动画屏必须 `captureScreenshotDeterministic`，验收看产物帧闭包断言 | #260 |
 | **AGP 9 恢复全模块 lint 后禁止 re-disable**：31 条旧 disable 删除 + 48 个 error 源码修复，CI 守卫断言 0 跳过 registry / 0 `UnknownIssueId` / 0 `disable +=` | #270 |
 | **APK 体积回归门禁**：release APK 超 `.github/apk-size-budget.properties` 的 `budget_bytes`（baseline + 256 KiB）即 nightly 判红；有意增重要在 PR 里同步抬预算并记录理由 | #271 |
-| **设计系统迁移以像素等价为前提分批**：Batch 1 = Card / Chip 家族 / Dialog / Snackbar；门禁禁止新增裸控件；实现严格排在 AGP 9 之后（已解除阻塞） | #268 / ADR-0010 |
+| **设计系统迁移以像素等价为前提分批**：Batch 1 = Card/Chip 家族/Dialog/Snackbar；Batch 2 = 三态状态视图（Empty/Error/Loading）；Batch 3 = 间距 scale + 禁新增裸控件门禁；Batch 4 = Scaffold/BottomSheet + 六类裸控件清零。门禁基线 `.github/bare-controls-baseline.txt` 全 0，回流即红 | #268 / ADR-0010 / #273/#274/#280/#282 |
+| **Mermaid 真渲染证据只能来自 API 33 腿**：`ci.yml` 截图 job 跑 API 30（WebView Chromium 83），Mermaid 按 `<94` 门禁回退为代码块；`mermaid-render-verify.yml` 的 API 33 腿才断言 `engine=supported rendered>0`，API 30 腿断言 `engine=blocked rendered=0`。两条都绿才是完整证据 | #275 |
+| **拼板取帧必须用无扩展名帧名**：`montage_board` 内先 `base=${f%.png}`；坏帧 severity 按帧名存（`FRAME_SEVERITIES`）防 critical 被降级成 warn；帧文件存在却未被取用 = 取帧契约破坏，`::error::` + `exit 1` | #276 |
+| **APK 体积预算随有意增重同行抬升**：离线 Mermaid 使 baseline `7585167` → `8162579` B、budget `7847311` → `8424723` B（+256 KiB 余量）；有意增重必须在 PR 里记录旧→新值 + 实测增量 | #271 / #275 |
 
 ---
 

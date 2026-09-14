@@ -7,14 +7,21 @@
 
 开发一个**功能全面的 Android GitHub 客户端**（轻量、流畅、全 Material You）。技术规划 = `plan.md`（41KB，必读），需求来源 = `request.txt`。应用名/包名仍为占位符：applicationId 与 namespace = `com.yumiru11.githubapp`（模块 namespace 用 `core.github_xxx` 下划线写法），产品定名后统一改。
 
-**当前状态（2026-09-13 修复波末）**：`main@db1b696`。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、**四张新缺陷票 #200–#203** 全部关闭；#166 / #167 已关闭（条目逐条对账）。本轮修复波共合入 **42 张 PR（#229–#271，剔除非 PR 的 issue #250，全部 squash）**：前半 #229–#255（26 张）、中段 **#256–#266（11 张）**、收尾 **#267–#271（5 张）**。收尾波 = **#267** 状态对账（#266 后）、**#268** 设计系统落地计划 + ADR-0010、**#269** 离线 KaTeX 数学渲染、**#270** AGP 9.1.1 迁移（Gradle 9.3.1 / compileSdk 37 / 全模块 lint 恢复，#170 兑现）、**#271** nightly APK 体积回归门禁。**在途 PR：#275 离线 Mermaid（Phase 2，KaTeX/Mermaid 计划最后一块）**。
-**当前活动票三张**：**#26（T25 真机项，需用户配 Secrets）**、#1（Spec，常开）、#71（截图测试面板，勿关）。（#250 已关闭 —— 探针断言 bug 由 #252 修复。）
-**已知真实缺陷：无。** **RepoDetail 仓库头整块不渲染（UI-C01）已由 #258 修复**：根因是 `headerHeightPx` 自锁 —— 首帧外层高 0dp → 内层 `onSizeChanged` 在 `maxHeight=0` 约束下只能测到 0 → 自然高度永远回填不上，头部被裁成 0 高。改为 `Modifier.layout` 以 `Constraints.Infinity` 在 layout 阶段测自然高度，首帧即按自然高度渲染；回归测试 `repoDetailScreen_success_rendersRepositoryHeaderBlock` 锁定，CI `repo-star` / `repo-actions` 帧已转绿（坏帧 2 → 0）。
+**当前状态（2026-09-14 波末对账）**：`main@15d1092`（#287）；main CI 最新 run `34796226194` = success。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、四张新缺陷票 #200–#203 全部关闭；#166 / #167 已关闭。本轮波次共合入 **58 张 PR（编号 #229–#289；剔除非 PR 的 issue #250、不存在的 #278/#279，全部 squash）**：前半 #229–#255（26 张）、中段 **#256–#266（11 张）**、收尾 **#267–#271（5 张）**、**渲染/设计系统/加固 #272–#289（16 张）**。最后合入 = **#287**（2026-09-14T01:32:07Z）。明细 ledger 见 `docs/agents/project-status.md` §2。
+**本波已落地（均已在 main 复核）**：
+- **设计系统 Batch 1–4**（#273/#274/#280/#282）：`AppCard` / `AppChip` / `AppFilterChip` / `AppDialog` / `AppSegmentedButton` / `AppStateViews`（Empty/Error/Loading） / `AppScaffold` / `AppBottomSheet` + debug 画廊屏 Roborazzi 基线（`core:designsystem` 28 张 `DesignSystemGallery_*`）；间距 scale `AppDimens.spacing`（#280）；**六类裸控件门禁棘轮到 0**（`.github/bare-controls-baseline.txt` 全 0 + `.github/scripts/forbid-bare-controls.sh`）。
+- **离线渲染**：KaTeX（#269）+ Mermaid（#275）；CI 证据车道 `Mermaid render verify (emulator)`（API 33 断言 `engine=supported` + `rendered>0`；API 30 断言 `<94` 回退 `engine=blocked` + `rendered=0`，`mermaid-render-verify.yml`）与 `Glass verification (API 31+)`（`glass-verify.yml`）。**APK 体积门禁**（#271）：`.github/scripts/check-apk-size.sh` + `.github/apk-size-budget.properties`。
+- **Markdown 阅读密度**（#281）：`MarkdownDensity` 单一事实来源（`Literal` 默认 / `Conservative` 备选），`core:markdown` 基线重录。
+- **截图证据链**（#276/#277）：拼板取帧契约（`base=${f%.png}`）+ 逐帧 critical 严重度（`FRAME_SEVERITIES`）+ `lookup_mismatch` 防回归闸门；`readme-mermaid` 探针改视口内短滑 + 先取帧后断言。
+- **加固/功能**：#283（Test 任务级 15min 超时 `build.gradle.kts:297` + verify 步骤级 30min 上限）、#284（UI-1 窄屏 diff unified-only + 超长行横向滚动）、#286（UI-4 无 README 空态 + UI-6 文件树 mtime 列）、#287（EDITOR-1 软换行 / 查找替换 / 显式 CRLF+编码）、#288（DATA-2 `:core:data` 首次纳入覆盖率门禁 0.99）、#289（UI-7 feed 首载骨架）。
+**在途 PR 两张（OPEN，未合入 main）**：#290（SPEC-3 `@mention` 真实候选）、#291（游客模式 REST 配额守卫）。
+**当前活动票三张**：**#26（T25 真机项，需用户配 Secrets）**、#1（Spec，常开）、#71（截图测试面板，勿关）。（#250 已关闭，探针断言 bug 由 #252 修复。）
+**已知真实缺陷：无。** 依据四份审计报告（`docs/agents/*-audit-2026-09-11.md`）与 `docs/agents/remaining-backlog-2026-09-12.md` 收敛：四份报告点名的 P0 均闭环，残余清单只留真开口（真机项 / 产品决策 / 两张在途 PR）。**RepoDetail 仓库头整块不渲染（UI-C01）已由 #258 修复**（`headerHeightPx` 自锁 → `Modifier.layout` 以 `Constraints.Infinity` 测自然高度；回归测试 `repoDetailScreen_success_rendersRepositoryHeaderBlock` 锁定，CI `repo-star` / `repo-actions` 帧转绿，坏帧 2 → 0）。
 
 > 🔴 **四份审计报告已入库（2026-09-12，开工前必读其一）**
 > `docs/agents/` 下：`spec-audit-2026-09-11.md`（需求符合性 106 条判定 / 16 条缺口 / 20 条文档漂移）· `commit-audit-2026-09-11.md`（296 提交逐票核对）· `ui-audit-2026-09-11.md`（**含系统栏的 CI 真机帧**逐张读图，Roborazzi 基线看不到系统栏）· `markdown-consistency-2026-09-11.md`（GFM §2.3 逐条 + 三层回归说明）· `agp9-feasibility-2026-09-11.md`（工具链迁移实测）
 >
-> 🔴 **本轮新增入库（2026-09-12 / 09-13）**：`docs/agents/remaining-backlog-2026-09-12.md`（残余审计缺口收敛：已闭环钉死 / 仍待实现 / 过时反证；**#267–#271 后已再次收敛**，只留真开口）· `docs/research/katex-mermaid-offline-feasibility.md`（离线 KaTeX/Mermaid 体积实测）· `docs/adr/0009-graphql-read-path-deviation.md`（读路径全 REST 的架构决定）· `docs/design-system/implementation-plan.md`（SPEC-1 组件 / SPEC-2 间距 / UI-2 选中态：批次表 + 门禁 + DoD）· `docs/adr/0010-design-system-rollout.md`（设计系统分批迁移决策）
+> 🔴 **本轮新增入库（2026-09-12 / 09-13）**：`docs/agents/remaining-backlog-2026-09-12.md`（残余审计缺口收敛：已闭环钉死 / 仍待实现 / 过时反证；**#229–#289 后已再次收敛**，只留真开口）· `docs/research/katex-mermaid-offline-feasibility.md`（离线 KaTeX/Mermaid 体积实测）· `docs/adr/0009-graphql-read-path-deviation.md`（读路径全 REST 的架构决定）· `docs/design-system/implementation-plan.md`（SPEC-1 组件 / SPEC-2 间距 / UI-2 选中态：批次表 + 门禁 + DoD）· `docs/adr/0010-design-system-rollout.md`（设计系统分批迁移决策）
 
 > ✅ **OAuth client id 注入已完成（PR #239），真机 PKCE 只剩你填一次值**
 > `app/build.gradle.kts:11-48` 三级解析、**先命中先取**：Gradle 属性 `-PoauthClientId` → `local.properties:oauthClientId` → 环境变量 `OAUTH_CLIENT_ID`，写入 `BuildConfig.OAUTH_CLIENT_ID`；由 app 装配层 `OAuthConfigModule` 构造 `OAuthConfig`（core:github-auth 不感知 BuildConfig，Konsist 禁 core→app）。真实值只进构建产物、不落库（`local.properties` 已 gitignore）。
@@ -77,14 +84,16 @@
 ./gradlew --no-daemon konsistCheck       # 架构测试（Konsist 分层依赖方向；无匹配测试已改为硬失败，#260）
 ./gradlew --no-daemon lintDebug         # Android Lint 全模块（abortOnError；#270 后检测器全恢复，0 disable）
 ./gradlew --no-daemon :app:testDebugUnitTest    # 单测
-./gradlew --no-daemon coverageVerify     # JaCoCo 覆盖率硬门禁（22 模块阈值见 build.gradle.kts coverageThresholds；无 exec 数据 = 硬失败，#260）
+./gradlew --no-daemon coverageVerify     # JaCoCo 覆盖率硬门禁（**23 模块**阈值见 build.gradle.kts coverageThresholds；#288 起含 :core:data；无 exec 数据 = 硬失败，#260）
 ./gradlew --no-daemon :app:verifyRoborazziDebug # 截图基准校验（app；模块需逐个列）
 ./gradlew --no-daemon :app:assembleDebug # 打 debug APK
 ```
 
 > **截图 verify 覆盖面（CI 同款，`ci.yml:192-205`）**：`app` + **13 个模块** —— `:core:ui` / `:core:designsystem` / `:core:markdown` / `:feature:auth` / `:feature:issue` / `:feature:repo` / `:feature:notifications` / `:feature:pullrequest` / `:feature:home` / `:feature:search` / `:feature:editor` / `:feature:profile` / `:feature:settings`；录制名单（`record-screenshots.yml`）与 verify 名单镜像。**帧闭包断言**：`.github/scripts/verify-screenshots.sh`（#260）要求 ≥1 张 PNG、无 0 字节 PNG、`screenshots.sh` 声明的每帧必有产出或显式处置标记（`.skipped.txt`），帧数下限 28。
 >
-> **两条新增硬门禁（2026-09-13）**：① **lint 覆盖面守卫**（`ci.yml`，AGP 9 收口）断言 0 跳过 registry + 0 `UnknownIssueId` + 0 `disable +=`（31 条旧 disable 已删、48 个 lint error 已在源码修复）；② **APK 体积回归**（`#271`）：`.github/scripts/check-apk-size.sh` 消费 `.github/apk-size-budget.properties`（baseline `7585167` B，budget = baseline + 256 KiB = `7847311` B），release APK 超预算即 nightly 判红。
+> **四条硬门禁（2026-09-13/14）**：① **lint 覆盖面守卫**（`ci.yml`，AGP 9 收口）断言 0 跳过 registry + 0 `UnknownIssueId` + 0 `disable +=`（31 条旧 disable 已删、48 个 lint error 已在源码修复）；② **APK 体积回归**（#271）：`.github/scripts/check-apk-size.sh` 消费 `.github/apk-size-budget.properties`（**现 baseline `8162579` B，budget = baseline + 256 KiB = `8424723` B**；旧值 `7585167`/`7847311` 已随离线 Mermaid 有意抬升），release APK 超预算即 nightly 判红；③ **禁新增裸控件**（#280/#282）：`.github/scripts/forbid-bare-controls.sh` 对照 `.github/bare-controls-baseline.txt`（Card/Scaffold/FilterChip/AlertDialog/ModalBottomSheet/SnackbarHost **六类全 0**），回流即红；④ **截图帧闭包**（#260）：`.github/scripts/verify-screenshots.sh` 断言每帧有产出或 `.skipped.txt` 显式处置。
+>
+> **CI 证据车道（API 分层，勿混淆）**：`ci.yml` 截图 job 跑 **API 30**（WebView Chromium 83）——Mermaid 在此按 `<94` 门禁**回退为代码块**，不能据此说「渲染通过」。真渲染证据在 `mermaid-render-verify.yml`：**API 33 腿**断言 `engine=supported` + `rendered>0`，**API 30 腿**断言 `engine=blocked` + `rendered=0`（两条都绿才是完整证据）。`glass-verify.yml` = `Glass verification (API 31+)`。
 
 快速验证（大量编辑后查 error，最快）：
 ```bash
@@ -95,7 +104,7 @@
 
 **⚠️ 铁律（血泪教训）**：
 - 本地验证必须与 CI 门禁**命令级对齐**——只跑 compile/test 会漏 spotless/detekt，CI 必挂（T4/T6/T7 曾爆 9 个违规）。任何实现/修复任务验证命令**必须含 `spotlessCheck + detekt`**
-- **覆盖率门禁同理必跑**：CI 有 `coverageVerify` 硬门禁（22 个有阈值模块的 LINE ≥ `coverageThresholds` 阈值；阈值已按 #261 后的**真实**覆盖率棘轮到实测值，#263）。新增/删除生产代码后必须跑 `coverageVerify`。**无 exec 数据不再静默 SKIP**——声明了阈值的模块若没有单测执行数据，任务**硬失败**（#260）。JaCoCo 排除按【编译类名】匹配（`*EditorViewKt*` 精确到 Composable 编译产物，逻辑 ViewModel 不再被误伤，#247）；`MarkdownEditorViewModel` 等有单测的逻辑类必须留在分母内
+- **覆盖率门禁同理必跑**：CI 有 `coverageVerify` 硬门禁（**23 个**有阈值模块的 LINE ≥ `coverageThresholds` 阈值；阈值已按 #261 后的**真实**覆盖率棘轮到实测值，#263；#288 起 `:core:data` 首次纳入 0.99）。新增/删除生产代码后必须跑 `coverageVerify`。**无 exec 数据不再静默 SKIP**——声明了阈值的模块若没有单测执行数据，任务**硬失败**（#260）。JaCoCo 排除按【编译类名】匹配（`*EditorViewKt*` 精确到 Composable 编译产物，逻辑 ViewModel 不再被误伤，#247）；`MarkdownEditorViewModel` 等有单测的逻辑类必须留在分母内
 - **Robolectric 的覆盖率是真数据（#261）**：JaCoCo agent 默认 `inclnolocationclasses=false` 会跳过 Robolectric `SandboxClassLoader` 定义的无 CodeSource 应用类 → 覆盖率假 0。修复 = `includeNoLocationClasses=true` + `includes=com/yumiru11/*`（`build.gradle.kts` 的 `configureRobolectricCoverage`）。**「必须纯 JVM 可测才进覆盖率」的旧约束已不成立**
 - 构建输出**禁止用 grep/tail/head 过滤后反复重跑**——一次跑完看完整输出
 - **不要用 LSP**（本机 kotlin-ls 冷启动失败/超时）——验证一律以 Gradle 输出为准
