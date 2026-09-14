@@ -43,6 +43,7 @@ import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.profile.model.GistItem
 
@@ -124,7 +125,7 @@ private fun GistListContent(
         else -> {
             LazyColumn(
                 modifier = modifier,
-                contentPadding = PaddingValues(bottom = 16.dp),
+                contentPadding = PaddingValues(bottom = AppDimens.spacing.l),
             ) {
                 items(
                     count = gists.itemCount,
@@ -143,7 +144,7 @@ private fun GistListContent(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 24.dp),
+                                    .padding(vertical = AppDimens.spacing.xl),
                         )
                     }
                 }
@@ -156,7 +157,7 @@ private fun GistListContent(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 24.dp),
+                                    .padding(vertical = AppDimens.spacing.xl),
                         )
                     }
                 }
@@ -176,7 +177,7 @@ private fun GistRow(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.m),
     ) {
         Text(
             text = gist.fileName,
@@ -186,7 +187,7 @@ private fun GistRow(
         )
         val description = gist.description
         if (description != null) {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodyMedium,
@@ -206,7 +207,7 @@ private fun GistRow(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(AppDimens.spacing.m))
             }
             gist.createdAt?.let { timestamp ->
                 relativeTimeText(timestamp)?.let { text ->

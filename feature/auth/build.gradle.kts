@@ -34,6 +34,9 @@ dependencies {
     // 认证核心（T4 Wave2 接线：OAuthSessionManager / TokenStorage / AuthState / OAuthConfig）
     implementation(project(":core:github-auth"))
 
+    // 设计系统令牌（#278：LoginScreen 结构间距消费 AppDimens.spacing；与其余 feature 模块口径一致）
+    implementation(project(":core:designsystem"))
+
     // Hilt（AuthViewModel @HiltViewModel 装配）
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
