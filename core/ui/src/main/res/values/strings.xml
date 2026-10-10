@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Navigation -->
+    <string name="nav_back">Back</string>
     <string name="nav_home">Home</string>
     <string name="nav_repos">Repos</string>
     <string name="nav_profile">Profile</string>

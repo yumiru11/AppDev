@@ -82,12 +82,30 @@ class SettingsViewModel
                 // 背景图两项并进 misc 组：外层 combine 最多支持 5 个流，单独再开一组会超。
                 // 语义上也算「杂项偏好」，合并无碍。
                 combine(
-                    preferences.languageTag,
-                    preferences.staggerEnabled,
-                    preferences.backgroundImageUri,
-                    preferences.backgroundOpacity,
-                ) { languageTag, stagger, backgroundUri, backgroundOpacity ->
-                    MiscPrefs(languageTag, stagger, backgroundUri, backgroundOpacity)
+                    combine(
+                        preferences.languageTag,
+                        preferences.staggerEnabled,
+                        preferences.backgroundImageUri,
+                        preferences.backgroundOpacity,
+                    ) { languageTag, stagger, backgroundUri, backgroundOpacity ->
+                        MiscPrefs(languageTag, stagger, backgroundUri, backgroundOpacity)
+                    },
+                    // 编辑器软换行两项（EDITOR-1）：外层 combine 5 槽已满，此处再嵌一层。
+                    combine(
+                        preferences.codeEditorSoftWrap,
+                        preferences.markdownEditorSoftWrap,
+                    ) { codeWrap, markdownWrap ->
+                        EditorWrapPrefs(codeWrap, markdownWrap)
+                    },
+                ) { misc, editorWrap ->
+                    MiscPrefs(
+                        languageTag = misc.languageTag,
+                        staggerEnabled = misc.staggerEnabled,
+                        backgroundUri = misc.backgroundUri,
+                        backgroundOpacity = misc.backgroundOpacity,
+                        codeSoftWrap = editorWrap.codeSoftWrap,
+                        markdownSoftWrap = editorWrap.markdownSoftWrap,
+                    )
                 },
                 // 登录态 + 限流快照并成一组（GATE-2）：外层 combine 上限 5 流，已满，
                 // 且两者同属「会话侧只读状态」，合并语义也自然。
@@ -109,6 +127,8 @@ class SettingsViewModel
                     iconStyle = style.iconStyle,
                     codeFont = style.codeFont,
                     codeLineNumbers = style.codeLineNumbers,
+                    codeSoftWrap = misc.codeSoftWrap,
+                    markdownSoftWrap = misc.markdownSoftWrap,
                     languageTag = misc.languageTag,
                     blurEnabled = glass.blurEnabled,
                     glassTopBar = glass.topBar,
@@ -165,6 +185,16 @@ class SettingsViewModel
 
         fun setCodeLineNumbers(enabled: Boolean) {
             persist { preferences.setCodeLineNumbers(enabled) }
+        }
+
+        /** 代码视图软换行（EDITOR-1；与编辑器工具栏写的是同一份偏好）。 */
+        fun setCodeSoftWrap(enabled: Boolean) {
+            persist { preferences.setCodeEditorSoftWrap(enabled) }
+        }
+
+        /** Markdown 编辑器软换行（EDITOR-1；同一份偏好）。 */
+        fun setMarkdownSoftWrap(enabled: Boolean) {
+            persist { preferences.setMarkdownEditorSoftWrap(enabled) }
         }
 
         fun setBlurEnabled(enabled: Boolean) {
@@ -271,6 +301,16 @@ private data class MiscPrefs(
     /** #167 / UI04：背景图 URI 与不透明度 */
     val backgroundUri: String?,
     val backgroundOpacity: Float,
+    /** 代码视图软换行（EDITOR-1） */
+    val codeSoftWrap: Boolean = false,
+    /** Markdown 编辑器软换行（EDITOR-1） */
+    val markdownSoftWrap: Boolean = true,
+)
+
+/** 编辑器软换行中间聚合（EDITOR-1：两个开关并成一层，避免外层 combine 超 5 槽）。 */
+private data class EditorWrapPrefs(
+    val codeSoftWrap: Boolean,
+    val markdownSoftWrap: Boolean,
 )
 
 /** 会话侧只读状态聚合（GATE-2：登录态 + 限流快照并进外层 combine 的第 5 槽）。 */

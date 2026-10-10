@@ -22,6 +22,14 @@ object AppDimens {
     /** 分组卡内条目圆角（#87：CardGroup 中段条目的常态圆角） */
     val cornerCardInner: Dp = 4.dp
 
+    /**
+     * 分组卡内条目之间的「细缝」。
+     *
+     * 语义：同组条目要看起来属于**同一张卡**——靠这条极细的缝分隔，而不是各自成卡。
+     * 缝的颜色 = 页面底色（条目圆角外自然露底），不另画分割线。
+     */
+    val groupSeam: Dp = 2.dp
+
     val cornerExtraLarge: Dp = 28.dp
 
     // Spacing

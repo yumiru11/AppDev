@@ -3,6 +3,7 @@ package com.yumiru11.githubapp.feature.settings
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
+import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.core.testing.screenshot.captureScreenshotDeterministic
 import io.mockk.every
@@ -54,14 +55,28 @@ class SettingsScreenScreenshotTest {
     @Test
     fun settingsScreen_lightTheme_matchesBaseline() {
         composeRule.captureScreenshotDeterministic(name = "SettingsScreen_light", darkTheme = false) {
-            SettingsScreen(viewModel = settingsViewModel(dark = false), onBackClick = {})
+            AppTheme(themeMode = ThemeMode.LIGHT) {
+                SettingsScreen(
+                    viewModel = settingsViewModel(dark = false),
+                    onBackClick = {},
+                    onOpenPreferences = {},
+                    onOpenAccount = {},
+                )
+            }
         }
     }
 
     @Test
     fun settingsScreen_darkTheme_matchesBaseline() {
         composeRule.captureScreenshotDeterministic(name = "SettingsScreen_dark", darkTheme = true) {
-            SettingsScreen(viewModel = settingsViewModel(dark = true), onBackClick = {})
+            AppTheme(themeMode = ThemeMode.DARK) {
+                SettingsScreen(
+                    viewModel = settingsViewModel(dark = true),
+                    onBackClick = {},
+                    onOpenPreferences = {},
+                    onOpenAccount = {},
+                )
+            }
         }
     }
 }

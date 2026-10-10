@@ -18,6 +18,23 @@ class AppRouteTest {
         assertEquals("login", AppRoute.startDestinationPattern<AppRoute.Login>())
     }
 
+    /**
+     * 设置分层结构（2026-10-10）的 7 条路由基路径。
+     *
+     * @SerialName 即 Navigation 的 route pattern 基路径，改名 = 破坏既有深链/回退栈，
+     * 故逐条钉死（与 Home/Login 同口径）。
+     */
+    @Test
+    fun startDestinationPattern_settingsHierarchy_isStable() {
+        assertEquals("settings", AppRoute.startDestinationPattern<AppRoute.Settings>())
+        assertEquals("settings_preferences", AppRoute.startDestinationPattern<AppRoute.SettingsPreferences>())
+        assertEquals("settings_appearance", AppRoute.startDestinationPattern<AppRoute.SettingsAppearance>())
+        assertEquals("settings_interface", AppRoute.startDestinationPattern<AppRoute.SettingsInterface>())
+        assertEquals("settings_editor", AppRoute.startDestinationPattern<AppRoute.SettingsEditor>())
+        assertEquals("settings_general", AppRoute.startDestinationPattern<AppRoute.SettingsGeneral>())
+        assertEquals("settings_account", AppRoute.startDestinationPattern<AppRoute.SettingsAccount>())
+    }
+
     // ---- 路由对象默认值（带默认值的参数 = optional query） ----
 
     @Test

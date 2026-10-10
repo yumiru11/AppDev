@@ -85,7 +85,23 @@ fun AppNavHost(
         @Composable (owner: String, repo: String, ref: String, path: String) -> Unit = { _, _, _, _ -> },
     profileScreen: @Composable (onLoginClick: () -> Unit, onBackClick: () -> Unit) -> Unit = { _, _ -> },
     gistsScreen: @Composable (username: String, onBackClick: () -> Unit) -> Unit = { _, _ -> },
-    settingsScreen: @Composable () -> Unit = {},
+    settingsScreen: @Composable (
+        onBackClick: () -> Unit,
+        onOpenPreferences: () -> Unit,
+        onOpenAccount: () -> Unit,
+    ) -> Unit = { _, _, _ -> },
+    settingsPreferencesScreen: @Composable (
+        onBackClick: () -> Unit,
+        onOpenAppearance: () -> Unit,
+        onOpenInterface: () -> Unit,
+        onOpenEditor: () -> Unit,
+        onOpenGeneral: () -> Unit,
+    ) -> Unit = { _, _, _, _, _ -> },
+    settingsAppearanceScreen: @Composable (onBackClick: () -> Unit) -> Unit = {},
+    settingsInterfaceScreen: @Composable (onBackClick: () -> Unit) -> Unit = {},
+    settingsEditorScreen: @Composable (onBackClick: () -> Unit) -> Unit = {},
+    settingsGeneralScreen: @Composable (onBackClick: () -> Unit) -> Unit = {},
+    settingsAccountScreen: @Composable (onBackClick: () -> Unit) -> Unit = {},
     issueListScreen: @Composable (
         owner: String,
         repo: String,
@@ -159,9 +175,57 @@ fun AppNavHost(
                     }
                 }
 
+                // 设置分层结构（2026-10-10）：screen lambda 是**函数类型参数**，
+                // 调用侧必须按位置传实参——Kotlin 禁止对函数类型用命名实参（编译实测）。
                 composable<AppRoute.Settings> {
                     provideNavTransitionScope {
-                        settingsScreen()
+                        settingsScreen(
+                            { navController.popBackStack() },
+                            { navController.navigate(AppRoute.SettingsPreferences) },
+                            { navController.navigate(AppRoute.SettingsAccount) },
+                        )
+                    }
+                }
+
+                composable<AppRoute.SettingsPreferences> {
+                    provideNavTransitionScope {
+                        settingsPreferencesScreen(
+                            { navController.popBackStack() },
+                            { navController.navigate(AppRoute.SettingsAppearance) },
+                            { navController.navigate(AppRoute.SettingsInterface) },
+                            { navController.navigate(AppRoute.SettingsEditor) },
+                            { navController.navigate(AppRoute.SettingsGeneral) },
+                        )
+                    }
+                }
+
+                composable<AppRoute.SettingsAppearance> {
+                    provideNavTransitionScope {
+                        settingsAppearanceScreen({ navController.popBackStack() })
+                    }
+                }
+
+                composable<AppRoute.SettingsInterface> {
+                    provideNavTransitionScope {
+                        settingsInterfaceScreen({ navController.popBackStack() })
+                    }
+                }
+
+                composable<AppRoute.SettingsEditor> {
+                    provideNavTransitionScope {
+                        settingsEditorScreen({ navController.popBackStack() })
+                    }
+                }
+
+                composable<AppRoute.SettingsGeneral> {
+                    provideNavTransitionScope {
+                        settingsGeneralScreen({ navController.popBackStack() })
+                    }
+                }
+
+                composable<AppRoute.SettingsAccount> {
+                    provideNavTransitionScope {
+                        settingsAccountScreen({ navController.popBackStack() })
                     }
                 }
 

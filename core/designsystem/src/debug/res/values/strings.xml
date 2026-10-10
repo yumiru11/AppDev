@@ -88,4 +88,6 @@
     <string name="gallery_color_error" translatable="false">error</string>
     <string name="gallery_color_success" translatable="false">success</string>
     <string name="gallery_color_warning" translatable="false">warning</string>
+    <string name="gallery_card_group_title">Group</string>
+    <string name="gallery_card_group_second_supporting">Supporting line</string>
 </resources>
