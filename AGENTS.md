@@ -7,7 +7,7 @@
 
 开发一个**功能全面的 Android GitHub 客户端**（轻量、流畅、全 Material You）。技术规划 = `plan.md`（41KB，必读），需求来源 = `request.txt`。应用名/包名仍为占位符：applicationId 与 namespace = `com.yumiru11.githubapp`（模块 namespace 用 `core.github_xxx` 下划线写法），产品定名后统一改。
 
-**当前状态（2026-09-14 波末对账 + 收尾 + .dp 扫荡）**：`main@04cf05e`（#301 扫荡收尾）；main CI 全绿。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、四张新缺陷票 #200–#203 全部关闭；#166 / #167 已关闭。本轮共合入 **70 张 PR**：波次 **#229–#291（60 张，全部 squash）** + 收尾 **#292**（docs 对账）+ **#293**（阅读密度回滚）+ **#294**（docs 状态修正）+ **#295–#301**（#278 全量 `.dp` 扫荡 7 张）。分档：前半 #229–#255（26 张）、中段 #256–#266（11 张）、收尾 #267–#271（5 张）、渲染/设计系统/加固 #272–#291（18 张）。**编号 #250 / #278 / #279 是 issue 不是 PR**：#278 = 全量 `.dp` 扫荡跟踪票——**2026-09-14 完成并关闭**（7 张 PR #295–#301，全部零基线变更；`core:markdown` 有意排除），#279 为其重复票（已关闭）。明细 ledger 见 `docs/agents/project-status.md` §2。
+**当前状态（2026-10-11 #307 设置分层重构合入）**：`main@399de75`（#307）；main CI 全绿。**T1–T26 全部合入**；ui-audit 8 票（#83–#90）、Task B 渲染架构切换（PR #70/#73）、四张新缺陷票 #200–#203 全部关闭；#166 / #167 已关闭。本轮共合入 **71 张 PR**：波次 **#229–#291（60 张，全部 squash）** + 收尾 **#292**（docs 对账）+ **#293**（阅读密度回滚）+ **#294**（docs 状态修正）+ **#295–#301**（#278 全量 `.dp` 扫荡 7 张）+ **#307**（设置模块 M3 Expressive 分层重构 + 截图证据链修复，2026-10-11，详见 `docs/agents/project-status.md` §2.6）。分档：前半 #229–#255（26 张）、中段 #256–#266（11 张）、收尾 #267–#271（5 张）、渲染/设计系统/加固 #272–#291（18 张）。**编号 #250 / #278 / #279 是 issue 不是 PR**：#278 = 全量 `.dp` 扫荡跟踪票——**2026-09-14 完成并关闭**（7 张 PR #295–#301，全部零基线变更；`core:markdown` 有意排除），#279 为其重复票（已关闭）。明细 ledger 见 `docs/agents/project-status.md` §2。
 **本波已落地（均已在 main 复核）**：
 - **设计系统 Batch 1–4**（#273/#274/#280/#282）：`AppCard` / `AppChip` / `AppFilterChip` / `AppDialog` / `AppSegmentedButton` / `AppStateViews`（Empty/Error/Loading） / `AppScaffold` / `AppBottomSheet` + debug 画廊屏 Roborazzi 基线（`core:designsystem` 28 张 `DesignSystemGallery_*`）；间距 scale `AppDimens.spacing`（#280）；**六类裸控件门禁棘轮到 0**（`.github/bare-controls-baseline.txt` 全 0 + `.github/scripts/forbid-bare-controls.sh`）。
 - **离线渲染**：KaTeX（#269）+ Mermaid（#275）；CI 证据车道 `Mermaid render verify (emulator)`（API 33 断言 `engine=supported` + `rendered>0`；API 30 断言 `<94` 回退 `engine=blocked` + `rendered=0`，`mermaid-render-verify.yml`）与 `Glass verification (API 31+)`（`glass-verify.yml`）。**APK 体积门禁**（#271）：`.github/scripts/check-apk-size.sh` + `.github/apk-size-budget.properties`。
@@ -15,8 +15,8 @@
 - **截图证据链**（#276/#277）：拼板取帧契约（`base=${f%.png}`）+ 逐帧 critical 严重度（`FRAME_SEVERITIES`）+ `lookup_mismatch` 防回归闸门；`readme-mermaid` 探针改视口内短滑 + 先取帧后断言。
 - **加固/功能**：#283（Test 任务级 15min 超时 `build.gradle.kts:297` + verify 步骤级 30min 上限）、#284（UI-1 窄屏 diff unified-only + 超长行横向滚动）、#286（UI-4 无 README 空态 + UI-6 文件树 mtime 列）、#287（EDITOR-1 软换行 / 查找替换 / 显式 CRLF+编码）、#288（DATA-2 `:core:data` 首次纳入覆盖率门禁 0.99）、#289（UI-7 feed 首载骨架）。
 - **在途收尾（已合入）**：#290（SPEC-3 `@mention` 接入真实候选：REST collaborators + `AppRoute.Editor(owner, repo)`，`MentionCandidates` 由宿主层 Hilt 解析 `mentions: List<String>`）、#291（游客模式 REST 配额守卫：`AuthState.Anonymous` 短路 mtime 列查询、不做负缓存）。
-**wave 内 PR 全部合入 main；当前唯一 open PR = #292（本 docs 对账）。**
-**当前活动票三张**：**#26（T25 真机项，需用户配 Secrets）**、#1（Spec，常开）、#71（截图测试面板，勿关）。（#250 已关闭，探针断言 bug 由 #252 修复。）
+**#307 已合入 main；当前 open PR 仅 Dependabot 两条（#304/#305）。**
+**当前活动票三张**：**#26（T25 真机项，需用户配 Secrets）**、#1（Spec，常开）、#71（截图测试面板，勿关）。（#250 已关闭，探针断言 bug 由 #252 修复；另 #306 为 test 票，待 triage。）
 **已知真实缺陷：无。** 依据四份审计报告（`docs/agents/*-audit-2026-09-11.md`）与 `docs/agents/remaining-backlog-2026-09-12.md` 收敛：四份报告点名的 P0 均闭环，残余清单只留真开口（真机项 / 产品决策 / PROTO-1 / PERF-1 / PERF-2）。**RepoDetail 仓库头整块不渲染（UI-C01）已由 #258 修复**（`headerHeightPx` 自锁 → `Modifier.layout` 以 `Constraints.Infinity` 测自然高度；回归测试 `repoDetailScreen_success_rendersRepositoryHeaderBlock` 锁定，CI `repo-star` / `repo-actions` 帧转绿，坏帧 2 → 0）。
 
 > 🔴 **四份审计报告已入库（2026-09-12，开工前必读其一）**
