@@ -39,6 +39,38 @@ sealed interface AppRoute {
     @SerialName("settings")
     data object Settings : AppRoute
 
+    // 设置二级页「偏好设置」（hub：外观 / 界面与动效 / 编辑器 / 通用）。
+    // 设置改为 rikkahub 式**分层结构**（2026-10-10 用户拍板）：L1 hub 只放入口，
+    // 真正的开关在叶子页——L1 条目带图标、叶子页条目不带图标，层级一眼可辨。
+    @Serializable
+    @SerialName("settings_preferences")
+    data object SettingsPreferences : AppRoute
+
+    /** 设置三级页：外观（主题模式 / 动态取色 / 主色调 / 图标风格 / 纯黑 / 高对比）。 */
+    @Serializable
+    @SerialName("settings_appearance")
+    data object SettingsAppearance : AppRoute
+
+    /** 设置三级页：界面与动效（圆角 / 动画 / 列表入场 / 毛玻璃 / 背景图）。 */
+    @Serializable
+    @SerialName("settings_interface")
+    data object SettingsInterface : AppRoute
+
+    /** 设置三级页：编辑器（代码字体 / 行号 / 换行）。 */
+    @Serializable
+    @SerialName("settings_editor")
+    data object SettingsEditor : AppRoute
+
+    /** 设置三级页：通用（语言）。 */
+    @Serializable
+    @SerialName("settings_general")
+    data object SettingsGeneral : AppRoute
+
+    /** 设置三级页：账号与开发者（登录方式 / PAT / 配额）。 */
+    @Serializable
+    @SerialName("settings_account")
+    data object SettingsAccount : AppRoute
+
     // SPEC-3：Markdown 编辑器需要 owner/repo 才能拉仓库协作者喂 @mention 补全候选；
     // 大文档正文仍走 EditorContentHolder（不适合放 route）。带默认参数的 data class：
     // Navigation pattern = `editor?owner={owner}&repo={repo}`，空串 = 无仓库语境（无候选）。

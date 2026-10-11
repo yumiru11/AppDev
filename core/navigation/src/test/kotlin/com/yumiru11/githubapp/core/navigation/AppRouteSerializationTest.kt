@@ -30,6 +30,14 @@ class AppRouteSerializationTest {
         roundTrip(AppRoute.Search())
         roundTrip(AppRoute.Search("topic:kotlin"))
         roundTrip(AppRoute.Settings)
+        // 设置分层结构（2026-10-10）：L2 偏好设置 + 5 个 L3 叶子页——新增路由必须在此登记，
+        // 否则 `core:navigation` 的覆盖率门禁（0.96）会因生成序列化器未被执行而判红。
+        roundTrip(AppRoute.SettingsPreferences)
+        roundTrip(AppRoute.SettingsAppearance)
+        roundTrip(AppRoute.SettingsInterface)
+        roundTrip(AppRoute.SettingsEditor)
+        roundTrip(AppRoute.SettingsGeneral)
+        roundTrip(AppRoute.SettingsAccount)
         roundTrip(AppRoute.Editor())
         roundTrip(AppRoute.Editor("owner", "repo"))
         roundTrip(AppRoute.CreateRepo)

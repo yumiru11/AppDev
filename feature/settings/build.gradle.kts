@@ -42,8 +42,10 @@ dependencies {
     // 偏好仓库（T24 全部设置项持久化）
     implementation(project(":core:datastore"))
 
-    // 设计令牌（AppMotion/AppDimens 滑杆预览）
+    // 设计令牌与组件（AppSettingsGroup / AppSelect / AppScaffold / AppDialog）
     implementation(project(":core:designsystem"))
+    // 壳层组件（AppBackButton 圆形返回、AppSnackbarHost）——与其余 6 个 feature 同款依赖
+    implementation(project(":core:ui"))
 
     // 认证核心（PAT 开发者模式：TokenStorage/OAuthSessionManager/AuthState）
     implementation(project(":core:github-auth"))

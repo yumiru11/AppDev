@@ -77,4 +77,6 @@
     <!-- Long bar action -->
     <string name="gallery_long_bar_enabled">新建 Issue</string>
     <string name="gallery_long_bar_disabled">新建仓库</string>
+    <string name="gallery_card_group_title">分组</string>
+    <string name="gallery_card_group_supporting">说明文字</string>
 </resources>

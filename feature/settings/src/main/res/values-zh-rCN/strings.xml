@@ -83,4 +83,34 @@
     <string name="about_version">版本 %1$s</string>
     <string name="about_description">轻量、流畅、全 Material You 的 GitHub 客户端。</string>
     <string name="about_ok">好</string>
-</resources>
+    <!-- 设置分层结构（2026-10-10 重构：L1 hub → L2 偏好设置 → L3 叶子页） -->
+    <string name="settings_preferences">偏好设置</string>
+    <string name="settings_preferences_desc">主题、界面与编辑器</string>
+    <string name="settings_account_entry">账号与开发者</string>
+    <string name="settings_account_entry_desc">登录方式、令牌与配额</string>
+    <string name="settings_about_group">关于</string>
+    <string name="settings_about_desc">版本与应用信息</string>
+    <string name="settings_appearance_desc">主题、配色与图标风格</string>
+    <string name="settings_interface">界面与动效</string>
+    <string name="settings_interface_desc">圆角、动画、毛玻璃与背景</string>
+    <string name="settings_editor">编辑器</string>
+    <string name="settings_editor_desc">代码字体、行号与换行</string>
+    <string name="settings_general_entry">通用</string>
+    <string name="settings_general_entry_desc">语言</string>
+    <string name="settings_group_theme">主题</string>
+    <string name="settings_group_colors">配色与图标</string>
+    <string name="settings_group_shape">形状与动效</string>
+    <string name="settings_group_glass">毛玻璃</string>
+    <string name="settings_group_background">背景图</string>
+    <string name="settings_group_quota">剩余配额</string>
+    <string name="settings_account_group">账号</string>
+    <string name="settings_account_state">登录方式</string>
+    <string name="settings_account_signed_in">已通过 GitHub 登录</string>
+    <string name="settings_account_pat">个人访问令牌</string>
+    <string name="settings_account_anonymous">游客（未登录）</string>
+    <string name="settings_pat_configured">已配置</string>
+    <string name="settings_pat_not_configured">未配置</string>
+    <string name="settings_code_wrap">长行自动换行</string>
+    <string name="settings_code_wrap_desc">长行换行显示，而不是横向滚动</string>
+    <string name="settings_md_wrap">Markdown 编辑器自动换行</string>
+    <string name="settings_md_wrap_desc">同上，作用于 Markdown 编辑器</string></resources>

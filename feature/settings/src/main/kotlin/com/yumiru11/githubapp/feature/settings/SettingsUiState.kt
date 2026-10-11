@@ -24,6 +24,10 @@ data class SettingsUiState(
     val iconStyle: IconStyle = IconStyle.ROUNDED,
     val codeFont: CodeFont = CodeFont.MONO,
     val codeLineNumbers: Boolean = true,
+    /** 代码视图软换行（EDITOR-1；默认关 = 横向滚动） */
+    val codeSoftWrap: Boolean = false,
+    /** Markdown 编辑器软换行（EDITOR-1；默认开 = 长行阅读友好） */
+    val markdownSoftWrap: Boolean = true,
     val languageTag: String? = null,
     /** 毛玻璃总开关（#167 / UI03） */
     val blurEnabled: Boolean = true,

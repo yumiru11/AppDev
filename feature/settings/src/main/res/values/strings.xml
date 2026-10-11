@@ -83,4 +83,34 @@
     <string name="about_version">Version %1$s</string>
     <string name="about_description">A lightweight, Material You GitHub client.</string>
     <string name="about_ok">OK</string>
-</resources>
+    <!-- 设置分层结构（2026-10-10 重构：L1 hub → L2 偏好设置 → L3 叶子页） -->
+    <string name="settings_preferences">Preferences</string>
+    <string name="settings_preferences_desc">Theme, interface and editor</string>
+    <string name="settings_account_entry">Account &amp; developer</string>
+    <string name="settings_account_entry_desc">Sign-in method, token and rate limit</string>
+    <string name="settings_about_group">About</string>
+    <string name="settings_about_desc">Version and app info</string>
+    <string name="settings_appearance_desc">Theme, colours and icon style</string>
+    <string name="settings_interface">Interface &amp; motion</string>
+    <string name="settings_interface_desc">Corners, animation, glass and background</string>
+    <string name="settings_editor">Editor</string>
+    <string name="settings_editor_desc">Code font, line numbers and wrapping</string>
+    <string name="settings_general_entry">General</string>
+    <string name="settings_general_entry_desc">Language</string>
+    <string name="settings_group_theme">Theme</string>
+    <string name="settings_group_colors">Colour &amp; icons</string>
+    <string name="settings_group_shape">Shape &amp; motion</string>
+    <string name="settings_group_glass">Glass effect</string>
+    <string name="settings_group_background">Background image</string>
+    <string name="settings_group_quota">Rate limit</string>
+    <string name="settings_account_group">Account</string>
+    <string name="settings_account_state">Sign-in</string>
+    <string name="settings_account_signed_in">Signed in with GitHub</string>
+    <string name="settings_account_pat">Personal access token</string>
+    <string name="settings_account_anonymous">Guest — not signed in</string>
+    <string name="settings_pat_configured">Configured</string>
+    <string name="settings_pat_not_configured">Not configured</string>
+    <string name="settings_code_wrap">Wrap long lines</string>
+    <string name="settings_code_wrap_desc">Wrap instead of scrolling sideways</string>
+    <string name="settings_md_wrap">Wrap in Markdown editor</string>
+    <string name="settings_md_wrap_desc">Same setting for the Markdown editor</string></resources>

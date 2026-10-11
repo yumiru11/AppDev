@@ -57,6 +57,8 @@ class SettingsViewModelTest {
                 assertEquals(IconStyle.ROUNDED, state.iconStyle)
                 assertEquals(CodeFont.MONO, state.codeFont)
                 assertEquals(true, state.codeLineNumbers)
+                assertEquals(false, state.codeSoftWrap)
+                assertEquals(true, state.markdownSoftWrap)
                 assertNull(state.languageTag)
                 assertEquals(true, state.blurEnabled)
             }
@@ -179,6 +181,30 @@ class SettingsViewModelTest {
                 awaitItem()
                 viewModel.setCodeLineNumbers(false)
                 assertEquals(false, awaitItem().codeLineNumbers)
+            }
+        }
+
+    @Test
+    fun setCodeSoftWrap_true_persistsAndEmits() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.setCodeSoftWrap(true)
+                assertEquals(true, awaitItem().codeSoftWrap)
+            }
+        }
+
+    @Test
+    fun setMarkdownSoftWrap_false_persistsAndEmits() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.setMarkdownSoftWrap(false)
+                assertEquals(false, awaitItem().markdownSoftWrap)
             }
         }
 

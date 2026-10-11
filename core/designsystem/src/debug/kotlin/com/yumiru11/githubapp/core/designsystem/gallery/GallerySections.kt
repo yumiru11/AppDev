@@ -39,8 +39,8 @@ import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.component.AppSegmentedButton
+import com.yumiru11.githubapp.core.designsystem.component.AppSettingsGroup
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
-import com.yumiru11.githubapp.core.designsystem.component.CardGroup
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.designsystem.component.LongBarAction
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
@@ -85,10 +85,16 @@ internal fun CardsSection() {
 /** 容器：分段卡（既有组件，和 AppCard 同屏对照圆角层级）。 */
 @Composable
 internal fun CardGroupSection() {
-    CardGroup {
-        item { GalleryItemText(text = stringResource(R.string.gallery_card_group_first)) }
-        item { GalleryItemText(text = stringResource(R.string.gallery_card_group_second)) }
-        item { GalleryItemText(text = stringResource(R.string.gallery_card_group_third)) }
+    AppSettingsGroup(title = stringResource(R.string.gallery_card_group_title)) {
+        item(headlineContent = { GalleryItemText(text = stringResource(R.string.gallery_card_group_first)) })
+        item(
+            headlineContent = { GalleryItemText(text = stringResource(R.string.gallery_card_group_second)) },
+            supportingContent = { GalleryItemText(text = stringResource(R.string.gallery_card_group_supporting)) },
+        )
+        item(
+            headlineContent = { GalleryItemText(text = stringResource(R.string.gallery_card_group_third)) },
+            supportingContent = { GalleryItemText(text = stringResource(R.string.gallery_card_group_supporting)) },
+        )
     }
 }
 

@@ -87,6 +87,12 @@ import com.yumiru11.githubapp.feature.repo.RepoFilesViewModel
 import com.yumiru11.githubapp.feature.repo.ReposScreen
 import com.yumiru11.githubapp.feature.search.SearchScreen
 import com.yumiru11.githubapp.feature.search.SearchViewModel
+import com.yumiru11.githubapp.feature.settings.SettingsAccountScreen
+import com.yumiru11.githubapp.feature.settings.SettingsAppearanceScreen
+import com.yumiru11.githubapp.feature.settings.SettingsEditorScreen
+import com.yumiru11.githubapp.feature.settings.SettingsGeneralScreen
+import com.yumiru11.githubapp.feature.settings.SettingsInterfaceScreen
+import com.yumiru11.githubapp.feature.settings.SettingsPreferencesScreen
 import com.yumiru11.githubapp.feature.settings.SettingsScreen
 import com.yumiru11.githubapp.feature.settings.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
@@ -357,11 +363,37 @@ class MainActivity : ComponentActivity() {
                                     )
                                 },
                                 // UI-3：设置是二级页，补屏内返回（与系统返回同路径）
-                                settingsScreen = {
+                                settingsScreen = { onBackClick, onOpenPreferences, onOpenAccount ->
                                     SettingsScreen(
                                         viewModel = settingsViewModel,
-                                        onBackClick = { navController.popBackStack() },
+                                        onBackClick = onBackClick,
+                                        onOpenPreferences = onOpenPreferences,
+                                        onOpenAccount = onOpenAccount,
                                     )
+                                },
+                                settingsPreferencesScreen = { onBackClick, onOpenAppearance, onOpenInterface, onOpenEditor, onOpenGeneral ->
+                                    SettingsPreferencesScreen(
+                                        onBackClick = onBackClick,
+                                        onOpenAppearance = onOpenAppearance,
+                                        onOpenInterface = onOpenInterface,
+                                        onOpenEditor = onOpenEditor,
+                                        onOpenGeneral = onOpenGeneral,
+                                    )
+                                },
+                                settingsAppearanceScreen = { onBackClick ->
+                                    SettingsAppearanceScreen(viewModel = settingsViewModel, onBackClick = onBackClick)
+                                },
+                                settingsInterfaceScreen = { onBackClick ->
+                                    SettingsInterfaceScreen(viewModel = settingsViewModel, onBackClick = onBackClick)
+                                },
+                                settingsEditorScreen = { onBackClick ->
+                                    SettingsEditorScreen(viewModel = settingsViewModel, onBackClick = onBackClick)
+                                },
+                                settingsGeneralScreen = { onBackClick ->
+                                    SettingsGeneralScreen(viewModel = settingsViewModel, onBackClick = onBackClick)
+                                },
+                                settingsAccountScreen = { onBackClick ->
+                                    SettingsAccountScreen(viewModel = settingsViewModel, onBackClick = onBackClick)
                                 },
                                 issueListScreen = { owner, repo, onIssueClick ->
                                     IssueListScreen(
