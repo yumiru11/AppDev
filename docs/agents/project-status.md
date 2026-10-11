@@ -1,8 +1,8 @@
-# AppDev 项目状态（2026-09-14）
+# AppDev 项目状态（2026-10-11）
 
 > 本文件是当前进度的**权威快照**。每张票合并/关闭后更新。配合 `docs/agents/workflow.md`（流程）、`AGENTS.md`（环境）与 `docs/agents/task-audit-2026-09-06.md`（全量审计）阅读。
 > 本版修正 2026-09-06 审计发现的 §7 D01「文档三处失真」：AGENTS.md / project-status.md / FEEDBACK.md 已与 `gh` 票面 + git 历史对齐。
-> **基线**：`main@04cf05e`（#301 `.dp` 扫荡收尾；main CI 全绿）。本轮共合入 **70 张 PR**：波次 **#229–#291（60 张）** 全部 squash + 收尾 **#292**（docs 对账）/ **#293**（阅读密度回滚）+ **#294**（docs 状态修正）+ **#295–#301**（#278 全量 `.dp` 扫荡，见 §2.5）—— 分段：前半 #229–#255（26 张，§2.1）、中段 #256–#266（11 张，§2.1）、收尾 #267–#271（5 张，§2.2）、设计系统/渲染/加固 #272–#291（18 张，§2.3/§2.4）。计数口径：#250 / #278 / #279 是 issue 非 PR（**#278 已完成并关闭**，#279 为其重复票）；**无 open PR**。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`。
+> **基线**：`main@399de75`（#307 设置模块 M3 Expressive 分层重构；main CI 全绿）。本轮共合入 **71 张 PR**：波次 **#229–#291（60 张）** 全部 squash + 收尾 **#292**（docs 对账）/ **#293**（阅读密度回滚）+ **#294**（docs 状态修正）+ **#295–#301**（#278 全量 `.dp` 扫荡，见 §2.5）+ **#307**（设置分层重构 + 截图证据链修复，2026-10-11，见 §2.6）—— 分段：前半 #229–#255（26 张，§2.1）、中段 #256–#266（11 张，§2.1）、收尾 #267–#271（5 张，§2.2）、设计系统/渲染/加固 #272–#291（18 张，§2.3/§2.4）。计数口径：#250 / #278 / #279 是 issue 非 PR（**#278 已完成并关闭**，#279 为其重复票）；**open PR 仅 Dependabot 2 条（#304/#305）**。完整清单见 `docs/agents/remaining-backlog-2026-09-12.md`。
 
 ## 1. 里程碑概览
 
@@ -144,6 +144,7 @@
 | #290 | editor | **SPEC-3**：`@mention` 接入真实候选 —— REST collaborators 数据源 + `AppRoute.Editor(owner, repo)` + `core:editor/MentionCandidates.kt`；屏接收 `mentions: List<String>`，Hilt 在宿主层（`AppNavHost`）解析（`EditorMentionsViewModel`）。合入 2026-09-14T02:12:53Z |
 | #291 | repo | 游客模式 REST 配额守卫：`AuthState.Anonymous` 短路文件树 mtime 列查询、**不做负缓存**（`RepoFilesViewModel.kt`）。合入 2026-09-14T02:23:50Z |
 | #292 | docs | 波次对账：AGENTS.md / project-status / remaining-backlog 收敛到 60 PR / `main@42821ef`（docs-only，无 CI 检查） |
+| #307 | settings | **设置模块重构为 M3 Expressive 分层结构**（hub + 6 个子页：General/Appearance/Interface/Preferences/Editor/Account；新增 `AppSettingsGroup` / `AppSelect` 组件与 Material Symbols 图标族）；同票修复**画廊分组卡支撑行复读标题 + 新增字符串未被引用**，并重录 `core:designsystem` 分组卡 2 帧基线（`CardGroup` → `AppSettingsGroup`）。合入 2026-10-11T07:04:57Z（squash `399de75`） |
 | #293 | markdown | **阅读密度回滚（本轮 last）**：产品负责人选定「现状（紧凑）」密度 → 移除 `MarkdownDensity` 令牌（回滚 #281 的 `Literal` 默认），`markdown-you.css` 与原生 Viewer 恢复改动前取值；`core:markdown` **37 帧基线直接取回 #281 之前的 CI 权威帧**（零本机录制）；补 `EnhancedListTest`（原生列表 marker/嵌套分支）使 diff 覆盖率 **76.9% → 100%**。合入 2026-09-14（main 头） |
 
 ### 2.5 `.dp` 扫荡（#278 跟踪票，2026-09-14 完成并关闭）
@@ -158,7 +159,15 @@
 - **保留未换（有理由）**：图标/媒体尺寸 · 描边 · 圆角 · 字级 · 动画驱动（如 `Stagger` 的 `SLIDE_DISTANCE`）· 装饰尺寸（状态圆点 `size(8.dp)`）· 非档位值（0/2/3/6/10/14/20/36/40/48/64…）· KDoc 示例
 - **有意排除 `core:markdown`（50 处）**：其 dp 是阅读密度/排版尺度（2026-09-14 产品决策保持现状密度），非 UI 结构间距；已在 `implementation-plan.md` §1.5 记录
 
-> §2.1/§2.2 的 #267–#271 仍有效；本波在其后。**wave 内 PR 与 #292/#293 均已合入，无 open PR**。
+### 2.6 #307 的 CI 证据链修复（2026-10-11）
+
+- **现象**：PR 评论里的拼板图链接全部 404（指向 `releases/download/<tag>/...`）。
+- **根因**：截图 job 的 `gh release create` 把 `artifacts/screenshots/*.txt` 全部当资产上传，而 README 帧断言失败时 `readme-render-log.txt` 是 **0 字节**；GitHub 资产上传接口对空文件返回 `HTTP 400: Bad Content-Length`，**gh 因此中断整个 release 创建** → release 根本不存在。原命令 `... >/dev/null 2>&1 || true` 把失败连同证据一起吞掉（本仓第 12 轮「评论图 404」的复发形态）。
+- **复现**（本机 draft release，零副作用）：带 0 字节文件 → `HTTP 400: Bad Content-Length`；剔除后 → 创建成功、31 个资产齐备。
+- **修复**（`.github/workflows/ci.yml`）：① 上传前剔除 0 字节产物（被跳过者记 `::warning::`）；② `gh release create` / `gh release upload` 失败改为进 annotation，不再静默；③ 评论只贴 `gh release view --json assets` 里**确实存在**的资产，release 未建成时明说「本轮不内联图片」并指向 job artifact —— 死链从机制上不可能再出现。
+- **基线取得方式**：分组卡 2 帧采用 **CI runner 自渲染帧**（取自失败运行的 `roborazzi-diffs` 产物，与 verify 同机同环境；本机 verify 逐字节一致），**未使用本机 `recordRoborazziDebug`**。
+
+> §2.1/§2.2 的 #267–#271 仍有效；本波在其后。**本波 PR 与 #292/#293/#307 均已合入，open PR 仅剩 Dependabot（#304/#305）**。
 
 ## 3. 进行中：审计补全波（2026-09-06 立项，9 张分类票 #163–#171）
 
