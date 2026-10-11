@@ -89,11 +89,11 @@ internal fun CardGroupSection() {
         item(headlineContent = { GalleryItemText(text = stringResource(R.string.gallery_card_group_first)) })
         item(
             headlineContent = { GalleryItemText(text = stringResource(R.string.gallery_card_group_second)) },
-            supportingContent = { GalleryItemText(text = stringResource(R.string.gallery_card_group_second)) },
+            supportingContent = { GalleryItemText(text = stringResource(R.string.gallery_card_group_supporting)) },
         )
         item(
             headlineContent = { GalleryItemText(text = stringResource(R.string.gallery_card_group_third)) },
-            supportingContent = { GalleryItemText(text = stringResource(R.string.gallery_card_group_third)) },
+            supportingContent = { GalleryItemText(text = stringResource(R.string.gallery_card_group_supporting)) },
         )
     }
 }
