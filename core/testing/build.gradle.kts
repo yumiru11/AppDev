@@ -10,12 +10,10 @@ dependencies {
     // 领域模型（GitHubFakes 工厂返回 core:data 真实模型；api 导出保证测试模块可用）
     api(project(":core:data"))
 
-    // Compose（截图测试基类依赖 @Composable / MaterialTheme；BOM 统一版本）
+    // Compose（Compose UI 测试基类与语义/几何断言依赖 @Composable / MaterialTheme；BOM 统一版本）
     api(platform(libs.compose.bom))
     api(libs.compose.ui)
     api(libs.compose.material3)
-    // Coil（截图捕获期间的离线 ImageLoader：禁网，见 OfflineImageLoader.kt）
-    api(libs.coil)
     // Compose UI 测试（createComposeRule / createAndroidComposeRule）
     api(libs.compose.ui.test.junit4)
     debugApi(libs.compose.ui.test.manifest)
