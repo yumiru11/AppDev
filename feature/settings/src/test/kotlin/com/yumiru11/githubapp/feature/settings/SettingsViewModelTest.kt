@@ -303,6 +303,28 @@ class SettingsViewModelTest {
         }
 
     @Test
+    fun uiState_byDefault_emitsNativePreferredRenderMode() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                assertEquals(MarkdownRenderMode.NATIVE_PREFERRED, awaitItem().markdownRenderMode)
+            }
+        }
+
+    @Test
+    fun setMarkdownRenderMode_webViewOnly_persistsAndEmits() =
+        runTest {
+            val viewModel = createViewModel()
+
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.setMarkdownRenderMode(MarkdownRenderMode.WEBVIEW_ONLY)
+                assertEquals(MarkdownRenderMode.WEBVIEW_ONLY, awaitItem().markdownRenderMode)
+            }
+        }
+
+    @Test
     fun setStaggerEnabled_false_persistsAndEmits() =
         runTest {
             val viewModel = createViewModel()

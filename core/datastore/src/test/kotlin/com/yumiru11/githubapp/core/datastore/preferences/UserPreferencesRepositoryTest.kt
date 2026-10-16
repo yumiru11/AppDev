@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
+import com.yumiru11.githubapp.core.datastore.model.MarkdownRenderMode
 import com.yumiru11.githubapp.core.datastore.model.RepoLayoutMode
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.model.resolveEffectiveThemeMode
@@ -203,6 +204,34 @@ class UserPreferencesRepositoryTest {
             repository.setStaggerEnabled(false)
 
             assertEquals(false, repository.staggerEnabled.first())
+        }
+
+    @Test
+    fun markdownRenderMode_byDefault_emitsNativePreferred() =
+        runTest {
+            val repository = createRepository()
+
+            assertEquals(MarkdownRenderMode.NATIVE_PREFERRED, repository.markdownRenderMode.first())
+        }
+
+    @Test
+    fun setMarkdownRenderMode_webViewOnly_persistsAndEmits() =
+        runTest {
+            val repository = createRepository()
+
+            repository.setMarkdownRenderMode(MarkdownRenderMode.WEBVIEW_ONLY)
+
+            assertEquals(MarkdownRenderMode.WEBVIEW_ONLY, repository.markdownRenderMode.first())
+        }
+
+    @Test
+    fun markdownRenderMode_unknownPersistedValue_fallsBackToNativePreferred() =
+        runTest {
+            val dataStore = PreferenceDataStoreFactory.create(scope = newScope(), produceFile = { newPreferencesFile() })
+            val repository = DefaultUserPreferencesRepository(dataStore)
+            dataStore.edit { it[stringPreferencesKey("markdown_render_mode")] = "SOMETHING_ELSE" }
+
+            assertEquals(MarkdownRenderMode.NATIVE_PREFERRED, repository.markdownRenderMode.first())
         }
 
     @Test

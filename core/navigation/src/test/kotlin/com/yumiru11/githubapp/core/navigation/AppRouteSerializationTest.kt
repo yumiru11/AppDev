@@ -38,6 +38,7 @@ class AppRouteSerializationTest {
         roundTrip(AppRoute.SettingsEditor)
         roundTrip(AppRoute.SettingsGeneral)
         roundTrip(AppRoute.SettingsAccount)
+        roundTrip(AppRoute.SettingsMarkdown)
         roundTrip(AppRoute.Editor())
         roundTrip(AppRoute.Editor("owner", "repo"))
         roundTrip(AppRoute.CreateRepo)
