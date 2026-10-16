@@ -116,7 +116,7 @@ fun EnhancedMarkdownViewer(
             tableBackground = scheme.surfaceContainerLow,
         )
 
-    androidx.compose.foundation.layout.Box(modifier = modifier.padding(horizontal = 37.dp)) {
+    androidx.compose.foundation.layout.Box(modifier = modifier.padding(horizontal = 36.dp)) {
         CompositionLocalProvider(LocalUriHandler provides linkUriHandler) {
             Markdown(
                 state,

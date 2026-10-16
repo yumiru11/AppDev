@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 
@@ -86,8 +88,8 @@ fun ReleaseCreateScreen(
                 title = { Text(text = stringResource(R.string.repo_release_create_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        AppIcon(
+                            spec = AppIcons.ArrowBack,
                             contentDescription = stringResource(R.string.repo_release_create_back),
                         )
                     }
@@ -108,7 +110,7 @@ fun ReleaseCreateScreen(
                     .verticalScroll(rememberScrollState())
                     .imePadding()
                     .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.l),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
         ) {
             OutlinedTextField(
                 value = uiState.tagName,

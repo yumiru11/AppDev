@@ -17,6 +17,7 @@ import androidx.compose.ui.zIndex
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
 import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
 import com.yumiru11.githubapp.core.designsystem.token.GlassScope
+import com.yumiru11.githubapp.core.designsystem.token.LocalAppSurfaces
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -95,6 +96,9 @@ fun MainTabPager(
             // 分区页各自处理 insets（Home/Profile 有 TopAppBar 自带 statusBars；
             // 容器不再叠加顶部 padding，否则出现「顶栏距状态栏空一段」——2026-08-14 真机走查修复）
             contentWindowInsets = WindowInsets(0.dp),
+            // 容器色取 AppSurfaces：有全局背景图时半透明（否则这层不透明 Scaffold 会把
+            // AppBackground 整层盖死 —— 「背景图不管用」的根因之一）。无图/OLED/高对比 = 不透明。
+            containerColor = LocalAppSurfaces.current.screen,
             bottomBar = {
                 // zIndex 保证底栏在 pager 内容之后绘制——Haze backdrop blur 要求
                 // source 先于 effect 绘制，否则底栏每帧拿到空背景（真机无效果根因）

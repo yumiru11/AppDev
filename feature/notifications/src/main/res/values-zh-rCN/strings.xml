@@ -42,4 +42,6 @@
     <string name="notification_sort_cd">按时间排序通知</string>
     <string name="notification_sort_newest">最新</string>
     <string name="notification_sort_oldest">最早</string>
+    <string name="notification_group_expand">展开</string>
+    <string name="notification_group_collapse">收起</string>
 </resources>

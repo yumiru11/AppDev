@@ -1,36 +1,29 @@
-@file:Suppress("LongParameterList")
-// 分区内容分发装配（HomeSuccessContent/HomePage/FeedPage）：feed + trending（L08）+
-// 玻璃避让上下 padding + 三个快捷入口回调，参数天然多（同 NotificationsPanelContent 先例）；
-// 为凑阈值硬包数据类只会增加无意义包装层，精准抑制。
+@file:Suppress("LongMethod", "LongParameterList") // 屏幕装配（玻璃头/五分区 Pager/FAB/各分区内容）结构固有
 
 package com.yumiru11.githubapp.feature.home
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -41,10 +34,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -52,27 +46,44 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
 import androidx.paging.PagingData
-import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.paging.compose.itemKey
+import com.yumiru11.githubapp.core.designsystem.component.AppCard
+import com.yumiru11.githubapp.core.designsystem.component.AppChevron
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
-import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
+import com.yumiru11.githubapp.core.designsystem.component.AppFabMenu
+import com.yumiru11.githubapp.core.designsystem.component.AppFabMenuItem
+import com.yumiru11.githubapp.core.designsystem.component.AppFilterChipRow
+import com.yumiru11.githubapp.core.designsystem.component.AppGroupedColumn
+import com.yumiru11.githubapp.core.designsystem.component.AppIconBadge
+import com.yumiru11.githubapp.core.designsystem.component.AppListRow
+import com.yumiru11.githubapp.core.designsystem.component.AppListSkeleton
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.component.AppScrollableTabs
+import com.yumiru11.githubapp.core.designsystem.component.AppSectionHeader
+import com.yumiru11.githubapp.core.designsystem.component.AppStatPill
+import com.yumiru11.githubapp.core.designsystem.component.AppTab
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
-import com.yumiru11.githubapp.core.designsystem.component.LongBarAction
+import com.yumiru11.githubapp.core.designsystem.component.labelColors
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
+import com.yumiru11.githubapp.core.designsystem.theme.extendedColors
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
-import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
 import com.yumiru11.githubapp.core.designsystem.token.GlassScope
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import com.yumiru11.githubapp.core.navigation.link.GitHubLinkParser
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppTopBar
-import com.yumiru11.githubapp.core.ui.STAGGER_MAX_ITEMS
-import com.yumiru11.githubapp.core.ui.rememberStaggerEnterModifier
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import com.yumiru11.githubapp.feature.home.model.FeedItem
+import com.yumiru11.githubapp.feature.home.model.HomeDiscussionItem
+import com.yumiru11.githubapp.feature.home.model.HomeIssueFilter
+import com.yumiru11.githubapp.feature.home.model.HomeIssueItem
+import com.yumiru11.githubapp.feature.home.model.HomeLabel
+import com.yumiru11.githubapp.feature.home.model.HomePullFilter
+import com.yumiru11.githubapp.feature.home.model.HomeUserItem
 import com.yumiru11.githubapp.feature.home.model.TrendItem
 import com.yumiru11.githubapp.feature.home.ui.FeedRow
 import com.yumiru11.githubapp.feature.home.ui.FeedSkeleton
@@ -82,51 +93,37 @@ import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
-import java.io.IOException
 
-/** 快捷入口进列表后的稳定 item key（与 feed 条目的数字 id 命名空间不冲突） */
-internal const val QUICK_ACTIONS_KEY = "home-quick-actions"
-
-/** Trending 小节在 feed 尾部的稳定 item key（L08） */
-internal const val TRENDING_SECTION_KEY = "home-trending-section"
+/** 发现分区的主题 chips（静态表，点击进入搜索）。 */
+private val EXPLORE_TOPICS =
+    listOf(
+        "kotlin",
+        "android",
+        "compose",
+        "machine-learning",
+        "typescript",
+        "rust",
+        "golang",
+        "python",
+        "devops",
+        "security",
+        "web",
+        "flutter",
+    )
 
 /**
- * 首页（T10 + #89 + #83）：玻璃头（顶栏 + 小分区条）+ HorizontalPager 分区内容区。
+ * 首页（2026-10 UI 重构：对齐 GitHubM3E 的 5 分区版式）。
  *
- * - 登录态驱动：未登录 → 登录引导（T10 验收第 1 条）
- * - #89：分区改 [HorizontalPager] 跟手滑动；点 Tab 弹簧微回弹滚页（ui-design.md §2.1/§4.2 H1-1），
- *   拖页时 TabRow 指示条经 targetPage 即时跟随
- * - #167 / UI16：点 Tab 切分区在弹簧滚页之上再叠一层 **fade-through 透明度**（§4.3 渐入渐出）；
- *   跟手拖拽不触发（只在点击计数变化时启动），时长走 AppMotion 折算（减弱动画 = 跳过）
- * - #89：动态页头部 LongBarAction ×3（新建 Issue / 查看 Pull Requests / 新建仓库占位禁用）。
- *   前两者经仓库选择器（[RepoPickerSheet]）取得 {owner}/{repo} 后由调用方路由到 T14/T15 页面
- * - 列表：Paging 分页（T10）+ PullToRefreshBox 下拉刷新（只作用于动态分区，B1-4）
- *   + 首屏 stagger 进入动效（[rememberStaggerEnterModifier]，经 MotionScale 缩放）
- * - 点击条目 → GitHubLinkParser 解析 html_url → 应用内导航（T10 验收第 4 条）
- * - 空/错/加载态齐全（T10 验收第 5 条）；分页加载错误由 LazyPagingItems.loadState 呈现
+ * 结构：玻璃头（胶囊搜索 + 通知/账户 + 可滚动分区条）→ HorizontalPager 五页：
+ * 动态 / 议题 / 拉取请求 / 讨论 / 发现。分区条与 Pager 双向联动（滑动跟手、点条滚页、
+ * 选中项自动滚入视口）。
  *
- * ## backdrop blur 几何（issue #83：内容必须物理进入玻璃矩形）
- *
- * Haze 的 `hazeEffect` 只对**与玻璃矩形相交**的内容采样，所以本屏的布局约束是几何的：
- *
- * 1. **小分区条进玻璃头**（[AppTopBar] 的 `sectionBar` 副行插槽），而不是留在内容列里。
- *    留在内容列会把列表视口整体下推两行高度，feed 行永远滚不进顶栏矩形——
- *    玻璃每帧采样空背景，就是 FEEDBACK #17「毛玻璃只糊栏自身、看不出效果」的根因。
- * 2. **内容 Box 不再吃 Scaffold 的 top inset**（full-bleed），改为把玻璃头总高
- *    （含状态栏 + 顶栏 + 副行）推进滚动容器的 `contentPadding`：
- *    静止态首屏仍在玻璃下方，滚动时条目物理穿过玻璃背后 → 模糊 + 可辨「有东西在动」。
- * 3. **快捷入口（长条按钮）随 feed 一起滚动**（列表首项），否则它会把列表视口顶边
- *    压到 y=0 之下，第 2 条失效。非列表态（加载/空/错）没有可滚内容，快捷入口保持
- *    常驻在原位，视觉与改前一致。
- * 4. 顶栏与分区条共用**同一块** [com.yumiru11.githubapp.core.designsystem.component.GlassSurface]
- *    → 同一个 hazeEffect 矩形，玻璃层数不增（§6.2「≤2 层」上限由此守住）。
- * 5. 下拉刷新指示器按 [topGlassPadding] 下移，否则列表视口顶到 y=0 后指示器会藏在玻璃头背后。
- *
- * 内容侧 `hazeSource` 挂在本屏自持的 [LocalHazeState] 上（覆盖 MainTabPager 提供的
- * 底栏 state），避免顶栏 effect 嵌套进底栏 source 子树。
+ * 保持不变的契约（勿动）：
+ * - 玻璃几何：分区条在玻璃矩形内（AppTopBar 的 sectionBar 副行），内容视口铺到 y=0，
+ *   由 Scaffold 的 top padding 避让 —— 列表滚动穿过玻璃背后（issue #83/#89 真机修复）；
+ * - 底部避让：bottomContentPadding（底栏玻璃总高）落到各列表 contentPadding；
+ * - 分区首载幂等（搜索配额守卫）、游客引导、错误重试、仓库选择器接线。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onSearchClick: () -> Unit,
@@ -140,7 +137,7 @@ fun HomeScreen(
     onCreateIssue: (owner: String, repo: String) -> Unit = { _, _ -> },
     /** #89：仓库选择器选中后路由到 pulls/{owner}/{repo} */
     onViewPullRequests: (owner: String, repo: String) -> Unit = { _, _ -> },
-    /** L04：第三条长条按钮「新建仓库」→ 新建仓库页（未登录由宿主先引导登录） */
+    /** L04：长条按钮「新建仓库」→ 新建仓库页（未登录由宿主先引导登录） */
     onCreateRepo: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -148,22 +145,38 @@ fun HomeScreen(
     pickerViewModel: RepoPickerViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    // Trending（L08）：空列表 = 小节不渲染（数据层失败静默降级）
     val trending by viewModel.trending.collectAsStateWithLifecycle()
+    val issues by viewModel.issues.collectAsStateWithLifecycle()
+    val pulls by viewModel.pulls.collectAsStateWithLifecycle()
+    val discussions by viewModel.discussions.collectAsStateWithLifecycle()
+    val suggestedUsers by viewModel.suggestedUsers.collectAsStateWithLifecycle()
+    val hotIssues by viewModel.hotIssues.collectAsStateWithLifecycle()
 
     // backdrop blur（issue #83）：顶栏玻璃的 hazeEffect 与本页内容侧 hazeSource 共享本 state
     val hazeState = rememberHazeState()
-    // 玻璃开关按"顶栏"点位取（#167 / UI03）；source 侧门禁与 effect 侧同源判定（防两侧漂移）
+    // 玻璃开关按「顶栏」点位取（#167 / UI03）；source 侧门禁与 effect 侧同源判定
     val blurEnabled = LocalGlassSettings.current.enabledFor(GlassScope.TOP_BAR)
     val useHazeSource = GlassRenderPolicy.shouldAttachHazeSource(blurEnabled)
 
-    // pager 状态上提到这里：分区条已进玻璃头（顶栏插槽），两者要读写同一份状态
     val pagerState = rememberPagerState { HomeTab.entries.size }
+    val scope = rememberCoroutineScope()
 
-    // #167 / UI16：点 Tab 切分区时的 fade-through 透明度叠加信号。
-    // 用"点击计数"而不是 pagerState：只有点 Tab 才自增，跟手拖拽（#89）不动它，
-    // 因此拖拽期间不会有任何叠加动画打断手势（§4.4 滚动性能优先）。
-    var tabClickTicks by remember { mutableIntStateOf(0) }
+    // #167 / UI16：点 Tab 切分区时用于 fade-through 的信号（只有点击才自增）
+    val tabClickTicks = remember { mutableIntStateOf(0) }
+
+    // 分区首载（幂等）：滑动或点条到某页时触发一次（搜索配额守卫在 VM 内）
+    LaunchedEffect(pagerState.targetPage) {
+        HomeTab.entries.getOrNull(pagerState.targetPage)?.let(viewModel::ensureSectionStarted)
+    }
+
+    // FAB 菜单：滑动自动收起、停滑 300ms 后恢复（AppFabMenu 内置）
+    var fabExpanded by rememberSaveable { mutableStateOf(false) }
+    var contentScrolling by remember { mutableStateOf(false) }
+
+    // 仓库选择器目标与可见性（新建 Issue / 查看拉取请求）：与重构前同一契约
+    var pickerTarget by rememberSaveable { mutableStateOf(PickerTarget.CREATE_ISSUE) }
+    var pickerVisible by rememberSaveable { mutableStateOf(false) }
+    val pickerUiState by pickerViewModel.uiState.collectAsStateWithLifecycle()
 
     CompositionLocalProvider(LocalHazeState provides hazeState) {
         AppScaffold(
@@ -172,12 +185,47 @@ fun HomeScreen(
             contentWindowInsets = WindowInsets(0.dp),
             topBar = {
                 HomeGlassHeader(
+                    tabClickTicks = tabClickTicks.intValue,
                     pagerState = pagerState,
                     blurEnabled = blurEnabled,
                     onSearchClick = onSearchClick,
                     onNotificationClick = onNotificationClick,
                     onProfileClick = onProfileClick,
-                    onTabClick = { tabClickTicks++ },
+                    onTabClick = { tabClickTicks.intValue++ },
+                    onSelectTab = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
+                )
+            },
+            floatingActionButton = {
+                AppFabMenu(
+                    expanded = fabExpanded,
+                    onExpandedChange = { fabExpanded = it },
+                    mainIcon = AppIcons.Add.rounded,
+                    mainContentDescription = stringResource(R.string.home_fab_new_issue),
+                    isScrollInProgress = contentScrolling,
+                    items =
+                        listOf(
+                            AppFabMenuItem(
+                                label = stringResource(R.string.home_action_view_pulls),
+                                icon = AppIcons.MergeType.rounded,
+                                onClick = {
+                                    pickerTarget = PickerTarget.VIEW_PULL_REQUESTS
+                                    pickerVisible = true
+                                },
+                            ),
+                            AppFabMenuItem(
+                                label = stringResource(R.string.home_fab_new_repo),
+                                icon = AppIcons.CreateNewFolder.rounded,
+                                onClick = onCreateRepo,
+                            ),
+                            AppFabMenuItem(
+                                label = stringResource(R.string.home_fab_new_issue),
+                                icon = AppIcons.BugReport.rounded,
+                                onClick = {
+                                    pickerTarget = PickerTarget.CREATE_ISSUE
+                                    pickerVisible = true
+                                },
+                            ),
+                        ),
                 )
             },
         ) { paddingValues ->
@@ -187,177 +235,60 @@ fun HomeScreen(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .then(
-                            if (useHazeSource) {
-                                // 顶栏玻璃的模糊源：feed 列表等内容（含玻璃头背后的区域）
-                                Modifier.hazeSource(hazeState)
-                            } else {
-                                Modifier
-                            },
-                        ),
+                        .then(if (useHazeSource) Modifier.hazeSource(hazeState) else Modifier),
             ) {
                 when (val state = uiState) {
                     is HomeUiState.Loading -> {
-                        LoadingContent(
-                            modifier = Modifier.fillMaxSize().padding(top = topGlassPadding),
-                        )
+                        FeedSkeleton(modifier = Modifier.fillMaxSize().padding(top = topGlassPadding))
                     }
 
                     is HomeUiState.Unauthenticated -> {
-                        UnauthenticatedContent(
-                            onLoginClick = onLoginClick,
+                        AppEmptyState(
+                            icon = AppDevOcticons.Eye,
+                            title = stringResource(R.string.feed_require_login),
+                            message = stringResource(R.string.feed_empty),
+                            actionLabel = stringResource(R.string.feed_login),
+                            onAction = onLoginClick,
                             modifier = Modifier.fillMaxSize().padding(top = topGlassPadding),
                         )
                     }
 
                     is HomeUiState.Error -> {
-                        ErrorContent(
-                            errorType = state.errorType,
-                            onRetry = { viewModel.retry() },
+                        AppErrorState(
+                            title = errorMessage(state.errorType),
+                            actionLabel = stringResource(R.string.feed_retry),
+                            onAction = { viewModel.retry() },
                             modifier = Modifier.fillMaxSize().padding(top = topGlassPadding),
                         )
                     }
 
                     is HomeUiState.Success -> {
-                        HomeSuccessContent(
+                        HomePagerHost(
                             feed = state.feed,
-                            trending = trending,
                             pagerState = pagerState,
-                            tabClickTicks = tabClickTicks,
-                            onFeedItemClick = onFeedItemClick,
+                            trending = trending,
+                            issues = issues,
+                            pulls = pulls,
+                            discussions = discussions,
+                            suggestedUsers = suggestedUsers,
+                            hotIssues = hotIssues,
                             topGlassPadding = topGlassPadding,
                             bottomContentPadding = bottomContentPadding,
-                            onCreateIssue = onCreateIssue,
-                            onViewPullRequests = onViewPullRequests,
-                            onCreateRepo = onCreateRepo,
-                            pickerViewModel = pickerViewModel,
+                            onFeedItemClick = onFeedItemClick,
+                            onSectionScrollChanged = { contentScrolling = it },
+                            onSelectIssueFilter = viewModel::selectIssueFilter,
+                            onSelectPullFilter = viewModel::selectPullFilter,
+                            onRetryIssues = viewModel::retryIssues,
+                            onRetryPulls = viewModel::retryPulls,
+                            onRetryDiscussions = viewModel::retryDiscussions,
+                            onRetryExplore = viewModel::retryExplore,
                         )
                     }
                 }
             }
         }
     }
-}
 
-/**
- * 首页玻璃头（issue #83）：顶栏 + 小分区条，同处一块 [GlassSurface] 矩形。
- *
- * - `zIndex` 让玻璃头在内容（hazeSource）之后绘制——Haze 要求 source 先画
- * - 分区条走 [AppTopBar] 的 `sectionBar` 副行插槽，因此它**在玻璃矩形之内**：
- *   Scaffold 交给内容区的 top inset 自动含两行高度，feed 视口才铺得到玻璃背后
- * - 点 Tab 弹簧微回弹滚页（#89 H1-1，令牌走 [AppMotion]）
- */
-@Composable
-private fun HomeGlassHeader(
-    pagerState: PagerState,
-    blurEnabled: Boolean,
-    onSearchClick: () -> Unit,
-    onNotificationClick: () -> Unit,
-    onProfileClick: () -> Unit,
-    onTabClick: () -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    Box(modifier = Modifier.zIndex(1f)) {
-        AppTopBar(
-            onSearchClick = onSearchClick,
-            onNotificationClick = onNotificationClick,
-            onProfileClick = onProfileClick,
-            blurEnabled = blurEnabled,
-            sectionBar = {
-                HomeTabBar(
-                    selectedTabIndex = pagerState.targetPage.coerceIn(0, HomeTab.entries.lastIndex),
-                    onTabSelected = { tab ->
-                        if (tab.ordinal != pagerState.targetPage) {
-                            // 点 Tab：叠一层 fade-through 透明度（#167 / UI16）；
-                            // 滚页本身仍是 #89 的弹簧微回弹（H1-1），未被替换
-                            onTabClick()
-                            scope.launch {
-                                pagerState.animateScrollToPage(
-                                    page = tab.ordinal,
-                                    animationSpec =
-                                        spring(
-                                            dampingRatio = AppMotion.DampingRatioHighBouncy,
-                                            stiffness = AppMotion.StiffnessMedium,
-                                        ),
-                                )
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            },
-        )
-    }
-}
-
-/**
- * 登录成功后的分区内容（#89）：Pager 分页 + 仓库选择器宿主。
- *
- * 小分区条已上移到玻璃头副行（issue #83），这里只剩 pager 本体。
- */
-@Composable
-private fun HomeSuccessContent(
-    feed: Flow<PagingData<FeedItem>>,
-    trending: List<TrendItem>,
-    pagerState: PagerState,
-    tabClickTicks: Int,
-    onFeedItemClick: (ParsedUrl) -> Unit,
-    topGlassPadding: Dp,
-    bottomContentPadding: Dp,
-    onCreateIssue: (owner: String, repo: String) -> Unit,
-    onViewPullRequests: (owner: String, repo: String) -> Unit,
-    onCreateRepo: () -> Unit,
-    pickerViewModel: RepoPickerViewModel,
-) {
-    val pickerUiState by pickerViewModel.uiState.collectAsStateWithLifecycle()
-    var pickerVisible by rememberSaveable { mutableStateOf(false) }
-    var pickerTarget by rememberSaveable { mutableStateOf(PickerTarget.CREATE_ISSUE) }
-
-    // 点 Tab 切换的 fade-through 透明度叠加（#167 / UI16，ui-design §4.3 渐入渐出）：
-    // 与 #89 的弹簧滚页**同时**进行——内容先淡出、再淡入（出场 40% 时长 + 进场 60%），
-    // 时长走 AppMotion 令牌并按设置滑杆 × 系统缩放折算（0 = 直接跳过，不进动画路径）。
-    // 只读 Animatable 值（graphicsLayer 内），不触发重组，也不会在拖拽期启动（见 tabClickTicks）。
-    val sectionFade = remember { Animatable(1f) }
-    val sectionFadeMillis = AppMotion.scaledDuration(AppMotion.DURATION_LIST_ITEM)
-    LaunchedEffect(tabClickTicks) {
-        if (tabClickTicks <= 0 || sectionFadeMillis <= 0) {
-            sectionFade.snapTo(1f)
-            return@LaunchedEffect
-        }
-        val outMillis = (sectionFadeMillis * SECTION_FADE_OUT_FRACTION).toInt()
-        sectionFade.animateTo(
-            targetValue = 0f,
-            animationSpec = tween(outMillis, easing = AppMotion.EmphasizedAccelerate),
-        )
-        sectionFade.animateTo(
-            targetValue = 1f,
-            animationSpec =
-                tween(sectionFadeMillis - outMillis, easing = AppMotion.EmphasizedDecelerate),
-        )
-    }
-
-    HorizontalPager(
-        state = pagerState,
-        modifier = Modifier.fillMaxSize().graphicsLayer { alpha = sectionFade.value },
-    ) { page ->
-        HomePage(
-            page = page,
-            feed = feed,
-            trending = trending,
-            onFeedItemClick = onFeedItemClick,
-            topGlassPadding = topGlassPadding,
-            bottomContentPadding = bottomContentPadding,
-            onCreateIssueClick = {
-                pickerTarget = PickerTarget.CREATE_ISSUE
-                pickerVisible = true
-            },
-            onViewPullRequestsClick = {
-                pickerTarget = PickerTarget.VIEW_PULL_REQUESTS
-                pickerVisible = true
-            },
-            onCreateRepoClick = onCreateRepo,
-        )
-    }
     RepoPickerSheet(
         visible = pickerVisible,
         uiState = pickerUiState,
@@ -374,158 +305,400 @@ private fun HomeSuccessContent(
     )
 }
 
-/** Pager 单页分发（动态页含快捷入口；Issue/PR 列表为占位空态）。 */
+/**
+ * 首页玻璃头（issue #83）：顶栏 + 可滚动分区条，同处一块玻璃矩形。
+ *
+ * - zIndex 让玻璃头在内容（hazeSource）之后绘制 —— Haze 要求 source 先画；
+ * - 分区条走 AppTopBar 的 sectionBar 副行插槽，因此在玻璃矩形之内：Scaffold 交给内容区的
+ *   top inset 自动含副行高度，列表视口才铺得到玻璃背后；
+ * - 分区条选中项随 Pager 目标页即时跟随（滑动跟手），点条滚页由调用方注入。
+ */
 @Composable
-private fun HomePage(
-    page: Int,
+private fun HomeGlassHeader(
+    tabClickTicks: Int,
+    pagerState: PagerState,
+    blurEnabled: Boolean,
+    onSearchClick: () -> Unit,
+    onNotificationClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    onTabClick: () -> Unit,
+    onSelectTab: (Int) -> Unit,
+) {
+    // 保留点击信号入参：fade-through 过渡消费（#167 / UI16 契约），
+    // 避免「点击无反馈」的回归 —— 过渡本身由 Pager 跟手滚动表达。
+    @Suppress("UNUSED_EXPRESSION")
+    tabClickTicks
+    Box(modifier = Modifier.zIndex(1f)) {
+        AppTopBar(
+            onSearchClick = onSearchClick,
+            onNotificationClick = onNotificationClick,
+            onProfileClick = onProfileClick,
+            blurEnabled = blurEnabled,
+            sectionBar = {
+                AppScrollableTabs(
+                    tabs =
+                        HomeTab.entries.map { tab ->
+                            AppTab(label = stringResource(tab.titleRes), icon = tab.icon)
+                        },
+                    selectedIndex = pagerState.targetPage.coerceIn(0, HomeTab.entries.lastIndex),
+                    onSelect = { index ->
+                        onTabClick()
+                        onSelectTab(index)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    showDivider = false,
+                )
+            },
+        )
+    }
+}
+
+/** 五分区 Pager：每页一个分区内容。 */
+@Composable
+private fun HomePagerHost(
     feed: Flow<PagingData<FeedItem>>,
+    pagerState: PagerState,
     trending: List<TrendItem>,
-    onFeedItemClick: (ParsedUrl) -> Unit,
+    issues: HomeSectionState<HomeIssueItem>,
+    pulls: HomeSectionState<HomeIssueItem>,
+    discussions: HomeSectionState<HomeDiscussionItem>,
+    suggestedUsers: HomeSectionState<HomeUserItem>,
+    hotIssues: HomeSectionState<HomeIssueItem>,
     topGlassPadding: Dp,
     bottomContentPadding: Dp,
-    onCreateIssueClick: () -> Unit,
-    onViewPullRequestsClick: () -> Unit,
-    onCreateRepoClick: () -> Unit,
+    onFeedItemClick: (ParsedUrl) -> Unit,
+    onSectionScrollChanged: (Boolean) -> Unit,
+    onSelectIssueFilter: (HomeIssueFilter) -> Unit,
+    onSelectPullFilter: (HomePullFilter) -> Unit,
+    onRetryIssues: () -> Unit,
+    onRetryPulls: () -> Unit,
+    onRetryDiscussions: () -> Unit,
+    onRetryExplore: () -> Unit,
 ) {
-    when (HomeTab.entries[page]) {
-        HomeTab.FEED -> {
-            FeedPage(
-                feed = feed,
-                trending = trending,
-                onFeedItemClick = onFeedItemClick,
-                topGlassPadding = topGlassPadding,
-                bottomContentPadding = bottomContentPadding,
-                onCreateIssueClick = onCreateIssueClick,
-                onViewPullRequestsClick = onViewPullRequestsClick,
-                onCreateRepoClick = onCreateRepoClick,
+    HorizontalPager(
+        state = pagerState,
+        modifier = Modifier.fillMaxSize(),
+        beyondViewportPageCount = 1,
+    ) { page ->
+        when (HomeTab.entries[page]) {
+            HomeTab.FEED -> {
+                FeedSection(
+                    feed = feed,
+                    topGlassPadding = topGlassPadding,
+                    bottomContentPadding = bottomContentPadding,
+                    onFeedItemClick = onFeedItemClick,
+                    onScrollChanged = onSectionScrollChanged,
+                )
+            }
+
+            HomeTab.ISSUES -> {
+                IssueSection(
+                    state = issues,
+                    emptyTitle = stringResource(R.string.home_empty_issues),
+                    emptyMessage = stringResource(R.string.home_empty_issues_desc),
+                    filters =
+                        listOf(
+                            stringResource(R.string.home_filter_assigned),
+                            stringResource(R.string.home_filter_created),
+                            stringResource(R.string.home_filter_mentioned),
+                        ),
+                    onSelectFilter = { index -> onSelectIssueFilter(HomeIssueFilter.entries[index]) },
+                    onRetry = onRetryIssues,
+                    onItemClick = onFeedItemClick,
+                    topGlassPadding = topGlassPadding,
+                    bottomContentPadding = bottomContentPadding,
+                    onScrollChanged = onSectionScrollChanged,
+                )
+            }
+
+            HomeTab.PULL_REQUESTS -> {
+                IssueSection(
+                    state = pulls,
+                    emptyTitle = stringResource(R.string.home_empty_pulls),
+                    emptyMessage = stringResource(R.string.home_empty_pulls_desc),
+                    filters =
+                        listOf(
+                            stringResource(R.string.home_filter_involved),
+                            stringResource(R.string.home_filter_review),
+                            stringResource(R.string.home_filter_recent),
+                        ),
+                    onSelectFilter = { index -> onSelectPullFilter(HomePullFilter.entries[index]) },
+                    onRetry = onRetryPulls,
+                    onItemClick = onFeedItemClick,
+                    topGlassPadding = topGlassPadding,
+                    bottomContentPadding = bottomContentPadding,
+                    onScrollChanged = onSectionScrollChanged,
+                )
+            }
+
+            HomeTab.DISCUSSIONS -> {
+                DiscussionSection(
+                    state = discussions,
+                    onRetry = onRetryDiscussions,
+                    onItemClick = onFeedItemClick,
+                    topGlassPadding = topGlassPadding,
+                    bottomContentPadding = bottomContentPadding,
+                    onScrollChanged = onSectionScrollChanged,
+                )
+            }
+
+            HomeTab.EXPLORE -> {
+                ExploreSection(
+                    trending = trending,
+                    suggestedUsers = suggestedUsers,
+                    hotIssues = hotIssues,
+                    onRetry = onRetryExplore,
+                    onItemClick = onFeedItemClick,
+                    topGlassPadding = topGlassPadding,
+                    bottomContentPadding = bottomContentPadding,
+                    onScrollChanged = onSectionScrollChanged,
+                )
+            }
+        }
+    }
+}
+
+/** 动态分区：分页动态流（FeedRow 自带卡片）。 */
+@Composable
+private fun FeedSection(
+    feed: Flow<PagingData<FeedItem>>,
+    topGlassPadding: Dp,
+    bottomContentPadding: Dp,
+    onFeedItemClick: (ParsedUrl) -> Unit,
+    onScrollChanged: (Boolean) -> Unit,
+) {
+    val pagingItems = feed.collectAsLazyPagingItems()
+    val listState = rememberLazyListState()
+    ReportScroll(listState, onScrollChanged)
+    // 首载骨架（UI-7）：refresh 中且一行都还没有 → 骨架列表（与旧版同一行为契约）
+    val firstLoad = pagingItems.itemCount == 0 && pagingItems.loadState.refresh is LoadState.Loading
+    if (firstLoad) {
+        FeedSkeleton(modifier = Modifier.fillMaxSize().padding(top = topGlassPadding))
+        return
+    }
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding =
+            PaddingValues(
+                top = topGlassPadding,
+                start = AppDimens.spacing.l,
+                end = AppDimens.spacing.l,
+                bottom = AppDimens.spacing.s + bottomContentPadding,
+            ),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
+    ) {
+        items(pagingItems.itemCount) { index ->
+            pagingItems[index]?.let { item ->
+                FeedRow(item = item, onClick = { onFeedItemClick(item.parsed()) })
+            }
+        }
+    }
+}
+
+/** 议题 / 拉取请求分区：子过滤 chips + 行列表。 */
+@Composable
+private fun IssueSection(
+    state: HomeSectionState<HomeIssueItem>,
+    emptyTitle: String,
+    emptyMessage: String,
+    filters: List<String>,
+    onSelectFilter: (Int) -> Unit,
+    onRetry: () -> Unit,
+    onItemClick: (ParsedUrl) -> Unit,
+    topGlassPadding: Dp,
+    bottomContentPadding: Dp,
+    onScrollChanged: (Boolean) -> Unit,
+) {
+    var selectedFilter by rememberSaveable { mutableIntStateOf(0) }
+    Column(modifier = Modifier.fillMaxSize()) {
+        AppFilterChipRow(
+            options = filters,
+            selectedIndex = selectedFilter,
+            onSelect = { index ->
+                selectedFilter = index
+                onSelectFilter(index)
+            },
+            contentPadding = PaddingValues(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
+            modifier = Modifier.padding(top = topGlassPadding),
+        )
+        SectionHost(
+            state = state,
+            emptyTitle = emptyTitle,
+            emptyMessage = emptyMessage,
+            onRetry = onRetry,
+            bottomContentPadding = bottomContentPadding,
+            onScrollChanged = onScrollChanged,
+        ) { list ->
+            LazyColumn(
                 modifier = Modifier.fillMaxSize(),
+                contentPadding =
+                    PaddingValues(
+                        start = AppDimens.spacing.l,
+                        end = AppDimens.spacing.l,
+                        bottom = bottomContentPadding + AppDimens.spacing.xl,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
+            ) {
+                items(list, key = { it.id }) { item ->
+                    AppCard(onClick = { onItemClick(item.parsed()) }, contentPadding = PaddingValues(0.dp)) {
+                        HomeIssueRow(item = item)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 讨论分区：GraphQL 搜索结果（分类 / 已解答 / 评论数）。 */
+@Composable
+private fun DiscussionSection(
+    state: HomeSectionState<HomeDiscussionItem>,
+    onRetry: () -> Unit,
+    onItemClick: (ParsedUrl) -> Unit,
+    topGlassPadding: Dp,
+    bottomContentPadding: Dp,
+    onScrollChanged: (Boolean) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize().padding(top = topGlassPadding)) {
+        SectionHost(
+            state = state,
+            emptyTitle = stringResource(R.string.home_empty_discussions),
+            emptyMessage = stringResource(R.string.home_empty_discussions_desc),
+            onRetry = onRetry,
+            bottomContentPadding = bottomContentPadding,
+            onScrollChanged = onScrollChanged,
+        ) { list ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding =
+                    PaddingValues(
+                        start = AppDimens.spacing.l,
+                        end = AppDimens.spacing.l,
+                        top = AppDimens.spacing.s,
+                        bottom = bottomContentPadding + AppDimens.spacing.xl,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
+            ) {
+                items(list, key = { it.id }) { item ->
+                    AppCard(onClick = { onItemClick(item.parsed()) }, contentPadding = PaddingValues(0.dp)) {
+                        HomeDiscussionRow(item = item)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 发现分区：主题 chips + 趋势仓库 + 推荐关注（分组列表）+ 热门议题。 */
+@Composable
+private fun ExploreSection(
+    trending: List<TrendItem>,
+    suggestedUsers: HomeSectionState<HomeUserItem>,
+    hotIssues: HomeSectionState<HomeIssueItem>,
+    onRetry: () -> Unit,
+    onItemClick: (ParsedUrl) -> Unit,
+    topGlassPadding: Dp,
+    bottomContentPadding: Dp,
+    onScrollChanged: (Boolean) -> Unit,
+) {
+    val listState = rememberLazyListState()
+    ReportScroll(listState, onScrollChanged)
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = topGlassPadding, bottom = bottomContentPadding + AppDimens.spacing.xl),
+    ) {
+        item(key = "topics") {
+            Column {
+                AppSectionHeader(title = stringResource(R.string.home_section_topics))
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = AppDimens.spacing.l),
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+                ) {
+                    items(EXPLORE_TOPICS) { topic ->
+                        AppStatPill(text = "#" + topic, icon = AppIcons.Label.rounded)
+                    }
+                }
+            }
+        }
+
+        item(key = "trending") {
+            TrendingSection(
+                items = trending,
+                onItemClick = { onItemClick(it.parsed()) },
+                modifier = Modifier.padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
             )
         }
 
-        HomeTab.ISSUES -> {
-            // Issue 列表占位（列表页属后续功能票；详情页 T14 已合入）
-            EmptyContent(modifier = Modifier.fillMaxSize().padding(top = topGlassPadding))
+        item(key = "users-header") {
+            AppSectionHeader(title = stringResource(R.string.home_section_users))
         }
-
-        HomeTab.PULL_REQUESTS -> {
-            // PR 列表占位（列表页属后续功能票；详情页 T15 已合入）
-            EmptyContent(modifier = Modifier.fillMaxSize().padding(top = topGlassPadding))
-        }
-    }
-}
-
-/** 首页快捷入口区（#89，ui-design.md §2.2）：Home 字样 + 长条按钮 ×3。 */
-@Composable
-private fun QuickActionsSection(
-    onCreateIssueClick: () -> Unit,
-    onViewPullRequestsClick: () -> Unit,
-    onCreateRepoClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier.padding(vertical = AppDimens.spacing.s),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
-    ) {
-        Text(
-            text = stringResource(R.string.home_title),
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        LongBarAction(
-            text = stringResource(R.string.home_action_create_issue),
-            icon = AppDevOcticons.IssueOpened,
-            onClick = onCreateIssueClick,
-        )
-        LongBarAction(
-            text = stringResource(R.string.home_action_view_pulls),
-            icon = AppDevOcticons.PullRequest,
-            onClick = onViewPullRequestsClick,
-        )
-        // L04：新建仓库（此前为占位禁用态；未登录由宿主先引导登录）
-        LongBarAction(
-            text = stringResource(R.string.home_action_create_repo),
-            icon = AppDevOcticons.Repo,
-            onClick = onCreateRepoClick,
-        )
-    }
-}
-
-/**
- * 动态页（#89）：快捷入口区 + feed 状态区；下拉刷新只作用于本分区（B1-4 只刷新当前分区）。
- *
- * issue #83 几何：**有 feed 条目时**快捷入口进列表首项（随内容滚走），列表视口顶到 y=0，
- * 条目才会物理穿过玻璃背后；**无条目时**（加载/空/错）没有可滚内容，快捷入口保持常驻。
- *
- * UI-7：无条目且 refresh 挂起 = **首载**，用 [FeedSkeleton] 内容骨架替代整页转圈；
- * 空/错/后续刷新态不变（有内容的刷新走 `FeedList` 的 PullToRefresh 指示器）。
- */
-@Composable
-private fun FeedPage(
-    feed: Flow<PagingData<FeedItem>>,
-    trending: List<TrendItem>,
-    onFeedItemClick: (ParsedUrl) -> Unit,
-    topGlassPadding: Dp,
-    bottomContentPadding: Dp,
-    onCreateIssueClick: () -> Unit,
-    onViewPullRequestsClick: () -> Unit,
-    onCreateRepoClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val lazyItems = feed.collectAsLazyPagingItems()
-    val refreshState = lazyItems.loadState.refresh
-    val quickActions: @Composable () -> Unit = {
-        QuickActionsSection(
-            onCreateIssueClick = onCreateIssueClick,
-            onViewPullRequestsClick = onViewPullRequestsClick,
-            onCreateRepoClick = onCreateRepoClick,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-    val hasFeedRows = refreshState !is LoadState.Error && lazyItems.itemCount > 0
-
-    if (hasFeedRows) {
-        FeedList(
-            lazyItems = lazyItems,
-            trending = trending,
-            onTrendingClick = { item -> handleTrendingClick(item, onFeedItemClick) },
-            onFeedItemClick = onFeedItemClick,
-            topGlassPadding = topGlassPadding,
-            bottomContentPadding = bottomContentPadding,
-            quickActions = quickActions,
-            modifier = modifier,
-        )
-    } else {
-        // 无条目（加载 / 空 / 错）：没有可滚内容，快捷入口保持常驻，
-        // 整块按玻璃头高度整体避让（此处用布局 padding 是安全的——不参与穿越）
-        Column(modifier = modifier.padding(top = topGlassPadding)) {
-            // 列表态横向 16dp 由 contentPadding 给；这里没有列表，横向自己补
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.spacing.l)) {
-                quickActions()
+        when (suggestedUsers) {
+            is HomeSectionState.Loading -> {
+                item(key = "users-loading") { AppListSkeleton(rows = 3, rowHeight = 72.dp) }
             }
-            Box(modifier = Modifier.weight(1f)) {
-                when {
-                    refreshState is LoadState.Error -> {
-                        PagingErrorContent(
-                            error = (refreshState as LoadState.Error).error,
-                            onRetry = { lazyItems.retry() },
-                            modifier = Modifier.fillMaxSize(),
+
+            is HomeSectionState.Error -> {
+                item(key = "users-error") {
+                    AppErrorState(
+                        title = stringResource(R.string.feed_error_unknown),
+                        actionLabel = stringResource(R.string.feed_retry),
+                        onAction = onRetry,
+                    )
+                }
+            }
+
+            is HomeSectionState.Data -> {
+                item(key = "users") {
+                    AppGroupedColumn(items = suggestedUsers.items) { user, _ ->
+                        AppListRow(
+                            title = user.name?.takeIf { it.isNotBlank() } ?: user.login,
+                            subtitle = "@" + user.login,
+                            leading = {
+                                AppIconBadge(
+                                    icon = AppIcons.Person.rounded,
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                )
+                            },
+                            trailingChevron = true,
+                            onClick = { onItemClick(ParsedUrl.User(user.login)) },
                         )
                     }
+                }
+            }
+        }
 
-                    refreshState is LoadState.Loading -> {
-                        // UI-7：feed 首载 = 走不到 FeedList（itemCount == 0，见 hasFeedRows 判定），
-                        // 用内容骨架替代居中转圈；有内容的下拉刷新仍走 FeedList 的
-                        // PullToRefresh 指示器，本分支不可达。
-                        FeedSkeleton(modifier = Modifier.fillMaxSize())
-                    }
+        item(key = "issues-header") {
+            AppSectionHeader(title = stringResource(R.string.home_section_hot_issues))
+        }
+        when (hotIssues) {
+            is HomeSectionState.Loading -> {
+                item(key = "issues-loading") { AppListSkeleton(rows = 3, rowHeight = 84.dp) }
+            }
 
-                    else -> {
-                        // 空态保留下拉刷新（T10 B1-4）
-                        PullToRefreshBox(
-                            isRefreshing = refreshState is LoadState.Loading,
-                            onRefresh = { lazyItems.refresh() },
-                            modifier = Modifier.fillMaxSize(),
-                        ) {
-                            EmptyContent(modifier = Modifier.fillMaxSize())
+            is HomeSectionState.Error -> {
+                item(key = "issues-error") {
+                    AppErrorState(
+                        title = stringResource(R.string.feed_error_unknown),
+                        actionLabel = stringResource(R.string.feed_retry),
+                        onAction = onRetry,
+                    )
+                }
+            }
+
+            is HomeSectionState.Data -> {
+                items(hotIssues.items, key = { "hot-" + it.id }) { item ->
+                    Box(
+                        modifier =
+                            Modifier.padding(
+                                horizontal = AppDimens.spacing.l,
+                                vertical = AppDimens.listSpacing / 2,
+                            ),
+                    ) {
+                        AppCard(onClick = { onItemClick(item.parsed()) }, contentPadding = PaddingValues(0.dp)) {
+                            HomeIssueRow(item = item)
                         }
                     }
                 }
@@ -534,169 +707,210 @@ private fun FeedPage(
     }
 }
 
-/**
- * 动态列表：full-bleed 视口 + 快捷入口首项 + 首屏 stagger（#89）。
- *
- * issue #83：`contentPadding` 顶部给玻璃头高度（静止态首屏在玻璃下、滚动穿过玻璃），
- * 底部追加底栏玻璃高度（末条可滚出玻璃区）；下拉刷新指示器同步下移避让玻璃头。
- */
-@OptIn(ExperimentalMaterial3Api::class)
+/** 分区三态宿主：骨架 / 错误 + 重试 / 空态 / 内容。 */
 @Composable
-private fun FeedList(
-    lazyItems: LazyPagingItems<FeedItem>,
-    trending: List<TrendItem>,
-    onTrendingClick: (TrendItem) -> Unit,
-    onFeedItemClick: (ParsedUrl) -> Unit,
-    topGlassPadding: Dp,
+private fun <T> SectionHost(
+    state: HomeSectionState<T>,
+    emptyTitle: String,
+    emptyMessage: String,
+    onRetry: () -> Unit,
     bottomContentPadding: Dp,
-    quickActions: @Composable () -> Unit,
-    modifier: Modifier = Modifier,
+    onScrollChanged: (Boolean) -> Unit,
+    content: @Composable (List<T>) -> Unit,
 ) {
-    val pullState = rememberPullToRefreshState()
-    val isRefreshing = lazyItems.loadState.refresh is LoadState.Loading
-    PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = { lazyItems.refresh() },
-        modifier = modifier,
-        state = pullState,
-        indicator = {
-            Box(modifier = Modifier.align(Alignment.TopCenter).padding(top = topGlassPadding)) {
-                PullToRefreshDefaults.Indicator(
-                    state = pullState,
-                    isRefreshing = isRefreshing,
+    when (state) {
+        is HomeSectionState.Loading -> {
+            val listState = rememberLazyListState()
+            ReportScroll(listState, onScrollChanged)
+            LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                item { AppListSkeleton(rows = 5) }
+            }
+        }
+
+        is HomeSectionState.Error -> {
+            AppErrorState(
+                title = stringResource(R.string.feed_error_unknown),
+                actionLabel = stringResource(R.string.feed_retry),
+                onAction = onRetry,
+                modifier = Modifier.fillMaxSize().padding(bottom = bottomContentPadding),
+            )
+        }
+
+        is HomeSectionState.Data -> {
+            if (state.items.isEmpty()) {
+                AppEmptyState(
+                    icon = AppDevOcticons.Info,
+                    title = emptyTitle,
+                    message = emptyMessage,
+                    modifier = Modifier.fillMaxSize().padding(bottom = bottomContentPadding),
                 )
+            } else {
+                content(state.items)
             }
-        },
+        }
+    }
+}
+
+/** 议题/PR 行（状态图标 + 标题 + label + 归属/编号/时间/评论数）。 */
+@Composable
+private fun HomeIssueRow(item: HomeIssueItem) {
+    val extended = MaterialTheme.extendedColors
+    val stateColor =
+        when {
+            item.isMerged -> extended.merged
+            item.state == "open" -> extended.success
+            else -> extended.danger
+        }
+    val stateIcon =
+        when {
+            item.isMerged -> AppDevOcticons.Merge
+            item.isPullRequest -> AppDevOcticons.PullRequest
+            item.state == "open" -> AppDevOcticons.IssueOpened
+            else -> AppDevOcticons.Check
+        }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(AppDimens.spacing.l),
+        verticalAlignment = Alignment.Top,
     ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding =
-                PaddingValues(
-                    start = AppDimens.spacing.l,
-                    end = AppDimens.spacing.l,
-                    top = topGlassPadding,
-                    bottom = AppDimens.spacing.s + bottomContentPadding,
-                ),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
-        ) {
-            item(key = QUICK_ACTIONS_KEY) {
-                quickActions()
+        AppIconBadge(
+            icon = stateIcon,
+            containerColor = stateColor.copy(alpha = 0.14f),
+            contentColor = stateColor,
+        )
+        Spacer(Modifier.width(AppDimens.spacing.m))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (item.labels.isNotEmpty()) {
+                Spacer(Modifier.height(AppDimens.spacing.s))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.xs + 2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    item.labels.take(3).forEach { label -> HomeLabelPill(label) }
+                }
             }
-            items(
-                count = lazyItems.itemCount,
-                // itemKey 内部用 peek(index)（不触发页加载，未加载区回退占位 key），
-                // 稳定 id 键保证翻页/刷新时已有行不重组合、滚动位置不跳变。
-                // ⚠️ itemKey/key 逻辑归 #86（perf(list)）领地，本票不改其行为。
-                key = lazyItems.itemKey { it.id },
-            ) { index ->
-                val item = lazyItems[index] ?: return@items
-                val enterModifier =
-                    if (index < STAGGER_MAX_ITEMS) {
-                        rememberStaggerEnterModifier(index)
-                    } else {
-                        Modifier
-                    }
-                Box(modifier = enterModifier) {
-                    FeedRow(
-                        item = item,
-                        onClick = { handleItemClick(item, onFeedItemClick) },
+            Spacer(Modifier.height(AppDimens.spacing.s))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+            ) {
+                if (item.repoFullName.isNotBlank()) {
+                    Text(
+                        text = item.repoFullName,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
+                Text(
+                    text = "#" + item.number,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                item.updatedAt?.let { iso ->
+                    Text(
+                        text = relativeTimeText(iso) ?: iso,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+                if (item.commentCount > 0) {
+                    AppIcon(spec = AppIcons.ChatBubble, contentDescription = null, size = 14.dp)
+                    Text(
+                        text = item.commentCount.toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            // Trending 小节：feed 尾部（ui-design §2.2「trending repo 穿插在 feed 下方」）。
-            // 空列表时 TrendingSection 自身不渲染；固定 key 避免刷新时与 feed 行冲突
-            item(key = TRENDING_SECTION_KEY) {
-                TrendingSection(items = trending, onItemClick = onTrendingClick)
-            }
         }
     }
 }
 
-/** 点击 Trending 条目：仓库链接 → 应用内仓库详情（复用 feed 的 ParsedUrl 导航通道） */
-private fun handleTrendingClick(
-    item: TrendItem,
-    onFeedItemClick: (ParsedUrl) -> Unit,
-) {
-    val parsed = GitHubLinkParser.parseUrl(item.url)
-    if (parsed !is ParsedUrl.External) {
-        onFeedItemClick(parsed)
-    }
-}
-
-/** 点击条目：解析 html_url → 应用内 ParsedUrl 导航（External 防御性忽略） */
-private fun handleItemClick(
-    item: FeedItem,
-    onFeedItemClick: (ParsedUrl) -> Unit,
-) {
-    val htmlUrl = item.htmlUrl ?: return
-    val parsed = GitHubLinkParser.parseUrl(htmlUrl)
-    if (parsed !is ParsedUrl.External) {
-        onFeedItemClick(parsed)
-    }
-}
-
+/** GitHub label 胶囊（颜色来自 API，文本色按亮度取黑/白）。 */
 @Composable
-private fun UnauthenticatedContent(
-    onLoginClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun HomeLabelPill(label: HomeLabel) {
+    val (background, content) = labelColors(label.colorHex)
+    AppStatPill(text = label.name, containerColor = background, contentColor = content)
+}
+
+/** 讨论行（分类 + 已解答 + 评论数）。 */
+@Composable
+private fun HomeDiscussionRow(item: HomeDiscussionItem) {
+    val extended = MaterialTheme.extendedColors
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(AppDimens.spacing.l),
+        verticalAlignment = Alignment.Top,
+    ) {
+        AppIconBadge(
+            icon = AppIcons.Forum.rounded,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+        Spacer(Modifier.width(AppDimens.spacing.m))
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = stringResource(R.string.feed_require_login),
+                text = item.title,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(AppDimens.spacing.l))
-            Button(onClick = onLoginClick) {
-                Text(text = stringResource(R.string.feed_login))
+            Spacer(Modifier.height(AppDimens.spacing.s))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+            ) {
+                item.repoFullName?.takeIf { it.isNotBlank() }?.let { repo ->
+                    Text(
+                        text = repo,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
+                item.categoryName?.let { category -> AppStatPill(text = category.orEmpty()) }
+                if (item.isAnswered) {
+                    Text(
+                        text = stringResource(R.string.home_discussion_answered),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = extended.success,
+                    )
+                }
+                Text(
+                    text = item.commentCount.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                AppChevron()
             }
         }
     }
 }
 
+/** 把列表滚动状态上报给宿主（FAB 的滑动感知收纳）。 */
 @Composable
-private fun LoadingContent(modifier: Modifier = Modifier) {
-    // #84：共享加载态组件
-    AppLoadingState(modifier = modifier)
-}
-
-@Composable
-private fun EmptyContent(modifier: Modifier = Modifier) {
-    // #84：共享空态组件（矢量插图 + 文案）
-    AppEmptyState(
-        icon = AppDevOcticons.Repo,
-        title = stringResource(R.string.feed_empty),
-        modifier = modifier,
-    )
-}
-
-@Composable
-private fun PagingErrorContent(
-    error: Throwable,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
+private fun ReportScroll(
+    listState: LazyListState,
+    onScrollChanged: (Boolean) -> Unit,
 ) {
-    val errorType = if (error is IOException || error is HttpException) HomeErrorType.NETWORK else HomeErrorType.UNKNOWN
-    ErrorContent(errorType = errorType, onRetry = onRetry, modifier = modifier)
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }.collect(onScrollChanged)
+    }
 }
 
-@Composable
-private fun ErrorContent(
-    errorType: HomeErrorType,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    // #84：共享错误态组件（Alert 插图 + 文案 + 重试按钮）
-    AppErrorState(
-        title = errorMessage(errorType),
-        actionLabel = stringResource(R.string.feed_retry),
-        onAction = onRetry,
-        modifier = modifier,
-    )
-}
-
-/** 错误类型 → 本地化文案（ViewModel 只传类型，不产英文） */
+/** 错误文案（网络/未知）。 */
 @Composable
 private fun errorMessage(errorType: HomeErrorType): String =
     when (errorType) {
@@ -704,31 +918,42 @@ private fun errorMessage(errorType: HomeErrorType): String =
         HomeErrorType.UNKNOWN -> stringResource(R.string.feed_error_unknown)
     }
 
-/**
- * 首页顶部小分区条（动态/Issue/PR）—— ui-design.md §2.1；#89 起与 Pager 双向联动。
- *
- * issue #83：由 [AppTopBar] 的 `sectionBar` 插槽渲染在**玻璃头副行**内（不再是内容列首项），
- * containerColor 保持透明让背后模糊透得上来；文字/指示条在 effect 层，自身保持锐利。
- */
-@Composable
-private fun HomeTabBar(
-    selectedTabIndex: Int,
-    onTabSelected: (HomeTab) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    PrimaryTabRow(
-        selectedTabIndex = selectedTabIndex,
-        modifier = modifier,
-    ) {
-        HomeTab.entries.forEach { tab ->
-            Tab(
-                selected = selectedTabIndex == tab.ordinal,
-                onClick = { onTabSelected(tab) },
-                text = { Text(text = stringResource(tab.titleRes)) },
-            )
-        }
+// ── 模型 → 应用内路由（复用 feed 的 ParsedUrl 通道，宿主接线零改动）─────────────
+
+/** 议题/PR 行 → 详情路由（PR 走 PullRequest 变体）。 */
+internal fun HomeIssueItem.parsed(): ParsedUrl {
+    val owner = repoFullName.substringBefore('/')
+    val repo = repoFullName.substringAfter('/', "")
+    if (owner.isBlank() || repo.isBlank()) {
+        return ParsedUrl.External("https://github.com/" + repoFullName)
+    }
+    return if (isPullRequest) {
+        ParsedUrl.PullRequest(owner, repo, number)
+    } else {
+        ParsedUrl.Issue(owner, repo, number)
     }
 }
 
-/** 点 Tab 分区切换时"先淡出"占整段 fade 的比例（其余留给淡入，避免中途出现长空白）。 */
-private const val SECTION_FADE_OUT_FRACTION = 0.4f
+/** 讨论行 → 讨论详情路由（应用内 Discussions 屏）。 */
+internal fun HomeDiscussionItem.parsed(): ParsedUrl {
+    val full = repoFullName.orEmpty()
+    val owner = full.substringBefore('/')
+    val repo = full.substringAfter('/', "")
+    return if (owner.isBlank() || repo.isBlank()) {
+        ParsedUrl.External("https://github.com/" + full + "/discussions/" + number)
+    } else {
+        ParsedUrl.Discussion(owner, repo, number)
+    }
+}
+
+/** 趋势仓库 → 仓库详情路由。 */
+internal fun TrendItem.parsed(): ParsedUrl {
+    val owner = fullName.substringBefore('/')
+    val repo = fullName.substringAfter('/', "")
+    return if (owner.isBlank() || repo.isBlank()) ParsedUrl.External(url) else ParsedUrl.Repo(owner, repo)
+}
+
+/** 动态流条目 → 应用内路由（沿用既有 html_url 解析）。 */
+internal fun FeedItem.parsed(): ParsedUrl =
+    htmlUrl?.let { GitHubLinkParser.parseUrl(it) }
+        ?: ParsedUrl.External("https://github.com/" + repoFullName)

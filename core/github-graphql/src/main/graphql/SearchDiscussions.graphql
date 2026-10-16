@@ -1,0 +1,30 @@
+query SearchDiscussions($query: String!, $first: Int!) {
+  search(query: $query, type: DISCUSSION, first: $first) {
+    nodes {
+      ... on Discussion {
+        id
+        number
+        title
+        url
+        createdAt
+        updatedAt
+        upvoteCount
+        answerChosenAt
+        author {
+          login
+          avatarUrl
+        }
+        repository {
+          nameWithOwner
+        }
+        category {
+          name
+          emoji
+        }
+        comments {
+          totalCount
+        }
+      }
+    }
+  }
+}

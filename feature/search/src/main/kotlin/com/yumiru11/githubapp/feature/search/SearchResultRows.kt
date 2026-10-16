@@ -3,6 +3,7 @@ package com.yumiru11.githubapp.feature.search
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,15 +49,12 @@ internal fun RepositoryRow(
     AppCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            ),
+        contentPadding = PaddingValues(AppDimens.cardPadding),
     ) {
-        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
+        Column {
             Text(
                 text = repository.fullName,
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -66,7 +64,7 @@ internal fun RepositoryRow(
                 Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
                 Text(
                     text = description,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -77,7 +75,7 @@ internal fun RepositoryRow(
                 Icon(
                     imageVector = Icons.Default.Star,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.extendedColors.star,
                     modifier = Modifier.size(14.dp),
                 )
                 Spacer(modifier = Modifier.width(AppDimens.spacing.xs))

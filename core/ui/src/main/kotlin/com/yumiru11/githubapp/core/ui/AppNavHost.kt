@@ -84,6 +84,7 @@ fun AppNavHost(
     blobScreen:
         @Composable (owner: String, repo: String, ref: String, path: String) -> Unit = { _, _, _, _ -> },
     profileScreen: @Composable (onLoginClick: () -> Unit, onBackClick: () -> Unit) -> Unit = { _, _ -> },
+    notificationsScreen: @Composable (onBackClick: () -> Unit) -> Unit = {},
     gistsScreen: @Composable (username: String, onBackClick: () -> Unit) -> Unit = { _, _ -> },
     settingsScreen: @Composable (
         onBackClick: () -> Unit,
@@ -177,6 +178,11 @@ fun AppNavHost(
 
                 // 设置分层结构（2026-10-10）：screen lambda 是**函数类型参数**，
                 // 调用侧必须按位置传实参——Kotlin 禁止对函数类型用命名实参（编译实测）。
+                composable<AppRoute.Notifications> {
+                    provideNavTransitionScope {
+                        notificationsScreen { navController.popBackStack() }
+                    }
+                }
                 composable<AppRoute.Settings> {
                     provideNavTransitionScope {
                         settingsScreen(

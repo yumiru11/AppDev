@@ -68,6 +68,8 @@ import com.composables.icons.materialsymbols.rounded.Search
 import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppDialog
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.editor.CodeEditorController
 import com.yumiru11.githubapp.core.editor.CodeEditorView
@@ -137,8 +139,8 @@ fun FileViewerScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        AppIcon(
+                            spec = AppIcons.ArrowBack,
                             contentDescription = stringResource(R.string.repo_back),
                         )
                     }
@@ -361,14 +363,14 @@ private fun FileViewerToolRail(
     ) {
         Column {
             IconButton(onClick = onOpenFind) {
-                Icon(
-                    imageVector = MaterialSymbols.Rounded.Search,
+                AppIcon(
+                    spec = AppIcons.Search,
                     contentDescription = stringResource(R.string.repo_file_search),
                 )
             }
             IconButton(onClick = onJumpToLine) {
-                Icon(
-                    imageVector = MaterialSymbols.Rounded.Format_list_numbered,
+                AppIcon(
+                    spec = AppIcons.FormatListNumbered,
                     contentDescription = stringResource(R.string.repo_file_jump_to_line),
                 )
             }
@@ -382,8 +384,8 @@ private fun FileViewerToolRail(
 @Composable
 private fun EditFileButton(viewModel: RepoFilesViewModel) {
     IconButton(onClick = { viewModel.startEdit() }) {
-        Icon(
-            imageVector = MaterialSymbols.Rounded.Edit,
+        AppIcon(
+            spec = AppIcons.Edit,
             contentDescription = stringResource(R.string.repo_file_edit),
         )
     }

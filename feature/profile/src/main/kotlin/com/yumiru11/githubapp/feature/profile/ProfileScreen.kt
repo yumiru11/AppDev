@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +29,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -74,11 +76,19 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.data.model.Repository
 import com.yumiru11.githubapp.core.data.model.User
+import com.yumiru11.githubapp.core.designsystem.component.AppButton
+import com.yumiru11.githubapp.core.designsystem.component.AppButtonStyle
+import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
+import com.yumiru11.githubapp.core.designsystem.component.AppGroupedColumn
+import com.yumiru11.githubapp.core.designsystem.component.AppIconBadge
+import com.yumiru11.githubapp.core.designsystem.component.AppListRow
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.ui.AppSnackbarHost
@@ -144,8 +154,8 @@ fun ProfileScreen(
                 navigationIcon = {
                     if (onBackClick != null) {
                         IconButton(onClick = onBackClick) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            AppIcon(
+                                spec = AppIcons.ArrowBack,
                                 contentDescription = stringResource(R.string.profile_back),
                             )
                         }
@@ -225,6 +235,7 @@ private fun ProfileContent(
     LazyColumn(
         modifier = modifier,
         contentPadding = PaddingValues(bottom = bottomContentPadding),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
     ) {
         item(key = "header") {
             ProfileHeader(
@@ -266,104 +277,92 @@ private fun ProfileHeader(
     isFollowing: Boolean,
     onToggleFollow: () -> Unit,
 ) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.l),
+    AppCard(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = AppDimens.spacing.l),
+        contentPadding = PaddingValues(AppDimens.cardPadding),
     ) {
-        ProfileAvatar(avatarUrl = user.avatarUrl)
-        Spacer(modifier = Modifier.height(AppDimens.spacing.m))
-        Text(
-            text = user.name ?: user.login,
-            style = MaterialTheme.typography.headlineSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = "@${user.login}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        val bio = user.bio
-        if (!bio.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
+        Column(modifier = Modifier.fillMaxWidth()) {
+            ProfileAvatar(avatarUrl = user.avatarUrl)
+            Spacer(modifier = Modifier.height(AppDimens.spacing.m))
             Text(
-                text = bio,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 3,
+                text = user.name ?: user.login,
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        }
-        Spacer(modifier = Modifier.height(AppDimens.spacing.l))
-        // 统计数字变化用 AnimatedContent 滚动（#167 / UI09，§3.5「统计数字 AnimatedContent 滚动」）：
-        // 关注/取关后 followers 会变，数字直接跳变会显得"闪"，滚动过渡更稳。
-        Row {
-            StatNumber(
-                value = user.publicRepos,
-                labelRes = R.string.profile_stats_repos,
+            Text(
+                text = "@${user.login}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(modifier = Modifier.width(AppDimens.spacing.xl))
-            StatNumber(
-                value = user.followers,
-                labelRes = R.string.profile_stats_followers,
-            )
-            Spacer(modifier = Modifier.width(AppDimens.spacing.xl))
-            StatNumber(
-                value = user.following,
-                labelRes = R.string.profile_stats_following,
-            )
-            // Star 总数（#166 / UI21）：REST 资料端点不返回，取不到时**整项不渲染**——
-            // 不拿 0 冒充（"0 stars" 与"未知"在用户眼里是两回事）。
-            user.starredCount?.let { stars ->
-                Spacer(modifier = Modifier.width(AppDimens.spacing.xl))
-                StatNumber(
-                    value = stars,
-                    labelRes = R.string.profile_stats_stars,
+            val bio = user.bio
+            if (!bio.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
+                Text(
+                    text = bio,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
-        if (!isSelf) {
             Spacer(modifier = Modifier.height(AppDimens.spacing.l))
-            FilledTonalButton(onClick = onToggleFollow) {
-                Text(
-                    text =
-                        stringResource(
-                            if (isFollowing) R.string.profile_unfollow else R.string.profile_follow,
-                        ),
+            // 统计数字变化用 AnimatedContent 滚动（#167 / UI09，§3.5「统计数字 AnimatedContent 滚动」）：
+            // 关注/取关后 followers 会变，数字直接跳变会显得"闪"，滚动过渡更稳。
+            Row {
+                StatNumber(
+                    value = user.publicRepos,
+                    labelRes = R.string.profile_stats_repos,
+                )
+                Spacer(modifier = Modifier.width(AppDimens.spacing.xl))
+                StatNumber(
+                    value = user.followers,
+                    labelRes = R.string.profile_stats_followers,
+                )
+                Spacer(modifier = Modifier.width(AppDimens.spacing.xl))
+                StatNumber(
+                    value = user.following,
+                    labelRes = R.string.profile_stats_following,
+                )
+                // Star 总数（#166 / UI21）：REST 资料端点不返回，取不到时**整项不渲染**——
+                // 不拿 0 冒充（"0 stars" 与"未知"在用户眼里是两回事）。
+                user.starredCount?.let { stars ->
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.xl))
+                    StatNumber(
+                        value = stars,
+                        labelRes = R.string.profile_stats_stars,
+                    )
+                }
+            }
+            if (!isSelf) {
+                Spacer(modifier = Modifier.height(AppDimens.spacing.l))
+                AppButton(
+                    text = stringResource(if (isFollowing) R.string.profile_unfollow else R.string.profile_follow),
+                    onClick = onToggleFollow,
+                    style = AppButtonStyle.Tonal,
+                    fillWidth = true,
+                    height = AppDimens.buttonHeightCompact,
                 )
             }
         }
     }
 }
 
-/** 入口列表（ui-design §3.5）：Gists（L11）——ListItem + 前置 Octicons + 尾随指示箭头 */
+/** 入口列表：分组卡 + 行首图标徽标 + 尾随箭头（M3 Expressive 分组列表语言）。 */
 @Composable
 private fun ProfileEntries(onOpenGists: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        ListItem(
-            headlineContent = { Text(text = stringResource(R.string.profile_gists_entry)) },
-            leadingContent = {
-                Icon(
-                    imageVector = AppDevOcticons.File,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    AppGroupedColumn(items = listOf(Unit), modifier = Modifier.padding(vertical = AppDimens.spacing.s)) { _, _ ->
+        AppListRow(
+            title = stringResource(R.string.profile_gists_entry),
+            leading = {
+                AppIconBadge(
+                    icon = AppDevOcticons.File,
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
             },
-            trailingContent = {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            },
-            modifier =
-                Modifier.clickable(
-                    onClickLabel = stringResource(R.string.profile_gists_entry),
-                    onClick = onOpenGists,
-                ),
+            trailingChevron = true,
+            onClick = onOpenGists,
         )
-        HorizontalDivider()
     }
 }
 
@@ -536,8 +535,8 @@ private fun RepositoryRow(
             }
             Spacer(modifier = Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.Star,
+                AppIcon(
+                    spec = AppIcons.Star,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -560,7 +559,6 @@ private fun RepositoryRow(
             }
         }
     }
-    HorizontalDivider()
 }
 
 @Composable
@@ -572,8 +570,11 @@ private fun UserRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .padding(horizontal = AppDimens.spacing.l)
+                .clip(RoundedCornerShape(AppDimens.cornerMedium))
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
                 .clickable(onClick = onClick)
-                .padding(horizontal = AppDimens.spacing.l, vertical = 10.dp),
+                .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
@@ -600,7 +601,6 @@ private fun UserRow(
             )
         }
     }
-    HorizontalDivider()
 }
 
 @Composable

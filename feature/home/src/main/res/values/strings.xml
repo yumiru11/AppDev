@@ -41,4 +41,28 @@
     <!-- Trending feed section (L08, ui-design.md §2.2/§2.5) -->
     <string name="home_trending_title">Trending</string>
     <string name="home_trending_stars_cd">Stars</string>
+    <!-- 首页五个内容分区（2026-10 UI 重构，对齐 GitHubM3E） -->
+    <string name="home_tab_discussions">Discussions</string>
+    <string name="home_tab_explore">Explore</string>
+    <string name="home_filter_assigned">Assigned</string>
+    <string name="home_filter_created">Created</string>
+    <string name="home_filter_mentioned">Mentioned</string>
+    <string name="home_filter_involved">Involved</string>
+    <string name="home_filter_review">Review requests</string>
+    <string name="home_filter_recent">Recent</string>
+    <string name="home_section_topics">Popular topics</string>
+    <string name="home_section_trending">Trending repositories</string>
+    <string name="home_section_users">Suggested people</string>
+    <string name="home_section_hot_issues">Hot issues</string>
+    <string name="home_empty_issues">No issues</string>
+    <string name="home_empty_issues_desc">Issues assigned to you, created by you or mentioning you appear here.</string>
+    <string name="home_empty_pulls">No pull requests</string>
+    <string name="home_empty_pulls_desc">Pull requests you are involved in or asked to review appear here.</string>
+    <string name="home_empty_discussions">No discussions</string>
+    <string name="home_empty_discussions_desc">Discussions you take part in appear here.</string>
+    <string name="home_discussion_answered">Answered</string>
+    <string name="home_fab_new_issue">New issue</string>
+    <string name="home_fab_new_pull">New pull request</string>
+    <string name="home_fab_new_repo">New repository</string>
+    <string name="home_fab_refresh">Refresh</string>
 </resources>

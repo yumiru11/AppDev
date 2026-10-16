@@ -240,4 +240,8 @@
     <string name="repo_commit_status_modified">Modified</string>
     <string name="repo_commit_status_renamed">Renamed</string>
     <string name="repo_commit_status_unknown">Changed</string>
+    <string name="repo_tab_issues">Issues</string>
+    <string name="repo_tab_pulls">Pull requests</string>
+    <string name="repo_issue_list_error">Could not load the list</string>
+    <string name="repo_issue_list_retry">Retry</string>
 </resources>

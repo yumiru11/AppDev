@@ -23,7 +23,8 @@ body {
   font-family: var(--fontStack-sansSerif);
   font-size: 16px;
   line-height: 1.6;
-  padding: 16px;
+  /* 2026-10 UI 重构：左右 36px 与原生渲染通道的 36dp 侧边距对齐（两通道读取同一视觉口径） */
+  padding: 16px 36px;
   word-wrap: break-word;
 }
 

@@ -48,6 +48,8 @@ import com.composables.icons.materialsymbols.rounded.Edit
 import com.composables.icons.materialsymbols.rounded.Search
 import com.yumiru11.githubapp.core.designsystem.component.AppDialog
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.editor.CodeEditorController
 import com.yumiru11.githubapp.core.editor.CodeEditorView
@@ -138,8 +140,8 @@ fun FileEditScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        AppIcon(
+                            spec = AppIcons.ArrowBack,
                             contentDescription = stringResource(R.string.repo_back),
                         )
                     }
@@ -157,8 +159,8 @@ fun FileEditScreen(
                                 }
                             },
                         ) {
-                            Icon(
-                                imageVector = MaterialSymbols.Rounded.Search,
+                            AppIcon(
+                                spec = AppIcons.Search,
                                 contentDescription = stringResource(R.string.repo_file_search),
                                 tint =
                                     if (uiState.isFindOpen) {
@@ -172,8 +174,8 @@ fun FileEditScreen(
                     }
                     if (!isNew && !isSubmitting) {
                         IconButton(onClick = { showDeleteDialog = true }) {
-                            Icon(
-                                imageVector = MaterialSymbols.Rounded.Delete,
+                            AppIcon(
+                                spec = AppIcons.Delete,
                                 contentDescription = stringResource(R.string.repo_file_delete),
                             )
                         }

@@ -2,8 +2,11 @@
 
 package com.yumiru11.githubapp.feature.search
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -22,6 +25,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -29,7 +33,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
+import com.yumiru11.githubapp.core.designsystem.token.GlassScope
 
 /**
  * 搜索页顶栏：返回键 + 大号搜索框（自动聚焦，IME 搜索键提交）。
@@ -42,30 +50,35 @@ internal fun SearchTopBar(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    TopAppBar(
-        navigationIcon = {
+    // 与首页顶栏同构：玻璃底 + 状态栏内边距 + 胶囊输入（搜索页此前是不透明 TopAppBar，
+    // 背景图开启时会出现"一条实色条压住壁纸"的割裂感）
+    GlassSurface(
+        modifier = modifier,
+        windowInsets = WindowInsets.statusBars,
+        scope = GlassScope.TOP_BAR,
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = AppDimens.spacing.s, vertical = AppDimens.spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             IconButton(onClick = onBackClick) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                AppIcon(
+                    spec = AppIcons.ArrowBack,
                     contentDescription = stringResource(R.string.search_back),
                 )
             }
-        },
-        title = {
             SearchInput(
                 value = input,
                 onValueChange = onInputChange,
                 onSubmit = onSubmit,
                 onClear = { onInputChange("") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
             )
-        },
-        colors =
-            TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-            ),
-        modifier = modifier,
-    )
+        }
+    }
 }
 
 @Composable
@@ -95,8 +108,8 @@ private fun SearchInput(
             )
         },
         leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.Search,
+            AppIcon(
+                spec = AppIcons.Search,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -104,8 +117,8 @@ private fun SearchInput(
         trailingIcon = {
             if (value.isNotEmpty()) {
                 IconButton(onClick = onClear) {
-                    Icon(
-                        imageVector = Icons.Default.Clear,
+                    AppIcon(
+                        spec = AppIcons.Close,
                         contentDescription = stringResource(R.string.search_clear_input),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

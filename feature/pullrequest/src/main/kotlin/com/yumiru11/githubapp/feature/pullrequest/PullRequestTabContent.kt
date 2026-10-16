@@ -49,9 +49,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
+import com.yumiru11.githubapp.core.designsystem.component.AppIconBadge
+import com.yumiru11.githubapp.core.designsystem.component.AppIconButton
+import com.yumiru11.githubapp.core.designsystem.component.AppStatPill
 import com.yumiru11.githubapp.core.designsystem.component.AppStateColorRole
 import com.yumiru11.githubapp.core.designsystem.component.appStateColors
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
+import com.yumiru11.githubapp.core.designsystem.theme.extendedColors
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
@@ -543,7 +548,7 @@ private fun CheckRunRow(
     }
 }
 
-/** 文件行：文件名 + 状态 + +N −M；展开显示 patch */
+/** 文件变更行：图标徽标 + 文件名 + 状态胶囊 + 增删数 + 展开/收起（展开后接 diff）。 */
 @Composable
 private fun FileRow(
     file: PullRequestFile,
@@ -561,41 +566,50 @@ private fun FileRow(
     ) {
         Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // 行首圆形图标徽标（按变更类型着色）：与列表类页面同一语言
+                AppIconBadge(
+                    icon = AppIcons.Article.rounded,
+                    containerColor = fileStatusContainer(file.status),
+                    contentColor = fileStatusContent(file.status),
+                )
+                Spacer(modifier = Modifier.width(AppDimens.spacing.m))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = file.filename,
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.bodyLarge,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text(
-                        text = fileStatusText(file.status),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
-                Text(
-                    text = stringResource(R.string.pull_request_additions, file.additions),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
-                Text(
-                    text = stringResource(R.string.pull_request_deletions, file.deletions),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                if (!file.patch.isNullOrBlank()) {
-                    IconButton(onClick = onToggleExpanded) {
-                        Icon(
-                            imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                            contentDescription =
-                                stringResource(
-                                    if (expanded) R.string.pull_request_file_collapse else R.string.pull_request_file_expand,
-                                ),
+                    Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AppStatPill(
+                            text = fileStatusText(file.status),
+                            containerColor = fileStatusContainer(file.status),
+                            contentColor = fileStatusContent(file.status),
+                        )
+                        Spacer(modifier = Modifier.width(AppDimens.spacing.s))
+                        Text(
+                            text = stringResource(R.string.pull_request_additions, file.additions),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.extendedColors.diffAddText,
+                        )
+                        Spacer(modifier = Modifier.width(AppDimens.spacing.xs))
+                        Text(
+                            text = stringResource(R.string.pull_request_deletions, file.deletions),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.extendedColors.diffDelText,
                         )
                     }
+                }
+                if (!file.patch.isNullOrBlank()) {
+                    AppIconButton(
+                        icon = if (expanded) AppIcons.ExpandLess.rounded else AppIcons.ExpandMore.rounded,
+                        contentDescription =
+                            stringResource(
+                                if (expanded) R.string.pull_request_file_collapse else R.string.pull_request_file_expand,
+                            ),
+                        onClick = onToggleExpanded,
+                    )
                 }
             }
             if (expanded) {

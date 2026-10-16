@@ -148,6 +148,55 @@ class ThemePaletteTest {
         assertEquals("onDraft ← onSurfaceVariant", lightScheme.onSurfaceVariant, light.onDraft)
     }
 
+    // ── Diff / 代码语义色（2026-10 UI 重构：diff 与代码视图的 M3E 口径配色）────────
+
+    @Test
+    fun extendedColors_everyPalette_diffAndCodeFieldsAreSpecified() {
+        // 这 10 个字段在 data class 上带 `Color.Unspecified` 默认值（palette 函数先构造、
+        // 再 withDiffRoles 补色）——因此必须有断言保证"每套色板都真的补上了"，
+        // 否则漏补的色板会在运行时画出透明 diff 行（静默缺陷）。
+        diffCodeFields().forEach { (field, value) ->
+            everyExtendedPalette().forEach { (palette, extended) ->
+                assertNotEquals("$palette.$field must carry a real color", Color.Unspecified, value(extended))
+            }
+        }
+    }
+
+    @Test
+    fun extendedColors_lightAndDark_diffAndCodeFieldsDiffer() {
+        val light = lightPalette().extendedColors
+        val dark = darkPalette().extendedColors
+        diffCodeFields().forEach { (field, value) ->
+            assertNotEquals("$field must differ between light and dark", value(light), value(dark))
+        }
+    }
+
+    @Test
+    fun extendedColorsFrom_dynamicSchemes_diffAndCodeFieldsAreDerived() {
+        // 动态取色 / seed 色的兜底派生同样要给全（否则这两条路径下 diff 是透明的）
+        val light = extendedColorsFrom(lightColorScheme())
+        val dark = extendedColorsFrom(darkColorScheme())
+        diffCodeFields().forEach { (field, value) ->
+            assertNotEquals("$field must be derived (light)", Color.Unspecified, value(light))
+            assertNotEquals("$field must be derived (dark)", Color.Unspecified, value(dark))
+        }
+    }
+
+    /** Diff / 代码视图的 10 个语义字段（字段名 → 取值器）。 */
+    private fun diffCodeFields(): List<Pair<String, (ExtendedColors) -> Color>> =
+        listOf(
+            "diffAddBackground" to { it.diffAddBackground },
+            "diffAddText" to { it.diffAddText },
+            "diffDelBackground" to { it.diffDelBackground },
+            "diffDelText" to { it.diffDelText },
+            "diffHunkBackground" to { it.diffHunkBackground },
+            "diffHunkText" to { it.diffHunkText },
+            "codeBackground" to { it.codeBackground },
+            "codeLineNumber" to { it.codeLineNumber },
+            "star" to { it.star },
+            "skeleton" to { it.skeleton },
+        )
+
     /** plan.md §5.3 的 8 个状态字段（字段名 → 取值器），用于遍历式断言。 */
     private fun stateFields(): List<Pair<String, (ExtendedColors) -> Color>> =
         listOf(

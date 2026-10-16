@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -77,7 +78,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -95,6 +98,8 @@ import com.yumiru11.githubapp.core.datastore.draft.DraftText
 import com.yumiru11.githubapp.core.designsystem.component.AppBottomSheet
 import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppDialog
+import com.yumiru11.githubapp.core.designsystem.component.AppFabMenu
+import com.yumiru11.githubapp.core.designsystem.component.AppFabMenuItem
 import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
@@ -103,6 +108,8 @@ import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.editor.MarkdownComposer
 import com.yumiru11.githubapp.core.editor.MarkdownEditorController
@@ -163,6 +170,8 @@ fun IssueDetailScreen(
     val commentDraftText by viewModel.commentDraft.text.collectAsStateWithLifecycle()
 
     var showCommentSheet by remember { mutableStateOf(false) }
+    // FAB 滑动感知：列表滑动时收起、停滑 300ms 后恢复（AppFabMenu 内置）
+    var listScrolling by remember { mutableStateOf(false) }
     var editingIssue by remember { mutableStateOf(false) }
     var editingComment by remember { mutableStateOf<IssueTimelineItem.Comment?>(null) }
     var deletingComment by remember { mutableStateOf<IssueTimelineItem.Comment?>(null) }
@@ -186,8 +195,8 @@ fun IssueDetailScreen(
                 title = { Text(text = "$owner/$repo #$number") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        AppIcon(
+                            spec = AppIcons.ArrowBack,
                             contentDescription = stringResource(R.string.issue_back),
                         )
                     }
@@ -206,15 +215,35 @@ fun IssueDetailScreen(
         floatingActionButton = {
             val state = uiState as? IssueDetailUiState.Success
             if (state?.canComment == true) {
-                ExtendedFloatingActionButton(
-                    onClick = { showCommentSheet = true },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Filled.Create,
-                            contentDescription = null,
-                        )
-                    },
-                    text = { Text(text = stringResource(R.string.issue_comment)) },
+                // 可展开 FAB 菜单（滑动自动收起、停滑 300ms 恢复）
+                var fabExpanded by rememberSaveable { mutableStateOf(false) }
+                val issueOpen = state.issue.state == IssueState.OPEN
+                AppFabMenu(
+                    expanded = fabExpanded,
+                    onExpandedChange = { fabExpanded = it },
+                    mainIcon = AppIcons.Add.rounded,
+                    mainContentDescription = stringResource(R.string.issue_comment),
+                    isScrollInProgress = listScrolling,
+                    items =
+                        listOf(
+                            AppFabMenuItem(
+                                label = stringResource(R.string.issue_comment),
+                                icon = AppIcons.ChatBubble.rounded,
+                                onClick = { showCommentSheet = true },
+                            ),
+                            AppFabMenuItem(
+                                label = stringResource(if (issueOpen) R.string.issue_close else R.string.issue_reopen),
+                                icon = AppIcons.Cancel.rounded,
+                                onClick = {
+                                    if (issueOpen) viewModel.closeIssue() else viewModel.reopenIssue()
+                                },
+                            ),
+                            AppFabMenuItem(
+                                label = stringResource(R.string.issue_edit_meta),
+                                icon = AppIcons.Tune.rounded,
+                                onClick = viewModel::openMetaEditor,
+                            ),
+                        ),
                 )
             }
         },
@@ -258,6 +287,7 @@ fun IssueDetailScreen(
                         },
                         onDeleteComment = { deletingComment = it },
                         onCheckboxClick = viewModel::toggleTaskListItem,
+                        onScrollChanged = { listScrolling = it },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -371,8 +401,8 @@ private fun IssueMoreMenu(
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
         IconButton(onClick = { expanded = true }) {
-            Icon(
-                imageVector = Icons.Filled.MoreVert,
+            AppIcon(
+                spec = AppIcons.MoreVert,
                 contentDescription = stringResource(R.string.issue_menu_more),
             )
         }
@@ -431,13 +461,19 @@ private fun SuccessContent(
     onEditComment: (IssueTimelineItem.Comment) -> Unit,
     onDeleteComment: (IssueTimelineItem.Comment) -> Unit,
     onCheckboxClick: (Int, Boolean) -> Unit,
+    onScrollChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val issue = state.issue
+    val listState = rememberLazyListState()
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }.collect(onScrollChanged)
+    }
     LazyColumn(
+        state = listState,
         modifier = modifier,
         contentPadding = issueDetailContentPadding(),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.m),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
     ) {
         item(key = "header") {
             IssueHeader(
@@ -602,7 +638,7 @@ private fun IssueHeader(
         // 操作区随权限增减按钮，窄屏自动换行（FlowRow；RTL 由 start/end 语义保证）
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
         ) {
             StatusChip(state = issue.state)
             if (canCloseReopen) {
@@ -619,8 +655,8 @@ private fun IssueHeader(
             }
             if (canEditIssue) {
                 OutlinedButton(onClick = onEditIssue) {
-                    Icon(
-                        imageVector = Icons.Filled.Edit,
+                    AppIcon(
+                        spec = AppIcons.Edit,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
                     )
@@ -717,8 +753,8 @@ private fun IssueSubscriptionButton(
                 strokeWidth = 2.dp,
             )
         } else {
-            Icon(
-                imageVector = Icons.Filled.Notifications,
+            AppIcon(
+                spec = AppIcons.Notifications,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
             )
@@ -923,8 +959,8 @@ private fun CommentMenu(
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
-            Icon(
-                imageVector = Icons.Filled.MoreVert,
+            AppIcon(
+                spec = AppIcons.MoreVert,
                 contentDescription = stringResource(R.string.issue_comment_menu),
             )
         }
@@ -982,7 +1018,7 @@ private fun IssueMetaEditSheet(
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = AppDimens.spacing.l)
                         .padding(bottom = AppDimens.spacing.xl),
-                verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.m),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
             ) {
                 Text(
                     text = stringResource(R.string.issue_meta_sheet_title),

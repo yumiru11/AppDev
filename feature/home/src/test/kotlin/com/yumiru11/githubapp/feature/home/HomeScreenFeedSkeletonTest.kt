@@ -13,6 +13,9 @@ import androidx.paging.PagingData
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.feature.home.model.FeedItem
+import com.yumiru11.githubapp.feature.home.model.HomeDiscussionItem
+import com.yumiru11.githubapp.feature.home.model.HomeIssueItem
+import com.yumiru11.githubapp.feature.home.model.HomeUserItem
 import com.yumiru11.githubapp.feature.home.ui.FEED_SKELETON_ROWS
 import com.yumiru11.githubapp.feature.home.ui.FEED_SKELETON_ROW_TAG
 import com.yumiru11.githubapp.feature.home.ui.FEED_SKELETON_TAG
@@ -83,6 +86,12 @@ class HomeScreenFeedSkeletonTest {
             mockk<HomeViewModel>(relaxed = true) {
                 every { uiState } returns MutableStateFlow(HomeUiState.Success(feed = feed))
                 every { trending } returns MutableStateFlow(emptyList())
+                // 2026-10 五分区：本文件只测动态流骨架，分区一律停在 Loading（不参与断言）
+                every { issues } returns MutableStateFlow<HomeSectionState<HomeIssueItem>>(HomeSectionState.Loading)
+                every { pulls } returns MutableStateFlow<HomeSectionState<HomeIssueItem>>(HomeSectionState.Loading)
+                every { discussions } returns MutableStateFlow<HomeSectionState<HomeDiscussionItem>>(HomeSectionState.Loading)
+                every { suggestedUsers } returns MutableStateFlow<HomeSectionState<HomeUserItem>>(HomeSectionState.Loading)
+                every { hotIssues } returns MutableStateFlow<HomeSectionState<HomeIssueItem>>(HomeSectionState.Loading)
             }
         composeRule.setContent {
             AppTheme {

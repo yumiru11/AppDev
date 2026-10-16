@@ -2,8 +2,10 @@ package com.yumiru11.githubapp.core.ui
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -65,6 +67,8 @@ fun AppBottomBar(
         blurEnabled = blurEnabled,
     ) {
         NavigationBar(
+            // 玻璃层之上保持透明；M3E 的底栏容器色（surfaceContainer）由 GlassSurface 的
+            // baseColor 承担（AppSurfaces.bar），保证背景图/毛玻璃两条路径同源。
             containerColor = Color.Transparent,
             windowInsets = WindowInsets(0.dp),
         ) {
@@ -81,9 +85,18 @@ fun AppBottomBar(
                     label = { Text(stringResource(tab.labelRes)) },
                     selected = isSelected,
                     onClick = { onTabSelected(tab.route) },
-                    // 不传 colors：M3 默认即 onSecondaryContainer/onSecondaryContainer/
-                    // secondaryContainer（NavigationBarTokens ItemActive* 三 token），
-                    // 此前显式覆盖值恰等于默认（#86 清理冗余）。
+                    // 2026-10 UI 重构（基准 = M3E GhBottomBar）：显式钉死三档颜色。
+                    // 值恰好等于 M3 默认（NavigationBarTokens.ItemActiveIndicatorColor 等），
+                    // 显式化的目的是让"药丸指示器 + 选中实心图标"这条视觉契约在任何
+                    // material3 版本漂移下都不变（ADR-0008 的 pin 撤除后仍需成立）。
+                    colors =
+                        NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                            indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        ),
                 )
             }
         }

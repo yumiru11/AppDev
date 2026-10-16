@@ -14,6 +14,7 @@ import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.model.resolveEffectiveThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
+import com.yumiru11.githubapp.core.designsystem.theme.ProvideAppSurfaces
 import com.yumiru11.githubapp.core.designsystem.token.CodeEditorPreferences
 import com.yumiru11.githubapp.core.designsystem.token.CodeEditorPreferencesWriter
 import com.yumiru11.githubapp.core.designsystem.token.GlassSettings
@@ -138,16 +139,48 @@ fun AppThemeHost(
             cornerScale = cornerScale,
             motionScale = effectiveMotionScale,
         ) {
-            // 背景图铺在**主题之内、内容之外**：主题之内是为了深浅色蒙版能取到正确的
-            // darkTheme；内容之外是为了"固定不动"（不参与任何滚动容器）。
-            AppBackground(
-                imageUri = backgroundImageUri,
-                opacity = backgroundOpacity,
-                darkTheme = isSystemInDarkTheme(),
-                enabled = !oledEnabled && !highContrastEnabled,
+            AppSurfacesAndBackgroundHost(
+                backgroundImageUri = backgroundImageUri,
+                backgroundOpacity = backgroundOpacity,
+                oledEnabled = oledEnabled,
+                highContrastEnabled = highContrastEnabled,
                 content = content,
             )
         }
+    }
+}
+
+/**
+ * 容器色 + 全局背景图宿主（2026-10 UI 重构）。
+ *
+ * 两件事必须**成对**发生且都在 [AppTheme] 之内：
+ * 1. [ProvideAppSurfaces] 解析容器色档位 —— 要读当前 `colorScheme`（动态取色/seed 换主题后
+ *    容器色跟着变）；`AppScaffold`/`AppCard`/`GlassSurface` 都从这里取数。
+ * 2. [AppBackground] 铺图 —— 主题之内取正确的深浅色蒙版；内容之外保证"固定不动"。
+ *
+ * 单独成 composable 而不是内联在 [AppThemeHost] 里：宿主组合体已到 detekt 的
+ * `LongMethod` 阈值，且这一层与主题/偏好装配无耦合。
+ */
+@Composable
+private fun AppSurfacesAndBackgroundHost(
+    backgroundImageUri: String?,
+    backgroundOpacity: Float,
+    oledEnabled: Boolean,
+    highContrastEnabled: Boolean,
+    content: @Composable () -> Unit,
+) {
+    ProvideAppSurfaces(
+        backgroundImageEnabled = !backgroundImageUri.isNullOrBlank(),
+        oled = oledEnabled,
+        highContrast = highContrastEnabled,
+    ) {
+        AppBackground(
+            imageUri = backgroundImageUri,
+            opacity = backgroundOpacity,
+            darkTheme = isSystemInDarkTheme(),
+            enabled = !oledEnabled && !highContrastEnabled,
+            content = content,
+        )
     }
 }
 

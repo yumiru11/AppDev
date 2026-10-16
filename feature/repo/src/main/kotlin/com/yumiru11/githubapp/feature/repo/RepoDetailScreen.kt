@@ -26,15 +26,20 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -67,18 +72,24 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
@@ -106,16 +117,33 @@ import com.composables.icons.materialsymbols.rounded.Visibility_off
 import com.yumiru11.githubapp.core.data.model.Release
 import com.yumiru11.githubapp.core.data.model.Repository
 import com.yumiru11.githubapp.core.designsystem.component.AppCard
+import com.yumiru11.githubapp.core.designsystem.component.AppChevron
 import com.yumiru11.githubapp.core.designsystem.component.AppChip
 import com.yumiru11.githubapp.core.designsystem.component.AppDialog
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
+import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
+import com.yumiru11.githubapp.core.designsystem.component.AppIconBadge
+import com.yumiru11.githubapp.core.designsystem.component.AppListSkeleton
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.component.AppScrollableTabs
+import com.yumiru11.githubapp.core.designsystem.component.AppStatPill
+import com.yumiru11.githubapp.core.designsystem.component.AppTab
+import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
+import com.yumiru11.githubapp.core.designsystem.component.collapsedHeaderDrift
+import com.yumiru11.githubapp.core.designsystem.component.collapsedHeaderHeight
+import com.yumiru11.githubapp.core.designsystem.component.connectedShape
+import com.yumiru11.githubapp.core.designsystem.component.headerCollapseFraction
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
+import com.yumiru11.githubapp.core.designsystem.component.labelColors
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
+import com.yumiru11.githubapp.core.designsystem.theme.extendedColors
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
+import com.yumiru11.githubapp.core.designsystem.token.GlassScope
 import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.MermaidRenderLog
@@ -126,6 +154,7 @@ import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 import com.yumiru11.githubapp.core.ui.LocalRepoDetailActions
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
 import com.yumiru11.githubapp.core.ui.sharedTransitionElement
+import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 import java.io.IOException
 import java.time.Instant
 import java.time.ZoneId
@@ -175,6 +204,8 @@ fun RepoDetailScreen(
     viewModel: RepoDetailViewModel = hiltViewModel(),
     // 与 viewModel 同形参化：屏幕级测试可直接注入（默认 hiltViewModel() 保持生产接线不变）
     filesViewModel: RepoFilesViewModel = hiltViewModel(),
+    // 仓库内议题/PR 分区数据源（同 filesViewModel 形参化：屏幕级测试可直接注入）
+    issueListViewModel: RepoIssueListViewModel = hiltViewModel(),
     actions: RepoDetailActions = LocalRepoDetailActions.current,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -266,6 +297,7 @@ fun RepoDetailScreen(
                                 initialTreePath = initialTreePath,
                                 initialShowReleases = initialShowReleases,
                                 initialReleaseTag = initialReleaseTag,
+                                listViewModel = issueListViewModel,
                                 onBranchesClick = { onBranchesClick(owner, repo, filesState.currentRef) },
                                 onTopicClick = onTopicClick,
                                 managementCallbacks =
@@ -535,83 +567,101 @@ private fun RepoTopBar(
     val context = LocalContext.current
     val htmlUrl = "https://github.com/$owner/$repo"
     val shareTitle = stringResource(R.string.repo_share_chooser)
-    TopAppBar(
-        title = {
-            Text(
-                text = "$owner/$repo",
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        navigationIcon = {
-            IconButton(onClick = onBackClick) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = stringResource(R.string.repo_back),
+    // 与首页/搜索页同构：玻璃顶栏 + 状态栏内边距（背景图开启时不再有实色条压住壁纸）；
+    // 顶栏内层透明，玻璃底由 GlassSurface 统一裁决（开关/主题降级同源）
+    GlassSurface(
+        modifier = Modifier.fillMaxWidth(),
+        windowInsets = WindowInsets.statusBars,
+        scope = GlassScope.TOP_BAR,
+    ) {
+        TopAppBar(
+            title = {
+                Text(
+                    text = "$owner/$repo",
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-            }
-        },
-        actions = {
-            Box {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(
-                        imageVector = Icons.Filled.MoreVert,
-                        contentDescription = stringResource(R.string.repo_more),
+            },
+            navigationIcon = {
+                IconButton(onClick = onBackClick) {
+                    AppIcon(
+                        spec = AppIcons.ArrowBack,
+                        contentDescription = stringResource(R.string.repo_back),
                     )
                 }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(text = stringResource(R.string.repo_menu_copy_link)) },
-                        leadingIcon = { Icon(MaterialSymbols.Rounded.Link, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            copyToClipboard(context, htmlUrl, owner)
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(text = stringResource(R.string.repo_menu_open_browser)) },
-                        leadingIcon = { Icon(MaterialSymbols.Rounded.Open_in_new, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(htmlUrl))
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(text = stringResource(R.string.repo_menu_share)) },
-                        leadingIcon = { Icon(MaterialSymbols.Rounded.Share, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            shareText(context, htmlUrl, shareTitle)
-                        },
-                    )
-                    if (canDelete) {
-                        DropdownMenuItem(
-                            text = { Text(text = stringResource(R.string.repo_delete)) },
-                            leadingIcon = { Icon(MaterialSymbols.Rounded.Delete, contentDescription = null) },
-                            onClick = {
-                                menuExpanded = false
-                                onDeleteClick()
-                            },
+            },
+            actions = {
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        AppIcon(
+                            spec = AppIcons.MoreVert,
+                            contentDescription = stringResource(R.string.repo_more),
                         )
                     }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(text = stringResource(R.string.repo_menu_copy_link)) },
+                            leadingIcon = { Icon(MaterialSymbols.Rounded.Link, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                copyToClipboard(context, htmlUrl, owner)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(text = stringResource(R.string.repo_menu_open_browser)) },
+                            leadingIcon = { Icon(MaterialSymbols.Rounded.Open_in_new, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                CustomTabsIntent.Builder().build().launchUrl(context, Uri.parse(htmlUrl))
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(text = stringResource(R.string.repo_menu_share)) },
+                            leadingIcon = { Icon(MaterialSymbols.Rounded.Share, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                shareText(context, htmlUrl, shareTitle)
+                            },
+                        )
+                        if (canDelete) {
+                            DropdownMenuItem(
+                                text = { Text(text = stringResource(R.string.repo_delete)) },
+                                leadingIcon = { Icon(MaterialSymbols.Rounded.Delete, contentDescription = null) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onDeleteClick()
+                                },
+                            )
+                        }
+                    }
                 }
-            }
-        },
-        colors =
-            TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-            ),
-    )
+            },
+            colors =
+                TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                ),
+        )
+    }
 }
 
+/**
+ * 仓库详情内容层：折叠头 + 分区条 + 五个分区页（README / 文件 / Releases / 议题 / PR）。
+ *
+ * 形参偏多是**刻意的**：这一层是"分区宿主机"，所有状态与回调都从 [RepoDetailScreen] 逐层显式传入
+ * （不用 CompositionLocal 藏依赖，屏幕级 Robolectric 测试才能直接注入假 VM）。detekt 的
+ * LongParameterList 已豁免带默认值的形参，但注入的两个 ViewModel 必须是必填，故在此显式静音。
+ */
+@Suppress("LongParameterList")
 @Composable
 private fun RepoDetailContent(
     state: RepoDetailUiState.Success,
     filesState: RepoFilesUiState,
     filesViewModel: RepoFilesViewModel,
+    listViewModel: RepoIssueListViewModel,
     actions: RepoDetailActions,
     onRetryReadme: () -> Unit,
     initialRef: String? = null,
@@ -624,58 +674,59 @@ private fun RepoDetailContent(
     managementCallbacks: RepoManagementCallbacks,
     modifier: Modifier = Modifier,
 ) {
-    // 深链初始分区：TREE → 文件，RELEASE → Releases；两者同帧不会同时来自解析器，
-    // 同真时文件优先（见 repoDetailInitialTab）。rememberSaveable：旋转/重建保留用户实际切到的分区。
+    // 深链初始分区：TREE → 文件，RELEASE → Releases；rememberSaveable 保留用户实际切到的分区
     var tab by rememberSaveable { mutableIntStateOf(repoDetailInitialTab(initialShowFiles, initialShowReleases)) }
+    // 折叠头进度来源：README 走 WebView 内部滚动回调，其余分区走 nestedScroll（见下方连接器）
+    var scrollPx by remember { mutableIntStateOf(0) }
+    val collapseDistancePx = with(LocalDensity.current) { HEADER_COLLAPSE_DISTANCE.toPx() }.roundToInt()
+    val headerCollapse = headerCollapseFraction(scrollPx, collapseDistancePx)
+    val listState by listViewModel.uiState.collectAsStateWithLifecycle()
 
-    // ── README 下滑收起头部（#167 / UI10，ui-design §3.8 A 版）────────────────
-    // A 版口径（用户拍板）：README 下滑时，仓库头（名称/描述/统计/Star·Watch·Fork）
-    // **跟手渐隐并收缩高度**，滚过一段距离后完全收起，只留下分区 Tab。
-    //
-    // 为什么要把 scrollY 从 WebView 里捞出来：README 正文是 WebView 主渲染，滚动发生在
-    // WebView 内部，Compose 侧完全观察不到 —— 所以由 WebViewMarkdownRenderer 反向回调。
-    // 这也是本渲染架构下唯一可行的联动方式（不引入嵌套滚动/手势冲突）。
-    var readmeScrollY by remember { mutableIntStateOf(0) }
-    val collapseDistancePx = with(LocalDensity.current) { HEADER_COLLAPSE_DISTANCE.toPx() }
-    // 只在 README 分区生效：文件/Releases 分区有自己的滚动，不该被 README 的滚动位置影响
-    val headerCollapse =
-        if (tab == README_TAB_INDEX) (readmeScrollY / collapseDistancePx).coerceIn(0f, 1f) else 0f
-    Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                // 水平 padding 移到各子段：README 段由 EnhancedMarkdownViewer 自带 37dp
-                // （用户实测目标边距）接管——全局 16 + 内层 37 = 53dp 太宽（2026-08-17 真机）
-                .padding(top = AppDimens.spacing.l),
-    ) {
+    val pagerState = rememberPagerState(initialPage = tab) { REPO_TAB_COUNT }
+    LaunchedEffect(tab) {
+        if (tab >= TAB_ISSUES) listViewModel.ensureLoaded(state.repo.ownerLogin, state.repo.name)
+        if (pagerState.targetPage != tab) pagerState.animateScrollToPage(tab)
+    }
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.targetPage }.collect { page ->
+            if (page != tab) {
+                tab = page
+                scrollPx = 0
+            }
+        }
+    }
+
+    val scrollConnection =
+        remember {
+            object : NestedScrollConnection {
+                override fun onPostScroll(
+                    consumed: Offset,
+                    available: Offset,
+                    source: NestedScrollSource,
+                ): Offset {
+                    if (consumed.y != 0f) {
+                        scrollPx = (scrollPx + consumed.y).toInt().coerceAtLeast(0)
+                    }
+                    return Offset.Zero
+                }
+            }
+        }
+
+    Column(modifier = modifier.fillMaxSize()) {
+        // ① 仓库介绍：最顶端，随滚动自动收起（高度收缩 + α 渐隐 + 向上位移）。
+        //    自然高度必须以 Constraints.Infinity 测量（UI-C01 自锁回归修复，勿改回 height 约束）。
         Box(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    // 高度收缩 + 裁剪 = "收起"；alpha 同步淡出 = "渐隐"
-                    //
-                    // 🔴 自然高度必须在「不受限高度」下测量（UI-C01 回归修复）：
-                    // 旧实现用外层 `.height(headerHeightPx * (1 - collapse))` 做约束，
-                    // 而 headerHeightPx 初值 0 → 外层高 0dp → 内层 onSizeChanged 在
-                    // maxHeight=0 的约束下只可能测到 0，自然高度永远回填不上（自锁），
-                    // 仓库头整块被裁成 0 高（截图/dump 里 Avatar/Star 全缺）。
-                    // 改为在 layout 阶段以 Constraints.Infinity 测量自然高度：首帧即按
-                    // 自然高度渲染，收起只压缩外层可视高度、不再污染测量基准。
                     .clipToBounds()
                     .graphicsLayer { alpha = 1f - headerCollapse }
                     .layout { measurable, constraints ->
                         val placeable =
-                            measurable.measure(
-                                constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity),
-                            )
-                        val visibleHeight =
-                            (placeable.height * (1f - headerCollapse)).roundToInt().coerceAtLeast(0)
+                            measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+                        val visibleHeight = collapsedHeaderHeight(placeable.height, headerCollapse)
                         layout(constraints.maxWidth, visibleHeight) {
-                            // 向上位移收进裁剪区，避免"高度在收、内容却在原地下沉"的割裂感
-                            placeable.place(
-                                0,
-                                (-headerCollapse * placeable.height * HEADER_COLLAPSE_DRIFT).roundToInt(),
-                            )
+                            placeable.place(0, collapsedHeaderDrift(placeable.height, headerCollapse))
                         }
                     }.padding(horizontal = AppDimens.spacing.l),
         ) {
@@ -688,70 +739,269 @@ private fun RepoDetailContent(
             )
         }
 
-        // 头部收起时不再需要那段留白，否则会留下一块"空气隙"
-        Spacer(modifier = Modifier.height(16.dp * (1f - headerCollapse)))
+        // ② 分区条：钉在介绍下方、随滑动跟手（选中项自动滚入视口）
+        AppScrollableTabs(
+            tabs =
+                listOf(
+                    R.string.repo_tab_readme,
+                    R.string.repo_tab_files,
+                    R.string.repo_tab_releases,
+                    R.string.repo_tab_issues,
+                    R.string.repo_tab_pulls,
+                ).map { AppTab(label = stringResource(it)) },
+            selectedIndex = tab.coerceIn(0, REPO_TAB_COUNT - 1),
+            onSelect = { index ->
+                if (index != tab) {
+                    tab = index
+                    scrollPx = 0
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
 
-        Box(Modifier.padding(horizontal = AppDimens.spacing.l)) {
-            TabRow(selectedTabIndex = tab) {
-                Tab(
-                    selected = tab == 0,
-                    onClick = { tab = 0 },
-                    text = { Text(text = stringResource(R.string.repo_tab_readme)) },
-                )
-                Tab(
-                    selected = tab == 1,
-                    onClick = { tab = 1 },
-                    text = { Text(text = stringResource(R.string.repo_tab_files)) },
-                )
-                Tab(
-                    selected = tab == 2,
-                    onClick = { tab = 2 },
-                    text = { Text(text = stringResource(R.string.repo_tab_releases)) },
-                )
-            }
-        }
+        // ③ 分区内容：左右滑动切换（与分区条双向联动）
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+        ) { page ->
+            val nativeScroll =
+                Modifier.fillMaxSize().nestedScroll(scrollConnection)
+            when (page) {
+                TAB_README -> {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        ReadmeSection(
+                            readmeState = state.readmeState,
+                            actions = actions,
+                            onRetryReadme = onRetryReadme,
+                            onViewFiles = { tab = TAB_FILES },
+                            baseRepoUrl = buildRepoUrl(state.repo),
+                            onScrollChanged = { scrollPx = it },
+                        )
+                    }
+                }
 
-        Spacer(modifier = Modifier.height(AppDimens.spacing.s))
+                TAB_FILES -> {
+                    Box(modifier = nativeScroll) {
+                        FilesTab(
+                            filesState = filesState,
+                            filesViewModel = filesViewModel,
+                            isLoggedIn = state.isLoggedIn,
+                            defaultBranch = state.repo.defaultBranch,
+                            currentRef = filesState.currentRef,
+                            initialRef = initialRef,
+                            initialTreePath = initialTreePath,
+                            onBranchesClick = onBranchesClick,
+                        )
+                    }
+                }
 
-        when (tab) {
-            0 -> {
-                ReadmeSection(
-                    readmeState = state.readmeState,
-                    actions = actions,
-                    onRetryReadme = onRetryReadme,
-                    // UI-4：无 README 空态的行动 = 切到「文件」分区（仓库有内容，只是没 README）
-                    onViewFiles = { tab = 1 },
-                    baseRepoUrl = buildRepoUrl(state.repo),
-                    onScrollChanged = { readmeScrollY = it },
-                )
-            }
+                TAB_RELEASES -> {
+                    Box(modifier = nativeScroll.padding(horizontal = AppDimens.spacing.l)) {
+                        ReleasesSection(
+                            state = state,
+                            actions = actions,
+                            callbacks = managementCallbacks,
+                            initialTag = initialReleaseTag,
+                        )
+                    }
+                }
 
-            1 -> {
-                FilesTab(
-                    filesState = filesState,
-                    filesViewModel = filesViewModel,
-                    isLoggedIn = state.isLoggedIn,
-                    defaultBranch = state.repo.defaultBranch,
-                    currentRef = filesState.currentRef,
-                    initialRef = initialRef,
-                    initialTreePath = initialTreePath,
-                    onBranchesClick = onBranchesClick,
-                )
-            }
-
-            else -> {
-                Box(Modifier.padding(horizontal = AppDimens.spacing.l)) {
-                    ReleasesSection(
-                        state = state,
-                        actions = actions,
-                        callbacks = managementCallbacks,
-                        initialTag = initialReleaseTag,
+                else -> {
+                    RepoIssueListSection(
+                        items = if (page == TAB_ISSUES) listState.issues else listState.pulls,
+                        loading = listState.loading,
+                        error = listState.error,
+                        emptyTitle =
+                            stringResource(
+                                if (page == TAB_ISSUES) R.string.repo_tab_issues else R.string.repo_tab_pulls,
+                            ),
+                        onRetry = listViewModel::retry,
+                        onLoadMore = listViewModel::loadMore,
+                        onItemClick = { item ->
+                            handleParsedUrl(
+                                if (item.isPullRequest) {
+                                    ParsedUrl.PullRequest(state.repo.ownerLogin, state.repo.name, item.number)
+                                } else {
+                                    ParsedUrl.Issue(state.repo.ownerLogin, state.repo.name, item.number)
+                                },
+                                actions,
+                            )
+                        },
+                        modifier = nativeScroll,
                     )
                 }
             }
         }
     }
 }
+
+/**
+ * 仓库内「议题 / 拉取请求」分区（2026-10 UI 重构新增）：
+ * 卡片列表 + 状态图标徽标 + label 胶囊 + 触底加载（与首页同族的行语言）。
+ */
+@Composable
+private fun RepoIssueListSection(
+    items: List<RepoListItem>,
+    loading: Boolean,
+    error: Boolean,
+    emptyTitle: String,
+    onRetry: () -> Unit,
+    onLoadMore: () -> Unit,
+    onItemClick: (RepoListItem) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when {
+        error && items.isEmpty() -> {
+            AppErrorState(
+                title = stringResource(R.string.repo_issue_list_error),
+                actionLabel = stringResource(R.string.repo_issue_list_retry),
+                onAction = onRetry,
+                modifier = modifier,
+            )
+        }
+
+        items.isEmpty() && loading -> {
+            AppListSkeleton(rows = 5, modifier = modifier)
+        }
+
+        items.isEmpty() -> {
+            AppEmptyState(
+                icon = AppDevOcticons.Info,
+                title = emptyTitle,
+                modifier = modifier,
+            )
+        }
+
+        else -> {
+            val listState = rememberLazyListState()
+            val shouldLoadMore by remember {
+                derivedStateOf {
+                    val last =
+                        listState.layoutInfo.visibleItemsInfo
+                            .lastOrNull()
+                            ?.index ?: 0
+                    last >= items.size - LOAD_MORE_THRESHOLD
+                }
+            }
+            LaunchedEffect(shouldLoadMore) {
+                if (shouldLoadMore) onLoadMore()
+            }
+            LazyColumn(
+                state = listState,
+                modifier = modifier,
+                contentPadding =
+                    PaddingValues(
+                        start = AppDimens.spacing.l,
+                        end = AppDimens.spacing.l,
+                        top = AppDimens.spacing.s,
+                        bottom = AppDimens.spacing.xl,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
+            ) {
+                items(items, key = { it.id }) { item ->
+                    AppCard(onClick = { onItemClick(item) }, contentPadding = PaddingValues(0.dp)) {
+                        RepoIssueRow(item = item)
+                    }
+                }
+                if (loading) {
+                    item(key = "loading") { AppListSkeleton(rows = 2, rowHeight = 72.dp) }
+                }
+            }
+        }
+    }
+}
+
+/** 议题/PR 行：状态图标徽标 + 标题 + label 胶囊 + 编号/评论数/更新时间。 */
+@Composable
+private fun RepoIssueRow(item: RepoListItem) {
+    val extended = MaterialTheme.extendedColors
+    val stateColor =
+        when {
+            item.isMerged -> extended.merged
+            item.state == "open" -> extended.success
+            else -> extended.danger
+        }
+    val stateIcon =
+        when {
+            item.isMerged -> AppDevOcticons.Merge
+            item.isPullRequest -> AppDevOcticons.PullRequest
+            item.state == "open" -> AppDevOcticons.IssueOpened
+            else -> AppDevOcticons.Check
+        }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(AppDimens.spacing.l),
+        verticalAlignment = Alignment.Top,
+    ) {
+        AppIconBadge(
+            icon = stateIcon,
+            containerColor = stateColor.copy(alpha = 0.14f),
+            contentColor = stateColor,
+        )
+        Spacer(modifier = Modifier.width(AppDimens.spacing.m))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (item.labels.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.xs + 2.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    item.labels.take(3).forEach { (name, colorHex) ->
+                        val (background, content) = labelColors(colorHex)
+                        AppStatPill(text = name, containerColor = background, contentColor = content)
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(AppDimens.spacing.s))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+            ) {
+                Text(
+                    text = "#" + item.number,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                item.updatedAt?.let { iso ->
+                    Text(
+                        text = relativeTimeText(iso) ?: iso,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+                if (item.commentCount > 0) {
+                    AppIcon(spec = AppIcons.ChatBubble, contentDescription = null, size = 14.dp)
+                    Text(
+                        text = item.commentCount.toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                AppChevron()
+            }
+        }
+    }
+}
+
+/** 触底加载阈值（距列表末尾还剩 N 行时预取下一页）。 */
+private const val LOAD_MORE_THRESHOLD = 4
+
+/** 仓库内分区数量（README / 文件 / Releases / 议题 / 拉取请求）。 */
+private const val REPO_TAB_COUNT = 5
+
+/** 分区索引常量（与分区条、Pager 页序严格一致）。 */
+private const val TAB_README = 0
+private const val TAB_FILES = 1
+private const val TAB_RELEASES = 2
+private const val TAB_ISSUES = 3
 
 /** 文件 Tab（T22 新建文件 + T23 分支入口）：分支 Chip（当前分支） + 新建文件（登录态）+ 文件树。 */
 @Composable
@@ -781,8 +1031,8 @@ private fun FilesTab(
                     TextButton(
                         onClick = { filesViewModel.startNewFile() },
                     ) {
-                        Icon(
-                            imageVector = MaterialSymbols.Rounded.Add,
+                        AppIcon(
+                            spec = AppIcons.Add,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )
@@ -816,10 +1066,6 @@ private fun RepoHeader(
     val repo = state.repo
     AppCard(
         modifier = Modifier.fillMaxWidth(),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            ),
     ) {
         Column(modifier = Modifier.padding(AppDimens.spacing.l)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -932,8 +1178,8 @@ private fun TopicsRow(
 private fun RepoStatsRow(repo: Repository) {
     Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.l)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Filled.Star,
+            AppIcon(
+                spec = AppIcons.Star,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -985,7 +1231,11 @@ private fun ManagementButtons(
     onToggleWatch: () -> Unit,
     onFork: () -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
+    // 连接式动作组（3dp 细缝，外缘胶囊 / 内缘 8dp）：与详情页其它动作条同一语言
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.groupSeam),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         // Star 微缩放 + 颜色过渡（UI07）：只在状态真正翻转时播一次，首次组合不播
         // （#167 / UI17 补齐：原实现首次组合也会弹一下——进详情页时星星无故自弹，
         //   且与「滚动/进场中不触发动画」的约束相悖；这里用 rememberSaveable 记账跳过首帧）
@@ -1018,7 +1268,8 @@ private fun ManagementButtons(
         FilledTonalButton(
             onClick = onToggleStar,
             enabled = pendingAction == null,
-            modifier = Modifier.weight(1f),
+            shape = connectedShape(0, 3, AppDimens.buttonHeightCompact),
+            modifier = Modifier.weight(1f).height(AppDimens.buttonHeightCompact),
             contentPadding = PaddingValues(horizontal = AppDimens.spacing.m, vertical = AppDimens.spacing.s),
         ) {
             Icon(
@@ -1042,7 +1293,8 @@ private fun ManagementButtons(
         FilledTonalButton(
             onClick = onToggleWatch,
             enabled = pendingAction == null,
-            modifier = Modifier.weight(1f),
+            shape = connectedShape(1, 3, AppDimens.buttonHeightCompact),
+            modifier = Modifier.weight(1f).height(AppDimens.buttonHeightCompact),
             contentPadding = PaddingValues(horizontal = AppDimens.spacing.m, vertical = AppDimens.spacing.s),
         ) {
             Icon(
@@ -1064,7 +1316,8 @@ private fun ManagementButtons(
         FilledTonalButton(
             onClick = onFork,
             enabled = pendingAction == null,
-            modifier = Modifier.weight(1f),
+            shape = connectedShape(2, 3, AppDimens.buttonHeightCompact),
+            modifier = Modifier.weight(1f).height(AppDimens.buttonHeightCompact),
             contentPadding = PaddingValues(horizontal = AppDimens.spacing.m, vertical = AppDimens.spacing.s),
         ) {
             if (pendingAction == RepoAction.FORK) {
@@ -1223,8 +1476,8 @@ private fun ReleasesSection(
             // L05：写权限才显示「新建 Release」（permissions 缺失 → 保守隐藏）
             if (state.canPushRepo) {
                 TextButton(onClick = callbacks.onCreateRelease) {
-                    Icon(
-                        imageVector = MaterialSymbols.Rounded.Add,
+                    AppIcon(
+                        spec = AppIcons.Add,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                     )
@@ -1280,7 +1533,7 @@ private fun ReleasesList(
             if (state.releases.isEmpty()) {
                 EmptyHint(text = stringResource(R.string.repo_releases_empty))
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing)) {
                     items(state.releases, key = { it.id }) { release ->
                         ReleaseCard(release = release, onClick = { onReleaseClick(release.id) })
                     }
@@ -1298,10 +1551,6 @@ private fun ReleaseCard(
     AppCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            ),
     ) {
         Column(modifier = Modifier.padding(AppDimens.spacing.l)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1397,21 +1646,17 @@ private fun TagsList(
             if (state.tags.isEmpty()) {
                 EmptyHint(text = stringResource(R.string.repo_tags_empty))
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing)) {
                     items(state.tags, key = { it.name }) { tag ->
                         AppCard(
                             modifier = Modifier.fillMaxWidth(),
-                            colors =
-                                CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                ),
                         ) {
                             Row(
                                 modifier = Modifier.padding(AppDimens.spacing.l),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Icon(
-                                    imageVector = MaterialSymbols.Rounded.Tag,
+                                AppIcon(
+                                    spec = AppIcons.Label,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1450,8 +1695,8 @@ private fun ReleaseDetailView(
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                AppIcon(
+                    spec = AppIcons.ArrowBack,
                     contentDescription = stringResource(R.string.repo_release_back),
                 )
             }
@@ -1613,8 +1858,8 @@ private fun ReleaseAssetsSection(
                     if (uploading) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     } else {
-                        Icon(
-                            imageVector = MaterialSymbols.Rounded.Add,
+                        AppIcon(
+                            spec = AppIcons.Add,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )
@@ -1636,10 +1881,6 @@ private fun ReleaseAssetsSection(
                     // 无直链（异常数据）时不可点，避免"点了没反应"
                     enabled = asset.downloadUrl != null,
                     modifier = Modifier.fillMaxWidth().padding(bottom = AppDimens.spacing.s),
-                    colors =
-                        CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        ),
                 ) {
                     Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
                         Text(
@@ -1713,10 +1954,6 @@ private const val DEFAULT_ASSET_NAME = "asset"
 internal fun EmptyHint(text: String) {
     AppCard(
         modifier = Modifier.fillMaxWidth(),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            ),
     ) {
         Text(
             text = text,
@@ -1966,11 +2203,3 @@ internal fun findReleaseIdByTag(
  * 太长则读正文时头部长期占着大半屏。
  */
 private val HEADER_COLLAPSE_DISTANCE = 120.dp
-
-/**
- * 收起过程中头部内容向上位移的比例（相对自然高度）。
- *
- * 只收缩容器高度而不位移的话，内容会"原地被裁"，看起来像被切掉而不是收起来。
- * 0.6 让内容在收起过程中向上滑走，观感更接近"折叠"。
- */
-private const val HEADER_COLLAPSE_DRIFT = 0.6f

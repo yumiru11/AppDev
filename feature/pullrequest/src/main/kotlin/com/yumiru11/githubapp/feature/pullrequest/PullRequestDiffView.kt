@@ -45,6 +45,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.theme.ExtendedColors
+import com.yumiru11.githubapp.core.designsystem.theme.extendedColors
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.feature.pullrequest.data.DiffParser
 import com.yumiru11.githubapp.feature.pullrequest.model.DiffLine
@@ -289,12 +291,11 @@ private fun DiffLineRow(
     onLineComment: (String, DiffSide, Int) -> Unit,
 ) {
     val anchor = line.anchor()
-    val scheme = MaterialTheme.colorScheme
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(line.kind.background(scheme)),
+                .background(line.kind.background(MaterialTheme.extendedColors)),
     ) {
         Row(
             modifier =
@@ -392,7 +393,7 @@ private fun SideBySideCell(
         modifier =
             modifier
                 .fillMaxWidth()
-                .background(line.kind.background(MaterialTheme.colorScheme)),
+                .background(line.kind.background(MaterialTheme.extendedColors)),
     ) {
         Row(
             modifier =
@@ -530,17 +531,21 @@ private fun threadFor(
     threads: List<ReviewThread>,
 ): ReviewThread? = threads.firstOrNull { it.path == path && it.side == anchor.side && it.anchorLine == anchor.line }
 
-private fun DiffLineKind.background(scheme: androidx.compose.material3.ColorScheme): Color =
+/**
+ * 行底色：走 ExtendedColors 的 diff 语义角色（各主题分别调过的增/删/块底色），
+ * 而不是在 Material 容器色上叠 alpha —— 后者在 OLED / 高对比主题下会糊成一团。
+ */
+private fun DiffLineKind.background(extended: ExtendedColors): Color =
     when (this) {
-        DiffLineKind.ADDED -> scheme.primaryContainer.copy(alpha = 0.35f)
+        DiffLineKind.ADDED -> extended.diffAddBackground
 
-        DiffLineKind.REMOVED -> scheme.errorContainer.copy(alpha = 0.35f)
+        DiffLineKind.REMOVED -> extended.diffDelBackground
 
-        DiffLineKind.CONTEXT -> scheme.surface
+        DiffLineKind.CONTEXT -> extended.codeBackground
 
         DiffLineKind.HEADER,
         DiffLineKind.NO_NEWLINE,
-        -> scheme.surfaceContainerHigh
+        -> extended.diffHunkBackground
     }
 
 private fun DiffViewMode.labelRes(): Int =

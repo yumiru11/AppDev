@@ -186,7 +186,7 @@ private fun AppSettingsGroupScope.backgroundImageItem(
     item(
         headlineContent = { Text(stringResource(R.string.settings_background)) },
         supportingContent = {
-            Column(verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s)) {
+            Column(verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing)) {
                 Text(
                     text =
                         if (imageUri == null) {

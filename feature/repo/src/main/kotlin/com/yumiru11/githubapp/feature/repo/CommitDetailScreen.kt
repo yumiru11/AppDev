@@ -54,6 +54,8 @@ import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Content_copy
 import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
@@ -88,8 +90,8 @@ fun CommitDetailScreen(
                 title = { Text(text = stringResource(R.string.repo_commit_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        AppIcon(
+                            spec = AppIcons.ArrowBack,
                             contentDescription = stringResource(R.string.repo_commit_back),
                         )
                     }
@@ -155,7 +157,7 @@ private fun CommitSection(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(AppDimens.spacing.l),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
     ) {
         item(key = COMMIT_HEADER_KEY) {
             CommitHeader(commit = commit, onCopySha = onCopySha)
@@ -197,8 +199,8 @@ private fun CommitHeader(
                     fontFamily = FontFamily.Monospace,
                 )
                 IconButton(onClick = onCopySha) {
-                    Icon(
-                        imageVector = MaterialSymbols.Rounded.Content_copy,
+                    AppIcon(
+                        spec = AppIcons.ContentCopy,
                         contentDescription = stringResource(R.string.repo_commit_copy_sha),
                         modifier = Modifier.size(18.dp),
                     )
@@ -342,8 +344,8 @@ private fun CommitDiffSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                AppIcon(
+                    spec = AppIcons.ArrowBack,
                     contentDescription = stringResource(R.string.repo_commit_back_to_files),
                 )
             }

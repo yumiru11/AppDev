@@ -69,7 +69,7 @@ import com.yumiru11.githubapp.feature.home.HomeScreen
 import com.yumiru11.githubapp.feature.issue.CreateIssueScreen
 import com.yumiru11.githubapp.feature.issue.IssueDetailScreen
 import com.yumiru11.githubapp.feature.issue.IssueListScreen
-import com.yumiru11.githubapp.feature.notifications.ui.NotificationsPanel
+import com.yumiru11.githubapp.feature.notifications.ui.NotificationsScreen
 import com.yumiru11.githubapp.feature.profile.GistsScreen
 import com.yumiru11.githubapp.feature.profile.ProfileScreen
 import com.yumiru11.githubapp.feature.pullrequest.PullRequestCreateScreen
@@ -166,7 +166,6 @@ class MainActivity : ComponentActivity() {
                 // 根级 HazeState（#88）：通知面板玻璃 backdrop-blur 整个 NavHost 内容。
                 // MainTabPager/HomeScreen 自建内层 state 只服务其顶/底栏，面板读不到内层值
                 val rootHazeState = rememberHazeState()
-                var notificationPanelVisible by rememberSaveable { mutableStateOf(false) }
                 // 根级 source 只服务通知面板玻璃 → 按 PANEL 点位判定（#167 / UI03）
                 val panelGlassEnabled = LocalGlassSettings.current.enabledFor(GlassScope.PANEL)
                 CompositionLocalProvider(LocalHazeState provides rootHazeState) {
@@ -186,6 +185,17 @@ class MainActivity : ComponentActivity() {
                             AppNavHost(
                                 navController = navController,
                                 startDestination = authStateToDestination(authState),
+                                notificationsScreen = { onBack ->
+                                    NotificationsScreen(
+                                        onBackClick = onBack,
+                                        onNotificationClick = { parsed -> navigateToParsedUrl(navController, parsed) },
+                                        onLoginClick = {
+                                            navController.navigate(AppRoute.Login) {
+                                                popUpTo(0) { inclusive = true }
+                                            }
+                                        },
+                                    )
+                                },
                                 homeScreen = {
                                     MainTabPager(
                                         selectedTab = mainTab,
@@ -193,7 +203,7 @@ class MainActivity : ComponentActivity() {
                                         homePage = { padding ->
                                             HomeScreen(
                                                 onSearchClick = { navController.navigate(AppRoute.Search()) },
-                                                onNotificationClick = { notificationPanelVisible = true },
+                                                onNotificationClick = { navController.navigate(AppRoute.Notifications) },
                                                 onProfileClick = { mainTab = MainTab.PROFILE },
                                                 onCreateIssue = { owner, repo ->
                                                     navController.navigate(AppRoute.IssueCreate(owner, repo))
@@ -240,7 +250,7 @@ class MainActivity : ComponentActivity() {
                                                     }
                                                 },
                                                 onSearchClick = { navController.navigate(AppRoute.Search()) },
-                                                onNotificationClick = { notificationPanelVisible = true },
+                                                onNotificationClick = { navController.navigate(AppRoute.Notifications) },
                                                 onProfileClick = { mainTab = MainTab.PROFILE },
                                                 bottomContentPadding = padding.calculateBottomPadding(),
                                             )
@@ -489,18 +499,6 @@ class MainActivity : ComponentActivity() {
                                 },
                             )
                         }
-                        // 通知面板（#88）：覆盖层挂在 NavHost 之上，铃铛置 visible；
-                        // 不进导航栈（ui-design §3.4 拍板「顶栏铃铛点击 → 右侧滑入面板」）
-                        NotificationsPanel(
-                            visible = notificationPanelVisible,
-                            onDismiss = { notificationPanelVisible = false },
-                            onLoginClick = {
-                                navController.navigate(AppRoute.Login) {
-                                    popUpTo(0) { inclusive = true }
-                                }
-                            },
-                            onNotificationClick = { parsed -> navigateToParsedUrl(navController, parsed) },
-                        )
                     }
                 }
             }

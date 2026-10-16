@@ -11,9 +11,16 @@ import org.junit.Test
  */
 class HomeTabTest {
     @Test
-    fun homeTab_entries_orderIsFeedIssuesThenPullRequests() {
+    fun homeTab_entries_orderIsFeedIssuesPullsDiscussionsExplore() {
+        // 顺序 = 分区条顺序 = Pager 页序（2026-10 UI 重构：对齐 GitHubM3E 的 5 分区）
         assertEquals(
-            listOf(HomeTab.FEED, HomeTab.ISSUES, HomeTab.PULL_REQUESTS),
+            listOf(
+                HomeTab.FEED,
+                HomeTab.ISSUES,
+                HomeTab.PULL_REQUESTS,
+                HomeTab.DISCUSSIONS,
+                HomeTab.EXPLORE,
+            ),
             HomeTab.entries,
         )
     }
@@ -30,5 +37,7 @@ class HomeTabTest {
         assertEquals(R.string.home_tab_feed, HomeTab.FEED.titleRes)
         assertEquals(R.string.home_tab_issues, HomeTab.ISSUES.titleRes)
         assertEquals(R.string.home_tab_pull_requests, HomeTab.PULL_REQUESTS.titleRes)
+        assertEquals(R.string.home_tab_discussions, HomeTab.DISCUSSIONS.titleRes)
+        assertEquals(R.string.home_tab_explore, HomeTab.EXPLORE.titleRes)
     }
 }

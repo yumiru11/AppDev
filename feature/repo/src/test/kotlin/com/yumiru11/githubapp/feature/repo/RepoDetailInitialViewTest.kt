@@ -16,6 +16,7 @@ import com.yumiru11.githubapp.core.datastore.draft.DraftRepository
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.githubauth.auth.AuthState
 import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
+import com.yumiru11.githubapp.core.githubrest.api.IssueApi
 import com.yumiru11.githubapp.core.ui.RepoDetailActions
 import io.mockk.coEvery
 import io.mockk.every
@@ -76,9 +77,12 @@ class RepoDetailInitialViewTest {
                 },
         )
 
+    private fun issueListViewModel(): RepoIssueListViewModel = RepoIssueListViewModel(issueApi = mockk<IssueApi>(relaxed = true))
+
     private fun setScreen(
         viewModel: RepoDetailViewModel,
         filesViewModel: RepoFilesViewModel,
+        issueListViewModel: RepoIssueListViewModel = issueListViewModel(),
         showFiles: Boolean = false,
         treePath: String = "",
         showReleases: Boolean = false,
@@ -96,6 +100,7 @@ class RepoDetailInitialViewTest {
                         initialReleaseTag = releaseTag,
                         viewModel = viewModel,
                         filesViewModel = filesViewModel,
+                        issueListViewModel = issueListViewModel,
                         actions = RepoDetailActions(),
                     )
                 }

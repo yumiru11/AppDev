@@ -240,4 +240,8 @@
     <string name="repo_commit_status_modified">修改</string>
     <string name="repo_commit_status_renamed">重命名</string>
     <string name="repo_commit_status_unknown">变更</string>
+    <string name="repo_tab_issues">议题</string>
+    <string name="repo_tab_pulls">拉取请求</string>
+    <string name="repo_issue_list_error">列表加载失败</string>
+    <string name="repo_issue_list_retry">重试</string>
 </resources>

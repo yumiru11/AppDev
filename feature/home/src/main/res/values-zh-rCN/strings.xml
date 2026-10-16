@@ -41,4 +41,28 @@
     <!-- Trending 小节（L08，ui-design.md §2.2/§2.5） -->
     <string name="home_trending_title">趋势</string>
     <string name="home_trending_stars_cd">星标数</string>
+    <!-- 首页五个内容分区（2026-10 UI 重构，对齐 GitHubM3E） -->
+    <string name="home_tab_discussions">讨论</string>
+    <string name="home_tab_explore">发现</string>
+    <string name="home_filter_assigned">指派给我</string>
+    <string name="home_filter_created">我创建的</string>
+    <string name="home_filter_mentioned">提及我的</string>
+    <string name="home_filter_involved">我参与的</string>
+    <string name="home_filter_review">待我评审</string>
+    <string name="home_filter_recent">最近更新</string>
+    <string name="home_section_topics">热门主题</string>
+    <string name="home_section_trending">趋势仓库</string>
+    <string name="home_section_users">推荐关注</string>
+    <string name="home_section_hot_issues">热门议题</string>
+    <string name="home_empty_issues">暂无议题</string>
+    <string name="home_empty_issues_desc">指派给你、由你创建或提及你的议题会出现在这里。</string>
+    <string name="home_empty_pulls">暂无拉取请求</string>
+    <string name="home_empty_pulls_desc">你参与或待你评审的拉取请求会出现在这里。</string>
+    <string name="home_empty_discussions">暂无讨论</string>
+    <string name="home_empty_discussions_desc">你参与的讨论会出现在这里。</string>
+    <string name="home_discussion_answered">已解答</string>
+    <string name="home_fab_new_issue">新建议题</string>
+    <string name="home_fab_new_pull">新建拉取请求</string>
+    <string name="home_fab_new_repo">新建仓库</string>
+    <string name="home_fab_refresh">刷新</string>
 </resources>

@@ -6,6 +6,7 @@ import com.yumiru11.githubapp.core.githubauth.auth.OAuthSessionManager
 import com.yumiru11.githubapp.core.githubauth.token.SessionData
 import com.yumiru11.githubapp.core.testing.MainDispatcherRule
 import com.yumiru11.githubapp.feature.home.data.FeedRepository
+import com.yumiru11.githubapp.feature.home.data.HomeSectionsRepository
 import com.yumiru11.githubapp.feature.home.data.TrendRepository
 import com.yumiru11.githubapp.feature.home.model.FeedEventType
 import com.yumiru11.githubapp.feature.home.model.FeedItem
@@ -77,15 +78,28 @@ class HomeViewModelTest {
             coEvery { trending(any()) } returns items
         }
 
+    /** 分区数据源桩：本文件只测动态流状态机，分区方法一律返回空列表。 */
+    private fun sectionsRepository(): HomeSectionsRepository {
+        val repo = mockk<HomeSectionsRepository>(relaxed = true)
+        coEvery { repo.issues(any(), any()) } returns emptyList()
+        coEvery { repo.pulls(any(), any()) } returns emptyList()
+        coEvery { repo.discussions() } returns emptyList()
+        coEvery { repo.suggestedUsers(any()) } returns emptyList()
+        coEvery { repo.hotIssues(any()) } returns emptyList()
+        return repo
+    }
+
     /** 装配入口：Trending 仓库默认桩为空列表（本节测试不关心 Trending 时零噪音） */
     private fun homeViewModel(
         feed: FeedRepository,
         session: OAuthSessionManager,
         trend: TrendRepository = trendRepository(),
+        sections: HomeSectionsRepository = sectionsRepository(),
     ): HomeViewModel =
         HomeViewModel(
             feedRepository = feed,
             trendRepository = trend,
+            sectionsRepository = sections,
             sessionManager = session,
         )
 

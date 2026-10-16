@@ -84,6 +84,8 @@ import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.component.LocalHazeState
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.designsystem.token.GlassRenderPolicy
@@ -357,7 +359,7 @@ private fun RepoCollection(
             LazyColumn(
                 state = state,
                 contentPadding = contentPadding,
-                verticalArrangement = Arrangement.spacedBy(AppDimens.cornerSmall),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 items(
@@ -389,7 +391,7 @@ private fun RepoCollection(
                 columns = GridCells.Adaptive(minSize = 160.dp),
                 state = state,
                 contentPadding = contentPadding,
-                verticalArrangement = Arrangement.spacedBy(AppDimens.cornerSmall),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
                 horizontalArrangement = Arrangement.spacedBy(AppDimens.cornerSmall),
                 modifier = Modifier.fillMaxSize(),
             ) {
@@ -662,8 +664,8 @@ private fun RepoDescription(
 @Composable
 private fun RepoMetaRow(repository: Repository) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = Icons.Filled.Star,
+        AppIcon(
+            spec = AppIcons.Star,
             contentDescription = null,
             modifier = Modifier.size(14.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -102,7 +102,7 @@ fun lightPalette(): ThemeColors =
                 onMerged = Color(0xFFFFFFFF), // Semantic — 同 onTertiary
                 draft = Color(0xFFE6E9ED), // Draft 中性底（§5.3）— 同 surfaceContainerHigh
                 onDraft = Color(0xFF656D76), // Draft 中性内容（§5.3）— 同 onSurfaceVariant
-            ),
+            ).withDiffRoles(DiffCodeRolesLight),
     )
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -185,7 +185,7 @@ fun darkPalette(): ThemeColors =
                 onMerged = Color(0xFF271052), // Semantic — 同 onTertiary
                 draft = Color(0xFF21262D), // Draft 中性底（§5.3）— 同 surfaceContainerHigh
                 onDraft = Color(0xFF8B949E), // Draft 中性内容（§5.3）— 同 onSurfaceVariant
-            ),
+            ).withDiffRoles(DiffCodeRolesDark),
     )
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -268,7 +268,7 @@ fun oledPalette(): ThemeColors =
                 onMerged = Color(0xFF271052), // Semantic — 同 onTertiary
                 draft = Color(0xFF161B22), // Draft 中性底（§5.3）— 同 surfaceContainerHigh
                 onDraft = Color(0xFF8B949E), // Draft 中性内容（§5.3）— 同 onSurfaceVariant
-            ),
+            ).withDiffRoles(DiffCodeRolesOled),
     )
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -406,7 +406,7 @@ fun highContrastLightPalette(): ThemeColors =
                 onMerged = Color(0xFFFFFFFF), // Semantic — 同 onTertiary
                 draft = Color(0xFFD0D7DE), // Draft 中性底（§5.3）— 同 surfaceContainerHigh
                 onDraft = Color(0xFF4B5360), // Draft 中性内容（§5.3）— 同 onSurfaceVariant
-            ),
+            ).withDiffRoles(DiffCodeRolesHighContrastLight),
     )
 
 /** High Contrast Dark — brighter accents on dark background for accessibility. */
@@ -485,7 +485,7 @@ fun highContrastDarkPalette(): ThemeColors =
                 onMerged = Color(0xFF2A1060), // Semantic — 同 onTertiary
                 draft = Color(0xFF21262D), // Draft 中性底（§5.3）— 同 surfaceContainerHigh
                 onDraft = Color(0xFFADBAC7), // Draft 中性内容（§5.3）— 同 onSurfaceVariant
-            ),
+            ).withDiffRoles(DiffCodeRolesHighContrastDark),
     )
 
 // ══════════════════════════════════════════════════════════════════════════════

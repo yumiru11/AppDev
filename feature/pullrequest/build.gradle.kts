@@ -52,6 +52,8 @@ dependencies {
 
     // Markdown（PR 正文 WebView 渲染 + 评论/Review 原生渲染）
     implementation(project(":core:markdown"))
+    // 新建 PR 正文用 Markdown 编辑器 + 预览（2026-10 UI 重构，同新建 Issue）
+    implementation(project(":core:editor"))
 
     // GraphQL（T16 会话解析/解除 reviewThreads——REST 无解析端点）
     implementation(project(":core:github-graphql"))

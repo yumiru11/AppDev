@@ -46,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
 import com.yumiru11.githubapp.core.ui.AppSnackbarHost
@@ -93,8 +95,8 @@ fun CreateRepoScreen(
                 title = { Text(text = stringResource(R.string.repo_create_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        AppIcon(
+                            spec = AppIcons.ArrowBack,
                             contentDescription = stringResource(R.string.repo_create_back),
                         )
                     }
@@ -115,7 +117,7 @@ fun CreateRepoScreen(
                     .verticalScroll(rememberScrollState())
                     .imePadding()
                     .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.l),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
         ) {
             NameField(
                 value = uiState.name,

@@ -49,6 +49,8 @@ dependencies {
     // 数据层（REST 接口 + T4 认证状态）
     implementation(project(":core:github-rest"))
     implementation(project(":core:github-auth"))
+    // 首页「讨论」分区（2026-10 UI 重构）：Discussions 只有 GraphQL 通道（REST 无此端点）
+    implementation(project(":core:github-graphql"))
 
     // 导航（GitHubLinkParser 解析事件 html_url → 应用内路由）
     implementation(project(":core:navigation"))
@@ -59,6 +61,8 @@ dependencies {
     // 主题 AppTheme（@Preview 包裹用，#86）；AppStateChip/三态组件族（#84）
     implementation(project(":core:designsystem"))
     implementation(libs.haze)
+    // IssueDto.pullRequest 是 JsonObject（PR 识别 + merged_at 判定），列表投影要用到
+    implementation(libs.kotlinx.serialization.json)
 
     // Testing
     testImplementation(project(":core:testing"))

@@ -30,6 +30,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
@@ -43,8 +44,12 @@ import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
+import com.yumiru11.githubapp.core.designsystem.component.AppIconBadge
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.component.AppStatPill
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequest
@@ -82,8 +87,8 @@ fun PullRequestListScreen(
                 title = { Text(text = "$owner/$repo") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        AppIcon(
+                            spec = AppIcons.ArrowBack,
                             contentDescription = stringResource(R.string.pull_request_back),
                         )
                     }
@@ -92,8 +97,8 @@ fun PullRequestListScreen(
                     // T23：创建 PR 入口（仅推送权限会话显示；权限未知/游客隐藏）
                     if ((uiState as? PullRequestListUiState.Success)?.canCreatePullRequest == true) {
                         IconButton(onClick = { onCreatePullRequest(owner, repo) }) {
-                            Icon(
-                                imageVector = MaterialSymbols.Rounded.Add,
+                            AppIcon(
+                                spec = AppIcons.Add,
                                 contentDescription = stringResource(R.string.pull_request_create),
                             )
                         }
@@ -236,7 +241,7 @@ private fun PullRequestList(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
         ) {
             items(
                 count = lazyItems.itemCount,
@@ -260,49 +265,66 @@ private fun PullRequestRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val stateColor = statusColor(pullRequest.state)
     AppCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            ),
+        contentPadding = PaddingValues(0.dp),
     ) {
-        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
-            Text(
-                text = pullRequest.title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+        // 行首圆形图标徽标 + 标题 + 元信息行（M3 Expressive 列表语言）
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(AppDimens.cardPadding),
+            verticalAlignment = Alignment.Top,
+        ) {
+            AppIconBadge(
+                icon = AppDevOcticons.PullRequest,
+                containerColor = stateColor.copy(alpha = BADGE_ALPHA),
+                contentColor = stateColor,
             )
-            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(modifier = Modifier.width(AppDimens.spacing.m))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = statusText(pullRequest.state),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = statusColor(pullRequest.state),
+                    text = pullRequest.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
-                val author = pullRequest.author?.login
-                if (!author.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AppStatPill(
+                        text = statusText(pullRequest.state),
+                        containerColor = stateColor.copy(alpha = BADGE_ALPHA),
+                        contentColor = stateColor,
+                    )
+                    val author = pullRequest.author?.login
+                    if (!author.isNullOrEmpty()) {
+                        Spacer(modifier = Modifier.width(AppDimens.spacing.s))
+                        Text(
+                            text = stringResource(R.string.pull_request_author, author),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                     Text(
-                        text = stringResource(R.string.pull_request_author, author),
-                        style = MaterialTheme.typography.bodySmall,
+                        text =
+                            pluralStringResource(
+                                R.plurals.pull_request_comment_count,
+                                pullRequest.commentCount,
+                                pullRequest.commentCount,
+                            ),
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 }
-                Text(
-                    text = pluralStringResource(R.plurals.pull_request_comment_count, pullRequest.commentCount, pullRequest.commentCount),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }
 }
 
-/** PR 状态 → 本地化文案 */
+/** 徽标底色的透明度（14%：够看出状态色，又不抢正文对比度）。 */
+private const val BADGE_ALPHA = 0.14f
+
 @Composable
 private fun statusText(state: PullRequestState): String =
     when (state) {

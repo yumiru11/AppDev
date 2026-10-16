@@ -64,6 +64,8 @@ dependencies {
 
     // 主题
     implementation(project(":core:designsystem"))
+    // IssueDto.pullRequest 是 JsonObject（议题/PR 分区共用一次 /issues 拉取）
+    implementation(libs.kotlinx.serialization.json)
 
     // 数据层
     implementation(project(":core:data"))

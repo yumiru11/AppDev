@@ -5,11 +5,13 @@ package com.yumiru11.githubapp.feature.pullrequest
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -42,10 +44,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
+import com.yumiru11.githubapp.core.editor.MarkdownComposer
+import com.yumiru11.githubapp.core.editor.MarkdownEditorController
+import com.yumiru11.githubapp.core.editor.rememberM3EditorThemeTokens
+import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 import com.yumiru11.githubapp.feature.pullrequest.R
 import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestErrorType
@@ -88,8 +98,8 @@ fun PullRequestCreateScreen(
                 title = { Text(text = stringResource(R.string.pull_request_create_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        AppIcon(
+                            spec = AppIcons.ArrowBack,
                             contentDescription = stringResource(R.string.pull_request_back),
                         )
                     }
@@ -188,14 +198,33 @@ private fun CreatePullRequestForm(
             enabled = !state.isSubmitting,
         )
         Spacer(modifier = Modifier.height(AppDimens.spacing.m))
-        OutlinedTextField(
-            value = body,
-            onValueChange = onBodyChange,
+        // 正文：大空间 Markdown 编辑器 + 渲染预览（编辑/预览双 Tab，工具栏插 markdown 符号）
+        var isBodyPreview by remember { mutableStateOf(false) }
+        var bodyEditorController by remember { mutableStateOf<MarkdownEditorController?>(null) }
+        val bodyEditorTokens = rememberM3EditorThemeTokens()
+        val bodyPreviewPlaceholder = stringResource(R.string.pull_request_create_body_label)
+        AppCard(
             modifier = Modifier.fillMaxWidth(),
-            label = { Text(text = stringResource(R.string.pull_request_create_body_label)) },
-            minLines = 5,
-            enabled = !state.isSubmitting,
-        )
+            contentPadding = PaddingValues(AppDimens.spacing.s),
+        ) {
+            MarkdownComposer(
+                text = body,
+                isPreview = isBodyPreview,
+                onTogglePreview = { isBodyPreview = it },
+                onTextChanged = onBodyChange,
+                onEditorReady = { bodyEditorController = it },
+                onToolbarAction = { bodyEditorController?.applySyntax(it) },
+                themeTokens = bodyEditorTokens,
+                preview = {
+                    MarkdownViewer(
+                        markdown = body.ifBlank { bodyPreviewPlaceholder },
+                        scrollable = false,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = AppDimens.spacing.s),
+                    )
+                },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 240.dp, max = 420.dp),
+            )
+        }
         Spacer(modifier = Modifier.height(AppDimens.spacing.l))
         BranchDropdown(
             label = stringResource(R.string.pull_request_create_base),
@@ -264,8 +293,8 @@ private fun BranchDropdown(
                 )
             }
             Spacer(modifier = Modifier.width(AppDimens.spacing.s))
-            Icon(
-                imageVector = Icons.Filled.KeyboardArrowDown,
+            AppIcon(
+                spec = AppIcons.KeyboardArrowDown,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

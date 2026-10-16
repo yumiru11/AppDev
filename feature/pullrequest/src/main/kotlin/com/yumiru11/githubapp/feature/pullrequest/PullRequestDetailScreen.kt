@@ -58,11 +58,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -75,12 +80,16 @@ import com.yumiru11.githubapp.core.datastore.draft.DraftText
 import com.yumiru11.githubapp.core.designsystem.component.AppBottomSheet
 import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppDialog
+import com.yumiru11.githubapp.core.designsystem.component.AppFabMenu
+import com.yumiru11.githubapp.core.designsystem.component.AppFabMenuItem
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
 import com.yumiru11.githubapp.core.designsystem.component.AppStateChip
 import com.yumiru11.githubapp.core.designsystem.component.GitHubStatus
 import com.yumiru11.githubapp.core.designsystem.component.GlassSheetSurface
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContainerColor
 import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppSnackbarHost
@@ -102,6 +111,8 @@ import com.yumiru11.githubapp.feature.pullrequest.model.PullRequestUser
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewComment
 import com.yumiru11.githubapp.feature.pullrequest.model.ReviewThread
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -130,6 +141,33 @@ fun PullRequestDetailScreen(
     val resources = LocalResources.current
     // 会话评论 Sheet 开关声明在事件收集之前：CommentPosted 事件要在这里把它关掉
     var showCommentSheet by remember { mutableStateOf(false) }
+    // FAB 滑动感知：列表滑动时收起、停滑 300ms 后恢复
+    var listScrolling by remember { mutableStateOf(false) }
+    val scrollScope = rememberCoroutineScope()
+    var scrollIdleJob by remember { mutableStateOf<Job?>(null) }
+    // 任意子分区（会话/提交/检查/文件变更）滚动都产生信号：置 true，300ms 无新滚动后复位。
+    // 这样 FAB 的收纳不依赖"每页各上报一次"，与仓库页的 nestedScroll 采集同一套做法。
+    val scrollActivity =
+        remember {
+            object : NestedScrollConnection {
+                override fun onPostScroll(
+                    consumed: Offset,
+                    available: Offset,
+                    source: NestedScrollSource,
+                ): Offset {
+                    if (consumed.y != 0f) {
+                        listScrolling = true
+                        scrollIdleJob?.cancel()
+                        scrollIdleJob =
+                            scrollScope.launch {
+                                delay(FAB_SCROLL_IDLE_MILLIS)
+                                listScrolling = false
+                            }
+                    }
+                    return Offset.Zero
+                }
+            }
+        }
     // #166：正在编辑/待删除的会话评论（null = 无对话框）
     var editingComment by remember { mutableStateOf<PullRequestTimelineItem.Comment?>(null) }
     var deletingComment by remember { mutableStateOf<PullRequestTimelineItem.Comment?>(null) }
@@ -229,8 +267,8 @@ fun PullRequestDetailScreen(
                 title = { Text(text = "$owner/$repo #$number") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        AppIcon(
+                            spec = AppIcons.ArrowBack,
                             contentDescription = stringResource(R.string.pull_request_back),
                         )
                     }
@@ -262,16 +300,24 @@ fun PullRequestDetailScreen(
         },
         floatingActionButton = {
             // 评论属写操作：仅详情加载成功后提供入口（Loading/Error 态无目标可评）
-            if (uiState is PullRequestDetailUiState.Success) {
-                ExtendedFloatingActionButton(
-                    onClick = { showCommentSheet = true },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Filled.Add,
-                            contentDescription = null, // 文本「评论」已表意，避免 TalkBack 重复朗读
-                        )
-                    },
-                    text = { Text(text = stringResource(R.string.pull_request_comment)) },
+            val detailState = uiState as? PullRequestDetailUiState.Success
+            if (detailState != null) {
+                // 可展开 FAB 菜单（滑动自动收起、停滑 300ms 恢复）
+                var fabExpanded by rememberSaveable { mutableStateOf(false) }
+                AppFabMenu(
+                    expanded = fabExpanded,
+                    onExpandedChange = { fabExpanded = it },
+                    mainIcon = AppIcons.Add.rounded,
+                    mainContentDescription = stringResource(R.string.pull_request_comment),
+                    isScrollInProgress = listScrolling,
+                    items =
+                        listOf(
+                            AppFabMenuItem(
+                                label = stringResource(R.string.pull_request_comment),
+                                icon = AppIcons.ChatBubble.rounded,
+                                onClick = { showCommentSheet = true },
+                            ),
+                        ),
                 )
             }
         },
@@ -280,7 +326,8 @@ fun PullRequestDetailScreen(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
+                    .padding(paddingValues)
+                    .nestedScroll(scrollActivity),
         ) {
             when (val state = uiState) {
                 is PullRequestDetailUiState.Loading -> {
@@ -510,8 +557,8 @@ private fun PullRequestMoreMenu(
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
         IconButton(onClick = { expanded = true }) {
-            Icon(
-                imageVector = Icons.Filled.MoreVert,
+            AppIcon(
+                spec = AppIcons.MoreVert,
                 contentDescription = stringResource(R.string.pull_request_menu_more),
             )
         }
@@ -1220,3 +1267,6 @@ private fun EditCommentDialog(
         },
     )
 }
+
+/** 滚动停止判定窗口（ms）：与 AppFabMenu 的 300ms 恢复窗口同源。 */
+private const val FAB_SCROLL_IDLE_MILLIS = 300L

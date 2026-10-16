@@ -1,7 +1,11 @@
 package com.yumiru11.githubapp.feature.repo
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,6 +34,9 @@ import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Folder
 import com.composables.icons.materialsymbols.rounded.Folder_open
 import com.composables.icons.materialsymbols.rounded.Text_snippet
+import com.yumiru11.githubapp.core.designsystem.component.AppChevron
+import com.yumiru11.githubapp.core.designsystem.component.AppIconBadge
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
 
@@ -85,7 +94,11 @@ fun FileTreeSection(
 
         is TreeState.Loaded -> {
             val rows = FileTreeBuilder.visibleRows(treeState.rootNodes)
-            LazyColumn(modifier = modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = modifier.fillMaxSize(),
+                contentPadding = PaddingValues(vertical = AppDimens.spacing.s),
+                verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
+            ) {
                 items(items = rows, key = { it.node.path }) { row ->
                     TreeRowItem(
                         row = row,
@@ -123,52 +136,71 @@ private fun TreeRowItem(
     // 所以此处就是「只查用户真看得到的行」的天然边界（同 path 会话缓存于 ViewModel）。
     LaunchedEffect(row.node.path) { onVisible() }
 
+    val lastModifiedText = lastModifiedIso?.let { relativeTimeText(it) }
+    val sizeText =
+        row.node.size
+            ?.takeIf { !row.node.isDirectory }
+            ?.let { formatFileSize(it) }
+    // 副标题 = 「大小 · 更新时间」（文件夹只有时间）；M3 Expressive 列表行的两行结构
+    val subtitle =
+        listOfNotNull(sizeText, lastModifiedText)
+            .joinToString(separator = " · ")
+            .takeIf { it.isNotBlank() }
+
     Row(
         modifier =
             modifier
                 .fillMaxWidth()
+                .padding(start = AppDimens.spacing.l + (row.depth * INDENT_PER_DEPTH_DP).dp, end = AppDimens.spacing.l)
+                .clip(RoundedCornerShape(AppDimens.cornerMedium))
                 .clickable(onClick = onClick)
-                .padding(horizontal = AppDimens.contentPadding, vertical = 10.dp),
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .padding(horizontal = AppDimens.spacing.m, vertical = AppDimens.spacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Spacer(modifier = Modifier.width((row.depth * INDENT_PER_DEPTH_DP).dp))
-        Icon(
-            imageVector =
+        // 行首圆形图标徽标（文件夹 = 主色容器，文件 = 中性容器）：与通知/议题列表同一语言
+        AppIconBadge(
+            icon =
                 when {
-                    row.node.isDirectory -> {
-                        if (row.node.isExpanded) MaterialSymbols.Rounded.Folder_open else MaterialSymbols.Rounded.Folder
-                    }
-
-                    else -> {
-                        MaterialSymbols.Rounded.Text_snippet
-                    }
+                    row.node.isDirectory && row.node.isExpanded -> AppIcons.FolderOpen.rounded
+                    row.node.isDirectory -> AppIcons.Folder.rounded
+                    else -> AppIcons.Article.rounded
                 },
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
+            containerColor =
+                if (row.node.isDirectory) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                },
+            contentColor =
+                if (row.node.isDirectory) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
         )
-        Spacer(modifier = Modifier.width(AppDimens.spacing.s))
-        Text(
-            text = row.node.name,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            // 时间列右对齐：名字吃掉剩余宽度并在窄屏省略号截断（而不是把时间挤出屏幕）
-            modifier = Modifier.weight(1f),
-        )
-        val lastModifiedText = lastModifiedIso?.let { relativeTimeText(it) }
-        if (lastModifiedText != null) {
-            Spacer(modifier = Modifier.width(AppDimens.spacing.s))
+        Spacer(modifier = Modifier.width(AppDimens.spacing.m))
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = lastModifiedText,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = row.node.name,
+                style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.End,
-                // 窄屏保护：时间列封顶，超长相对文案（如 11 months ago）也不挤走文件名
-                modifier = Modifier.widthIn(max = LAST_MODIFIED_MAX_WIDTH),
             )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = LAST_MODIFIED_MAX_WIDTH * 2),
+                )
+            }
+        }
+        if (!row.node.isDirectory) {
+            Spacer(modifier = Modifier.width(AppDimens.spacing.s))
+            AppChevron()
         }
     }
 }

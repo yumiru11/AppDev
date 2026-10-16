@@ -76,7 +76,7 @@ class SettingsScreensSmokeTest {
     @Test
     fun settingsPreferencesScreen_rendersTitle() {
         render(R.string.settings_preferences) {
-            SettingsPreferencesScreen({}, {}, {}, {}, {}, {})
+            SettingsPreferencesScreen({}, {}, {}, {}, {})
         }
     }
 
@@ -112,13 +112,6 @@ class SettingsScreensSmokeTest {
     fun settingsAccountScreen_rendersTitle() {
         render(R.string.settings_account_entry) {
             SettingsAccountScreen(viewModel = viewModel(), onBackClick = {})
-        }
-    }
-
-    @Test
-    fun settingsMarkdownScreen_rendersTitle() {
-        render(R.string.settings_markdown_title) {
-            SettingsMarkdownScreen(viewModel = viewModel(), onBackClick = {})
         }
     }
 }

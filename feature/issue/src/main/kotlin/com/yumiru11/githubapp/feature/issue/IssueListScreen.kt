@@ -33,6 +33,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
@@ -44,8 +45,12 @@ import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppCenteredLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
+import com.yumiru11.githubapp.core.designsystem.component.AppIconBadge
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.component.AppStatPill
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.feature.issue.model.Issue
@@ -84,16 +89,16 @@ fun IssueListScreen(
                 title = { Text(text = "$owner/$repo") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        AppIcon(
+                            spec = AppIcons.ArrowBack,
                             contentDescription = stringResource(R.string.issue_back),
                         )
                     }
                 },
                 actions = {
                     IconButton(onClick = onSearchClick) {
-                        Icon(
-                            imageVector = Icons.Filled.Search,
+                        AppIcon(
+                            spec = AppIcons.Search,
                             contentDescription = stringResource(R.string.issue_search),
                         )
                     }
@@ -104,8 +109,8 @@ fun IssueListScreen(
             ExtendedFloatingActionButton(
                 onClick = onCreateIssue,
                 icon = {
-                    Icon(
-                        imageVector = Icons.Filled.Create,
+                    AppIcon(
+                        spec = AppIcons.Edit,
                         contentDescription = null,
                     )
                 },
@@ -246,7 +251,7 @@ private fun IssueList(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
         ) {
             items(
                 count = lazyItems.itemCount,
@@ -267,49 +272,61 @@ private fun IssueRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val stateColor = statusColor(issue.state)
     AppCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            ),
+        contentPadding = PaddingValues(0.dp),
     ) {
-        Column(modifier = Modifier.padding(AppDimens.spacing.m)) {
-            Text(
-                text = issue.title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+        // 行首圆形图标徽标 + 标题 + 元信息行（M3 Expressive 列表语言）
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(AppDimens.cardPadding),
+            verticalAlignment = Alignment.Top,
+        ) {
+            AppIconBadge(
+                icon = AppDevOcticons.IssueOpened,
+                containerColor = stateColor.copy(alpha = BADGE_ALPHA),
+                contentColor = stateColor,
             )
-            Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(modifier = Modifier.width(AppDimens.spacing.m))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = statusText(issue.state),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = statusColor(issue.state),
+                    text = issue.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
-                val author = issue.author?.login
-                if (!author.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AppStatPill(
+                        text = statusText(issue.state),
+                        containerColor = stateColor.copy(alpha = BADGE_ALPHA),
+                        contentColor = stateColor,
+                    )
+                    val author = issue.author?.login
+                    if (!author.isNullOrEmpty()) {
+                        Spacer(modifier = Modifier.width(AppDimens.spacing.s))
+                        Text(
+                            text = stringResource(R.string.issue_author, author),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                     Text(
-                        text = stringResource(R.string.issue_author, author),
-                        style = MaterialTheme.typography.bodySmall,
+                        text = pluralStringResource(R.plurals.issue_comment_count, issue.commentCount, issue.commentCount),
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(modifier = Modifier.width(AppDimens.spacing.s))
                 }
-                Text(
-                    text = pluralStringResource(R.plurals.issue_comment_count, issue.commentCount, issue.commentCount),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }
 }
 
-/** Issue 状态 → 本地化文案 */
+/** 徽标底色的透明度（14%：够看出状态色，又不抢正文对比度）。 */
+private const val BADGE_ALPHA = 0.14f
+
 @Composable
 private fun statusText(state: IssueState): String =
     when (state) {

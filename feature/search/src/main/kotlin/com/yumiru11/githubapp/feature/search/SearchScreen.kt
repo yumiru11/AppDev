@@ -327,8 +327,10 @@ private fun IdleContent(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
+        // 2026-10 UI 重构：与首页同一列表度量（横向 16dp / 行距 10dp）——
+        // 此前搜索用 8dp 行距，同一张仓库卡在首页与搜索页的纵向节奏不一致（用户实测指出）
         contentPadding = PaddingValues(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
     ) {
         if (history.isNotEmpty()) {
             item {
@@ -579,7 +581,7 @@ private fun <T : Any> SearchPagingList(
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
     ) {
         val refreshError = lazyItems.loadState.refresh as? LoadState.Error
         when {

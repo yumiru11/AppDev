@@ -6,10 +6,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,9 +39,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
+import com.yumiru11.githubapp.core.editor.MarkdownComposer
+import com.yumiru11.githubapp.core.editor.MarkdownEditorController
+import com.yumiru11.githubapp.core.editor.rememberM3EditorThemeTokens
+import com.yumiru11.githubapp.core.markdown.MarkdownViewer
 import com.yumiru11.githubapp.feature.issue.model.IssueErrorType
 
 /**
@@ -82,8 +91,8 @@ fun CreateIssueScreen(
                 title = { Text(text = stringResource(R.string.issue_create_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        AppIcon(
+                            spec = AppIcons.ArrowBack,
                             contentDescription = stringResource(R.string.issue_back),
                         )
                     }
@@ -99,7 +108,7 @@ fun CreateIssueScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = AppDimens.spacing.l)
                     .imePadding(),
-            verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.m),
+            verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
         ) {
             Text(
                 text = "$owner/$repo",
@@ -113,13 +122,33 @@ fun CreateIssueScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = body,
-                onValueChange = viewModel.bodyDraft::onChanged,
-                label = { Text(text = stringResource(R.string.issue_create_body_label)) },
-                minLines = 6,
+            // 正文：大空间 Markdown 编辑器 + 渲染预览（编辑/预览双 Tab，工具栏可插 markdown 符号）
+            var isBodyPreview by remember { mutableStateOf(false) }
+            var bodyEditorController by remember { mutableStateOf<MarkdownEditorController?>(null) }
+            val bodyEditorTokens = rememberM3EditorThemeTokens()
+            val bodyPreviewPlaceholder = stringResource(R.string.issue_comment_preview_empty)
+            AppCard(
                 modifier = Modifier.fillMaxWidth(),
-            )
+                contentPadding = PaddingValues(AppDimens.spacing.s),
+            ) {
+                MarkdownComposer(
+                    text = body,
+                    isPreview = isBodyPreview,
+                    onTogglePreview = { isBodyPreview = it },
+                    onTextChanged = viewModel.bodyDraft::onChanged,
+                    onEditorReady = { bodyEditorController = it },
+                    onToolbarAction = { bodyEditorController?.applySyntax(it) },
+                    themeTokens = bodyEditorTokens,
+                    preview = {
+                        MarkdownViewer(
+                            markdown = body.ifBlank { bodyPreviewPlaceholder },
+                            scrollable = false,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = AppDimens.spacing.s),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 260.dp, max = 460.dp),
+                )
+            }
             Text(
                 text = stringResource(R.string.issue_create_labels_label),
                 style = MaterialTheme.typography.titleSmall,

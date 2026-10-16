@@ -1,13 +1,20 @@
 package com.yumiru11.githubapp.core.designsystem.component
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CardElevation
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.dp
+import com.yumiru11.githubapp.core.designsystem.token.LocalAppSurfaces
 
 /**
  * 应用统一卡片（设计系统 Batch 1，`docs/design-system/implementation-plan.md` §3.1③）。
@@ -39,27 +46,44 @@ fun AppCard(
     onClick: (() -> Unit)? = null,
     enabled: Boolean = true,
     shape: Shape = CardDefaults.shape,
-    colors: CardColors = CardDefaults.cardColors(),
+    colors: CardColors = CardDefaults.cardColors(containerColor = LocalAppSurfaces.current.card),
     elevation: CardElevation = CardDefaults.cardElevation(),
+    outlined: Boolean = false,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val surfaceModifier =
+        modifier.then(
+            if (outlined) {
+                Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            } else {
+                Modifier
+            },
+        )
+    val padded: @Composable ColumnScope.() -> Unit = {
+        if (contentPadding != PaddingValues(0.dp)) {
+            Column(modifier = Modifier.padding(contentPadding), content = content)
+        } else {
+            content()
+        }
+    }
     if (onClick == null) {
         Card(
-            modifier = modifier,
+            modifier = surfaceModifier,
             shape = shape,
             colors = colors,
             elevation = elevation,
-            content = content,
+            content = padded,
         )
     } else {
         Card(
             onClick = onClick,
-            modifier = modifier,
+            modifier = surfaceModifier,
             enabled = enabled,
             shape = shape,
             colors = colors,
             elevation = elevation,
-            content = content,
+            content = padded,
         )
     }
 }

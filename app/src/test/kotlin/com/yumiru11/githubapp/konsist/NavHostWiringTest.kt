@@ -346,7 +346,7 @@ class NavHostWiringTest {
          * 当前 AppNavHost 恰好有 19 个带默认空实现的 screen lambda（21 个形参减去
          * navController / modifier / startDestination 三个装配参数）。低于此数即解析器失效。
          */
-        const val MIN_EXPECTED_SCREEN_LAMBDAS = 19
+        const val MIN_EXPECTED_SCREEN_LAMBDAS = 20
 
         /** T23 白屏实证案例：解析器必须能把它们的签名形态判为「带默认空实现」。 */
         val KNOWN_MISSING_CASE_LAMBDAS = listOf("branchesScreen", "createPullRequestScreen")

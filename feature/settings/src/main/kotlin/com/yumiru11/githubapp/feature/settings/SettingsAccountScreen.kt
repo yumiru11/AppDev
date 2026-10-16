@@ -105,7 +105,7 @@ private fun PatEditor(onSave: (String) -> Unit) {
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = AppDimens.spacing.xs),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
     ) {
         OutlinedTextField(
             value = patValue,

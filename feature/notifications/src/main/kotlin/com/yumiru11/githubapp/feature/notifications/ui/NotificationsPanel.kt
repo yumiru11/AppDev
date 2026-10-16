@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -62,6 +63,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -80,8 +82,10 @@ import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppEmptyState
 import com.yumiru11.githubapp.core.designsystem.component.AppErrorState
 import com.yumiru11.githubapp.core.designsystem.component.AppFilterChip
+import com.yumiru11.githubapp.core.designsystem.component.AppIconBadge
 import com.yumiru11.githubapp.core.designsystem.component.AppLoadingState
 import com.yumiru11.githubapp.core.designsystem.component.AppSegmentedButton
+import com.yumiru11.githubapp.core.designsystem.component.AppStatPill
 import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
@@ -445,7 +449,7 @@ private fun GroupHeader(
  * 已读行禁用右滑（无可标记项）。背景随滑动进度渐变（primary 系 / error 系）。
  */
 @Composable
-private fun SwipeableNotificationRow(
+internal fun SwipeableNotificationRow(
     item: NotificationItem,
     onMarkRead: (NotificationItem) -> Unit,
     onDelete: (NotificationItem) -> Unit,
@@ -535,6 +539,23 @@ private fun DismissBackground(
     }
 }
 
+/** 行内元信息：原因胶囊 + 相对时间（未读/已读共用，抽出来让主行保持短）。 */
+@Composable
+private fun NotificationMetaRow(item: NotificationItem) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        AppStatPill(text = reasonLabel(item.reason))
+        val date = notificationTimestampText(item.updatedAt)
+        if (date.isNotEmpty()) {
+            Spacer(Modifier.width(AppDimens.spacing.s))
+            Text(
+                text = date,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 /** 通知卡片：未读左缘 primary 色条（替换 T19 圆点，淡出动画）+ 摘要 + 原因/相对时间 + 事件图标（internal 供预览文件复用） */
 @Composable
 internal fun NotificationCard(
@@ -542,11 +563,6 @@ internal fun NotificationCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val barColor by animateColorAsState(
-        targetValue = if (item.unread) MaterialTheme.colorScheme.primary else Color.Transparent,
-        animationSpec = tween(AppMotion.DURATION_SMALL_STATE_CHANGE),
-        label = "unreadBar",
-    )
     val unreadDescription = stringResource(R.string.notification_state_unread)
     val readDescription = stringResource(R.string.notification_state_read)
 
@@ -556,62 +572,59 @@ internal fun NotificationCard(
             modifier
                 .fillMaxWidth()
                 .semantics { stateDescription = if (item.unread) unreadDescription else readDescription },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        contentPadding =
+            androidx.compose.foundation.layout
+                .PaddingValues(0.dp),
     ) {
-        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-            // 未读左缘色条：占满行高，已读淡出（ui-design §3.4）
-            Box(
-                modifier =
-                    Modifier
-                        .width(4.dp)
-                        .fillMaxHeight()
-                        .background(color = barColor),
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(AppDimens.spacing.l),
+            verticalAlignment = Alignment.Top,
+        ) {
+            // 行首圆形图标徽标（未读用主色容器、已读中性）：与列表类页面同一语言
+            AppIconBadge(
+                icon = eventIconFor(item.subjectType),
+                containerColor =
+                    if (item.unread) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                contentColor =
+                    if (item.unread) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
             )
-            Row(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .padding(AppDimens.spacing.m),
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = item.subjectTitle,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = if (item.unread) FontWeight.SemiBold else FontWeight.Normal,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
-                    Text(
-                        text = item.repoFullName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    val date = notificationTimestampText(item.updatedAt)
-                    if (date.isNotEmpty()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = reasonLabel(item.reason),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                            Spacer(modifier = Modifier.width(AppDimens.spacing.s))
-                            Text(
-                                text = date,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.width(AppDimens.spacing.s))
-                Icon(
-                    imageVector = eventIconFor(item.subjectType),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
+            Spacer(Modifier.width(AppDimens.spacing.m))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.subjectTitle,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (item.unread) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(AppDimens.spacing.xs))
+                Text(
+                    text = item.repoFullName,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(AppDimens.spacing.xs))
+                NotificationMetaRow(item = item)
+            }
+            if (item.unread) {
+                Spacer(Modifier.width(AppDimens.spacing.s))
+                Box(
+                    modifier =
+                        Modifier
+                            .padding(top = AppDimens.spacing.xs)
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
                 )
             }
         }
@@ -713,7 +726,7 @@ private fun errorMessage(errorType: NotificationsErrorType): String =
     }
 
 /** 点击条目：解析 html_url → 应用内 ParsedUrl 导航（External 不可能出现，防御性忽略） */
-private fun handleItemClick(
+internal fun handleItemClick(
     item: NotificationItem,
     onNotificationClick: (ParsedUrl) -> Unit,
 ) {

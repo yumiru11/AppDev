@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 
@@ -73,6 +74,7 @@ fun AppFilterChip(
     containerColor: Color = Color.Unspecified,
     labelColor: Color = Color.Unspecified,
     border: BorderStroke? = null,
+    shape: Shape = FilterChipDefaults.shape,
     interactionSource: MutableInteractionSource? = null,
 ) {
     FilterChip(
@@ -91,7 +93,7 @@ fun AppFilterChip(
                     )
                 }
             },
-        shape = FilterChipDefaults.shape,
+        shape = shape,
         colors =
             FilterChipDefaults.filterChipColors(
                 containerColor = containerColor,

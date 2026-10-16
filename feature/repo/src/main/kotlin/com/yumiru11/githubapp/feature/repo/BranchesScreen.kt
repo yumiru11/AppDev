@@ -53,6 +53,8 @@ import com.composables.icons.materialsymbols.rounded.Delete
 import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppDialog
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.ui.AppSnackbarHost
 import com.yumiru11.githubapp.feature.repo.R
@@ -103,8 +105,8 @@ fun BranchesScreen(
                 title = { Text(text = "$owner/$repo") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        AppIcon(
+                            spec = AppIcons.ArrowBack,
                             contentDescription = stringResource(R.string.repo_branch_back),
                         )
                     }
@@ -115,8 +117,8 @@ fun BranchesScreen(
                             onClick = { showCreateDialog = true },
                             enabled = !(uiState as BranchesUiState.Success).isBusy,
                         ) {
-                            Icon(
-                                imageVector = MaterialSymbols.Rounded.Add,
+                            AppIcon(
+                                spec = AppIcons.Add,
                                 contentDescription = stringResource(R.string.repo_branch_new),
                             )
                         }
@@ -242,7 +244,7 @@ private fun BranchList(
     LazyColumn(
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.s),
-        verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
+        verticalArrangement = Arrangement.spacedBy(AppDimens.listSpacing),
     ) {
         items(branches, key = { it.name }) { branch ->
             val isCurrent = branch.name == currentRef
@@ -251,10 +253,6 @@ private fun BranchList(
             AppCard(
                 onClick = { if (!isCurrent) onBranchSelected(branch.name) },
                 modifier = Modifier.fillMaxWidth(),
-                colors =
-                    CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(AppDimens.spacing.m),
@@ -291,8 +289,8 @@ private fun BranchList(
                     }
                     if (canDelete) {
                         IconButton(onClick = { onDeleteClick(branch.name) }) {
-                            Icon(
-                                imageVector = MaterialSymbols.Rounded.Delete,
+                            AppIcon(
+                                spec = AppIcons.Delete,
                                 contentDescription = stringResource(R.string.repo_branch_delete),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

@@ -21,6 +21,11 @@ import androidx.compose.ui.graphics.Color
  * - **Material-derived** — mapped from Material 3 color roles
  * - **Brand** — GitHub brand palette (primer/primitives)
  * - **Semantic** — domain-meaningful colors with no direct Material role
+ *
+ * Diff / 代码查看器的 10 个语义色由 [DiffCodeRoles] + \`ExtendedColors.withDiffRoles(...)\` 注入
+ * （见 DiffCodeRoles.kt）：此处给出 \`Color.Unspecified\` 默认值只是让 palette 函数可以
+ * 先构造再链式补色（palette 函数体因此压在 detekt LongMethod 阈值内）。**每套色板都必须
+ * 真的补上**——由 ThemePaletteTest 的「每个色板每个字段都非 Unspecified」断言守住。
  */
 @Immutable
 data class ExtendedColors(
@@ -90,6 +95,25 @@ data class ExtendedColors(
     val draft: Color,
     /** Text/icon on [draft] (plan.md §5.3: draft → onSurfaceVariant). Material-derived. */
     val onDraft: Color,
+    val diffAddBackground: Color = Color.Unspecified,
+    /** Diff: added line text. Semantic (success family). */
+    val diffAddText: Color = Color.Unspecified,
+    /** Diff: deleted line background. Semantic (danger family). */
+    val diffDelBackground: Color = Color.Unspecified,
+    /** Diff: deleted line text. Semantic (danger family). */
+    val diffDelText: Color = Color.Unspecified,
+    /** Diff: hunk header (@@) background. Semantic (info family). */
+    val diffHunkBackground: Color = Color.Unspecified,
+    /** Diff: hunk header text. Semantic (info family). */
+    val diffHunkText: Color = Color.Unspecified,
+    /** Code/diff container background (code blocks, file viewer, diff body). Material-derived. */
+    val codeBackground: Color = Color.Unspecified,
+    /** Line-number gutter text in code/diff views. Material-derived (onSurfaceVariant family). */
+    val codeLineNumber: Color = Color.Unspecified,
+    /** Star count accent (GitHub star yellow). Semantic. */
+    val star: Color = Color.Unspecified,
+    /** Skeleton/shimmer base block while loading. Material-derived (surfaceContainerHigh family). */
+    val skeleton: Color = Color.Unspecified,
 )
 
 /** Default extended colors for preview / testing. */
@@ -124,6 +148,17 @@ val DefaultExtendedColors =
         onMerged = Color(0xFFFFFFFF),
         draft = Color(0xFFE6E9ED),
         onDraft = Color(0xFF656D76),
+        // Diff / code roles — mirror lightPalette (GitHub primer light)
+        diffAddBackground = Color(0xFFDAFBE1),
+        diffAddText = Color(0xFF1A7F37),
+        diffDelBackground = Color(0xFFFFEBE9),
+        diffDelText = Color(0xFFCF222E),
+        diffHunkBackground = Color(0xFFDDF4FF),
+        diffHunkText = Color(0xFF0969DA),
+        codeBackground = Color(0xFFEEF1F5),
+        codeLineNumber = Color(0xFF656D76),
+        star = Color(0xFFE3A008),
+        skeleton = Color(0xFFE6E9ED),
     )
 
 private val LocalExtendedColors = staticCompositionLocalOf { DefaultExtendedColors }
@@ -203,4 +238,17 @@ internal fun extendedColorsFrom(colorScheme: ColorScheme): ExtendedColors =
         onMerged = colorScheme.onTertiary,
         draft = colorScheme.surfaceContainerHigh,
         onDraft = colorScheme.onSurfaceVariant,
+        // Diff / code roles: dynamic & seed schemes have no hand-tuned green/red,
+        // so the pairs borrow the container families they already use
+        // (add → primary, del → error, hunk → secondary).
+        diffAddBackground = colorScheme.primaryContainer,
+        diffAddText = colorScheme.onPrimaryContainer,
+        diffDelBackground = colorScheme.errorContainer,
+        diffDelText = colorScheme.onErrorContainer,
+        diffHunkBackground = colorScheme.secondaryContainer,
+        diffHunkText = colorScheme.onSecondaryContainer,
+        codeBackground = colorScheme.surfaceContainer,
+        codeLineNumber = colorScheme.onSurfaceVariant,
+        star = colorScheme.tertiary,
+        skeleton = colorScheme.surfaceContainerHigh,
     )

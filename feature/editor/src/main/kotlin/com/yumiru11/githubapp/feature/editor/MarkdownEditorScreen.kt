@@ -45,6 +45,8 @@ import com.composables.icons.materialsymbols.rounded.Redo
 import com.composables.icons.materialsymbols.rounded.Undo
 import com.composables.icons.materialsymbols.rounded.Wrap_text
 import com.yumiru11.githubapp.core.designsystem.component.AppScaffold
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
+import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferences
 import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferencesWriter
 import com.yumiru11.githubapp.core.editor.DEFAULT_MARKDOWN_EMOJIS
@@ -100,8 +102,8 @@ fun MarkdownEditorScreen(
                 title = { Text(text = stringResource(R.string.editor_title)) },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        AppIcon(
+                            spec = AppIcons.ArrowBack,
                             contentDescription = stringResource(R.string.editor_back),
                         )
                     }
@@ -126,8 +128,8 @@ fun MarkdownEditorScreen(
                         )
                     }
                     IconButton(onClick = { viewModel.undo() }) {
-                        Icon(
-                            imageVector = MaterialSymbols.Rounded.Undo,
+                        AppIcon(
+                            spec = AppIcons.Refresh,
                             contentDescription = stringResource(R.string.editor_undo),
                         )
                     }
