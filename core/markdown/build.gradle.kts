@@ -44,6 +44,29 @@ dependencies {
     implementation(libs.coil.gif)
     implementation(libs.coil.network.okhttp)
 
+    // HTML 子集原生渲染：标签/属性三级白名单解析（MIT）
+    implementation(libs.jsoup)
+    // 原生 Mermaid 图表渲染（Compose Canvas，MIT；上游 swithun-liu/cmp-mermaid）
+    // 取 Android 专用坐标：KMP 根坐标的变体带 Kotlin platform 属性，AGP 9 内置 Kotlin
+    // 的消费端匹配不到 androidJvm 变体（实测 "Could not find mermaid-compose-0.1.10.jar"）。
+    // JetBrains Compose 传递依赖整体排除：Android 目标下它们与 androidx.compose.* 同源，
+    // 本项目已有 BOM 托管，重复引入会撞类。
+    // mermaid-compose 的 POM 把 mermaid-core 标成 runtime scope → 编译期拿不到其类型
+    // （MermaidTheme / GMResult / MermaidError）。显式补齐编译期依赖，版本与 compose 侧一致。
+    implementation(
+        "io.github.swithun-liu:mermaid-core-android:" +
+            libs.versions.cmp.mermaid
+                .get(),
+    )
+    implementation(libs.cmp.mermaid) {
+        exclude(group = "org.jetbrains.compose.ui")
+        exclude(group = "org.jetbrains.compose.foundation")
+        exclude(group = "org.jetbrains.compose.runtime")
+        exclude(group = "org.jetbrains.compose.annotation-internal")
+        exclude(group = "org.jetbrains.compose.collection-internal")
+        exclude(group = "org.jetbrains.compose.ui.util")
+    }
+
     // WebViewAssetLoader（assets 安全加载，禁 file://；T8 WebView 兜底通道用）
     implementation(libs.androidx.webkit)
 

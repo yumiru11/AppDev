@@ -31,8 +31,10 @@ import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Chevron_right
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
 import com.mikepenz.markdown.m3.Markdown
+import com.yumiru11.githubapp.core.markdown.html.ComposeHtml
 import com.yumiru11.githubapp.core.markdown.native.HtmlBadgeParser
 import com.yumiru11.githubapp.core.markdown.native.HtmlDetailsParser
+import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 
 /**
  * HTML_BLOCK 原生处理：识别 `<details>` 时自研折叠；徽章组（含相对路径 img）渲染为
@@ -44,6 +46,7 @@ import com.yumiru11.githubapp.core.markdown.native.HtmlDetailsParser
 fun EnhancedHtmlBlock(
     model: MarkdownComponentModel,
     baseRepoUrl: String? = null,
+    onInternalLink: (ParsedUrl) -> Unit = {},
 ) {
     val details = remember(model.content, model.node) { HtmlDetailsParser.parse(model.content, model.node) }
     val badges =
@@ -60,13 +63,12 @@ fun EnhancedHtmlBlock(
         }
 
         !isClosingDetailsOnly(model) -> {
-            // HTML_BLOCK 无 details/徽章时：不展示源码（用户可见「未渲染 HTML 标签」），
-            // 降级为去标签纯文本——保留内容可读性（2026-08-17 真机：EchoMusic/mikepenz
-            // HTML 段直接展示源码，要求修复）。
+            // HTML_BLOCK 其余情形：交给原生 HTML 子集渲染器（段落/标题/列表/表格/图片/折叠块…）。
+            // 既不展示源码（2026-08-17 真机要求），也不再退化为「去标签纯文本」丢掉排版语义。
             val htmlText = model.content.substring(model.node.startOffset, model.node.endOffset)
-            Text(
-                text = stripHtmlTags(htmlText),
-                style = model.typography.text.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+            ComposeHtml(
+                html = htmlText,
+                onLinkClick = { url -> dispatchMarkdownLink(url, baseRepoUrl, onInternalLink) },
             )
         }
     }

@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -46,8 +47,11 @@ import com.yumiru11.githubapp.core.markdown.native.rememberMarkdownInlineSemanti
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import org.intellij.markdown.MarkdownElementTypes
 
+/** Mermaid 围栏语言标识（技术标识符，非用户可见文案）。 */
+private const val MERMAID_FENCE_LANGUAGE = "mermaid"
+
 /**
- * B「原生增强版」Markdown 渲染组件（prototype/readme-comparison）。
+ * 原生增强版 Markdown 渲染组件。
  *
  * 基于 mikepenz 0.38.1 扩展，不重写解析链路：
  * - GitHub 排版基准：正文 16sp/1.6，标题 H1 32 / H2 24 / H3 20 / H4 16
@@ -154,11 +158,23 @@ fun EnhancedMarkdownViewer(
                         blockQuote = { model -> GitHubAlertOrQuote(model) },
                         codeFence = { model ->
                             MarkdownCodeFence(model.content, model.node, model.typography.code) { code, language, _ ->
-                                EnhancedCodeBlock(
-                                    code = code,
-                                    language = language,
-                                    isDark = darkTheme,
-                                )
+                                // mermaid 围栏走原生图表通道（cmp-mermaid）；引擎判定为不支持时
+                                // 回退到代码块渲染，绝不画错图。
+                                if (language.equals(MERMAID_FENCE_LANGUAGE, ignoreCase = true)) {
+                                    com.yumiru11.githubapp.core.markdown.diagram.AppMermaidDiagram(
+                                        source = code,
+                                        contentDescription = stringResource(R.string.markdown_mermaid_description),
+                                        fallback = {
+                                            EnhancedCodeBlock(code = code, language = language, isDark = darkTheme)
+                                        },
+                                    )
+                                } else {
+                                    EnhancedCodeBlock(
+                                        code = code,
+                                        language = language,
+                                        isDark = darkTheme,
+                                    )
+                                }
                             }
                         },
                         horizontalRule = { EnhancedHorizontalRule() },
@@ -188,7 +204,7 @@ fun EnhancedMarkdownViewer(
                         },
                         custom = { type, model ->
                             if (type == MarkdownElementTypes.HTML_BLOCK) {
-                                EnhancedHtmlBlock(model, baseRepoUrl)
+                                EnhancedHtmlBlock(model, baseRepoUrl, onInternalLink)
                             } else {
                                 MarkdownText(content = model.content, node = model.node, style = model.typography.text)
                             }
