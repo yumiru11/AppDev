@@ -113,4 +113,17 @@
     <string name="settings_code_wrap">长行自动换行</string>
     <string name="settings_code_wrap_desc">长行换行显示，而不是横向滚动</string>
     <string name="settings_md_wrap">Markdown 编辑器自动换行</string>
-    <string name="settings_md_wrap_desc">同上，作用于 Markdown 编辑器</string></resources>
+    <string name="settings_md_wrap_desc">同上，作用于 Markdown 编辑器</string>    <string name="settings_markdown_title">Markdown 渲染</string>
+    <string name="settings_markdown_entry_desc">渲染通道与 WebView 回退策略</string>
+    <string name="settings_markdown_group_channel">渲染通道</string>
+    <string name="settings_markdown_native_preferred">原生优先</string>
+    <string name="settings_markdown_native_preferred_desc">以原生方式渲染；只有数学公式、引擎不支持的图表等特殊情况才回退</string>
+    <string name="settings_markdown_native_only">仅原生</string>
+    <string name="settings_markdown_native_only_desc">完全不使用 WebView；无法原生渲染的块显示占位卡片并保留源码</string>
+    <string name="settings_markdown_webview_preferred">WebView 优先</string>
+    <string name="settings_markdown_webview_preferred_desc">长文档交给网页渲染通道；短文本仍走原生</string>
+    <string name="settings_markdown_webview_only">仅 WebView</string>
+    <string name="settings_markdown_webview_only_desc">始终使用网页渲染通道（排障与对照用）</string>
+    <string name="settings_markdown_note">原生渲染已覆盖标题、列表、表格、图片、徽章、HTML 块与 Mermaid 图表；数学公式继续使用内置的离线 KaTeX 渲染。</string>
+    <string name="about_third_party">第三方组件：cmp-mermaid（MIT，(c) 2026 swithun-liu）、jsoup（MIT，(c) Jonathan Hedley）、multiplatform-markdown-renderer（Apache-2.0）、KaTeX 与 Mermaid（MIT）。完整许可文本见 docs/third-party/notices.md。</string>
+</resources>

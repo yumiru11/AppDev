@@ -96,11 +96,13 @@ fun AppNavHost(
         onOpenInterface: () -> Unit,
         onOpenEditor: () -> Unit,
         onOpenGeneral: () -> Unit,
-    ) -> Unit = { _, _, _, _, _ -> },
+        onOpenMarkdown: () -> Unit,
+    ) -> Unit = { _, _, _, _, _, _ -> },
     settingsAppearanceScreen: @Composable (onBackClick: () -> Unit) -> Unit = {},
     settingsInterfaceScreen: @Composable (onBackClick: () -> Unit) -> Unit = {},
     settingsEditorScreen: @Composable (onBackClick: () -> Unit) -> Unit = {},
     settingsGeneralScreen: @Composable (onBackClick: () -> Unit) -> Unit = {},
+    settingsMarkdownScreen: @Composable (onBackClick: () -> Unit) -> Unit = {},
     settingsAccountScreen: @Composable (onBackClick: () -> Unit) -> Unit = {},
     issueListScreen: @Composable (
         owner: String,
@@ -195,6 +197,7 @@ fun AppNavHost(
                             { navController.navigate(AppRoute.SettingsInterface) },
                             { navController.navigate(AppRoute.SettingsEditor) },
                             { navController.navigate(AppRoute.SettingsGeneral) },
+                            { navController.navigate(AppRoute.SettingsMarkdown) },
                         )
                     }
                 }
@@ -220,6 +223,12 @@ fun AppNavHost(
                 composable<AppRoute.SettingsGeneral> {
                     provideNavTransitionScope {
                         settingsGeneralScreen({ navController.popBackStack() })
+                    }
+                }
+
+                composable<AppRoute.SettingsMarkdown> {
+                    provideNavTransitionScope {
+                        settingsMarkdownScreen({ navController.popBackStack() })
                     }
                 }
 

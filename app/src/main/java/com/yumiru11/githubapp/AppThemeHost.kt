@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
+import com.yumiru11.githubapp.core.datastore.model.MarkdownRenderMode
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.model.resolveEffectiveThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
@@ -21,10 +22,14 @@ import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferences
 import com.yumiru11.githubapp.core.designsystem.token.LocalCodeEditorPreferencesWriter
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 import com.yumiru11.githubapp.core.designsystem.token.LocalIconStyle
+import com.yumiru11.githubapp.core.designsystem.token.LocalMarkdownRenderMode
 import com.yumiru11.githubapp.core.designsystem.token.LocalStaggerEnabled
 import com.yumiru11.githubapp.core.designsystem.token.rememberSystemMotionScale
 import com.yumiru11.githubapp.core.designsystem.token.resolveEffectiveMotionScale
 import kotlinx.coroutines.launch
+
+// 装配函数天然长：每个偏好项一次 collectAsStateWithLifecycle + 一次 provides，
+// 拆成子函数只会把同一份「偏好到 CompositionLocal」映射切碎并造成参数爆炸（T3 先例）。
 
 /**
  * 主题宿主：把 [UserPreferencesRepository] 持久化的偏好接到
@@ -47,6 +52,7 @@ import kotlinx.coroutines.launch
  * @param repository 用户偏好仓库（Hilt 注入的单例）
  * @param content 主题之下的界面内容
  */
+@Suppress("LongMethod")
 @Composable
 fun AppThemeHost(
     repository: UserPreferencesRepository,
@@ -86,6 +92,11 @@ fun AppThemeHost(
     // 图标风格（#168 / UI12）：设置页「图标风格」→ DataStore → LocalIconStyle →
     // 底栏/顶栏图标经 AppIcon 立即切换 Material Symbols 变体（无需重启）。
     val iconStyle by repository.iconStyle.collectAsStateWithLifecycle(initialValue = IconStyle.ROUNDED)
+    // Markdown 渲染通道策略（设置页「Markdown 渲染」）→ LocalMarkdownRenderMode →
+    // README/正文宿主据此决定原生渲染或回退 WebView。
+    val markdownRenderMode by repository.markdownRenderMode.collectAsStateWithLifecycle(
+        initialValue = MarkdownRenderMode.NATIVE_PREFERRED,
+    )
     // 代码编辑器外观（T24 死设置收口）：设置页「代码字体」「行号」→ DataStore →
     // LocalCodeEditorPreferences → 代码视图 / Markdown 编辑器即时改 Sora 字体与行号。
     val codeFont by repository.codeFont.collectAsStateWithLifecycle(initialValue = CodeFont.MONO)
@@ -121,6 +132,7 @@ fun AppThemeHost(
         LocalGlassSettings provides glassSettings,
         LocalStaggerEnabled provides staggerEnabled,
         LocalIconStyle provides iconStyle,
+        LocalMarkdownRenderMode provides markdownRenderMode,
         LocalCodeEditorPreferences provides
             CodeEditorPreferences(
                 codeFont = codeFont,

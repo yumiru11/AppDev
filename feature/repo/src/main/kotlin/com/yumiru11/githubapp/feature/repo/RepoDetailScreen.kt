@@ -35,7 +35,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
@@ -105,6 +107,7 @@ import com.composables.icons.materialsymbols.rounded.Visibility
 import com.composables.icons.materialsymbols.rounded.Visibility_off
 import com.yumiru11.githubapp.core.data.model.Release
 import com.yumiru11.githubapp.core.data.model.Repository
+import com.yumiru11.githubapp.core.datastore.model.MarkdownRenderMode
 import com.yumiru11.githubapp.core.designsystem.component.AppCard
 import com.yumiru11.githubapp.core.designsystem.component.AppChip
 import com.yumiru11.githubapp.core.designsystem.component.AppDialog
@@ -116,9 +119,15 @@ import com.yumiru11.githubapp.core.designsystem.component.labelChipContentColor
 import com.yumiru11.githubapp.core.designsystem.icon.AppDevOcticons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.designsystem.token.AppMotion
+import com.yumiru11.githubapp.core.designsystem.token.LocalMarkdownRenderMode
 import com.yumiru11.githubapp.core.markdown.EnhancedMarkdownViewer
+import com.yumiru11.githubapp.core.markdown.MarkdownChannelPolicy
+import com.yumiru11.githubapp.core.markdown.MarkdownViewer
+import com.yumiru11.githubapp.core.markdown.dispatchMarkdownLink
+import com.yumiru11.githubapp.core.markdown.html.ComposeHtml
 import com.yumiru11.githubapp.core.markdown.webview.MarkdownBridgeCallback
 import com.yumiru11.githubapp.core.markdown.webview.MermaidRenderLog
+import com.yumiru11.githubapp.core.markdown.webview.RenderMode
 import com.yumiru11.githubapp.core.markdown.webview.WebViewMarkdownRenderer
 import com.yumiru11.githubapp.core.navigation.link.ParsedUrl
 import com.yumiru11.githubapp.core.ui.AppImageOverlay
@@ -723,6 +732,7 @@ private fun RepoDetailContent(
                     onViewFiles = { tab = 1 },
                     baseRepoUrl = buildRepoUrl(state.repo),
                     onScrollChanged = { readmeScrollY = it },
+                    contentModifier = Modifier.weight(1f),
                 )
             }
 
@@ -1737,6 +1747,8 @@ private fun ReadmeSection(
     baseRepoUrl: String,
     /** #167 / UI10：把 WebView 内部滚动上报给上层，用于 README 下滑收起头部 */
     onScrollChanged: (Int) -> Unit = {},
+    /** 原生通道的滚动容器修饰符（调用方给 weight，使正文在剩余空间内滚动） */
+    contentModifier: Modifier = Modifier,
 ) {
     // 图片全屏查看（#166 / UI11）：README 正文里的图片此前点了没反应（onImageClick 是空桩）
     var previewImageUrl by remember { mutableStateOf<String?>(null) }
@@ -1772,14 +1784,58 @@ private fun ReadmeSection(
         is ReadmeState.Loaded -> {
             // 渲染通道日志（Q7 复测锚点）：logcat 过滤 ReadmeRender；Log.i 因 vivo [log.tag]=[I] 过滤 Debug 级
             Log.i(TAG, "renderMode=${readmeState.renderMode}")
-            WebViewMarkdownRenderer(
-                sanitizedHtml = readmeState.content,
-                tokenProvider = { null },
-                bridgeCallback = createBridgeCallback(actions) { previewImageUrl = it },
-                baseRepoUrl = baseRepoUrl,
-                renderMode = readmeState.webViewRenderMode,
-                onScrollChanged = onScrollChanged,
-            )
+            val markdownRenderMode = LocalMarkdownRenderMode.current
+            val isServerHtml = readmeState.webViewRenderMode == RenderMode.SERVER_HTML
+            val useWebView =
+                when (markdownRenderMode) {
+                    MarkdownRenderMode.WEBVIEW_ONLY,
+                    MarkdownRenderMode.WEBVIEW_PREFERRED,
+                    -> {
+                        true
+                    }
+
+                    MarkdownRenderMode.NATIVE_ONLY -> {
+                        false
+                    }
+
+                    MarkdownRenderMode.NATIVE_PREFERRED -> {
+                        MarkdownChannelPolicy.requiresWebView(
+                            content = readmeState.content,
+                            isServerHtml = isServerHtml,
+                        )
+                    }
+                }
+            if (useWebView) {
+                WebViewMarkdownRenderer(
+                    sanitizedHtml = readmeState.content,
+                    tokenProvider = { null },
+                    bridgeCallback = createBridgeCallback(actions) { previewImageUrl = it },
+                    baseRepoUrl = baseRepoUrl,
+                    renderMode = readmeState.webViewRenderMode,
+                    onScrollChanged = onScrollChanged,
+                )
+            } else {
+                // 原生通道：服务端 HTML 走 HTML 子集渲染器；离线 markdown 走原生 markdown 链。
+                // 两者都不自持滚动（外层容器负责），滚动位置反向上报以保持仓库头收起联动一致。
+                Log.i(TAG, "readmeNative=1 serverHtml=$isServerHtml")
+                val nativeScrollState = rememberScrollState()
+                LaunchedEffect(nativeScrollState.value) { onScrollChanged(nativeScrollState.value) }
+                Column(modifier = contentModifier.verticalScroll(nativeScrollState)) {
+                    if (isServerHtml) {
+                        ComposeHtml(
+                            html = readmeState.content,
+                            onLinkClick = { url -> handleReadmeLink(url, baseRepoUrl, actions) },
+                        )
+                    } else {
+                        MarkdownViewer(
+                            markdown = readmeState.content,
+                            onInternalLink = { parsed -> handleParsedUrl(parsed, actions) },
+                            baseRepoUrl = baseRepoUrl,
+                            scrollable = false,
+                        )
+                    }
+                }
+            }
         }
 
         is ReadmeState.Error -> {
@@ -1795,6 +1851,18 @@ private fun ReadmeSection(
         imageUrl = previewImageUrl,
         onDismiss = { previewImageUrl = null },
     )
+}
+
+/**
+ * 原生 HTML 渲染通道的链接分发：href 经 Markdown 链接归一化后再走统一路由
+ * （相对路径按 baseRepoUrl 解析，与原生 markdown 通道同一条链路）。
+ */
+internal fun handleReadmeLink(
+    url: String,
+    baseRepoUrl: String?,
+    actions: RepoDetailActions,
+) {
+    dispatchMarkdownLink(url, baseRepoUrl) { parsed -> handleParsedUrl(parsed, actions) }
 }
 
 /**

@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
+import com.yumiru11.githubapp.core.datastore.model.MarkdownRenderMode
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.githubauth.auth.AuthState
@@ -94,8 +95,9 @@ class SettingsViewModel
                     combine(
                         preferences.codeEditorSoftWrap,
                         preferences.markdownEditorSoftWrap,
-                    ) { codeWrap, markdownWrap ->
-                        EditorWrapPrefs(codeWrap, markdownWrap)
+                        preferences.markdownRenderMode,
+                    ) { codeWrap, markdownWrap, renderMode ->
+                        EditorWrapPrefs(codeWrap, markdownWrap, renderMode)
                     },
                 ) { misc, editorWrap ->
                     MiscPrefs(
@@ -105,6 +107,7 @@ class SettingsViewModel
                         backgroundOpacity = misc.backgroundOpacity,
                         codeSoftWrap = editorWrap.codeSoftWrap,
                         markdownSoftWrap = editorWrap.markdownSoftWrap,
+                        markdownRenderMode = editorWrap.markdownRenderMode,
                     )
                 },
                 // 登录态 + 限流快照并成一组（GATE-2）：外层 combine 上限 5 流，已满，
@@ -138,6 +141,7 @@ class SettingsViewModel
                     staggerEnabled = misc.staggerEnabled,
                     backgroundImageUri = misc.backgroundUri,
                     backgroundOpacity = misc.backgroundOpacity,
+                    markdownRenderMode = misc.markdownRenderMode,
                     authState = session.authState,
                     rateLimit = session.rateLimit,
                 )
@@ -195,6 +199,11 @@ class SettingsViewModel
         /** Markdown 编辑器软换行（EDITOR-1；同一份偏好）。 */
         fun setMarkdownSoftWrap(enabled: Boolean) {
             persist { preferences.setMarkdownEditorSoftWrap(enabled) }
+        }
+
+        /** Markdown 渲染策略：原生优先 / 仅原生 / WebView 优先 / 仅 WebView（渲染改造）。 */
+        fun setMarkdownRenderMode(mode: MarkdownRenderMode) {
+            persist { preferences.setMarkdownRenderMode(mode) }
         }
 
         fun setBlurEnabled(enabled: Boolean) {
@@ -305,12 +314,15 @@ private data class MiscPrefs(
     val codeSoftWrap: Boolean = false,
     /** Markdown 编辑器软换行（EDITOR-1） */
     val markdownSoftWrap: Boolean = true,
+    /** Markdown 渲染通道策略（渲染改造） */
+    val markdownRenderMode: MarkdownRenderMode = MarkdownRenderMode.NATIVE_PREFERRED,
 )
 
 /** 编辑器软换行中间聚合（EDITOR-1：两个开关并成一层，避免外层 combine 超 5 槽）。 */
 private data class EditorWrapPrefs(
     val codeSoftWrap: Boolean,
     val markdownSoftWrap: Boolean,
+    val markdownRenderMode: MarkdownRenderMode,
 )
 
 /** 会话侧只读状态聚合（GATE-2：登录态 + 限流快照并进外层 combine 的第 5 槽）。 */

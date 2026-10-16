@@ -123,7 +123,7 @@ class SettingsHierarchyScreenshotTest {
                     }
 
                     "preferences" -> {
-                        SettingsPreferencesScreen({}, {}, {}, {}, {})
+                        SettingsPreferencesScreen({}, {}, {}, {}, {}, {})
                     }
 
                     "appearance" -> {

@@ -2,6 +2,7 @@ package com.yumiru11.githubapp.feature.settings
 
 import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
+import com.yumiru11.githubapp.core.datastore.model.MarkdownRenderMode
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import com.yumiru11.githubapp.core.datastore.preferences.UserPreferencesRepository
 import com.yumiru11.githubapp.core.githubauth.auth.AuthState
@@ -28,6 +29,11 @@ data class SettingsUiState(
     val codeSoftWrap: Boolean = false,
     /** Markdown 编辑器软换行（EDITOR-1；默认开 = 长行阅读友好） */
     val markdownSoftWrap: Boolean = true,
+    /**
+     * Markdown 渲染通道策略：原生优先 / 仅原生 / WebView 优先 / 仅 WebView。
+     * 决定「原生处理不了的内容（数学公式、引擎不支持的图表）是否回退 WebView」。
+     */
+    val markdownRenderMode: MarkdownRenderMode = MarkdownRenderMode.NATIVE_PREFERRED,
     val languageTag: String? = null,
     /** 毛玻璃总开关（#167 / UI03） */
     val blurEnabled: Boolean = true,

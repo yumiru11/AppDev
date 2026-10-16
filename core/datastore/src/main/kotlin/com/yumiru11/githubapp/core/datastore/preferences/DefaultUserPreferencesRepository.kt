@@ -14,6 +14,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
+import com.yumiru11.githubapp.core.datastore.model.MarkdownRenderMode
 import com.yumiru11.githubapp.core.datastore.model.RepoLayoutMode
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -84,6 +85,9 @@ class DefaultUserPreferencesRepository
 
         override val markdownEditorSoftWrap: Flow<Boolean> =
             dataStore.data.map { it[KEY_MARKDOWN_EDITOR_SOFT_WRAP] ?: true }
+
+        override val markdownRenderMode: Flow<MarkdownRenderMode> =
+            dataStore.data.map { prefs -> MarkdownRenderMode.fromName(prefs[KEY_MARKDOWN_RENDER_MODE]) }
 
         override val repoLayout: Flow<RepoLayoutMode> =
             dataStore.data.map { prefs ->
@@ -185,6 +189,10 @@ class DefaultUserPreferencesRepository
 
         override val staggerEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_STAGGER_ENABLED] ?: true }
 
+        override suspend fun setMarkdownRenderMode(mode: MarkdownRenderMode) {
+            dataStore.edit { it[KEY_MARKDOWN_RENDER_MODE] = mode.name }
+        }
+
         override suspend fun setStaggerEnabled(enabled: Boolean) {
             dataStore.edit { it[KEY_STAGGER_ENABLED] = enabled }
         }
@@ -233,6 +241,7 @@ class DefaultUserPreferencesRepository
             val KEY_CODE_EDITOR_SOFT_WRAP = booleanPreferencesKey("code_editor_soft_wrap")
             val KEY_MARKDOWN_EDITOR_SOFT_WRAP = booleanPreferencesKey("markdown_editor_soft_wrap")
             val KEY_REPO_LAYOUT = stringPreferencesKey("repo_layout")
+            val KEY_MARKDOWN_RENDER_MODE = stringPreferencesKey("markdown_render_mode")
             val KEY_STAGGER_ENABLED = booleanPreferencesKey("stagger_enabled")
             val KEY_BACKGROUND_IMAGE_URI = stringPreferencesKey("background_image_uri")
             val KEY_BACKGROUND_OPACITY = floatPreferencesKey("background_opacity")

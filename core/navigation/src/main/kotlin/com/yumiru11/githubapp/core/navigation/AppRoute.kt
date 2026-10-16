@@ -66,6 +66,11 @@ sealed interface AppRoute {
     @SerialName("settings_general")
     data object SettingsGeneral : AppRoute
 
+    /** 设置三级页：Markdown 渲染（渲染通道 + 特殊内容回退策略）。 */
+    @Serializable
+    @SerialName("settings_markdown")
+    data object SettingsMarkdown : AppRoute
+
     /** 设置三级页：账号与开发者（登录方式 / PAT / 配额）。 */
     @Serializable
     @SerialName("settings_account")

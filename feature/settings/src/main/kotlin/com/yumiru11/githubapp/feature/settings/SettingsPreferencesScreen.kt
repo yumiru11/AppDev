@@ -18,6 +18,7 @@ fun SettingsPreferencesScreen(
     onOpenInterface: () -> Unit,
     onOpenEditor: () -> Unit,
     onOpenGeneral: () -> Unit,
+    onOpenMarkdown: () -> Unit,
 ) {
     SettingsPageScaffold(
         title = stringResource(R.string.settings_preferences),
@@ -48,6 +49,12 @@ fun SettingsPreferencesScreen(
                     leadingContent = { SettingsEntryIcon(AppIcons.Language) },
                     headlineContent = { Text(stringResource(R.string.settings_general_entry)) },
                     supportingContent = { Text(stringResource(R.string.settings_general_entry_desc)) },
+                )
+                item(
+                    onClick = onOpenMarkdown,
+                    leadingContent = { SettingsEntryIcon(AppIcons.PlaylistPlay) },
+                    headlineContent = { Text(stringResource(R.string.settings_markdown_title)) },
+                    supportingContent = { Text(stringResource(R.string.settings_markdown_entry_desc)) },
                 )
             }
         }

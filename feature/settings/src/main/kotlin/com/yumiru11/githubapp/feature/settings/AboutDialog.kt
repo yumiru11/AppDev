@@ -31,7 +31,9 @@ internal fun AboutDialog(onDismiss: () -> Unit) {
                 text =
                     stringResource(R.string.about_version, versionName) +
                         "\n\n" +
-                        stringResource(R.string.about_description),
+                        stringResource(R.string.about_description) +
+                        "\n\n" +
+                        stringResource(R.string.about_third_party),
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Start,
             )

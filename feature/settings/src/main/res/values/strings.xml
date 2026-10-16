@@ -113,4 +113,17 @@
     <string name="settings_code_wrap">Wrap long lines</string>
     <string name="settings_code_wrap_desc">Wrap instead of scrolling sideways</string>
     <string name="settings_md_wrap">Wrap in Markdown editor</string>
-    <string name="settings_md_wrap_desc">Same setting for the Markdown editor</string></resources>
+    <string name="settings_md_wrap_desc">Same setting for the Markdown editor</string>    <string name="settings_markdown_title">Markdown rendering</string>
+    <string name="settings_markdown_entry_desc">Rendering channel and WebView fallback</string>
+    <string name="settings_markdown_group_channel">Rendering channel</string>
+    <string name="settings_markdown_native_preferred">Native first</string>
+    <string name="settings_markdown_native_preferred_desc">Render natively; fall back only for special content such as math or unsupported diagrams</string>
+    <string name="settings_markdown_native_only">Native only</string>
+    <string name="settings_markdown_native_only_desc">Never use a WebView; unsupported blocks show a placeholder that keeps the source</string>
+    <string name="settings_markdown_webview_preferred">WebView first</string>
+    <string name="settings_markdown_webview_preferred_desc">Hand long documents to the web renderer; short text stays native</string>
+    <string name="settings_markdown_webview_only">WebView only</string>
+    <string name="settings_markdown_webview_only_desc">Always use the web renderer (troubleshooting and comparison)</string>
+    <string name="settings_markdown_note">Native rendering covers headings, lists, tables, images, badges, HTML blocks and Mermaid diagrams. Math formulas keep using the bundled offline KaTeX renderer.</string>
+    <string name="about_third_party">Third-party: cmp-mermaid (MIT, (c) 2026 swithun-liu), jsoup (MIT, (c) Jonathan Hedley), multiplatform-markdown-renderer (Apache-2.0), KaTeX and Mermaid (MIT). See docs/third-party/notices.md for full texts.</string>
+</resources>

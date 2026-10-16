@@ -92,6 +92,7 @@ import com.yumiru11.githubapp.feature.settings.SettingsAppearanceScreen
 import com.yumiru11.githubapp.feature.settings.SettingsEditorScreen
 import com.yumiru11.githubapp.feature.settings.SettingsGeneralScreen
 import com.yumiru11.githubapp.feature.settings.SettingsInterfaceScreen
+import com.yumiru11.githubapp.feature.settings.SettingsMarkdownScreen
 import com.yumiru11.githubapp.feature.settings.SettingsPreferencesScreen
 import com.yumiru11.githubapp.feature.settings.SettingsScreen
 import com.yumiru11.githubapp.feature.settings.SettingsViewModel
@@ -371,13 +372,21 @@ class MainActivity : ComponentActivity() {
                                         onOpenAccount = onOpenAccount,
                                     )
                                 },
-                                settingsPreferencesScreen = { onBackClick, onOpenAppearance, onOpenInterface, onOpenEditor, onOpenGeneral ->
+                                settingsPreferencesScreen = {
+                                    onBackClick,
+                                    onOpenAppearance,
+                                    onOpenInterface,
+                                    onOpenEditor,
+                                    onOpenGeneral,
+                                    onOpenMarkdown,
+                                    ->
                                     SettingsPreferencesScreen(
                                         onBackClick = onBackClick,
                                         onOpenAppearance = onOpenAppearance,
                                         onOpenInterface = onOpenInterface,
                                         onOpenEditor = onOpenEditor,
                                         onOpenGeneral = onOpenGeneral,
+                                        onOpenMarkdown = onOpenMarkdown,
                                     )
                                 },
                                 settingsAppearanceScreen = { onBackClick ->
@@ -391,6 +400,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 settingsGeneralScreen = { onBackClick ->
                                     SettingsGeneralScreen(viewModel = settingsViewModel, onBackClick = onBackClick)
+                                },
+                                settingsMarkdownScreen = { onBackClick ->
+                                    SettingsMarkdownScreen(viewModel = settingsViewModel, onBackClick = onBackClick)
                                 },
                                 settingsAccountScreen = { onBackClick ->
                                     SettingsAccountScreen(viewModel = settingsViewModel, onBackClick = onBackClick)

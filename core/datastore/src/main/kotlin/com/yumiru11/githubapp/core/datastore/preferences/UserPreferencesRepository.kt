@@ -7,6 +7,7 @@ package com.yumiru11.githubapp.core.datastore.preferences
 
 import com.yumiru11.githubapp.core.datastore.model.CodeFont
 import com.yumiru11.githubapp.core.datastore.model.IconStyle
+import com.yumiru11.githubapp.core.datastore.model.MarkdownRenderMode
 import com.yumiru11.githubapp.core.datastore.model.RepoLayoutMode
 import com.yumiru11.githubapp.core.datastore.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -173,4 +174,14 @@ interface UserPreferencesRepository {
     suspend fun setBackgroundImageUri(uri: String?)
 
     suspend fun setBackgroundOpacity(opacity: Float)
+
+    /**
+     * Markdown 渲染通道策略（默认 [MarkdownRenderMode.NATIVE_PREFERRED]）。
+     *
+     * 控制「原生渲染遇到数学公式 / 引擎不支持的内容时是否回退 WebView」——
+     * 逐块回退，不是整篇回退。
+     */
+    val markdownRenderMode: Flow<MarkdownRenderMode>
+
+    suspend fun setMarkdownRenderMode(mode: MarkdownRenderMode)
 }
