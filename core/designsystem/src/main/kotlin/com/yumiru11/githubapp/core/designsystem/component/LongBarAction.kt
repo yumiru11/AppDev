@@ -43,7 +43,7 @@ fun LongBarAction(
             if (enabled) {
                 MaterialTheme.colorScheme.secondaryContainer
             } else {
-                MaterialTheme.colorScheme.surfaceVariant
+                MaterialTheme.colorScheme.surfaceContainerHighest
             },
         contentColor =
             if (enabled) {
@@ -55,19 +55,19 @@ fun LongBarAction(
         Row(
             modifier =
                 Modifier
-                    .heightIn(min = AppDimens.minTouchTarget)
-                    .padding(horizontal = AppDimens.spacing.l, vertical = 14.dp),
+                    .heightIn(min = AppDimens.buttonHeight)
+                    .padding(horizontal = AppDimens.spacing.l, vertical = AppDimens.spacing.m),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(22.dp),
             )
             Spacer(modifier = Modifier.width(AppDimens.spacing.m))
             Text(
                 text = text,
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.titleSmall,
             )
         }
     }

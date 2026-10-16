@@ -1,14 +1,18 @@
 package com.yumiru11.githubapp.core.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,11 +25,15 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.yumiru11.githubapp.core.designsystem.component.GlassSurface
+import com.yumiru11.githubapp.core.designsystem.component.appConnectedShape
+import com.yumiru11.githubapp.core.designsystem.component.appPillShape
 import com.yumiru11.githubapp.core.designsystem.icon.AppIcon
 import com.yumiru11.githubapp.core.designsystem.icon.AppIcons
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
@@ -33,19 +41,23 @@ import com.yumiru11.githubapp.core.designsystem.token.GlassScope
 import com.yumiru11.githubapp.core.designsystem.token.LocalGlassSettings
 
 /**
- * 应用顶栏（玻璃头）：左侧胶囊搜索框 + 右侧通知铃铛（未读角标）+ 头像，
+ * 应用顶栏（玻璃头）：左侧胶囊搜索框 + 右侧连接式通知/账户按钮，
  * 副行插槽 [sectionBar] 供首页小分区条并入同一块玻璃。
  *
  * 回调驱动，不自己导航。
  *
+ * 视觉（2026-10 UI 系统重构）：搜索框与右侧按钮组统一 48dp 高度与同一容器色
+ * （surfaceContainerHigh），按钮组按「连接式」形状——外缘胶囊、相邻角收紧、
+ * 之间留 [AppDimens.groupSeam] 细缝；搜索框为胶囊（[appPillShape]）。
+ *
  * 玻璃装配（T6 Wave2，ADR-0004 §6.1 允许清单）：[GlassSurface] 包住 [TopAppBar]，
- * - `windowInsets = statusBars`：玻璃背景延伸进状态栏区域（edge-to-edge 覆盖），
+ * - windowInsets = statusBars：玻璃背景延伸进状态栏区域（edge-to-edge 覆盖），
  *   内容按状态栏内缩；TopAppBar 自身 insets 归零避免双重内缩
- * - `containerColor = Transparent`：透出玻璃层（半透明 surface @ AppBlur.SCRIM_ALPHA）
+ * - containerColor = Transparent：透出玻璃层（半透明 surface @ AppBlur.SCRIM_ALPHA）
  * - [blurEnabled]：true（默认）API 31+ 真模糊 / 26–30 降级半透明；false 纯降级
  *   （设置页 T24 提供关闭项）
  *
- * **玻璃矩形的尺寸决定 backdrop 能糊到什么**（issue #83）：分区条经 [sectionBar]
+ * 玻璃矩形的尺寸决定 backdrop 能糊到什么（issue #83）：分区条经 [sectionBar]
  * 进玻璃层后，Scaffold 交给内容区的 top inset 自动含副行高度，内容区据此把列表视口
  * 铺到玻璃背后（见 HomeScreen）。分区条若留在内容列里，会把列表视口整体下推、
  * 滚动内容永远进不了顶栏矩形——即「玻璃只糊栏自身、看不出模糊」的几何根因。
@@ -64,6 +76,8 @@ fun AppTopBar(
     /** 玻璃头副行插槽（首页小分区条）；默认空 = 只有 TopAppBar 一行 */
     sectionBar: @Composable () -> Unit = {},
 ) {
+    val controlHeight = AppDimens.buttonHeightCompact
+    val controlColor = MaterialTheme.colorScheme.surfaceContainerHigh
     GlassSurface(
         modifier = modifier,
         windowInsets = WindowInsets.statusBars,
@@ -72,61 +86,15 @@ fun AppTopBar(
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             TopAppBar(
-                title = {
-                    Surface(
-                        onClick = onSearchClick,
-                        // 胶囊形（ui-design §1.1-5 圆角全覆盖）：percent 50 = 高度一半，替代散落的 24dp 硬编码
-                        shape = RoundedCornerShape(percent = 50),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = AppDimens.spacing.l, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            AppIcon(
-                                spec = AppIcons.Search,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.width(AppDimens.spacing.s))
-                            Text(
-                                text = stringResource(R.string.search_hint),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                },
+                title = { TopBarSearchPill(onSearchClick, controlHeight, controlColor) },
                 actions = {
-                    // audit 缺陷 #14（issue #85）：未读数并入铃铛语义描述，TalkBack 可感知数量。
-                    // issue #168 / UI27：>99 时显示与播报同口径封顶 99+（不再报真实数字）。
-                    val notificationBellDescription =
-                        if (unreadCount > 0) {
-                            unreadBadgeDescription(unreadCount)
-                        } else {
-                            stringResource(R.string.notification_title)
-                        }
-                    BadgedBox(
-                        badge = {
-                            if (unreadCount > 0) {
-                                Badge { Text(badgeCountText(unreadCount)) }
-                            }
-                        },
-                    ) {
-                        IconButton(onClick = onNotificationClick) {
-                            AppIcon(
-                                spec = AppIcons.Notifications,
-                                contentDescription = notificationBellDescription,
-                            )
-                        }
-                    }
-                    IconButton(onClick = onProfileClick) {
-                        AppIcon(
-                            spec = AppIcons.Person,
-                            contentDescription = stringResource(R.string.nav_profile),
-                        )
-                    }
+                    TopBarConnectedActions(
+                        onNotificationClick = onNotificationClick,
+                        onProfileClick = onProfileClick,
+                        unreadCount = unreadCount,
+                        controlHeight = controlHeight,
+                        controlColor = controlColor,
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                 windowInsets = WindowInsets(0.dp),
@@ -135,6 +103,99 @@ fun AppTopBar(
         }
     }
 }
+
+/** 胶囊搜索框（左侧主入口）。 */
+@Composable
+private fun TopBarSearchPill(
+    onSearchClick: () -> Unit,
+    controlHeight: Dp,
+    controlColor: Color,
+) {
+    Surface(
+        onClick = onSearchClick,
+        shape = appPillShape(controlHeight),
+        color = controlColor,
+        modifier = Modifier.fillMaxWidth().height(controlHeight),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = AppDimens.spacing.l),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AppIcon(
+                spec = AppIcons.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(AppDimens.spacing.s))
+            Text(
+                text = stringResource(R.string.search_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** 右侧连接式按钮组：通知铃铛（未读角标）+ 账户。 */
+@Composable
+private fun TopBarConnectedActions(
+    onNotificationClick: () -> Unit,
+    onProfileClick: () -> Unit,
+    unreadCount: Int,
+    controlHeight: Dp,
+    controlColor: Color,
+) {
+    // audit 缺陷 #14（issue #85）：未读数并入铃铛语义描述，TalkBack 可感知数量。
+    // issue #168 / UI27：>99 时显示与播报同口径封顶 99+（不再报真实数字）。
+    val bellDescription =
+        if (unreadCount > 0) {
+            unreadBadgeDescription(unreadCount)
+        } else {
+            stringResource(R.string.notification_title)
+        }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(AppDimens.groupSeam),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(controlHeight)
+                    .clip(appConnectedShape(index = 0, size = CONNECTED_ACTION_COUNT, height = controlHeight))
+                    .background(controlColor),
+        ) {
+            BadgedBox(
+                badge = {
+                    if (unreadCount > 0) {
+                        Badge { Text(badgeCountText(unreadCount)) }
+                    }
+                },
+            ) {
+                IconButton(onClick = onNotificationClick, modifier = Modifier.size(controlHeight)) {
+                    AppIcon(spec = AppIcons.Notifications, contentDescription = bellDescription)
+                }
+            }
+        }
+        Box(
+            modifier =
+                Modifier
+                    .size(controlHeight)
+                    .clip(appConnectedShape(index = 1, size = CONNECTED_ACTION_COUNT, height = controlHeight))
+                    .background(controlColor),
+        ) {
+            IconButton(onClick = onProfileClick, modifier = Modifier.size(controlHeight)) {
+                AppIcon(
+                    spec = AppIcons.Person,
+                    contentDescription = stringResource(R.string.nav_profile),
+                )
+            }
+        }
+    }
+}
+
+/** 连接式按钮组的条目数（形状推导用：首尾外缘胶囊、相邻边收紧）。 */
+private const val CONNECTED_ACTION_COUNT = 2
 
 /** 角标数字显示上限：超过显示 99+（audit 缺陷 #14 / issue #85）。 */
 internal const val BADGE_MAX_COUNT = 99

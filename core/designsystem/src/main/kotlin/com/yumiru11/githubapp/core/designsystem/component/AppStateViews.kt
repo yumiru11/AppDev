@@ -1,12 +1,13 @@
 package com.yumiru11.githubapp.core.designsystem.component
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -14,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -152,12 +154,22 @@ private fun AppMessageState(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(AppDimens.spacing.s),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        // 插图进柔和底圆形容器（表达性语言）：插图保持纯装饰语义，信息仍由文本承载。
+        Box(
+            modifier =
+                Modifier
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(32.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
@@ -178,9 +190,13 @@ private fun AppMessageState(
             }
 
             actionLabel != null && onAction != null -> {
-                Button(onClick = onAction) {
-                    Text(text = actionLabel)
-                }
+                AppButton(
+                    text = actionLabel,
+                    onClick = onAction,
+                    style = AppButtonStyle.Tonal,
+                    height = AppDimens.buttonHeightCompact,
+                    fillWidth = false,
+                )
             }
         }
     }

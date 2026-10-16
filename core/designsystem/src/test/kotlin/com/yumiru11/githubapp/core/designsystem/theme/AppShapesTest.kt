@@ -5,35 +5,36 @@ import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
+/** 形状令牌 × cornerScale 的解析契约（数值与 [com.yumiru11.githubapp.core.designsystem.token.AppDimens] 同源）。 */
 class AppShapesTest {
     @Test
-    fun resolveCornerTokens_defaultScale_matchesAppDimensTokens() {
+    fun resolveCornerTokens_defaultScale_matchesAppDimensCornerTokens() {
         val tokens = AppShapes.resolveCornerTokens(1f)
-        assertEquals(4.dp, tokens.extraSmall)
-        assertEquals(8.dp, tokens.small)
-        assertEquals(12.dp, tokens.medium)
-        assertEquals(16.dp, tokens.large)
-        assertEquals(28.dp, tokens.extraLarge)
+        assertEquals(8.dp, tokens.extraSmall)
+        assertEquals(12.dp, tokens.small)
+        assertEquals(20.dp, tokens.medium)
+        assertEquals(28.dp, tokens.large)
+        assertEquals(36.dp, tokens.extraLarge)
     }
 
     @Test
     fun resolveCornerTokens_minScale_halvesAllRadii() {
         val tokens = AppShapes.resolveCornerTokens(AppShapes.MIN_CORNER_SCALE)
-        assertEquals(2.dp, tokens.extraSmall)
-        assertEquals(4.dp, tokens.small)
-        assertEquals(6.dp, tokens.medium)
-        assertEquals(8.dp, tokens.large)
-        assertEquals(14.dp, tokens.extraLarge)
+        assertEquals(4.dp, tokens.extraSmall)
+        assertEquals(6.dp, tokens.small)
+        assertEquals(10.dp, tokens.medium)
+        assertEquals(14.dp, tokens.large)
+        assertEquals(18.dp, tokens.extraLarge)
     }
 
     @Test
     fun resolveCornerTokens_maxScale_scalesAllRadiiUp() {
         val tokens = AppShapes.resolveCornerTokens(AppShapes.MAX_CORNER_SCALE)
-        assertEquals(6.dp, tokens.extraSmall)
-        assertEquals(12.dp, tokens.small)
-        assertEquals(18.dp, tokens.medium)
-        assertEquals(24.dp, tokens.large)
-        assertEquals(42.dp, tokens.extraLarge)
+        assertEquals(12.dp, tokens.extraSmall)
+        assertEquals(18.dp, tokens.small)
+        assertEquals(30.dp, tokens.medium)
+        assertEquals(42.dp, tokens.large)
+        assertEquals(54.dp, tokens.extraLarge)
     }
 
     @Test
@@ -53,20 +54,20 @@ class AppShapesTest {
     }
 
     @Test
-    fun from_defaultScale_matchesMaterial3DefaultShapes() {
+    fun from_defaultScale_matchesDesignSystemCornerTokens() {
         val shapes = AppShapes.from(1f)
-        assertEquals(RoundedCornerShape(4.dp), shapes.extraSmall)
-        assertEquals(RoundedCornerShape(8.dp), shapes.small)
-        assertEquals(RoundedCornerShape(12.dp), shapes.medium)
-        assertEquals(RoundedCornerShape(16.dp), shapes.large)
-        assertEquals(RoundedCornerShape(28.dp), shapes.extraLarge)
+        assertEquals(RoundedCornerShape(8.dp), shapes.extraSmall)
+        assertEquals(RoundedCornerShape(12.dp), shapes.small)
+        assertEquals(RoundedCornerShape(20.dp), shapes.medium)
+        assertEquals(RoundedCornerShape(28.dp), shapes.large)
+        assertEquals(RoundedCornerShape(36.dp), shapes.extraLarge)
     }
 
     @Test
     fun from_customScale_appliesScaledRadii() {
         val shapes = AppShapes.from(0.5f)
-        assertEquals(RoundedCornerShape(2.dp), shapes.extraSmall)
-        assertEquals(RoundedCornerShape(6.dp), shapes.medium)
-        assertEquals(RoundedCornerShape(14.dp), shapes.extraLarge)
+        assertEquals(RoundedCornerShape(4.dp), shapes.extraSmall)
+        assertEquals(RoundedCornerShape(10.dp), shapes.medium)
+        assertEquals(RoundedCornerShape(18.dp), shapes.extraLarge)
     }
 }

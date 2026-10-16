@@ -23,9 +23,10 @@ data class CornerTokens(
  * [androidx.compose.material3.MaterialTheme] removes the dual source of truth between
  * the M3 defaults and [AppDimens] — components consume `MaterialTheme.shapes.*`.
  *
- * At [DEFAULT_CORNER_SCALE] (= 1f) the radii equal the M3 defaults
- * (4/8/12/16/28 dp), so visuals are unchanged until the user moves the
- * settings "圆角强度" slider (DataStore cornerScale, wired via AppTheme).
+ * At [DEFAULT_CORNER_SCALE] (= 1f) the radii equal the [AppDimens] corner tokens
+ * (8/12/20/28/36 dp) — an intentionally rounder container language than the M3
+ * defaults; the settings "圆角强度" slider (DataStore cornerScale, wired via
+ * AppTheme) scales them between 0.5x and 1.5x.
  */
 object AppShapes {
     /** Mirror of the DataStore cornerScale slider bounds (UserPreferencesRepository contract). */

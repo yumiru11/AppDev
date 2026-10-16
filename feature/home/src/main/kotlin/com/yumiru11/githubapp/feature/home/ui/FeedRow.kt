@@ -26,6 +26,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.yumiru11.githubapp.core.designsystem.component.AppCard
+import com.yumiru11.githubapp.core.designsystem.component.AppStatPill
 import com.yumiru11.githubapp.core.designsystem.theme.AppTheme
 import com.yumiru11.githubapp.core.designsystem.token.AppDimens
 import com.yumiru11.githubapp.core.ui.time.relativeTimeText
@@ -54,7 +55,7 @@ internal fun FeedRow(
         modifier = modifier.fillMaxWidth(),
         colors =
             CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             ),
     ) {
         Row(modifier = Modifier.padding(AppDimens.spacing.m)) {
@@ -63,7 +64,7 @@ internal fun FeedRow(
                 contentDescription = item.actorLogin,
                 modifier =
                     Modifier
-                        .size(32.dp)
+                        .size(36.dp)
                         .clip(CircleShape),
             )
             Spacer(modifier = Modifier.width(AppDimens.spacing.m))
@@ -83,14 +84,11 @@ internal fun FeedRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(modifier = Modifier.height(AppDimens.spacing.xs))
+                Spacer(modifier = Modifier.height(AppDimens.spacing.s))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
+                    AppStatPill(
                         text = item.repoFullName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                     // #84：相对时间优先（"3 小时前"），解析失败/未来时间回退绝对日期（缺陷 #11 时间显示统一）
                     val date = feedTimestampText(item.createdAt)
