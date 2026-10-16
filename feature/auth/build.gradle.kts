@@ -1,6 +1,5 @@
 plugins {
     id("appdev.android.library")
-    alias(libs.plugins.roborazzi)
     // Hilt（AuthViewModel @HiltViewModel）
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
@@ -44,7 +43,6 @@ dependencies {
     // Lifecycle（viewModelScope）
     implementation(libs.lifecycle.viewmodel.compose)
 
-    // 测试：core:testing 已 api 导出 JUnit4/Robolectric/Roborazzi/compose-test/coroutines-test
     testImplementation(project(":core:testing"))
     // MockK（mock OAuthSessionManager）+ Turbine（导航事件流断言）
     testImplementation(libs.mockk)

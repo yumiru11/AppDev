@@ -62,7 +62,6 @@ dependencies {
     // AppAuth（OAuth PKCE 授权流程，ADR-0001：自定义 scheme com.yumiru11.githubapp:// 回调）
     implementation(libs.appauth)
 
-    // 测试：core:testing 已 api 导出 JUnit4/coroutines-test/Robolectric/Roborazzi
     testImplementation(project(":core:testing"))
     // MockWebServer3 模拟 GitHub token 端点与 API 端点（零真实网络）
     testImplementation(libs.mockwebserver3)

@@ -38,7 +38,7 @@
 > 1. **判断 Kotlin 库成员可用性，`javap` 不够** —— JVM `public` 可能是 Kotlin `internal`（`javap` 看不到 `@Metadata` 那一层）。**唯一可靠做法：用真实 Kotlin 编译探针引用目标符号、跑 `compileDebugKotlin`、读错误原文。** 本轮在 material3 1.4.0 与 1.5.0-alpha18 上各撞一次。
 > 2. **断言/门禁必须做「红→绿双向验证」** —— 任何守卫/断言先证明「缺陷形态下必红」。修复波两次抓到恒真守卫：**i18n lint canary 自引用断言**（期望值取自被检查的同一清单 → 恒真；已改为独立 `REQUIRED_I18N_LINT_RULES` + 运行期 canary，见 `buildSrc/.../AppDevI18nLint.kt:43,66,72`）、**`repo-actions` 探针空洞**（仓库头缺失仍假绿，补 `desc:"Avatar"` 闸门后才转红，#252）。RTL 旧写法 `@Config(qualifiers="...ldrtl")` 亦是「永远绿的假测试」，改组合内显式注入 + SHA 互斥断言（#245）。**不经红证明的守卫会以「在跑但什么都没查」的形态上线。**
 > 3. **含无限动画的屏必须用 `captureScreenshotDeterministic`** —— Roborazzi `captureRoboImage(content)` 截图前会 `ShadowLooper.idle()` 排空主 looper，而无限动画（转圈 / 下拉刷新指示器）每帧经 Choreographer 续订 → `idle()` 永不返回 → verify/record 挂死（`:feature:issue` 7min+ 挂起根因，已修并纳入 CI verify）。`core:testing` 的 `captureScreenshotDeterministic`（冻结 `mainClock.autoAdvance=false` + 固定 `advanceTimeBy` + 手工 `decorView.draw(Canvas)` + `Bitmap.captureRoboImage` 不做 idle 等待）才稳。**已核实：普通 `testDebugUnitTest`（未开 record/verify）下 `captureRoboImage` 直接静默返回、不落盘** → 测试绿 **≠** 拍了帧，验收必须看产物（`.github/scripts/verify-screenshots.sh` 的帧闭包断言）。
-> 4. **截图基线只能由 CI canonical 录制** —— `record-screenshots.yml`（`Record screenshots (CI canonical)`）是唯一权威录制环境；本机 `recordRoborazziDebug` **禁止**（渲染与 runner 非逐字节相同，本机录的基线 CI verify 全红）。**录制前必须先 rebase 到最新 main**（**已证实**：#256 即 rebase 至 #259 后录制，仅重录语义确实变化的 4 帧）。
+> 4. ~~截图基线只能由 CI canonical 录制~~（**该体系已于 2026-10 整体移除**：基线、录制 workflow 与 adb 车道全部下线，本条仅作历史注记）。
 > 5. **截图探针语义 + 时间炸弹** —— Compose `TabRow` 选中态是 `selected`，M3 `SegmentedButton` 是 `checkable/checked`（radio 语义，`selected` 恒 false，pr-diff 两帧假红根因）；`ExtendedFAB` 文案不进 uiautomator dump，须 `try_tap_fab` 结构性定位（**判据必须限制右下角 x ≥ 0.7w 且 y ≥ 0.85h**，放宽到「底部最大可点区域」会误点 diff 行，`adb-helpers.sh:840-842`）；M3 `OutlinedTextField` 的 placeholder 仅在聚焦且为空时渲染，**不得当就绪信号**（#250）。截图/测试夹具**禁止写死绝对时间戳**，一律相对时间（`isoDaysAgo`，#246）。探针不得静默降级为 `opt:`。
 > 6. **截图捕获必须禁网（离线 ImageLoader）** —— `AsyncImage` 的真实网络往返会让录制/校验两次运行不可复现（`ProfileScreen_light` 曾因头像时有时无单独 verify 红）。`captureScreenshotDeterministic` 在捕获期 `installOfflineImageLoader()`（拦截器短路 http(s) 图片 → Coil `ErrorResult` → 渲染空白，与既有全部基线一致），`finally` reset（#256）。机制由临时 Robolectric 探针实证后删除。
 
@@ -86,15 +86,14 @@
 ./gradlew --no-daemon lintDebug         # Android Lint 全模块（abortOnError；#270 后检测器全恢复，0 disable）
 ./gradlew --no-daemon :app:testDebugUnitTest    # 单测
 ./gradlew --no-daemon coverageVerify     # JaCoCo 覆盖率硬门禁（**23 模块**阈值见 build.gradle.kts coverageThresholds；#288 起含 :core:data；无 exec 数据 = 硬失败，#260）
-./gradlew --no-daemon :app:verifyRoborazziDebug # 截图基准校验（app；模块需逐个列）
 ./gradlew --no-daemon :app:assembleDebug # 打 debug APK
 ```
 
-> **截图 verify 覆盖面（CI 同款，`ci.yml:192-205`）**：`app` + **13 个模块** —— `:core:ui` / `:core:designsystem` / `:core:markdown` / `:feature:auth` / `:feature:issue` / `:feature:repo` / `:feature:notifications` / `:feature:pullrequest` / `:feature:home` / `:feature:search` / `:feature:editor` / `:feature:profile` / `:feature:settings`；录制名单（`record-screenshots.yml`）与 verify 名单镜像。**帧闭包断言**：`.github/scripts/verify-screenshots.sh`（#260）要求 ≥1 张 PNG、无 0 字节 PNG、`screenshots.sh` 声明的每帧必有产出或显式处置标记（`.skipped.txt`），帧数下限 28。
+> **截图体系已整体移除（2026-10）**：Roborazzi 基线/录制 workflow、adb 截图车道、`glass-verify`、`mermaid-render-verify`、帧闭包门禁与 `SCREENSHOT_TOKEN` 注入入口全部下线；`src/test/screenshots/*.png` 不再入库。**替代验证**：Konsist 守卫 + 纯函数/语义断言 + 几何数值断言 + 每个 UI 变更 PR 附本机真机截图（人工走查，结论记 `FEEDBACK.md`）。
 >
-> **四条硬门禁（2026-09-13/14）**：① **lint 覆盖面守卫**（`ci.yml`，AGP 9 收口）断言 0 跳过 registry + 0 `UnknownIssueId` + 0 `disable +=`（31 条旧 disable 已删、48 个 lint error 已在源码修复）；② **APK 体积回归**（#271）：`.github/scripts/check-apk-size.sh` 消费 `.github/apk-size-budget.properties`（**现 baseline `8162579` B，budget = baseline + 256 KiB = `8424723` B**；旧值 `7585167`/`7847311` 已随离线 Mermaid 有意抬升），release APK 超预算即 nightly 判红；③ **禁新增裸控件**（#280/#282）：`.github/scripts/forbid-bare-controls.sh` 对照 `.github/bare-controls-baseline.txt`（Card/Scaffold/FilterChip/AlertDialog/ModalBottomSheet/SnackbarHost **六类全 0**），回流即红；④ **截图帧闭包**（#260）：`.github/scripts/verify-screenshots.sh` 断言每帧有产出或 `.skipped.txt` 显式处置。
+> **四条硬门禁（2026-09-13/14）**：① **lint 覆盖面守卫**（`ci.yml`，AGP 9 收口）断言 0 跳过 registry + 0 `UnknownIssueId` + 0 `disable +=`（31 条旧 disable 已删、48 个 lint error 已在源码修复）；② **APK 体积回归**（#271）：`.github/scripts/check-apk-size.sh` 消费 `.github/apk-size-budget.properties`（**现 baseline `8162579` B，budget = baseline + 256 KiB = `8424723` B**；旧值 `7585167`/`7847311` 已随离线 Mermaid 有意抬升），release APK 超预算即 nightly 判红；③ **禁新增裸控件**（#280/#282）：`.github/scripts/forbid-bare-controls.sh` 对照 `.github/bare-controls-baseline.txt`（Card/Scaffold/FilterChip/AlertDialog/ModalBottomSheet/SnackbarHost **六类全 0**），回流即红。
 >
-> **CI 证据车道（API 分层，勿混淆）**：`ci.yml` 截图 job 跑 **API 30**（WebView Chromium 83）——Mermaid 在此按 `<94` 门禁**回退为代码块**，不能据此说「渲染通过」。真渲染证据在 `mermaid-render-verify.yml`：**API 33 腿**断言 `engine=supported` + `rendered>0`，**API 30 腿**断言 `engine=blocked` + `rendered=0`（两条都绿才是完整证据）。`glass-verify.yml` = `Glass verification (API 31+)`。
+> **渲染证据车道已随截图体系一并移除**：WebView 通道（数学公式 / 图表回退）不再有模拟器真机渲染断言，改由 `core:markdown` 的产物契约测试与 JS 执行测试覆盖；毛玻璃真机效果靠人工走查。
 
 快速验证（大量编辑后查 error，最快）：
 ```bash
@@ -109,15 +108,14 @@
 - **Robolectric 的覆盖率是真数据（#261）**：JaCoCo agent 默认 `inclnolocationclasses=false` 会跳过 Robolectric `SandboxClassLoader` 定义的无 CodeSource 应用类 → 覆盖率假 0。修复 = `includeNoLocationClasses=true` + `includes=com/yumiru11/*`（`build.gradle.kts` 的 `configureRobolectricCoverage`）。**「必须纯 JVM 可测才进覆盖率」的旧约束已不成立**
 - 构建输出**禁止用 grep/tail/head 过滤后反复重跑**——一次跑完看完整输出
 - **不要用 LSP**（本机 kotlin-ls 冷启动失败/超时）——验证一律以 Gradle 输出为准
-- `recordRoborazziDebug` 本机极慢（1000s+ 曾卡死）——**默认禁止跑**；截图相关任务需先问用户
+- 截图相关 Gradle 任务（record/verify Roborazzi）**已不存在**——体系移除后不要按旧文档找它们；UI 变更的观感验证走本机真机/模拟器截图 + 人工走查
 - edit 工具超时消息**不可信**——超时后必须 grep/read 验证是否落地再重试，防重复写入
 
 ## 测试体系（全部 Linux JVM 免模拟器）
 
-- 金字塔：单测（JUnit 4 + MockK + Turbine）→ 集成（MockWebServer / Apollo MockServer，不碰真实网络）→ Compose UI（Robolectric Native Graphics）→ 截图（Roborazzi）
+- 金字塔：单测（JUnit 4 + MockK + Turbine）→ 集成（MockWebServer / Apollo MockServer，不碰真实网络）→ Compose UI（Robolectric Native Graphics，语义与几何断言）
 - 测试命名：**`methodName_scenario_expectedBehavior`**（如 `guestWelcomeScreen_lightTheme_matchesBaseline`）
-- 测试基建在 `core:testing`（MainDispatcherRule / ScreenshotTest / GitHubFakes）；新增测试依赖一律 `testImplementation(project(":core:testing"))`
-- 截图基准路径：`app/src/test/screenshots/*.png`（入库）；CI `verifyRoborazziDebug` 校验
+- 测试基建在 `core:testing`（MainDispatcherRule / GitHubFakes / SystemBarInsets）；新增测试依赖一律 `testImplementation(project(":core:testing"))`
 - **覆盖率（Phase A 进行中）**：JaCoCo 0.8.13+（不用 Kover——官方已转向，kotlinx-kover#746）；AGP `enableUnitTestCoverage`；diff coverage 门禁（新增代码 ≥80%）——完整策略见 `docs/agents/testing-strategy.md`
 
 ## 模块架构（plan.md §10.1）

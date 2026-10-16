@@ -1,6 +1,5 @@
 plugins {
     id("appdev.android.library")
-    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -33,6 +32,5 @@ dependencies {
     implementation("com.composables:icons-material-symbols-outlined-filled-cmp:${libs.versions.icons.get()}")
     implementation("com.composables:icons-material-symbols-rounded-filled-cmp:${libs.versions.icons.get()}")
 
-    // 测试：core:testing 已 api 导出 JUnit4/Robolectric/Roborazzi/compose-test
     testImplementation(project(":core:testing"))
 }

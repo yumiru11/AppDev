@@ -2,7 +2,6 @@ import java.util.Properties
 
 plugins {
     id("appdev.android.application")
-    alias(libs.plugins.roborazzi)
     // Hilt（@HiltAndroidApp 图根 + @AndroidEntryPoint 注入）
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
@@ -54,7 +53,6 @@ android {
 
     testOptions {
         unitTests {
-            // Robolectric/Roborazzi 需要 Android 资源
             isIncludeAndroidResources = true
         }
     }
@@ -218,7 +216,6 @@ dependencies {
     releaseImplementation(libs.chucker.library.noop)
     debugImplementation(libs.leakcanary.android)
 
-    // Testing：Konsist 架构护栏 + core:testing 基建（JUnit4/Robolectric/Roborazzi/coroutines-test 由其 api 导出）
     testImplementation(libs.konsist)
     testImplementation(project(":core:testing"))
     // MockK（core:testing 不导出，截图测试直接使用）

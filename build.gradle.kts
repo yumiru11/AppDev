@@ -85,7 +85,6 @@ tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
 // 每模块覆盖率基线阈值（LINE COVEREDRATIO，0~1）。
 // 规则（2026-08-16 定稿；2026-08-20 v2 因 UI 排除口径修订；2026-09-13 #261 修复后全量重设）：
 //   - 逻辑模块（UseCase/Repository/ViewModel/模型/DTO/解析器为主）：地板 50~80
-//   - UI/渲染模块（markdown/designsystem）：地板 25~70（Composable 主要靠 Roborazzi 截图兜底）
 //   - 网络 DTO 模块（github-rest）：地板 15
 //   - 地板作为 Phase C 目标（testing-strategy.md §4）；棘轮后阈值已普遍高于地板
 //   - 棘轮规则（2026-09-13 起）：阈值 = max(旧阈值, floor2(实测 − 0.5pt))，即【只升不降】。
@@ -541,7 +540,6 @@ abstract class DiffCoverageCheck : DefaultTask() {
                 // 纯 Composable 的 BottomSheet：*Sheet.kt（feature 模块把 UI 混在根包，如
                 // feature/pullrequest/{ReviewSheet,LineCommentSheet}.kt —— 包目录排除够不着）。
                 // 为什么排除：这两个文件是**整文件 @Composable**、无独立可断言的逻辑分支，
-                // 「Sheet 该长什么样」由 Roborazzi 截图基线（app 模块）与真机走查兜底。
                 // ⚠️ 2026-09-13 更正（#261）：旧注释把「报告里 0/104 与 0/69」归因于「被 Robolectric
                 // 沙箱加载的类不产出 JaCoCo 覆盖数据」——已证伪（沙箱类现正常入 exec）。真实的
                 // 0/104 解释是这些类早已被本文件 coverageExcludes 的 *ReviewSheet*.class /

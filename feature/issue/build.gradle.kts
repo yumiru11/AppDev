@@ -1,6 +1,5 @@
 plugins {
     id("appdev.android.library")
-    alias(libs.plugins.roborazzi)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
 }

@@ -1,6 +1,5 @@
 plugins {
     id("appdev.android.library")
-    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -19,7 +18,6 @@ android {
             // 是纯 JVM 测试（原因见该文件 KDoc：Robolectric 沙箱类不产 JaCoCo 覆盖数据）
             isReturnDefaultValues = true
             all {
-                // Roborazzi 官方推荐：硬件渲染模式提升截图颜色准确性（符号不再与背景混色）
                 it.systemProperties["robolectric.pixelCopyRenderMode"] = "hardware"
             }
         }
@@ -60,7 +58,6 @@ dependencies {
     // 设计系统（Octicons ImageVector + ExtendedColors 语义色，GitHub Alert 增强用）
     implementation(project(":core:designsystem"))
 
-    // 测试基建（ScreenshotTest 基类 + Robolectric/Roborazzi，见 AGENTS.md）
     testImplementation(project(":core:testing"))
     // PrivateImageInterceptor 代理链测试：MockWebServer 验证 Authorization 注入与回包
     testImplementation(libs.mockwebserver3)
