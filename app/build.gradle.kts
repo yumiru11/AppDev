@@ -196,8 +196,6 @@ dependencies {
     implementation(project(":feature:editor"))
     // 全局搜索（T18）：SEARCH 路由接线（此前误挂 core.ui 占位组件）
     implementation(project(":feature:search"))
-    // 原型入口（仅 debug）：README 双版本对照（prototype/readme-comparison 分支产物）
-    debugImplementation(project(":prototype:readme-comparison"))
 
     // Hilt（app 图根）
     implementation(libs.hilt.android)

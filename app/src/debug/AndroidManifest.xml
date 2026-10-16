@@ -10,17 +10,6 @@
         <activity
             android:name="androidx.activity.ComponentActivity"
             android:exported="true" />
-        <!-- 原型入口（PROTOTYPE ONLY）：README A/B 对照，仅 debug 变体存在，release 不受影响 -->
-        <activity
-            android:name="com.yumiru11.githubapp.PrototypeActivity"
-            android:exported="true"
-            android:theme="@style/Theme.AppDev">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-
         <!-- 截图登录接收器（DEBUG ONLY）：经 adb am start -e pat 注入只读 PAT →
              EncryptedTokenStorage，无界面、存完即 finish。release 不声明。 -->
         <activity
