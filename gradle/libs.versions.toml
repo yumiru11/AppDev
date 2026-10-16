@@ -76,7 +76,6 @@ leakcanary = "2.14"
 
 # Testing
 robolectric = "4.16.1"
-roborazzi = "1.71.0"
 junit = "4.13.2"
 mockk = "1.14.11"
 turbine = "1.2.1"
@@ -207,9 +206,6 @@ mockwebserver3 = { group = "com.squareup.okhttp3", name = "mockwebserver3", vers
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 konsist = { group = "com.lemonappdev", name = "konsist", version.ref = "konsist" }
-roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
-roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
-roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "roborazzi-junit-rule", version.ref = "roborazzi" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -221,6 +217,5 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 apollo = { id = "com.apollographql.apollo", version.ref = "apollo" }
-roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }

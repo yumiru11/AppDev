@@ -3,7 +3,6 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     // 截图基线（T22 FileEditScreen；与 feature/issue 同模式）
-    alias(libs.plugins.roborazzi)
 }
 
 android {

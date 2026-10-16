@@ -1,5 +1,9 @@
 # AppDev 测试策略（整合外部方法论 + 落地路线）
 
+> **2026-10 变更：截图测试层（Roborazzi 基线 / 录制 workflow / adb 截图车道）已整体移除。**
+> 本文档中所有「截图基线 / verifyRoborazziDebug / recordRoborazziDebug / 帧闭包」相关章节均视为
+> **历史记录**：UI 回归改由语义与几何断言（Compose UI Test）+ Konsist 守卫承担，观感验证走人工真机走查。
+
 > 2026-08-16 定稿。方法论来源：`docs/agents/unit-test-coverage.md`（外部 AI，25 节）；工具选型：主代理调研
 > （Kover→JaCoCo 官方转向、AGP 原生 coverage、diff coverage 插件）。技术栈：Kotlin 2.3.21 / AGP 9.1.1（Gradle 9.3.1 / compileSdk 37，
 > #270 从 AGP 8.7.3 升）/ JUnit4 + MockK + Turbine + MockWebServer3 + Robolectric 4.16 + Roborazzi。

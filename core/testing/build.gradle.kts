@@ -24,9 +24,5 @@ dependencies {
     api(libs.junit)
     api(libs.kotlinx.coroutines.test)
 
-    // Robolectric + Roborazzi（截图基准测试）
     api(libs.robolectric)
-    api(libs.roborazzi)
-    api(libs.roborazzi.compose)
-    api(libs.roborazzi.junit.rule)
 }

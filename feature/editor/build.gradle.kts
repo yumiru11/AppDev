@@ -1,7 +1,5 @@
 plugins {
     id("appdev.android.library")
-    // 截图基线（Roborazzi）：提供 recordRoborazziDebug / verifyRoborazziDebug 任务
-    alias(libs.plugins.roborazzi)
     // #Hilt：编辑器 @mention 候选需要仓库协作者数据源（EditorMentionsViewModel）
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)

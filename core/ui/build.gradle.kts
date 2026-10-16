@@ -1,6 +1,5 @@
 plugins {
     id("appdev.android.library")
-    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -42,7 +41,6 @@ dependencies {
     // 图片全屏查看器（#166 / UI11）：AsyncImage 加载 README/正文里的图片
     implementation(libs.coil.compose)
 
-    // 测试：core:testing 已 api 导出 JUnit4/Robolectric/Roborazzi/compose-test
     testImplementation(project(":core:testing"))
     // 主题模式矩阵截图（AppTopBarMatrixScreenshotTest）需要 ThemeMode 枚举；
     // ThemeMode 归属 core:datastore（与 core:designsystem 的 AppTheme 参数同源），

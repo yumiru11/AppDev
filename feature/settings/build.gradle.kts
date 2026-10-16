@@ -1,7 +1,5 @@
 plugins {
     id("appdev.android.library")
-    // 截图基线（Roborazzi）：提供 recordRoborazziDebug / verifyRoborazziDebug 任务
-    alias(libs.plugins.roborazzi)
     // Hilt（SettingsViewModel @HiltViewModel）
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
@@ -57,7 +55,6 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
-    // 测试：core:testing 已 api 导出 JUnit4/Robolectric/Roborazzi/compose-test/coroutines-test
     testImplementation(project(":core:testing"))
     // MockK（mock OAuthSessionManager）+ Turbine（Flow 断言）
     testImplementation(libs.mockk)
